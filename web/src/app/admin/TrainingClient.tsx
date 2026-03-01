@@ -523,8 +523,10 @@ export default function TrainingClient({ specialty, label }: Props) {
         <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "0.06em" }}>
           PULSE<span style={{ color: "#E83B2A" }}>FEED</span>
         </span>
-        <div style={{ fontSize: "13px", color: "#5a6a85", marginLeft: "20px", paddingLeft: "20px", borderLeft: "1px solid #dde3ed" }}>
-          Training · {label}
+        <div style={{ fontSize: "13px", color: "#5a6a85", marginLeft: "20px", paddingLeft: "20px", borderLeft: "1px solid #dde3ed", display: "flex", alignItems: "center", gap: "12px" }}>
+          <a href="/admin/lab" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>← The Lab</a>
+          <span style={{ color: "#dde3ed" }}>·</span>
+          <span>Training · {label}</span>
         </div>
         <div style={{ marginLeft: "auto" }}>
           <div style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a", background: "#fff", border: "1px solid #dde3ed", borderRadius: "20px", padding: "4px 14px" }}>
