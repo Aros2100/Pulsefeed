@@ -23,7 +23,7 @@ const STATUS_STYLES: Record<string, string> = {
   paused: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
 };
 
-type SortField = "name" | "email" | "subscribed_at" | "status";
+type SortField = "name" | "email" | "subscribed_at" | "status" | "role";
 type SortDir = "asc" | "desc";
 
 function Avatar({ name }: { name: string }) {
@@ -69,10 +69,53 @@ function StatusBadge({ status }: { status: UserRow["status"] }) {
   );
 }
 
+function RoleDropdown({ sub, onRoleChange }: { sub: UserRow; onRoleChange: (id: string, role: string) => Promise<void> }) {
+  const [saving, setSaving] = useState(false);
+  const [currentRole, setCurrentRole] = useState(sub.role ?? "subscriber");
+
+  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newRole = e.target.value;
+    const prevRole = currentRole;
+    setCurrentRole(newRole);
+    setSaving(true);
+    try {
+      await onRoleChange(sub.id, newRole);
+    } catch {
+      setCurrentRole(prevRole);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="relative flex items-center gap-1.5">
+      <select
+        value={currentRole}
+        onChange={handleChange}
+        disabled={saving}
+        className={`rounded-lg border px-2 py-1 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-colors ${
+          currentRole === "admin"
+            ? "border-indigo-200 bg-indigo-50 text-indigo-700 focus:border-indigo-400"
+            : "border-slate-200 bg-white text-slate-600 focus:border-slate-400"
+        } disabled:opacity-60`}
+      >
+        <option value="subscriber">Subscriber</option>
+        <option value="admin">Admin</option>
+      </select>
+      {saving && (
+        <svg className="h-3.5 w-3.5 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+        </svg>
+      )}
+    </div>
+  );
+}
+
 function SkeletonRow() {
   return (
     <tr className="border-b border-slate-100">
-      {[1, 2, 3, 4, 5].map((i) => (
+      {[1, 2, 3, 4, 5, 6].map((i) => (
         <td key={i} className="px-4 py-3">
           <div className="h-4 rounded bg-slate-100 animate-pulse" style={{ width: `${60 + i * 8}%` }} />
         </td>
@@ -327,6 +370,18 @@ export default function SubscribersPage() {
     await fetchSubscribers();
   };
 
+  const handleRoleChange = async (id: string, role: string) => {
+    const res = await fetch(`/api/admin/users/${id}/set-role`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error ?? "Fejl ved rolleændring");
+    }
+  };
+
   const handleExportCSV = () => {
     const headers = ["Navn", "E-mail", "Status", "Specialer", "Frekvens", "Kilde", "Oprettet"];
     const rows = filtered.map((s) => [
@@ -486,6 +541,7 @@ export default function SubscribersPage() {
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-slate-600">Specialer</th>
+                <th className="px-4 py-3 text-left font-medium text-slate-600">Rolle</th>
                 <th className="px-4 py-3 text-left">
                   <button onClick={() => toggleSort("subscribed_at")} className="flex items-center font-medium text-slate-600 hover:text-slate-900">
                     Oprettet <SortIcon field="subscribed_at" />
@@ -499,7 +555,7 @@ export default function SubscribersPage() {
                 Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
+                  <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
                     {search ? "Ingen subscribers matcher din søgning" : "Ingen subscribers endnu"}
                   </td>
                 </tr>
@@ -529,6 +585,9 @@ export default function SubscribersPage() {
                           </span>
                         )}
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <RoleDropdown sub={sub} onRoleChange={handleRoleChange} />
                     </td>
                     <td className="px-4 py-3 text-slate-500">
                       {new Date(sub.subscribed_at).toLocaleDateString("da-DK", {
