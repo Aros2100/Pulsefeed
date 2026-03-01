@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
   const { error: insertError } = await admin.from("lab_decisions").insert({
     article_id,
     specialty,
-    editor_verdict,
+    decision: editor_verdict,
     ai_verdict: ai_verdict ?? null,
     ai_confidence: ai_confidence ?? null,
     agreement,
