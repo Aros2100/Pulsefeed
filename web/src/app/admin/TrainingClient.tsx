@@ -675,32 +675,52 @@ export default function TrainingClient({ specialty, label }: Props) {
                 })}
 
                 {/* Disagreement reason — shown when editor overrules AI (both directions) */}
-                {((currentVerdict === "not_relevant" && currentAI?.verdict === "relevant") ||
-                  (currentVerdict === "relevant" && currentAI?.verdict === "not_relevant")) && (
-                  <select
-                    value={reasons[currentArticle.id] ?? ""}
-                    onChange={(e) => setReasons((prev) => ({ ...prev, [currentArticle.id]: e.target.value }))}
-                    style={{
-                      fontSize: "12px",
-                      padding: "7px 10px",
-                      borderRadius: "8px",
-                      border: "1px solid #fecaca",
-                      background: "#fff8f7",
-                      color: reasons[currentArticle.id] ? "#1a1a1a" : "#b91c1c",
-                      cursor: "pointer",
-                      outline: "none",
-                      minWidth: "180px",
-                    }}
-                  >
-                    <option value="">Vælg årsag…</option>
-                    <option value="Forkert speciale">Forkert speciale</option>
-                    <option value="Ikke klinisk relevant">Ikke klinisk relevant</option>
-                    <option value="Case report / editorial">Case report / editorial</option>
-                    <option value="Dyrestudie">Dyrestudie</option>
-                    <option value="Fremmedsprog">Fremmedsprog</option>
-                    <option value="Andet">Andet</option>
-                  </select>
-                )}
+                {(() => {
+                  const isFalsePositive = currentVerdict === "not_relevant" && currentAI?.verdict === "relevant";
+                  const isFalseNegative = currentVerdict === "relevant" && currentAI?.verdict === "not_relevant";
+                  if (!isFalsePositive && !isFalseNegative) return null;
+
+                  const options = isFalsePositive
+                    ? [
+                        "Forkert speciale",
+                        "Ikke klinisk relevant",
+                        "Case report / editorial",
+                        "Dyrestudie",
+                        "Fremmedsprog",
+                        "Andet",
+                      ]
+                    : [
+                        "Klinisk relevant trods lav AI-score",
+                        "Ny behandlingsmetode / intervention",
+                        "Ændrer klinisk praksis",
+                        "Vigtig sikkerhedsdata",
+                        "Sjælden tilstand / specialiseret emne",
+                        "Andet",
+                      ];
+
+                  return (
+                    <select
+                      value={reasons[currentArticle.id] ?? ""}
+                      onChange={(e) => setReasons((prev) => ({ ...prev, [currentArticle.id]: e.target.value }))}
+                      style={{
+                        fontSize: "12px",
+                        padding: "7px 10px",
+                        borderRadius: "8px",
+                        border: "1px solid #fecaca",
+                        background: "#fff8f7",
+                        color: reasons[currentArticle.id] ? "#1a1a1a" : "#b91c1c",
+                        cursor: "pointer",
+                        outline: "none",
+                        minWidth: "180px",
+                      }}
+                    >
+                      <option value="">Vælg årsag…</option>
+                      {options.map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                  );
+                })()}
 
                 <div style={{ flex: 1 }} />
 
