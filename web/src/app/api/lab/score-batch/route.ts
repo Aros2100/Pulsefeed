@@ -59,18 +59,12 @@ export async function POST(request: NextRequest) {
     const results = await Promise.allSettled(
       batch.map(async (article) => {
         const score = await scoreArticle(article, specialty, activePrompt);
-        console.log('[debug]', {
-          articleId: article.id,
-          aiDecision: score.ai_decision,
-          specialtyTags: score.ai_decision === "approved" ? [specialty] : [],
-        });
         const { error } = await admin
           .from("articles")
           .update({
             specialty_confidence: score.confidence,
             ai_decision: score.ai_decision,
             model_version: score.version,
-            specialty_tags: score.ai_decision === "approved" ? [specialty] : [],
           })
           .eq("id", article.id);
         if (error) throw new Error(error.message);

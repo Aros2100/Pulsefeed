@@ -101,7 +101,7 @@ export default async function SpecialtyImportPage({
   const stats = (statsRows as StatRow[]) ?? [];
 
   function get(c: number, s: string) {
-    return stats.find((r) => r.circle === c && r.status === s)?.antal ?? 0;
+    return Number(stats.find((r) => r.circle === c && r.status === s)?.antal ?? 0);
   }
 
   const c1Approved  = get(1, "approved");
@@ -109,8 +109,8 @@ export default async function SpecialtyImportPage({
   const c2Pending   = get(2, "pending");
   const c2Rejected  = get(2, "rejected");
   const c2Total     = c2Approved + c2Pending + c2Rejected;
-  const c1Total     = stats.filter((r) => r.circle === 1).reduce((s, r) => s + r.antal, 0);
-  const totalInDB   = stats.reduce((s, r) => s + r.antal, 0);
+  const c1Total     = stats.filter((r) => r.circle === 1).reduce((s, r) => s + Number(r.antal), 0);
+  const totalInDB   = stats.reduce((s, r) => s + Number(r.antal), 0);
   const tilgaengelige = c1Approved + c2Approved;
 
   // Balance checks

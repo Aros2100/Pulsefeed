@@ -137,7 +137,7 @@ export async function runImportCircle2(
             pubmed_indexed_at: a.pubmedIndexedAt,
             issn_electronic:   a.issnElectronic,
             issn_print:        a.issnPrint,
-            specialty_tags:    [],
+            specialty_tags:    [specialty],
             circle:            2,
             verified:          false,
             status:            "pending",
