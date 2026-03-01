@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import type { UserRow } from "@/lib/supabase/types";
+import type { Database } from "@/lib/supabase/types";
+
+type UserRow = Database["public"]["Tables"]["users"]["Row"];
 import Header from "@/components/Header";
 
 const SPECIALTIES: Record<string, string> = {
