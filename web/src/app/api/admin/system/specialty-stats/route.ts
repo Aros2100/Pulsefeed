@@ -31,7 +31,7 @@ export async function GET() {
           .order("completed_at", { ascending: false })
           .limit(1),
         admin
-          .from("training_decisions")
+          .from("lab_decisions")
           .select("decided_at")
           .eq("specialty", slug)
           .order("decided_at", { ascending: false })
