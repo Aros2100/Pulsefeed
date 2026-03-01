@@ -86,23 +86,17 @@ export default async function SpecialtyImportPage({
 
   const { data: logs } = await logsQuery;
 
-  // Summary stats
-  const [circle1Res, circle2Res] = await Promise.all([
-    admin
-      .from("articles")
-      .select("id", { count: "exact", head: true })
-      .eq("circle", 1)
-      .contains("specialty_tags", [specialty]),
-    admin
-      .from("articles")
-      .select("id", { count: "exact", head: true })
-      .eq("circle", 2)
-      .contains("specialty_tags", [specialty]),
-  ]);
+  // Summary stats — single query with conditional aggregation
+  const { data: articleRows } = await admin
+    .from("articles")
+    .select("circle")
+    .contains("specialty_tags", [specialty]);
 
-  const circle1Count = circle1Res.count ?? 0;
-  const circle2Count = circle2Res.count ?? 0;
-  const totalCount = circle1Count + circle2Count;
+  const rows = articleRows ?? [];
+  const circle1Count = rows.filter((r) => r.circle === 1).length;
+  const circle2Count = rows.filter((r) => r.circle === 2).length;
+  const circle3Count = rows.filter((r) => r.circle === 3).length;
+  const totalCount = rows.length;
 
   const lastImportAt = logs?.find((l) => l.status === "completed")?.completed_at ?? null;
 
@@ -146,16 +140,17 @@ export default async function SpecialtyImportPage({
         {/* Summary stats */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
+          gridTemplateColumns: "repeat(5, 1fr)",
           gap: "12px",
           marginBottom: "28px",
         }}>
           {[
             { label: "Total articles", value: totalCount },
-            { label: "Circle 1", value: circle1Count },
-            { label: "Circle 2", value: circle2Count },
+            { label: "Circle 1 · Verified", value: circle1Count },
+            { label: "Circle 2 · Pending", value: circle2Count },
+            { label: "Circle 3 · Rejected", value: circle3Count, red: circle3Count > 0 },
             { label: "Last import", value: fmt(lastImportAt), small: true },
-          ].map(({ label, value, small }) => (
+          ].map(({ label, value, small, red }) => (
             <div key={label} style={{
               background: "#fff",
               borderRadius: "10px",
@@ -165,7 +160,7 @@ export default async function SpecialtyImportPage({
               <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>
                 {label}
               </div>
-              <div style={{ fontSize: small ? "14px" : "22px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3 }}>
+              <div style={{ fontSize: small ? "14px" : "22px", fontWeight: 700, color: red ? "#b91c1c" : "#1a1a1a", lineHeight: 1.3 }}>
                 {value}
               </div>
             </div>
