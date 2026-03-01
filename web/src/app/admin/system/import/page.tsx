@@ -120,20 +120,36 @@ export default function ImportPage() {
                       </span>
                     </div>
                   </div>
-                  <Link
-                    href={`/admin/system/layers/${spec.slug}`}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      fontSize: "13px",
-                      fontWeight: 600,
-                      color: "#E83B2A",
-                      textDecoration: "none",
-                    }}
-                  >
-                    Manage →
-                  </Link>
+                  <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
+                    <Link
+                      href={`/admin/system/layers/${spec.slug}`}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        color: "#E83B2A",
+                        textDecoration: "none",
+                      }}
+                    >
+                      Manage →
+                    </Link>
+                    <Link
+                      href={`/admin/system/import/${spec.slug}`}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        fontSize: "13px",
+                        fontWeight: 500,
+                        color: "#5a6a85",
+                        textDecoration: "none",
+                      }}
+                    >
+                      Import history →
+                    </Link>
+                  </div>
                 </div>
               </div>
             );
