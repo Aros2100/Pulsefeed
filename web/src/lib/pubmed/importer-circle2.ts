@@ -46,12 +46,14 @@ export interface Circle2ImportResult {
  */
 export async function runImportCircle2(
   specialty: string,
-  existingLogId?: string
+  existingLogId?: string,
+  trigger: "cron" | "manual" = "cron"
 ): Promise<Circle2ImportResult> {
   const admin: AdminClient = createAdminClient();
   const errors: string[] = [];
   let totalImported = 0;
   let totalSkipped = 0;
+  let totalFetched = 0;
 
   // 1. Load active affiliation sources
   const { data: sources, error: sourcesErr } = await admin
@@ -91,6 +93,7 @@ export async function runImportCircle2(
 
     // 3. ESearch
     const pmids = await fetchPubMedIds(query, maxResults);
+    totalFetched = pmids.length;
 
     if (pmids.length > 0) {
       // 4. Deduplicate
@@ -172,6 +175,7 @@ export async function runImportCircle2(
       .from("import_logs")
       .update({
         status: errors.length > 0 && totalImported === 0 ? "failed" : "completed",
+        articles_fetched: totalFetched,
         articles_imported: totalImported,
         articles_skipped: totalSkipped,
         errors: errors.length > 0 ? errors : null,

@@ -655,12 +655,14 @@ export async function fetchArticleDetails(
 export async function runImport(
   filterId?: string,
   force = false,
-  existingLogId?: string
+  existingLogId?: string,
+  trigger: "cron" | "manual" = "cron"
 ): Promise<ImportResult> {
   const admin = createAdminClient();
   const errors: string[] = [];
   let totalImported = 0;
   let totalSkipped = 0;
+  let totalFetched = 0;
 
   // 1. Load filters
   let q = admin.from("pubmed_filters").select("*").eq("active", true);
@@ -683,7 +685,7 @@ export async function runImport(
   if (!logId) {
     const { data: log } = await admin
       .from("import_logs")
-      .insert({ filter_id: filterId ?? null, status: "running" })
+      .insert({ filter_id: filterId ?? null, status: "running", trigger })
       .select("id")
       .single();
     logId = log?.id ?? null;
@@ -706,6 +708,7 @@ export async function runImport(
       const tSearch = Date.now();
       const pmids = await fetchPubMedIds(filter.query_string, filter.max_results ?? 100);
       console.log(`[import] fetchPubMedIds: ${Date.now() - tSearch}ms`);
+      totalFetched += pmids.length;
       if (!pmids.length) continue;
 
       // 4. Deduplicate
@@ -803,6 +806,7 @@ export async function runImport(
       .from("import_logs")
       .update({
         status: errors.length > 0 && totalImported === 0 ? "failed" : "completed",
+        articles_fetched: totalFetched,
         articles_imported: totalImported,
         articles_skipped: totalSkipped,
         errors: errors.length > 0 ? errors : null,

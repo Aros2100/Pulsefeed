@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
 
   const { data: log, error } = await admin
     .from("import_logs")
-    .insert({ filter_id: filterId ?? null, status: "running" })
+    .insert({ filter_id: filterId ?? null, status: "running", trigger: "manual" })
     .select("id")
     .single();
 
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
   // Fire-and-forget — works in Node.js dev server.
   // In Vercel production, replace with a proper queue (e.g. Vercel Queues).
-  void runImport(filterId, false, log.id);
+  void runImport(filterId, false, log.id, "manual");
 
   return NextResponse.json({ ok: true, jobId: log.id });
 }

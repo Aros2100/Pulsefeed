@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
   const { data: log, error } = await admin
     .from("import_logs")
-    .insert({ filter_id: null, status: "running" })
+    .insert({ filter_id: null, status: "running", trigger: "manual" })
     .select("id")
     .single();
 
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Fire-and-forget
-  void runImportCircle2(specialty, log.id);
+  void runImportCircle2(specialty, log.id, "manual");
 
   return NextResponse.json({ ok: true, jobId: log.id });
 }

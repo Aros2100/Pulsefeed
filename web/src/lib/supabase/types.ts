@@ -351,6 +351,7 @@ export type Database = {
       }
       import_logs: {
         Row: {
+          articles_fetched: number
           articles_imported: number
           articles_skipped: number
           completed_at: string | null
@@ -359,8 +360,10 @@ export type Database = {
           id: string
           started_at: string
           status: string
+          trigger: string | null
         }
         Insert: {
+          articles_fetched?: number
           articles_imported?: number
           articles_skipped?: number
           completed_at?: string | null
@@ -369,8 +372,10 @@ export type Database = {
           id?: string
           started_at?: string
           status: string
+          trigger?: string | null
         }
         Update: {
+          articles_fetched?: number
           articles_imported?: number
           articles_skipped?: number
           completed_at?: string | null
@@ -379,6 +384,7 @@ export type Database = {
           id?: string
           started_at?: string
           status?: string
+          trigger?: string | null
         }
         Relationships: [
           {

@@ -208,9 +208,9 @@ export default async function SpecialtyImportPage({
                     <th style={thStyle}>Trigger</th>
                     <th style={thStyle}>Filter</th>
                     <th style={thStyle}>Status</th>
+                    <th style={{ ...thStyle, textAlign: "right" }}>Fetched</th>
                     <th style={{ ...thStyle, textAlign: "right" }}>Imported</th>
                     <th style={{ ...thStyle, textAlign: "right" }}>Skipped</th>
-                    <th style={{ ...thStyle, textAlign: "right" }}>Total</th>
                     <th style={{ ...thStyle, textAlign: "right" }}>Errors</th>
                     <th style={{ ...thStyle, textAlign: "center" }}>Balance</th>
                     <th style={thStyle}>Duration</th>
@@ -220,10 +220,11 @@ export default async function SpecialtyImportPage({
                   {importLogs.map((log) => {
                     const failed = log.status === "failed";
                     const errCount = errorCount(log.errors);
-                    const total = (log.articles_imported ?? 0) + (log.articles_skipped ?? 0);
-                    const balanceOk = errCount === 0;
-                    // Infer trigger: null filter_id = cron (all filters), specific filter = likely manual
-                    const trigger = log.filter_id == null ? "cron" : "manual";
+                    const fetched = log.articles_fetched ?? 0;
+                    const imported = log.articles_imported ?? 0;
+                    const skipped = log.articles_skipped ?? 0;
+                    const trigger = (log.trigger as string | null) ?? "—";
+                    const balanceOk = fetched > 0 && fetched === imported + skipped + errCount;
                     const td = tdStyle(failed);
 
                     return (
@@ -266,14 +267,14 @@ export default async function SpecialtyImportPage({
                             {log.status}
                           </span>
                         </td>
+                        <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", color: failed ? "#b91c1c" : "#1a1a1a" }}>
+                          {fetched}
+                        </td>
                         <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: failed ? "#b91c1c" : "#15803d" }}>
-                          {log.articles_imported ?? 0}
+                          {imported}
                         </td>
                         <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", color: failed ? "#b91c1c" : "#888" }}>
-                          {log.articles_skipped ?? 0}
-                        </td>
-                        <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", color: failed ? "#b91c1c" : "#1a1a1a" }}>
-                          {total}
+                          {skipped}
                         </td>
                         <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", color: errCount > 0 ? "#b91c1c" : "#bbb" }}>
                           {errCount > 0 ? errCount : "—"}

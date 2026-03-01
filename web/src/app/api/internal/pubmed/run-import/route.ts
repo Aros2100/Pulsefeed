@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await runImport();
+    const result = await runImport(undefined, false, undefined, "cron");
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
