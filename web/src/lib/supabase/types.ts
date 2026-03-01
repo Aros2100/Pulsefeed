@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_usage: {
+        Row: {
+          called_at: string | null
+          completion_tokens: number
+          cost_usd: number | null
+          id: string
+          model_key: string
+          prompt_tokens: number
+          total_tokens: number
+        }
+        Insert: {
+          called_at?: string | null
+          completion_tokens: number
+          cost_usd?: number | null
+          id?: string
+          model_key: string
+          prompt_tokens: number
+          total_tokens: number
+        }
+        Update: {
+          called_at?: string | null
+          completion_tokens?: number
+          cost_usd?: number | null
+          id?: string
+          model_key?: string
+          prompt_tokens?: number
+          total_tokens?: number
+        }
+        Relationships: []
+      }
       article_authors: {
         Row: {
           article_id: string
@@ -56,6 +86,7 @@ export type Database = {
       articles: {
         Row: {
           abstract: string | null
+          ai_decision: string | null
           article_number: string | null
           authors: Json
           circle: number | null
@@ -67,6 +98,9 @@ export type Database = {
           grants: Json
           id: string
           imported_at: string
+          indexed_month: number | null
+          indexed_week: number | null
+          indexed_year: number | null
           issn_electronic: string | null
           issn_print: string | null
           issue: string | null
@@ -76,6 +110,7 @@ export type Database = {
           language: string | null
           long_resume: string | null
           mesh_terms: Json
+          model_version: string | null
           news_value: number | null
           pico: Json | null
           pmc_id: string | null
@@ -84,11 +119,10 @@ export type Database = {
           published_year: number | null
           pubmed_date: string | null
           pubmed_id: string
+          pubmed_indexed_at: string | null
           short_resume: string | null
           source_id: string | null
           specialty_confidence: number | null
-          ai_decision: string | null
-          model_version: string | null
           specialty_tags: string[]
           subspecialty: string | null
           substances: Json
@@ -98,6 +132,7 @@ export type Database = {
         }
         Insert: {
           abstract?: string | null
+          ai_decision?: string | null
           article_number?: string | null
           authors?: Json
           circle?: number | null
@@ -109,6 +144,9 @@ export type Database = {
           grants?: Json
           id?: string
           imported_at?: string
+          indexed_month?: number | null
+          indexed_week?: number | null
+          indexed_year?: number | null
           issn_electronic?: string | null
           issn_print?: string | null
           issue?: string | null
@@ -118,6 +156,7 @@ export type Database = {
           language?: string | null
           long_resume?: string | null
           mesh_terms?: Json
+          model_version?: string | null
           news_value?: number | null
           pico?: Json | null
           pmc_id?: string | null
@@ -126,11 +165,10 @@ export type Database = {
           published_year?: number | null
           pubmed_date?: string | null
           pubmed_id: string
+          pubmed_indexed_at?: string | null
           short_resume?: string | null
           source_id?: string | null
           specialty_confidence?: number | null
-          ai_decision?: string | null
-          model_version?: string | null
           specialty_tags?: string[]
           subspecialty?: string | null
           substances?: Json
@@ -140,6 +178,7 @@ export type Database = {
         }
         Update: {
           abstract?: string | null
+          ai_decision?: string | null
           article_number?: string | null
           authors?: Json
           circle?: number | null
@@ -151,6 +190,9 @@ export type Database = {
           grants?: Json
           id?: string
           imported_at?: string
+          indexed_month?: number | null
+          indexed_week?: number | null
+          indexed_year?: number | null
           issn_electronic?: string | null
           issn_print?: string | null
           issue?: string | null
@@ -160,6 +202,7 @@ export type Database = {
           language?: string | null
           long_resume?: string | null
           mesh_terms?: Json
+          model_version?: string | null
           news_value?: number | null
           pico?: Json | null
           pmc_id?: string | null
@@ -168,11 +211,10 @@ export type Database = {
           published_year?: number | null
           pubmed_date?: string | null
           pubmed_id?: string
+          pubmed_indexed_at?: string | null
           short_resume?: string | null
           source_id?: string | null
           specialty_confidence?: number | null
-          ai_decision?: string | null
-          model_version?: string | null
           specialty_tags?: string[]
           subspecialty?: string | null
           substances?: Json
@@ -190,242 +232,33 @@ export type Database = {
           },
         ]
       }
-      training_decisions: {
+      author_linking_logs: {
         Row: {
-          id: string
-          article_id: string | null
-          specialty: string
-          editor_verdict: string | null
-          ai_verdict: string | null
-          ai_confidence: number | null
-          agreement: boolean | null
-          disagreement_reason: string | null
-          decided_at: string
-        }
-        Insert: {
-          id?: string
-          article_id?: string | null
-          specialty: string
-          editor_verdict?: string | null
-          ai_verdict?: string | null
-          ai_confidence?: number | null
-          agreement?: boolean | null
-          disagreement_reason?: string | null
-          decided_at?: string
-        }
-        Update: {
-          id?: string
-          article_id?: string | null
-          specialty?: string
-          editor_verdict?: string | null
-          ai_verdict?: string | null
-          ai_confidence?: number | null
-          agreement?: boolean | null
-          disagreement_reason?: string | null
-          decided_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "training_decisions_article_id_fkey"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "articles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      model_versions: {
-        Row: {
-          id: string
-          specialty: string
-          module: string
-          version: string
-          prompt_text: string
-          notes: string | null
-          activated_at: string
-          active: boolean
-          generated_by: string
-        }
-        Insert: {
-          id?: string
-          specialty: string
-          module: string
-          version: string
-          prompt_text: string
-          notes?: string | null
-          activated_at?: string
-          active?: boolean
-          generated_by?: string
-        }
-        Update: {
-          id?: string
-          specialty?: string
-          module?: string
-          version?: string
-          prompt_text?: string
-          notes?: string | null
-          activated_at?: string
-          active?: boolean
-          generated_by?: string
-        }
-        Relationships: []
-      }
-      api_usage: {
-        Row: {
-          id: string
-          model_key: string
-          prompt_tokens: number
-          completion_tokens: number
-          total_tokens: number
-          cost_usd: number | null
-          called_at: string
-        }
-        Insert: {
-          id?: string
-          model_key: string
-          prompt_tokens: number
-          completion_tokens: number
-          total_tokens: number
-          cost_usd?: number | null
-          called_at?: string
-        }
-        Update: {
-          id?: string
-          model_key?: string
-          prompt_tokens?: number
-          completion_tokens?: number
-          total_tokens?: number
-          cost_usd?: number | null
-          called_at?: string
-        }
-        Relationships: []
-      }
-      lab_sessions: {
-        Row: {
-          id: string
-          specialty: string
-          module: string
-          user_id: string | null
-          started_at: string
+          articles_processed: number | null
+          authors_linked: number | null
           completed_at: string | null
-          articles_reviewed: number
-          articles_approved: number
-          articles_rejected: number
-        }
-        Insert: {
-          id?: string
-          specialty: string
-          module?: string
-          user_id?: string | null
-          started_at?: string
-          completed_at?: string | null
-          articles_reviewed?: number
-          articles_approved?: number
-          articles_rejected?: number
-        }
-        Update: {
-          id?: string
-          specialty?: string
-          module?: string
-          user_id?: string | null
-          started_at?: string
-          completed_at?: string | null
-          articles_reviewed?: number
-          articles_approved?: number
-          articles_rejected?: number
-        }
-        Relationships: []
-      }
-      lab_decisions: {
-        Row: {
+          errors: Json | null
           id: string
-          session_id: string | null
-          article_id: string | null
-          specialty: string
-          module: string
-          decision: string
-          ai_decision: string | null
-          ai_confidence: number | null
-          decided_at: string
-          model_version: string | null
+          started_at: string | null
+          status: string | null
         }
         Insert: {
+          articles_processed?: number | null
+          authors_linked?: number | null
+          completed_at?: string | null
+          errors?: Json | null
           id?: string
-          session_id?: string | null
-          article_id?: string | null
-          specialty: string
-          module?: string
-          decision: string
-          ai_decision?: string | null
-          ai_confidence?: number | null
-          decided_at?: string
-          model_version?: string | null
+          started_at?: string | null
+          status?: string | null
         }
         Update: {
+          articles_processed?: number | null
+          authors_linked?: number | null
+          completed_at?: string | null
+          errors?: Json | null
           id?: string
-          session_id?: string | null
-          article_id?: string | null
-          specialty?: string
-          module?: string
-          decision?: string
-          ai_decision?: string | null
-          ai_confidence?: number | null
-          decided_at?: string
-          model_version?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "lab_decisions_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "lab_sessions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lab_decisions_article_id_fkey"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "articles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      circle_2_sources: {
-        Row: {
-          id: string
-          specialty: string
-          type: string
-          value: string
-          description: string | null
-          confidence_prior: number | null
-          max_results: number | null
-          active: boolean | null
-          last_run_at: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          specialty: string
-          type: string
-          value: string
-          description?: string | null
-          confidence_prior?: number | null
-          max_results?: number | null
-          active?: boolean | null
-          last_run_at?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          specialty?: string
-          type?: string
-          value?: string
-          description?: string | null
-          confidence_prior?: number | null
-          max_results?: number | null
-          active?: boolean | null
-          last_run_at?: string | null
-          created_at?: string
+          started_at?: string | null
+          status?: string | null
         }
         Relationships: []
       }
@@ -477,6 +310,45 @@ export type Database = {
         }
         Relationships: []
       }
+      circle_2_sources: {
+        Row: {
+          active: boolean | null
+          confidence_prior: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          last_run_at: string | null
+          max_results: number | null
+          specialty: string
+          type: string
+          value: string
+        }
+        Insert: {
+          active?: boolean | null
+          confidence_prior?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          last_run_at?: string | null
+          max_results?: number | null
+          specialty: string
+          type: string
+          value: string
+        }
+        Update: {
+          active?: boolean | null
+          confidence_prior?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          last_run_at?: string | null
+          max_results?: number | null
+          specialty?: string
+          type?: string
+          value?: string
+        }
+        Relationships: []
+      }
       import_logs: {
         Row: {
           articles_imported: number
@@ -517,6 +389,143 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      lab_decisions: {
+        Row: {
+          ai_confidence: number | null
+          ai_decision: string | null
+          article_id: string | null
+          decided_at: string | null
+          decision: string
+          disagreement_reason: string | null
+          id: string
+          model_version: string | null
+          module: string
+          session_id: string | null
+          specialty: string
+        }
+        Insert: {
+          ai_confidence?: number | null
+          ai_decision?: string | null
+          article_id?: string | null
+          decided_at?: string | null
+          decision: string
+          disagreement_reason?: string | null
+          id?: string
+          model_version?: string | null
+          module: string
+          session_id?: string | null
+          specialty: string
+        }
+        Update: {
+          ai_confidence?: number | null
+          ai_decision?: string | null
+          article_id?: string | null
+          decided_at?: string | null
+          decision?: string
+          disagreement_reason?: string | null
+          id?: string
+          model_version?: string | null
+          module?: string
+          session_id?: string | null
+          specialty?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_decisions_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_decisions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "lab_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lab_sessions: {
+        Row: {
+          articles_approved: number | null
+          articles_rejected: number | null
+          articles_reviewed: number | null
+          completed_at: string | null
+          id: string
+          module: string
+          specialty: string
+          started_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          articles_approved?: number | null
+          articles_rejected?: number | null
+          articles_reviewed?: number | null
+          completed_at?: string | null
+          id?: string
+          module: string
+          specialty: string
+          started_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          articles_approved?: number | null
+          articles_rejected?: number | null
+          articles_reviewed?: number | null
+          completed_at?: string | null
+          id?: string
+          module?: string
+          specialty?: string
+          started_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      model_versions: {
+        Row: {
+          activated_at: string | null
+          active: boolean
+          generated_by: string
+          id: string
+          module: string
+          notes: string | null
+          prompt_text: string
+          specialty: string
+          version: string
+        }
+        Insert: {
+          activated_at?: string | null
+          active?: boolean
+          generated_by?: string
+          id?: string
+          module: string
+          notes?: string | null
+          prompt_text: string
+          specialty: string
+          version: string
+        }
+        Update: {
+          activated_at?: string | null
+          active?: boolean
+          generated_by?: string
+          id?: string
+          module?: string
+          notes?: string | null
+          prompt_text?: string
+          specialty?: string
+          version?: string
+        }
+        Relationships: []
       }
       newsletter_feedback: {
         Row: {
@@ -571,7 +580,7 @@ export type Database = {
       pubmed_filters: {
         Row: {
           active: boolean
-          circle: number
+          circle: number | null
           created_at: string
           id: string
           journal_list: string[] | null
@@ -584,7 +593,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
-          circle?: number
+          circle?: number | null
           created_at?: string
           id?: string
           journal_list?: string[] | null
@@ -597,7 +606,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
-          circle?: number
+          circle?: number | null
           created_at?: string
           id?: string
           journal_list?: string[] | null
@@ -793,6 +802,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      count_unlinked_articles: { Args: never; Returns: number }
+      fetch_unlinked_articles: {
+        Args: { p_limit: number; p_offset: number }
+        Returns: {
+          authors: Json
+          id: string
+          pubmed_id: string
+        }[]
+      }
       generate_referral_code: { Args: never; Returns: string }
     }
     Enums: {
@@ -926,7 +944,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
-export type UserRow = Database["public"]["Tables"]["users"]["Row"];
-export type UserInsert = Database["public"]["Tables"]["users"]["Insert"];
-export type UserUpdate = Database["public"]["Tables"]["users"]["Update"];
