@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand:       #E83B2A;
+  --color-canvas:      #FAFAF8;
+  --color-ink:         #1A1A1A;
+  --color-ink-muted:   #6B6459;
+  --color-warm-border: #E8E4DF;
+  --color-warm-sidebar:#F4F1EC;
+}
+
+/* Serif editorial font — applied per-component, not globally */
+.font-editorial {
+  font-family: var(--font-lora), Georgia, "Times New Roman", serif;
+}

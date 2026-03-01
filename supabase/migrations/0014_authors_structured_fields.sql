@@ -1,0 +1,5 @@
+ALTER TABLE public.authors
+  ADD COLUMN IF NOT EXISTS department TEXT,
+  ADD COLUMN IF NOT EXISTS hospital   TEXT,
+  ADD COLUMN IF NOT EXISTS city       TEXT,
+  ADD COLUMN IF NOT EXISTS country    TEXT;

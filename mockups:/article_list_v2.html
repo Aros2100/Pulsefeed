@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Articles</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; background: #f5f7fa; color: #1a1a1a; }
+
+  /* Header */
+  .header { height: 72px; background: #EEF2F7; border-bottom: 1px solid #dde3ed; display: flex; align-items: center; padding: 0 40px; position: sticky; top: 0; z-index: 100; }
+  .header-logo { font-weight: 800; font-size: 20px; letter-spacing: 0.06em; }
+  .header-logo span { color: #E83B2A; }
+
+  /* Page */
+  .page { max-width: 860px; margin: 0 auto; padding: 32px 24px 80px; }
+
+  /* Page header card */
+  .page-header-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04); margin-bottom: 12px; overflow: hidden; }
+  .page-header-top { background: #EEF2F7; border-bottom: 1px solid #dde3ed; padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .page-specialty { font-size: 11px; letter-spacing: 0.08em; color: #E83B2A; text-transform: uppercase; font-weight: 700; }
+  .page-header-body { padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .page-title { font-size: 20px; font-weight: 700; }
+  .page-count { font-size: 13px; color: #999; }
+
+  /* Filters */
+  .filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .filter-btn { font-size: 12px; background: #fff; border: 1px solid #dde3ed; border-radius: 6px; padding: 6px 12px; color: #5a6a85; cursor: pointer; white-space: nowrap; }
+  .filter-btn:hover { background: #f5f7fa; }
+  .filter-btn.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+
+  /* Articles card */
+  .articles-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04); overflow: hidden; }
+  .articles-card-header { background: #EEF2F7; border-bottom: 1px solid #dde3ed; padding: 10px 24px; }
+  .articles-card-label { font-size: 11px; letter-spacing: 0.08em; color: #5a6a85; text-transform: uppercase; font-weight: 700; }
+
+  /* Article row */
+  .article { padding: 16px 24px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.1s; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; }
+  .article:last-child { border-bottom: none; }
+  .article:hover { background: #fafbfc; }
+  .article:hover .article-title { color: #E83B2A; }
+
+  .article-left { }
+  .article-meta { font-size: 11px; color: #aaa; margin-bottom: 5px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .article-title { font-size: 15px; font-weight: 600; line-height: 1.45; color: #1a1a1a; transition: color 0.15s; }
+  .article-authors { font-size: 13px; color: #888; margin-top: 5px; }
+  .article-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .tag { font-size: 11px; background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 2px 8px; color: #555; }
+  .tag.ai { background: #f0f7ee; border-color: #c8e6c0; color: #3a7d44; }
+
+  /* Right side — news value + relevance */
+  .article-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; min-width: 90px; padding-top: 2px; }
+  .news-value { font-size: 13px; color: #f4a100; letter-spacing: 1px; }
+  .relevance { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; white-space: nowrap; }
+  .relevance.clinical { background: #e8f4e8; color: #2d7a2d; }
+  .relevance.research { background: #f0f0f0; color: #666; }
+  .relevance.practice { background: #fff3e0; color: #e65100; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-logo">PULSE<span>FEED</span></div>
+</header>
+
+<div class="page">
+
+  <!-- Page header -->
+  <div class="page-header-card">
+    <div class="page-header-top">
+      <div class="page-specialty">Neurosurgery</div>
+    </div>
+    <div class="page-header-body">
+      <div>
+        <div class="page-title">Articles</div>
+        <div class="page-count">247 articles</div>
+      </div>
+      <div class="filters">
+        <button class="filter-btn active">All</button>
+        <button class="filter-btn">Clinical trials</button>
+        <button class="filter-btn">High impact</button>
+        <button class="filter-btn">This week</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Article list -->
+  <div class="articles-card">
+    <div class="articles-card-header"><div class="articles-card-label">Latest articles</div></div>
+
+    <div class="article">
+      <div class="article-left">
+        <div class="article-meta">Neurosurgery · 18 Feb 2026</div>
+        <div class="article-title">Association Between Postoperative Hypotension and Mortality and Complications in Patients Undergoing Craniotomy for Brain Tumor</div>
+        <div class="article-authors">Peng Wang et al.</div>
+        <div class="article-tags">
+          <span class="tag">Journal Article</span>
+          <span class="tag ai">AI enriched</span>
+        </div>
+      </div>
+      <div class="article-right">
+        <div class="news-value">★★★★☆</div>
+        <div class="relevance clinical">Clinically relevant</div>
+      </div>
+    </div>
+
+    <div class="article">
+      <div class="article-left">
+        <div class="article-meta">Neurosurg Rev · 15 Feb 2026</div>
+        <div class="article-title">Clinical effectiveness of spinal cord stimulation in managing refractory upper-extremity pain: a systematic review and meta-analysis</div>
+        <div class="article-authors">Yanisa Ingkapassakorn et al.</div>
+        <div class="article-tags">
+          <span class="tag">Systematic Review</span>
+          <span class="tag ai">AI enriched</span>
+        </div>
+      </div>
+      <div class="article-right">
+        <div class="news-value">★★★★★</div>
+        <div class="relevance practice">Practice changing</div>
+      </div>
+    </div>
+
+    <div class="article">
+      <div class="article-left">
+        <div class="article-meta">J Neurosurg Spine · 12 Feb 2026</div>
+        <div class="article-title">A novel scoring system for predisposing factors influencing surgical outcomes: comparing the endoscopic endonasal approach and transorbital approach for trigeminal schwannoma</div>
+        <div class="article-authors">Won-Jae Lee et al.</div>
+        <div class="article-tags">
+          <span class="tag">Journal Article</span>
+        </div>
+      </div>
+      <div class="article-right">
+        <div class="news-value">★★★☆☆</div>
+        <div class="relevance research">Research only</div>
+      </div>
+    </div>
+
+    <div class="article">
+      <div class="article-left">
+        <div class="article-meta">Neuro-Oncology · 10 Feb 2026</div>
+        <div class="article-title">Bevacizumab plus temozolomide versus temozolomide alone for newly diagnosed glioblastoma: long-term follow-up of a randomized phase 3 trial</div>
+        <div class="article-authors">Michael Weller et al.</div>
+        <div class="article-tags">
+          <span class="tag">Randomized Controlled Trial</span>
+          <span class="tag ai">AI enriched</span>
+        </div>
+      </div>
+      <div class="article-right">
+        <div class="news-value">★★★★★</div>
+        <div class="relevance practice">Practice changing</div>
+      </div>
+    </div>
+
+    <div class="article">
+      <div class="article-left">
+        <div class="article-meta">J Neurosurg · 8 Feb 2026</div>
+        <div class="article-title">Intraoperative MRI-guided resection of pediatric brain tumors: a single-center experience with 150 consecutive cases</div>
+        <div class="article-authors">Sarah Mitchell et al.</div>
+        <div class="article-tags">
+          <span class="tag">Journal Article</span>
+        </div>
+      </div>
+      <div class="article-right">
+        <div class="news-value">★★★☆☆</div>
+        <div class="relevance clinical">Clinically relevant</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

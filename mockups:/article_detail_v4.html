@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Article Detail v4</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: #f5f7fa; color: #1a1a1a; }
+
+  /* Header */
+  .header { height: 72px; background: #EEF2F7; border-bottom: 1px solid #dde3ed; display: flex; align-items: center; padding: 0 40px; position: sticky; top: 0; z-index: 100; }
+  .header-logo { font-weight: 800; font-size: 20px; letter-spacing: 0.06em; font-family: 'Inter', sans-serif; }
+  .header-logo span { color: #E83B2A; }
+
+  /* Layout */
+  .layout { display: grid; grid-template-columns: 180px 1fr; max-width: 860px; margin: 0 auto; padding: 0 24px; gap: 32px; }
+
+  /* Sticky sidebar */
+  .sidebar { position: sticky; top: 88px; height: fit-content; padding: 32px 0; }
+  .sidebar-back { font-size: 13px; color: #888; text-decoration: none; display: block; margin-bottom: 28px; }
+  .sidebar-back:hover { color: #1a1a1a; }
+  .sidebar-nav { list-style: none; }
+  .sidebar-nav li { margin-bottom: 2px; }
+  .sidebar-nav a { font-size: 13px; color: #888; text-decoration: none; padding: 7px 12px; display: flex; align-items: center; justify-content: space-between; border-radius: 6px; border-left: 2px solid transparent; transition: all 0.15s; }
+  .sidebar-nav a:hover { color: #1a1a1a; background: #eef2f7; }
+  .sidebar-nav a.active { color: #E83B2A; border-left-color: #E83B2A; background: #fff5f4; font-weight: 500; }
+  .sidebar-nav a.ai-section { color: #3a7d44; }
+  .sidebar-nav a.ai-section.active { color: #3a7d44; border-left-color: #3a7d44; background: #f0f7ee; }
+  .nav-badge { font-size: 11px; background: #eef2f7; color: #888; padding: 1px 6px; border-radius: 10px; font-weight: 500; }
+  .sidebar-nav a.active .nav-badge { background: #fde8e6; color: #E83B2A; }
+  .ai-tag { font-size: 10px; background: #e8f4e8; color: #3a7d44; padding: 1px 6px; border-radius: 10px; font-weight: 600; }
+
+  /* Main */
+  .main { padding: 32px 0 80px; }
+
+  /* Cards */
+  .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04); margin-bottom: 12px; overflow: hidden; }
+  .card-header { background: #EEF2F7; border-bottom: 1px solid #dde3ed; padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .card-header.green { background: #f0f7ee; border-bottom-color: #c8e6c0; }
+  .card-label { font-size: 11px; letter-spacing: 0.08em; color: #5a6a85; text-transform: uppercase; font-weight: 700; }
+  .card-label.green { color: #3a7d44; }
+  .card-body { padding: 20px 24px; }
+
+  /* Title card */
+  .title-meta { font-size: 13px; color: #888; margin-top: 10px; }
+  .title-meta a { color: #1a6eb5; text-decoration: none; }
+  .article-specialty { font-size: 11px; letter-spacing: 0.08em; color: #E83B2A; text-transform: uppercase; font-weight: 700; }
+  .article-title { font-family: 'Inter', sans-serif; font-size: 23px; font-weight: 700; line-height: 1.4; margin-top: 10px; }
+  .share-btn { font-size: 12px; color: #5a6a85; background: #fff; border: 1px solid #dde3ed; border-radius: 6px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
+  .share-btn:hover { background: #f5f7fa; }
+
+  /* Facts */
+  .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 0; font-size: 14px; }
+  .fact-row { display: grid; grid-template-columns: 120px 1fr; padding: 7px 0; border-bottom: 1px solid #f5f5f5; }
+  .fact-row:last-child { border-bottom: none; }
+  .fact-label { color: #888; }
+  .fact-value { color: #1a1a1a; }
+  .fact-value a { color: #1a6eb5; text-decoration: none; }
+  .fact-value a:hover { text-decoration: underline; }
+  .facts-col { }
+
+  /* Authors */
+  .author { padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+  .author:last-of-type { border-bottom: none; }
+  .author-name { font-size: 14px; font-weight: 600; }
+  .author-affiliation { font-size: 13px; color: #888; margin-top: 2px; line-height: 1.4; }
+  .show-more { font-size: 13px; color: #444; cursor: pointer; background: none; border: none; padding: 10px 0 0; display: block; text-decoration: underline; }
+
+  /* Tags */
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tag { font-size: 13px; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 5px 12px; color: #1a1a1a; }
+
+  /* MeSH */
+  .mesh-item { font-size: 14px; color: #444; padding: 6px 0; border-bottom: 1px solid #f5f5f5; }
+  .mesh-item:last-child { border-bottom: none; }
+  .mesh-qualifier { color: #bbb; }
+  .mesh-major { font-weight: 600; color: #1a1a1a; }
+
+  /* Funding */
+  .grant { font-size: 14px; padding: 8px 0; border-bottom: 1px solid #f5f5f5; }
+  .grant:last-child { border-bottom: none; }
+  .grant-id { font-weight: 600; }
+  .grant-agency { color: #666; }
+
+  /* AI Summary */
+  .ai-summary-text { font-size: 15px; line-height: 1.75; color: #1a1a1a; }
+  .ai-meta { display: flex; gap: 32px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e8f0e8; }
+  .ai-meta-item { }
+  .ai-meta-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .stars { font-size: 18px; letter-spacing: 2px; }
+  .relevance-badge { display: inline-block; font-size: 12px; background: #e8f4e8; color: #2d7a2d; padding: 4px 12px; border-radius: 20px; font-weight: 600; }
+
+  /* PICO */
+  .pico-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .pico-item { background: #f9fafb; border-radius: 8px; padding: 14px; border: 1px solid #eef2f7; }
+  .pico-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; font-weight: 600; }
+  .pico-value { font-size: 14px; line-height: 1.5; color: #2a2a2a; }
+
+  /* Abstract */
+  .abstract-section { margin-bottom: 18px; }
+  .abstract-section:last-child { margin-bottom: 0; }
+  .abstract-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #5a6a85; display: block; margin-bottom: 5px; }
+  .abstract-text { font-size: 15px; line-height: 1.85; color: #2a2a2a; }
+
+  /* Citation */
+  .citation-text { font-size: 13px; line-height: 1.6; color: #444; background: #f9fafb; border-radius: 6px; padding: 14px; border: 1px solid #eef2f7; font-family: Georgia, serif; }
+  .copy-btn { margin-top: 12px; font-size: 12px; color: #5a6a85; background: #fff; border: 1px solid #dde3ed; border-radius: 6px; padding: 6px 14px; cursor: pointer; }
+  .copy-btn:hover { background: #f5f7fa; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-logo">PULSE<span>FEED</span></div>
+</header>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <a href="#" class="sidebar-back">← All articles</a>
+    <ul class="sidebar-nav">
+      <li><a href="#facts" class="active">Facts</a></li>
+      <li><a href="#keywords">Keywords <span class="nav-badge">4</span></a></li>
+      <li><a href="#mesh">MeSH Terms <span class="nav-badge">6</span></a></li>
+      <li><a href="#ai-summary" class="ai-section">AI Summary <span class="ai-tag">AI</span></a></li>
+      <li><a href="#pico" class="ai-section">PICO <span class="ai-tag">AI</span></a></li>
+      <li><a href="#authors">Authors <span class="nav-badge">7</span></a></li>
+      <li><a href="#abstract">Abstract</a></li>
+      <li><a href="#funding">Funding <span class="nav-badge">2</span></a></li>
+      <li><a href="#citation">Cite</a></li>
+    </ul>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- Title -->
+    <div class="card" id="top">
+      <div class="card-header">
+        <div class="article-specialty">Neurosurgery</div>
+        <button class="share-btn">↗ Share article</button>
+      </div>
+      <div class="card-body">
+        <h1 class="article-title">Optimizing surgical strategies for ruptured vertebral artery dissecting aneurysms: experience with perforator bypass and hyperacute management</h1>
+        <div class="title-meta">Neurosurgical review · 18 Feb 2026 · <a href="#">PMID 41706223</a> · <a href="#">DOI ↗</a></div>
+      </div>
+    </div>
+
+    <!-- Facts -->
+    <div class="card" id="facts">
+      <div class="card-header"><div class="card-label">Facts</div></div>
+      <div class="card-body">
+        <div class="facts">
+          <div class="facts-col">
+            <div class="fact-row"><span class="fact-label">Journal</span><span class="fact-value">Neurosurg Rev</span></div>
+            <div class="fact-row"><span class="fact-label">Published</span><span class="fact-value">18 Feb 2026</span></div>
+            <div class="fact-row"><span class="fact-label">Volume / Issue</span><span class="fact-value">49 / 1</span></div>
+            <div class="fact-row"><span class="fact-label">Article number</span><span class="fact-value">233</span></div>
+            <div class="fact-row"><span class="fact-label">Authors</span><span class="fact-value">Ota N et al. · Hokkaido University Hospital</span></div>
+            <div class="fact-row"><span class="fact-label">Imported</span><span class="fact-value">24 Feb 2026 at 00:43</span></div>
+          </div>
+          <div class="facts-col" style="border-left:1px solid #f0f0f0; padding-left:20px;">
+            <div class="fact-row"><span class="fact-label">Publication type</span><span class="fact-value">Journal Article</span></div>
+            <div class="fact-row"><span class="fact-label">Language</span><span class="fact-value">English</span></div>
+            <div class="fact-row"><span class="fact-label">PubMed</span><span class="fact-value"><a href="#">PMID 41706223 ↗</a></span></div>
+            <div class="fact-row"><span class="fact-label">ISSN</span><span class="fact-value">1437-2320</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Keywords -->
+    <div class="card" id="keywords">
+      <div class="card-header"><div class="card-label">Keywords</div></div>
+      <div class="card-body">
+        <div class="tags">
+          <span class="tag">Vertebral artery dissection</span>
+          <span class="tag">Bypass surgery</span>
+          <span class="tag">Ruptured aneurysm</span>
+          <span class="tag">Hyperacute management</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- MeSH -->
+    <div class="card" id="mesh">
+      <div class="card-header"><div class="card-label">MeSH Terms</div></div>
+      <div class="card-body">
+        <div class="mesh-item"><span class="mesh-major">Aneurysm, Ruptured*</span> <span class="mesh-qualifier">/ diagnostic imaging / surgery</span></div>
+        <div class="mesh-item"><span class="mesh-major">Cerebral Revascularization*</span> <span class="mesh-qualifier">/ methods</span></div>
+        <div class="mesh-item">Humans</div>
+        <div class="mesh-item"><span class="mesh-major">Intracranial Aneurysm*</span> <span class="mesh-qualifier">/ surgery</span></div>
+        <div class="mesh-item">Retrospective Studies</div>
+        <div class="mesh-item"><span class="mesh-major">Vertebral Artery Dissection*</span> <span class="mesh-qualifier">/ diagnostic imaging / surgery</span></div>
+      </div>
+    </div>
+
+    <!-- AI Summary -->
+    <div class="card" id="ai-summary">
+      <div class="card-header green"><div class="card-label green">AI Summary</div></div>
+      <div class="card-body">
+        <div class="ai-summary-text">This retrospective study demonstrates that hyperacute surgical intervention with perforator bypass is both feasible and safe for ruptured vertebral artery dissecting aneurysms, achieving good neurological outcomes (mRS 0–2) in 78% of patients at 6-month follow-up. The proposed surgical algorithm may guide decision-making in this technically challenging patient group.</div>
+        <div class="ai-meta">
+          <div class="ai-meta-item">
+            <div class="ai-meta-label">News Value</div>
+            <div class="stars">★★★★<span style="color:#ddd">★</span></div>
+          </div>
+          <div class="ai-meta-item">
+            <div class="ai-meta-label">Clinical Relevance</div>
+            <div class="relevance-badge">Clinically relevant</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PICO -->
+    <div class="card" id="pico">
+      <div class="card-header green"><div class="card-label green">PICO</div></div>
+      <div class="card-body">
+        <div class="pico-grid">
+          <div class="pico-item">
+            <div class="pico-label">Population</div>
+            <div class="pico-value">Patients with ruptured vertebral artery dissecting aneurysms (n=23)</div>
+          </div>
+          <div class="pico-item">
+            <div class="pico-label">Intervention</div>
+            <div class="pico-value">Hyperacute surgical intervention with perforator bypass within 72 hours</div>
+          </div>
+          <div class="pico-item">
+            <div class="pico-label">Comparison</div>
+            <div class="pico-value">Historical controls, conservative management</div>
+          </div>
+          <div class="pico-item">
+            <div class="pico-label">Outcome</div>
+            <div class="pico-value">Neurological outcome (mRS 0–2) at 6 months, bypass patency, complications</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Authors -->
+    <div class="card" id="authors">
+      <div class="card-header"><div class="card-label">Authors</div></div>
+      <div class="card-body">
+        <div class="author"><div class="author-name">Nakao Ota</div><div class="author-affiliation">Department of Neurosurgery, Hokkaido University Hospital, Sapporo, Japan</div></div>
+        <div class="author"><div class="author-name">Juan Carlos Gomez-Vega</div><div class="author-affiliation">Department of Neurosurgery, Stroke Center, Hokkaido University Hospital</div></div>
+        <div class="author"><div class="author-name">Yasuaki Okada</div><div class="author-affiliation">Department of Neurosurgery, Hokkaido University Hospital, Sapporo, Japan</div></div>
+        <button class="show-more">Show all 7 authors</button>
+      </div>
+    </div>
+
+    <!-- Abstract -->
+    <div class="card" id="abstract">
+      <div class="card-header"><div class="card-label">Abstract</div></div>
+      <div class="card-body">
+        <div class="abstract-section"><span class="abstract-label">Background</span><span class="abstract-text">Ruptured vertebral artery dissecting aneurysms (VADAs) present significant surgical challenges due to their complex anatomy and the need for hyperacute intervention. The optimal surgical strategy remains controversial.</span></div>
+        <div class="abstract-section"><span class="abstract-label">Methods</span><span class="abstract-text">We retrospectively reviewed 23 consecutive patients with ruptured VADAs treated at our institution between 2015 and 2023. All patients underwent surgical intervention within 72 hours of initial hemorrhage. Perforator bypass was performed when the posterior inferior cerebellar artery territory was at risk.</span></div>
+        <div class="abstract-section"><span class="abstract-label">Results</span><span class="abstract-text">Good neurological outcomes (mRS 0–2) were achieved in 78% of patients at 6-month follow-up. Perforator bypass was successfully performed in 8 patients with no bypass-related complications.</span></div>
+        <div class="abstract-section"><span class="abstract-label">Conclusions</span><span class="abstract-text">Hyperacute surgical intervention with perforator bypass is feasible and safe for ruptured VADAs, providing excellent outcomes in selected patients.</span></div>
+      </div>
+    </div>
+
+    <!-- Funding -->
+    <div class="card" id="funding">
+      <div class="card-header"><div class="card-label">Funding</div></div>
+      <div class="card-body">
+        <div class="grant"><span class="grant-id">82271364</span> — <span class="grant-agency">National Natural Science Foundation of China</span></div>
+        <div class="grant"><span class="grant-id">CDFYCX202203</span> — <span class="grant-agency">Innovation team project, Affiliated Hospital of Clinical Medicine College of Chengdu University</span></div>
+      </div>
+    </div>
+
+    <!-- Citation -->
+    <div class="card" id="citation">
+      <div class="card-header"><div class="card-label">Cite this article</div></div>
+      <div class="card-body">
+        <div class="citation-text">Ota N, Gomez-Vega JC, Okada Y, et al. Optimizing surgical strategies for ruptured vertebral artery dissecting aneurysms: experience with perforator bypass and hyperacute management. <em>Neurosurg Rev.</em> 2026;49(1):233. doi:10.1007/s10143-026-04145-9</div>
+        <button class="copy-btn" onclick="navigator.clipboard.writeText(document.querySelector('.citation-text').innerText); this.innerText='✓ Copied'">Copy Vancouver</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('.sidebar-nav a');
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(s => { if (window.scrollY >= s.offsetTop - 120) current = s.id; });
+    navLinks.forEach(l => {
+      l.classList.remove('active');
+      if (l.getAttribute('href') === '#' + current) l.classList.add('active');
+    });
+  });
+  navLinks.forEach(l => {
+    l.addEventListener('click', e => {
+      e.preventDefault();
+      const t = document.querySelector(l.getAttribute('href'));
+      if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+</script>
+
+</body>
+</html>

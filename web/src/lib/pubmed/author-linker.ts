@@ -1,0 +1,103 @@
+import { createAdminClient } from "@/lib/supabase/admin";
+import { linkAuthorsToArticle, type Author } from "@/lib/pubmed/importer";
+
+const BATCH_SIZE = 20;
+
+export async function runAuthorLinking(logId: string): Promise<void> {
+  const admin = createAdminClient();
+  const errors: string[] = [];
+  let articlesProcessed = 0;
+  let authorsLinked = 0;
+
+  try {
+    while (true) {
+      // Always fetch at offset 0 — linked articles are removed from the unlinked
+      // set by the NOT IN clause, so the result shrinks as we process each batch.
+      const { data: articles, error } = await admin.rpc(
+        "fetch_unlinked_articles",
+        { p_offset: 0, p_limit: BATCH_SIZE }
+      );
+
+      if (error) {
+        console.error(`[author-linker] RPC error:`, error.message);
+        errors.push(`Query error: ${error.message}`);
+        break;
+      }
+
+      const batch = articles ?? [];
+      console.log(`[author-linker] RPC returned ${batch.length} articles (data type: ${typeof articles}, isArray: ${Array.isArray(articles)})`);
+      if (batch.length === 0) break;
+
+      for (const article of batch) {
+        const rawAuthors = (article.authors ?? []) as Record<string, unknown>[];
+        console.log(`[author-linker] PMID ${article.pubmed_id}: authors field type=${typeof article.authors}, rawAuthors.length=${rawAuthors.length}`);
+        if (rawAuthors.length === 0) {
+          articlesProcessed++;
+          continue;
+        }
+
+        const authors: Author[] = rawAuthors.map((a) => ({
+          lastName:    String(a.lastName ?? ""),
+          foreName:    String(a.foreName ?? ""),
+          affiliation: a.affiliation != null ? String(a.affiliation) : null,
+          orcid:       a.orcid != null ? String(a.orcid) : null,
+        }));
+
+        console.log(`[author-linker] calling linkAuthorsToArticle for PMID ${article.pubmed_id} (${authors.length} authors)`);
+        await linkAuthorsToArticle(admin, article.id, authors)
+          .then(() => {
+            authorsLinked += authors.length;
+            console.log(`[author-linker] linked ${authors.length} authors for PMID ${article.pubmed_id} — authorsLinked now ${authorsLinked}`);
+          })
+          .catch((e) => {
+            const msg = `PMID ${article.pubmed_id}: ${e instanceof Error ? e.message : String(e)}`;
+            errors.push(msg);
+            console.error(`[author-linker] error — ${msg}`);
+          });
+
+        articlesProcessed++;
+      }
+
+      // Update progress after each batch
+      console.log(`[author-linker] writing progress to DB — logId=${logId} articles_processed=${articlesProcessed} authors_linked=${authorsLinked}`);
+      const { error: updateErr } = await admin
+        .from("author_linking_logs")
+        .update({ articles_processed: articlesProcessed, authors_linked: authorsLinked })
+        .eq("id", logId);
+      if (updateErr) {
+        console.error(`[author-linker] progress update failed:`, updateErr.message);
+      } else {
+        console.log(`[author-linker] progress update OK`);
+      }
+
+      console.log(`[author-linker] batch done — articles=${articlesProcessed} authors=${authorsLinked}`);
+
+      if (batch.length < BATCH_SIZE) break;
+    }
+
+    // Mark completed
+    await admin
+      .from("author_linking_logs")
+      .update({
+        status: errors.length > 0 && articlesProcessed === 0 ? "failed" : "completed",
+        completed_at: new Date().toISOString(),
+        articles_processed: articlesProcessed,
+        authors_linked: authorsLinked,
+        errors: errors.length > 0 ? errors : [],
+      })
+      .eq("id", logId);
+
+    console.log(`[author-linker] done — articles=${articlesProcessed} authors=${authorsLinked} errors=${errors.length}`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[author-linker] fatal error:`, e);
+    await admin
+      .from("author_linking_logs")
+      .update({
+        status: "failed",
+        completed_at: new Date().toISOString(),
+        errors: [...errors, msg],
+      })
+      .eq("id", logId);
+  }
+}

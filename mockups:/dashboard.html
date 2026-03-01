@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; background: #f5f7fa; color: #1a1a1a; }
+
+  .header { height: 72px; background: #EEF2F7; border-bottom: 1px solid #dde3ed; display: flex; align-items: center; padding: 0 40px; position: sticky; top: 0; z-index: 100; }
+  .header-logo { font-weight: 800; font-size: 20px; letter-spacing: 0.06em; }
+  .header-logo span { color: #E83B2A; }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+  .header-name { font-size: 14px; color: #5a6a85; }
+  .header-signout { font-size: 13px; color: #888; background: none; border: none; cursor: pointer; text-decoration: underline; }
+
+  .page { max-width: 960px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  .greeting { margin-bottom: 28px; }
+  .greeting-title { font-size: 26px; font-weight: 700; }
+  .greeting-sub { font-size: 14px; color: #888; margin-top: 4px; }
+  .greeting-sub strong { color: #1a1a1a; }
+
+  /* KPI card */
+  .kpi-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04); overflow: hidden; margin-bottom: 12px; }
+  .kpi-card-header { background: #EEF2F7; border-bottom: 1px solid #dde3ed; padding: 10px 24px; }
+  .kpi-card-label { font-size: 11px; letter-spacing: 0.08em; color: #5a6a85; text-transform: uppercase; font-weight: 700; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); }
+  .kpi { padding: 20px 24px; border-right: 1px solid #f0f0f0; }
+  .kpi:last-child { border-right: none; }
+  .kpi-value { font-size: 28px; font-weight: 700; line-height: 1; }
+  .kpi-value.red { color: #E83B2A; }
+  .kpi-value.green { color: #2d7a2d; }
+  .kpi-label { font-size: 12px; color: #888; margin-top: 6px; }
+  .kpi-delta { font-size: 11px; margin-top: 4px; }
+  .kpi-delta.up { color: #2d7a2d; }
+  .kpi-delta.neutral { color: #aaa; }
+
+  /* Section label */
+  .section-label { font-size: 11px; letter-spacing: 0.08em; color: #5a6a85; text-transform: uppercase; font-weight: 700; margin-bottom: 12px; margin-top: 28px; }
+
+  /* Action buttons */
+  .btn-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .btn { display: flex; flex-direction: column; align-items: flex-start; background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04); padding: 20px 24px; text-decoration: none; color: #1a1a1a; cursor: pointer; border: none; transition: box-shadow 0.15s, transform 0.1s; }
+  .btn:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.06); transform: translateY(-1px); }
+  .btn-icon { font-size: 22px; margin-bottom: 12px; }
+  .btn-title { font-size: 14px; font-weight: 700; }
+  .btn-desc { font-size: 12px; color: #888; margin-top: 4px; line-height: 1.4; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-logo">PULSE<span>FEED</span></div>
+  <div class="header-right">
+    <span class="header-name">Morten</span>
+    <button class="header-signout">Sign out</button>
+  </div>
+</header>
+
+<div class="page">
+
+  <div class="greeting">
+    <div class="greeting-title">Good evening, Morten</div>
+    <div class="greeting-sub">Showing content for <strong>Neurosurgery</strong></div>
+  </div>
+
+  <!-- KPI strip -->
+  <div class="kpi-card">
+    <div class="kpi-card-header"><div class="kpi-card-label">This week · Neurosurgery</div></div>
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-value red">23</div>
+        <div class="kpi-label">New articles</div>
+        <div class="kpi-delta up">↑ 4 vs last week</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-value">8</div>
+        <div class="kpi-label">AI enriched</div>
+        <div class="kpi-delta neutral">of 23 new</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-value green">3</div>
+        <div class="kpi-label">Practice changing</div>
+        <div class="kpi-delta up">↑ 1 vs last week</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-value">4.2</div>
+        <div class="kpi-label">Avg. news value</div>
+        <div class="kpi-delta neutral">out of 5</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-value">Feb 17</div>
+        <div class="kpi-label">Last newsletter</div>
+        <div class="kpi-delta neutral">Week 7 · 5 articles</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action buttons -->
+  <div class="section-label">Quick access</div>
+  <div class="btn-grid">
+    <a href="#" class="btn">
+      <div class="btn-icon">📄</div>
+      <div class="btn-title">All Articles</div>
+      <div class="btn-desc">Browse and search all 247 articles</div>
+    </a>
+    <a href="#" class="btn">
+      <div class="btn-icon">✉️</div>
+      <div class="btn-title">Newsletters</div>
+      <div class="btn-desc">View your previous digests</div>
+    </a>
+    <a href="#" class="btn">
+      <div class="btn-icon">⚙️</div>
+      <div class="btn-title">Preferences</div>
+      <div class="btn-desc">Manage specialties and keywords</div>
+    </a>
+    <a href="#" class="btn">
+      <div class="btn-icon">🔍</div>
+      <div class="btn-title">Search</div>
+      <div class="btn-desc">Full-text search across all articles</div>
+    </a>
+  </div>
+</div>
+
+</body>
+</html>
