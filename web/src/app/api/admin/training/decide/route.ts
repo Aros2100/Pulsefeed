@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   if (editor_verdict === "relevant") {
     const { error: updateError } = await admin
       .from("articles")
-      .update({ specialty_tags: [specialty], verified: true })
+      .update({ specialty_tags: [specialty], verified: true, status: "approved" })
       .eq("id", article_id);
     if (updateError) {
       return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
   } else if (editor_verdict === "not_relevant") {
     const { error: updateError } = await admin
       .from("articles")
-      .update({ specialty_tags: [], verified: false })
+      .update({ specialty_tags: [], verified: false, status: "rejected" })
       .eq("id", article_id);
     if (updateError) {
       return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });

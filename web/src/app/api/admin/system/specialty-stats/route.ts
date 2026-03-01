@@ -15,13 +15,12 @@ export async function GET() {
         admin
           .from("articles")
           .select("id", { count: "exact", head: true })
-          .eq("circle", 1)
+          .eq("status", "approved")
           .contains("specialty_tags", [slug]),
         admin
           .from("articles")
           .select("id", { count: "exact", head: true })
-          .eq("circle", 2)
-          .eq("verified", false)
+          .eq("status", "pending")
           .contains("specialty_tags", [slug]),
         admin
           .from("import_logs")

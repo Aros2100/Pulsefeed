@@ -60,12 +60,12 @@ export default async function DashboardPage() {
       { count: lastWeekPractice },
       { data: newsValueRows },
     ] = await Promise.all([
-      supabase.from("articles").select("*", { count: "exact", head: true }).eq("verified", true).contains("specialty_tags", specialtySlugs).gte("imported_at", weekAgo),
-      supabase.from("articles").select("*", { count: "exact", head: true }).eq("verified", true).contains("specialty_tags", specialtySlugs).gte("imported_at", twoWeeksAgo).lt("imported_at", weekAgo),
-      supabase.from("articles").select("*", { count: "exact", head: true }).eq("verified", true).contains("specialty_tags", specialtySlugs).gte("imported_at", weekAgo).not("enriched_at", "is", null),
-      supabase.from("articles").select("*", { count: "exact", head: true }).eq("verified", true).contains("specialty_tags", specialtySlugs).gte("imported_at", weekAgo).ilike("clinical_relevance", "%practice%"),
-      supabase.from("articles").select("*", { count: "exact", head: true }).eq("verified", true).contains("specialty_tags", specialtySlugs).gte("imported_at", twoWeeksAgo).lt("imported_at", weekAgo).ilike("clinical_relevance", "%practice%"),
-      supabase.from("articles").select("news_value").eq("verified", true).contains("specialty_tags", specialtySlugs).gte("imported_at", weekAgo).not("news_value", "is", null),
+      supabase.from("articles").select("*", { count: "exact", head: true }).eq("status", "approved").contains("specialty_tags", specialtySlugs).gte("imported_at", weekAgo),
+      supabase.from("articles").select("*", { count: "exact", head: true }).eq("status", "approved").contains("specialty_tags", specialtySlugs).gte("imported_at", twoWeeksAgo).lt("imported_at", weekAgo),
+      supabase.from("articles").select("*", { count: "exact", head: true }).eq("status", "approved").contains("specialty_tags", specialtySlugs).gte("imported_at", weekAgo).not("enriched_at", "is", null),
+      supabase.from("articles").select("*", { count: "exact", head: true }).eq("status", "approved").contains("specialty_tags", specialtySlugs).gte("imported_at", weekAgo).ilike("clinical_relevance", "%practice%"),
+      supabase.from("articles").select("*", { count: "exact", head: true }).eq("status", "approved").contains("specialty_tags", specialtySlugs).gte("imported_at", twoWeeksAgo).lt("imported_at", weekAgo).ilike("clinical_relevance", "%practice%"),
+      supabase.from("articles").select("news_value").eq("status", "approved").contains("specialty_tags", specialtySlugs).gte("imported_at", weekAgo).not("news_value", "is", null),
     ]);
 
     thisWeekCount = thisWeek ?? 0;

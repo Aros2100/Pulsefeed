@@ -89,13 +89,13 @@ export default async function SpecialtyImportPage({
   // Summary stats — single query with conditional aggregation
   const { data: articleRows } = await admin
     .from("articles")
-    .select("circle")
+    .select("status")
     .contains("specialty_tags", [specialty]);
 
   const rows = articleRows ?? [];
-  const circle1Count = rows.filter((r) => r.circle === 1).length;
-  const circle2Count = rows.filter((r) => r.circle === 2).length;
-  const circle3Count = rows.filter((r) => r.circle === 3).length;
+  const circle1Count = rows.filter((r) => r.status === "approved").length;
+  const circle2Count = rows.filter((r) => r.status === "pending").length;
+  const circle3Count = rows.filter((r) => r.status === "rejected").length;
   const totalCount = rows.length;
 
   const lastImportAt = logs?.find((l) => l.status === "completed")?.completed_at ?? null;

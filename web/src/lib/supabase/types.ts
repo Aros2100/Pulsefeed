@@ -124,6 +124,7 @@ export type Database = {
           source_id: string | null
           specialty_confidence: number | null
           specialty_tags: string[]
+          status: string
           subspecialty: string | null
           substances: Json
           title: string
@@ -170,6 +171,7 @@ export type Database = {
           source_id?: string | null
           specialty_confidence?: number | null
           specialty_tags?: string[]
+          status?: string
           subspecialty?: string | null
           substances?: Json
           title: string
@@ -216,6 +218,7 @@ export type Database = {
           source_id?: string | null
           specialty_confidence?: number | null
           specialty_tags?: string[]
+          status?: string
           subspecialty?: string | null
           substances?: Json
           title?: string

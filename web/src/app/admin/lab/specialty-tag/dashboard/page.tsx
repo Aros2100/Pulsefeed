@@ -100,7 +100,7 @@ export default async function DashboardPage() {
     admin
       .from("articles")
       .select("id", { count: "exact", head: true })
-      .eq("circle", 2).eq("verified", false)
+      .eq("status", "pending")
       .contains("specialty_tags", [specialty]),
     admin
       .from("lab_sessions")

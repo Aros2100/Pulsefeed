@@ -17,7 +17,7 @@ export default async function ArticlesPage() {
   let articlesQuery = supabase
     .from("articles")
     .select("id, title, journal_abbr, published_date, authors, publication_types, news_value, clinical_relevance, enriched_at, imported_at")
-    .eq("verified", true)
+    .eq("status", "approved")
     .order("imported_at", { ascending: false })
     .limit(200);
 

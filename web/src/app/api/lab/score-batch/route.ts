@@ -42,8 +42,7 @@ export async function POST(request: NextRequest) {
   const { data: articles, error: fetchError } = await admin
     .from("articles")
     .select("id, title, abstract")
-    .eq("circle", 2)
-    .eq("verified", false)
+    .eq("status", "pending")
     .is("specialty_confidence", null);
 
   if (fetchError) {

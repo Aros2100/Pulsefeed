@@ -20,8 +20,7 @@ export async function GET(request: NextRequest) {
   const { data: articles, error } = await admin
     .from("articles")
     .select("id, title, journal_abbr, journal_title, published_date, abstract, pubmed_id, authors, specialty_confidence")
-    .eq("circle", 2)
-    .eq("verified", false)
+    .eq("status", "pending")
     .order("specialty_confidence", { ascending: true, nullsFirst: false })
     .limit(100);
 

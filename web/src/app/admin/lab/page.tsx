@@ -41,8 +41,7 @@ export default async function LabPage() {
     admin
       .from("articles")
       .select("id", { count: "exact", head: true })
-      .eq("circle", 2)
-      .eq("verified", false),
+      .eq("status", "pending"),
     admin
       .from("lab_decisions")
       .select("decision, decided_at")

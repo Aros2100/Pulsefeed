@@ -22,8 +22,7 @@ export async function GET(request: NextRequest) {
     admin
       .from("articles")
       .select("id", { count: "exact", head: true })
-      .eq("circle", 2)
-      .eq("verified", false)
+      .eq("status", "pending")
       .contains("specialty_tags", [specialty]),
 
     // All lab decisions for this specialty+module

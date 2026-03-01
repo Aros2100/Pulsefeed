@@ -140,6 +140,7 @@ export async function runImportCircle2(
             specialty_tags:    [],
             circle:            2,
             verified:          false,
+            status:            "pending",
           }));
 
           const { data: upsertedRows, error: upsertErr } = await admin

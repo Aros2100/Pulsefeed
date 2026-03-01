@@ -36,7 +36,7 @@ export default async function NewsletterSelectPage() {
   let query = supabase
     .from("articles")
     .select("id, title, journal_abbr, published_date, authors, publication_types, news_value, clinical_relevance, enriched_at, short_resume, abstract, pico, pubmed_id, volume, issue, imported_at")
-    .eq("verified", true)
+    .eq("status", "approved")
     .gte("imported_at", twoWeeksAgo)
     .order("news_value", { ascending: false, nullsFirst: false })
     .limit(50);

@@ -103,7 +103,7 @@ export default async function ArticleDetailPage({
     .from("articles")
     .select("*")
     .eq("id", id)
-    .eq("verified", true)
+    .eq("status", "approved")
     .single();
 
   if (!article) notFound();

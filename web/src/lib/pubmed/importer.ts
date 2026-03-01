@@ -760,6 +760,7 @@ export async function runImport(
             specialty_tags:    [specialty],
             circle:            1,
             verified:          true,
+            status:            "approved",
           }));
 
           // Pre-insert validation: every row must have a non-empty specialty_tags
