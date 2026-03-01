@@ -102,6 +102,15 @@ export default async function SpecialtyImportPage({
 
   const importLogs = logs ?? [];
 
+  // Accumulated total per row (newest → oldest).
+  // Baseline is the actual DB total; each older row subtracts the imported count of the rows above it.
+  let runningTotal = totalCount;
+  const accumulatedByIndex = importLogs.map((log) => {
+    const acc = runningTotal;
+    runningTotal -= (log.articles_imported ?? 0);
+    return acc;
+  });
+
   return (
     <div style={{
       fontFamily: "var(--font-inter), Inter, sans-serif",
@@ -205,6 +214,7 @@ export default async function SpecialtyImportPage({
                     <th style={thStyle}>Status</th>
                     <th style={{ ...thStyle, textAlign: "right" }}>Fetched</th>
                     <th style={{ ...thStyle, textAlign: "right" }}>Imported</th>
+                    <th style={{ ...thStyle, textAlign: "right" }}>Akkumuleret</th>
                     <th style={{ ...thStyle, textAlign: "right" }}>Skipped</th>
                     <th style={{ ...thStyle, textAlign: "right" }}>Errors</th>
                     <th style={{ ...thStyle, textAlign: "center" }}>Balance</th>
@@ -212,7 +222,7 @@ export default async function SpecialtyImportPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {importLogs.map((log) => {
+                  {importLogs.map((log, i) => {
                     const failed = log.status === "failed";
                     const errCount = errorCount(log.errors);
                     const fetched = log.articles_fetched ?? 0;
@@ -267,6 +277,9 @@ export default async function SpecialtyImportPage({
                         </td>
                         <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: failed ? "#b91c1c" : "#15803d" }}>
                           {imported}
+                        </td>
+                        <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: "#1a1a1a" }}>
+                          {accumulatedByIndex[i]}
                         </td>
                         <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", color: failed ? "#b91c1c" : "#888" }}>
                           {skipped}
