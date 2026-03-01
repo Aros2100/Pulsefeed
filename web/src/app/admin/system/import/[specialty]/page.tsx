@@ -86,25 +86,47 @@ export default async function SpecialtyImportPage({
 
   const { data: logs } = await logsQuery;
 
-  // Summary stats — single query with conditional aggregation
+  // All logs (no limit) for accurate flow sums
+  let allLogsQuery = admin
+    .from("import_logs")
+    .select("articles_fetched, articles_imported, articles_skipped");
+
+  if (filterIds.length > 0) {
+    allLogsQuery = allLogsQuery.or(`filter_id.is.null,filter_id.in.(${filterIds.join(",")})`);
+  } else {
+    allLogsQuery = allLogsQuery.is("filter_id", null);
+  }
+
+  const { data: allLogs } = await allLogsQuery;
+  const allLogsRows = allLogs ?? [];
+  const totalFetched  = allLogsRows.reduce((s, r) => s + (r.articles_fetched  ?? 0), 0);
+  const totalImported = allLogsRows.reduce((s, r) => s + (r.articles_imported ?? 0), 0);
+  const totalSkipped  = allLogsRows.reduce((s, r) => s + (r.articles_skipped  ?? 0), 0);
+
+  // Current DB state — need both circle and status
   const { data: articleRows } = await admin
     .from("articles")
-    .select("status")
+    .select("circle, status")
     .contains("specialty_tags", [specialty]);
 
   const rows = articleRows ?? [];
-  const circle1Count = rows.filter((r) => r.status === "approved").length;
-  const circle2Count = rows.filter((r) => r.status === "pending").length;
-  const circle3Count = rows.filter((r) => r.status === "rejected").length;
-  const totalCount = rows.length;
+  const autoVerified   = rows.filter((r) => r.circle === 1 && r.status === "approved").length;
+  const c2Total        = rows.filter((r) => r.circle === 2).length;
+  const c2Approved     = rows.filter((r) => r.circle === 2 && r.status === "approved").length;
+  const c2Pending      = rows.filter((r) => r.circle === 2 && r.status === "pending").length;
+  const c2Rejected     = rows.filter((r) => r.circle === 2 && r.status === "rejected").length;
+  const totalInDB      = rows.length;
+
+  // Balance checks
+  const balanceFlow       = totalImported === autoVerified + c2Total;
+  const balanceValidering = c2Total === c2Approved + c2Pending + c2Rejected;
 
   const lastImportAt = logs?.find((l) => l.status === "completed")?.completed_at ?? null;
 
   const importLogs = logs ?? [];
 
   // Accumulated total per row (newest → oldest).
-  // Baseline is the actual DB total; each older row subtracts the imported count of the rows above it.
-  let runningTotal = totalCount;
+  let runningTotal = totalInDB;
   const accumulatedByIndex = importLogs.map((log) => {
     const acc = runningTotal;
     runningTotal -= (log.articles_imported ?? 0);
@@ -147,33 +169,111 @@ export default async function SpecialtyImportPage({
         </div>
 
         {/* Summary stats */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(5, 1fr)",
-          gap: "12px",
-          marginBottom: "28px",
-        }}>
+
+        {/* Row 1 — Total flow */}
+        <div style={{ fontSize: "11px", color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: "8px" }}>
+          Total flow · alle import runs
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "20px" }}>
           {[
-            { label: "Total articles", value: totalCount },
-            { label: "Circle 1 · Verified", value: circle1Count },
-            { label: "Circle 2 · Pending", value: circle2Count },
-            { label: "Circle 3 · Rejected", value: circle3Count, red: circle3Count > 0 },
-            { label: "Last import", value: fmt(lastImportAt), small: true },
-          ].map(({ label, value, small, red }) => (
+            { label: "Hentet fra PubMed", value: totalFetched },
+            { label: "Importeret", value: totalImported, green: true },
+            { label: "Skippet", value: totalSkipped, muted: true },
+          ].map(({ label, value, green, muted }) => (
             <div key={label} style={{
               background: "#fff",
               borderRadius: "10px",
               boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
               padding: "16px 20px",
             }}>
-              <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>
-                {label}
-              </div>
-              <div style={{ fontSize: small ? "14px" : "22px", fontWeight: 700, color: red ? "#b91c1c" : "#1a1a1a", lineHeight: 1.3 }}>
-                {value}
-              </div>
+              <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>{label}</div>
+              <div style={{ fontSize: "22px", fontWeight: 700, color: green ? "#15803d" : muted ? "#888" : "#1a1a1a" }}>{value.toLocaleString("da-DK")}</div>
             </div>
           ))}
+        </div>
+
+        {/* Row 2 — Current DB state */}
+        <div style={{ fontSize: "11px", color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: "8px" }}>
+          Nuværende tilstand i databasen
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+
+          {/* Auto-verificeret */}
+          <div style={{
+            background: "#fff",
+            borderRadius: "10px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
+            padding: "16px 20px",
+          }}>
+            <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>Auto-verificeret · Circle 1</div>
+            <div style={{ fontSize: "28px", fontWeight: 700, color: "#15803d" }}>{autoVerified.toLocaleString("da-DK")}</div>
+            <div style={{ fontSize: "11px", color: "#bbb", marginTop: "4px" }}>circle = 1 · status = approved</div>
+          </div>
+
+          {/* Til validering */}
+          <div style={{
+            background: "#fff",
+            borderRadius: "10px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
+            padding: "16px 20px",
+          }}>
+            <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>Til validering · Circle 2</div>
+            <div style={{ fontSize: "28px", fontWeight: 700, color: "#1a1a1a", marginBottom: "12px" }}>{c2Total.toLocaleString("da-DK")}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+              {[
+                { label: "Godkendt", value: c2Approved, color: "#15803d" },
+                { label: "Afventer", value: c2Pending,  color: "#d97706" },
+                { label: "Afvist",   value: c2Rejected, color: "#b91c1c" },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ background: "#f8f9fb", borderRadius: "6px", padding: "8px 10px" }}>
+                  <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "3px" }}>{label}</div>
+                  <div style={{ fontSize: "18px", fontWeight: 700, color }}>{value.toLocaleString("da-DK")}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Balance checks */}
+        <div style={{
+          background: "#fff",
+          borderRadius: "10px",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
+          padding: "14px 20px",
+          marginBottom: "28px",
+          display: "flex",
+          gap: "32px",
+          alignItems: "center",
+        }}>
+          <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, flexShrink: 0 }}>Balance</div>
+          <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+              <span style={{ fontSize: "15px", fontWeight: 700, color: balanceFlow ? "#15803d" : "#b91c1c" }}>
+                {balanceFlow ? "✓" : "✗"}
+              </span>
+              <span style={{ color: "#5a6a85" }}>
+                Importeret ({totalImported}) = Auto-verificeret ({autoVerified}) + Til validering ({c2Total})
+                {!balanceFlow && (
+                  <span style={{ color: "#b91c1c", marginLeft: "6px" }}>
+                    diff: {totalImported - autoVerified - c2Total > 0 ? "+" : ""}{totalImported - autoVerified - c2Total}
+                  </span>
+                )}
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+              <span style={{ fontSize: "15px", fontWeight: 700, color: balanceValidering ? "#15803d" : "#b91c1c" }}>
+                {balanceValidering ? "✓" : "✗"}
+              </span>
+              <span style={{ color: "#5a6a85" }}>
+                Til validering ({c2Total}) = Godkendt ({c2Approved}) + Afventer ({c2Pending}) + Afvist ({c2Rejected})
+                {!balanceValidering && (
+                  <span style={{ color: "#b91c1c", marginLeft: "6px" }}>
+                    diff: {c2Total - c2Approved - c2Pending - c2Rejected > 0 ? "+" : ""}{c2Total - c2Approved - c2Pending - c2Rejected}
+                  </span>
+                )}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Import runs table */}
