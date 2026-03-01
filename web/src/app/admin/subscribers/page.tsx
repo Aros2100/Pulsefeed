@@ -456,6 +456,13 @@ export default function SubscribersPage() {
       <Header />
 
       <main className="mx-auto max-w-6xl w-full px-4 sm:px-6 py-8">
+        {/* Back link */}
+        <div className="mb-4">
+          <a href="/admin" className="text-sm text-slate-500 hover:text-slate-700 no-underline transition-colors">
+            ← Admin
+          </a>
+        </div>
+
         {/* Toolbar */}
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-slate-900">Subscribers</h1>

@@ -248,8 +248,13 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
           fontSize: "14px", color: "#5a6a85",
           marginLeft: "24px", paddingLeft: "24px",
           borderLeft: "1px solid #dde3ed",
+          display: "flex", alignItems: "center", gap: "12px",
         }}>
-          Select articles · Week {weekNumber} · {specialtyLabel}
+          <a href="/admin" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+            ← Admin
+          </a>
+          <span style={{ color: "#dde3ed" }}>·</span>
+          <span>Select articles · Week {weekNumber} · {specialtyLabel}</span>
         </div>
         <div style={{ marginLeft: "auto" }}>
           <div style={{
