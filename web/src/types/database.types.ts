@@ -142,7 +142,7 @@ export type Database = {
           },
         ]
       }
-      training_decisions: {
+      lab_decisions: {
         Row: {
           id: string
           article_id: string | null
@@ -178,7 +178,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "training_decisions_article_id_fkey"
+            foreignKeyName: "lab_decisions_article_id_fkey"
             columns: ["article_id"]
             isOneToOne: false
             referencedRelation: "articles"

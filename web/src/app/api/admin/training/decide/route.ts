@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  const { error: insertError } = await admin.from("training_decisions").insert({
+  const { error: insertError } = await admin.from("lab_decisions").insert({
     article_id,
     specialty,
     editor_verdict,

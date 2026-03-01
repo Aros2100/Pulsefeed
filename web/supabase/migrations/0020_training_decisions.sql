@@ -1,4 +1,4 @@
-CREATE TABLE public.training_decisions (
+CREATE TABLE public.lab_decisions (
   id                  UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   article_id          UUID REFERENCES public.articles(id),
   specialty           TEXT NOT NULL,
@@ -11,8 +11,8 @@ CREATE TABLE public.training_decisions (
 );
 
 -- Index for querying by specialty
-CREATE INDEX training_decisions_specialty_idx ON public.training_decisions (specialty);
-CREATE INDEX training_decisions_article_id_idx ON public.training_decisions (article_id);
+CREATE INDEX lab_decisions_specialty_idx ON public.lab_decisions (specialty);
+CREATE INDEX lab_decisions_article_id_idx ON public.lab_decisions (article_id);
 
 -- Notify PostgREST to reload schema
 NOTIFY pgrst, 'reload schema';
