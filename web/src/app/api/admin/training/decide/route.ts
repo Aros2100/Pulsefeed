@@ -47,11 +47,9 @@ export async function POST(request: NextRequest) {
     article_id,
     specialty,
     decision: editor_verdict,
-    ai_verdict: ai_verdict ?? null,
+    ai_decision: ai_verdict ?? null,
     ai_confidence: ai_confidence ?? null,
-    agreement,
     disagreement_reason: disagreement_reason ?? null,
-    disagreement_comment: disagreement_comment ?? null,
   });
 
   if (insertError) {
