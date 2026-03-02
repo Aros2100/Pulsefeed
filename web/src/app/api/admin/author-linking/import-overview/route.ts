@@ -25,7 +25,7 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 
-  type Filter = { name: string; circle: number | null } | null;
+  type Filter = { name: string; circle: number | null } | { name: string; circle: number | null }[] | null;
   type LinkingLog = { articles_processed: number; authors_linked: number; status: string; new_authors: number | null; duplicates: number | null; rejected: number | null };
 
   const ids = (data ?? []).map((il) => il.id);
@@ -41,7 +41,8 @@ export async function GET() {
   );
 
   const rows = (data ?? []).map((il) => {
-    const filter = il.pubmed_filters as Filter;
+    const filterRaw = il.pubmed_filters as Filter;
+    const filter = Array.isArray(filterRaw) ? (filterRaw[0] ?? null) : filterRaw;
     const linkingLogs = (il.author_linking_logs ?? []) as LinkingLog[];
     const linking = linkingLogs[0] ?? null;
 
