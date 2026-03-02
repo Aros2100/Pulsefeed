@@ -23,6 +23,7 @@ interface ImportOverviewRow {
   circle: number | null;
   authors_linked: number | null;
   linking_status: string | null;
+  unlinked_author_slots: number;
 }
 
 interface StatusResponse {
@@ -293,6 +294,7 @@ export default function AuthorLinkingPage() {
                   <th style={thStyle}>Filter</th>
                   <th style={{ ...thStyle, textAlign: "right" }}>Artikler importeret</th>
                   <th style={{ ...thStyle, textAlign: "right" }}>Forfattere linket</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>Forfattere i kø</th>
                   <th style={thStyle}>Status</th>
                 </tr>
               </thead>
@@ -313,6 +315,9 @@ export default function AuthorLinkingPage() {
                     </td>
                     <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: row.authors_linked != null ? "#1a1a1a" : "#bbb" }}>
                       {row.authors_linked != null ? row.authors_linked.toLocaleString("da-DK") : "—"}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: row.unlinked_author_slots > 0 ? "#d97706" : "#bbb" }}>
+                      {row.unlinked_author_slots > 0 ? row.unlinked_author_slots.toLocaleString("da-DK") : "—"}
                     </td>
                     <td style={tdStyle}>
                       <LinkingStatusBadge status={row.linking_status} />
