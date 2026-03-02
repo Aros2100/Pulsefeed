@@ -139,7 +139,7 @@ function LabCard({ data }: { data: Record<string, unknown> }) {
       {aiConf != null && (
         <KV label="AI confidence" value={`${(aiConf * 100).toFixed(1)}%`} />
       )}
-      {data.disagreement_reason && (
+      {Boolean(data.disagreement_reason) && (
         <KV label="Årsag til uenighed" value={
           <span style={{ color: "#b91c1c" }}>{String(data.disagreement_reason)}</span>
         } />
