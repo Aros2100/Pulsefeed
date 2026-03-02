@@ -153,7 +153,7 @@ function FeedbackCard({ data }: { data: Record<string, unknown> }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       <KV label="Tidspunkt" value={fmt(data.decided_at as string)} />
       <KV label="Uge / År" value={`Uge ${data.week_number}, ${data.year}`} />
-      {data.decision && (
+      {Boolean(data.decision) && (
         <KV label="Beslutning" value={
           <Badge color={data.decision === "approved" ? "green" : "red"}>{String(data.decision)}</Badge>
         } />
