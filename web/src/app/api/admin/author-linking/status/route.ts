@@ -15,7 +15,7 @@ export async function GET() {
       .order("started_at", { ascending: false })
       .limit(20),
     admin.rpc("count_unlinked_articles"),
-    admin.rpc("count_unlinked_author_slots"),
+    admin.rpc("count_unlinked_author_slots" as never),
     admin.from("article_authors").select("id", { count: "exact", head: true }),
     admin
       .from("author_linking_logs")
