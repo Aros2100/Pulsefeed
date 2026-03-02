@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
   const [approvedResult, rejectedResult] = await Promise.all([
     approvedIds.length > 0
       ? admin.from("articles")
-          .update({ verified: true, circle: 1, status: "approved", specialty_tags: [specialty] })
+          .update({ verified: true, status: "approved", specialty_tags: [specialty] })
           .in("id", approvedIds)
       : Promise.resolve({ error: null }),
     rejectedIds.length > 0
