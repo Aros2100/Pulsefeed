@@ -107,8 +107,8 @@ export default function ImportControl() {
         jobId?: string;
         error?: string;
       };
-      if (data.ok && data.jobId) {
-        setJobId(data.jobId);
+      if (data.ok) {
+        setJobId(data.jobId ?? null);
         await fetchLogs(); // Show the new "running" entry immediately
       } else {
         setError(data.error ?? "Failed to start import");
