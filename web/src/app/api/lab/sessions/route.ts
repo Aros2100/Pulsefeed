@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       : Promise.resolve({ error: null }),
     rejectedIds.length > 0
       ? admin.from("articles")
-          .update({ verified: false, circle: 3, status: "rejected", specialty_tags: [] })
+          .update({ verified: false, status: "rejected" })
           .in("id", rejectedIds)
       : Promise.resolve({ error: null }),
   ]);
