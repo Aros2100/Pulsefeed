@@ -84,7 +84,7 @@ function parseDateCompleted(dc: unknown): string | null {
 
 // ── HTML entity decoding ───────────────────────────────────────────────────────
 
-function decodeHtmlEntities(str: string): string {
+export function decodeHtmlEntities(str: string): string {
   return str
     .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
     .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))

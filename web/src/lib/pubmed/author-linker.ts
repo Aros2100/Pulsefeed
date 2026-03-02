@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { linkAuthorsToArticle, type Author } from "@/lib/pubmed/importer";
+import { linkAuthorsToArticle, decodeHtmlEntities, type Author } from "@/lib/pubmed/importer";
 
 const BATCH_SIZE = 20;
 
@@ -44,8 +44,8 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
         }
 
         const authors: Author[] = rawAuthors.map((a) => ({
-          lastName:    String(a.lastName ?? ""),
-          foreName:    String(a.foreName ?? ""),
+          lastName:    decodeHtmlEntities(String(a.lastName ?? "")),
+          foreName:    decodeHtmlEntities(String(a.foreName ?? "")),
           affiliation: a.affiliation != null ? String(a.affiliation) : null,
           orcid:       a.orcid != null ? String(a.orcid) : null,
         }));
