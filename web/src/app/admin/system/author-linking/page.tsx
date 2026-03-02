@@ -12,16 +12,30 @@ interface AuthorLinkingLog {
   articles_processed: number;
   authors_linked: number;
   errors: string[];
-  import_log_id: string | null;
-  import_filter_name: string | null;
+}
+
+interface ImportOverviewRow {
+  id: string;
+  started_at: string;
+  articles_imported: number;
+  trigger: string | null;
+  filter_name: string | null;
+  circle: number | null;
+  authors_linked: number | null;
+  linking_status: string | null;
 }
 
 interface StatusResponse {
   ok: boolean;
   latest: AuthorLinkingLog | null;
-  logs: AuthorLinkingLog[];
   unlinkedCount: number;
+  unlinkedAuthorSlots: number;
   totalAuthors: number;
+}
+
+interface ImportOverviewResponse {
+  ok: boolean;
+  rows: ImportOverviewRow[];
 }
 
 function fmt(iso: string | null) {
@@ -32,13 +46,6 @@ function fmt(iso: string | null) {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function duration(log: AuthorLinkingLog): string {
-  if (!log.completed_at) return "—";
-  const ms = new Date(log.completed_at).getTime() - new Date(log.started_at).getTime();
-  const s = Math.round(ms / 1000);
-  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
 const thStyle: React.CSSProperties = {
@@ -61,77 +68,96 @@ const tdStyle: React.CSSProperties = {
   borderBottom: "1px solid #f1f3f7",
 };
 
-function StatusBadge({ status }: { status: AuthorLinkingLog["status"] }) {
-  const styles: Record<AuthorLinkingLog["status"], React.CSSProperties> = {
-    running:   { background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" },
-    completed: { background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0" },
-    failed:    { background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca" },
-  };
+function LinkingStatusBadge({ status }: { status: string | null }) {
+  if (status === "completed") {
+    return (
+      <span style={{
+        display: "inline-flex", alignItems: "center", gap: "4px",
+        borderRadius: "999px", padding: "2px 8px",
+        fontSize: "11px", fontWeight: 600,
+        background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0",
+      }}>
+        ✓ Linket
+      </span>
+    );
+  }
+  if (status === "running") {
+    return (
+      <span style={{
+        display: "inline-flex", alignItems: "center", gap: "5px",
+        borderRadius: "999px", padding: "2px 8px",
+        fontSize: "11px", fontWeight: 600,
+        background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe",
+      }}>
+        <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#3b82f6", animation: "pulse 1.5s infinite" }} />
+        Kører…
+      </span>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <span style={{
+        display: "inline-flex", alignItems: "center", gap: "4px",
+        borderRadius: "999px", padding: "2px 8px",
+        fontSize: "11px", fontWeight: 600,
+        background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca",
+      }}>
+        Fejlet
+      </span>
+    );
+  }
+  // null = no linking job for this import
   return (
-    <span style={{
-      display: "inline-flex",
-      alignItems: "center",
-      gap: "5px",
-      borderRadius: "999px",
-      padding: "2px 8px",
-      fontSize: "11px",
-      fontWeight: 600,
-      ...styles[status],
-    }}>
-      {status === "running" && (
-        <span style={{
-          width: "6px",
-          height: "6px",
-          borderRadius: "50%",
-          background: "#3b82f6",
-          animation: "pulse 1.5s infinite",
-        }} />
-      )}
-      {status === "running" ? "Kører…" : status === "completed" ? "Færdig" : "Fejlet"}
-    </span>
+    <span style={{ fontSize: "12px", color: "#bbb" }}>⏳ Afventer</span>
   );
 }
 
 export default function AuthorLinkingPage() {
-  const [data, setData] = useState<StatusResponse | null>(null);
+  const [status, setStatus] = useState<StatusResponse | null>(null);
+  const [overview, setOverview] = useState<ImportOverviewRow[] | null>(null);
   const [starting, setStarting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const fetchStatus = useCallback(async () => {
+  const fetchAll = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/author-linking/status");
-      const json = (await res.json()) as StatusResponse;
-      if (json.ok) setData(json);
+      const [statusRes, overviewRes] = await Promise.all([
+        fetch("/api/admin/author-linking/status"),
+        fetch("/api/admin/author-linking/import-overview"),
+      ]);
+      const statusJson = (await statusRes.json()) as StatusResponse;
+      const overviewJson = (await overviewRes.json()) as ImportOverviewResponse;
+      if (statusJson.ok) setStatus(statusJson);
+      if (overviewJson.ok) setOverview(overviewJson.rows);
     } catch (e) {
-      console.error("[author-linking] fetchStatus error:", e);
+      console.error("[author-linking] fetchAll error:", e);
     }
   }, []);
 
   useEffect(() => {
-    void fetchStatus();
-  }, [fetchStatus]);
+    void fetchAll();
+  }, [fetchAll]);
 
-  const isRunning = data?.latest?.status === "running";
+  const isRunning = status?.latest?.status === "running";
 
   useEffect(() => {
     if (!isRunning) return;
-    const id = setInterval(() => { void fetchStatus(); }, 3000);
+    const id = setInterval(() => { void fetchAll(); }, 3000);
     return () => clearInterval(id);
-  }, [isRunning, fetchStatus]);
+  }, [isRunning, fetchAll]);
 
   async function handleStart() {
     setStarting(true);
-    setError(null);
+    setActionError(null);
     try {
       const res = await fetch("/api/admin/author-linking/start", { method: "POST" });
       const json = (await res.json()) as { ok: boolean; error?: string };
       if (!json.ok) {
-        setError(json.error ?? "Ukendt fejl");
+        setActionError(json.error ?? "Ukendt fejl");
       } else {
-        await fetchStatus();
+        await fetchAll();
       }
     } catch {
-      setError("Netværksfejl");
+      setActionError("Netværksfejl");
     } finally {
       setStarting(false);
     }
@@ -154,12 +180,8 @@ export default function AuthorLinkingPage() {
         </div>
         <div style={{ marginBottom: "28px" }}>
           <div style={{
-            fontSize: "11px",
-            letterSpacing: "0.08em",
-            color: "#E83B2A",
-            textTransform: "uppercase",
-            fontWeight: 700,
-            marginBottom: "6px",
+            fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A",
+            textTransform: "uppercase", fontWeight: 700, marginBottom: "6px",
           }}>
             System · Forfattere
           </div>
@@ -187,7 +209,15 @@ export default function AuthorLinkingPage() {
                 Artikler uden forfattere
               </div>
               <div style={{ fontSize: "28px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                {data == null ? "—" : data.unlinkedCount.toLocaleString("da-DK")}
+                {status == null ? "—" : status.unlinkedCount.toLocaleString("da-DK")}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: "13px", color: "#5a6a85", marginBottom: "4px" }}>
+                Forfatter-slots i kø
+              </div>
+              <div style={{ fontSize: "28px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                {status == null ? "—" : status.unlinkedAuthorSlots.toLocaleString("da-DK")}
               </div>
             </div>
             <div>
@@ -195,41 +225,38 @@ export default function AuthorLinkingPage() {
                 Forfattere i DB
               </div>
               <div style={{ fontSize: "28px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                {data == null ? "—" : data.totalAuthors.toLocaleString("da-DK")}
+                {status == null ? "—" : status.totalAuthors.toLocaleString("da-DK")}
               </div>
             </div>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
-            {isRunning && data?.latest && (
+            {isRunning && status?.latest && (
               <div style={{ fontSize: "13px", color: "#5a6a85", textAlign: "right" }}>
-                {data.latest.articles_processed.toLocaleString("da-DK")} artikler behandlet
-                · {data.latest.authors_linked.toLocaleString("da-DK")} forfattere koblet
+                {status.latest.articles_processed.toLocaleString("da-DK")} artikler behandlet
+                · {status.latest.authors_linked.toLocaleString("da-DK")} forfattere koblet
               </div>
             )}
             <button
               onClick={() => { void handleStart(); }}
               disabled={isRunning || starting}
               style={{
-                padding: "8px 20px",
-                borderRadius: "6px",
-                border: "none",
+                padding: "8px 20px", borderRadius: "6px", border: "none",
                 background: isRunning || starting ? "#e5e7eb" : "#E83B2A",
                 color: isRunning || starting ? "#9ca3af" : "#fff",
-                fontWeight: 600,
-                fontSize: "13px",
+                fontWeight: 600, fontSize: "13px",
                 cursor: isRunning || starting ? "not-allowed" : "pointer",
               }}
             >
               {isRunning ? "Kører…" : starting ? "Starter…" : "Kør forfatter-import"}
             </button>
-            {error && (
-              <div style={{ fontSize: "12px", color: "#b91c1c" }}>{error}</div>
+            {actionError && (
+              <div style={{ fontSize: "12px", color: "#b91c1c" }}>{actionError}</div>
             )}
           </div>
         </div>
 
-        {/* Logs table */}
+        {/* Import overview table */}
         <div style={{
           background: "#fff",
           borderRadius: "10px",
@@ -242,60 +269,53 @@ export default function AuthorLinkingPage() {
             padding: "10px 24px",
           }}>
             <span style={{
-              fontSize: "11px",
-              letterSpacing: "0.08em",
-              color: "#E83B2A",
-              textTransform: "uppercase",
-              fontWeight: 700,
+              fontSize: "11px", letterSpacing: "0.08em",
+              color: "#E83B2A", textTransform: "uppercase", fontWeight: 700,
             }}>
-              Seneste kørsler
+              Import-kørsler
             </span>
           </div>
 
-          {!data ? (
+          {overview == null ? (
             <div style={{ padding: "48px", textAlign: "center", fontSize: "13px", color: "#888" }}>
               Indlæser…
             </div>
-          ) : data.logs.length === 0 ? (
+          ) : overview.length === 0 ? (
             <div style={{ padding: "48px", textAlign: "center", fontSize: "13px", color: "#888" }}>
-              Ingen kørsler endnu
+              Ingen import-kørsler endnu
             </div>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
                   <th style={thStyle}>Dato</th>
-                  <th style={thStyle}>Import</th>
-                  <th style={thStyle}>Artikler processeret</th>
-                  <th style={thStyle}>Forfattere linket</th>
+                  <th style={thStyle}>Cirkel</th>
+                  <th style={thStyle}>Filter</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>Artikler importeret</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>Forfattere linket</th>
                   <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Varighed</th>
-                  <th style={thStyle}>Fejl</th>
                 </tr>
               </thead>
               <tbody>
-                {data.logs.map((log) => (
-                  <tr key={log.id}>
+                {overview.map((row) => (
+                  <tr key={row.id}>
                     <td style={{ ...tdStyle, whiteSpace: "nowrap", color: "#5a6a85" }}>
-                      {fmt(log.started_at)}
+                      {fmt(row.started_at)}
                     </td>
-                    <td style={{ ...tdStyle, color: log.import_filter_name ? "#1a1a1a" : "#bbb" }}>
-                      {log.import_filter_name ?? "—"}
+                    <td style={{ ...tdStyle, color: "#5a6a85" }}>
+                      {row.circle != null ? `C${row.circle}` : "—"}
                     </td>
-                    <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
-                      {log.articles_processed.toLocaleString("da-DK")}
+                    <td style={{ ...tdStyle, color: row.filter_name ? "#1a1a1a" : "#bbb" }}>
+                      {row.filter_name ?? "—"}
                     </td>
-                    <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
-                      {log.authors_linked.toLocaleString("da-DK")}
+                    <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                      {row.articles_imported.toLocaleString("da-DK")}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: row.authors_linked != null ? "#1a1a1a" : "#bbb" }}>
+                      {row.authors_linked != null ? row.authors_linked.toLocaleString("da-DK") : "—"}
                     </td>
                     <td style={tdStyle}>
-                      <StatusBadge status={log.status} />
-                    </td>
-                    <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums", color: "#888" }}>
-                      {duration(log)}
-                    </td>
-                    <td style={{ ...tdStyle, color: log.errors?.length > 0 ? "#b91c1c" : "#bbb" }}>
-                      {log.errors?.length > 0 ? `${log.errors.length} fejl` : "—"}
+                      <LinkingStatusBadge status={row.linking_status} />
                     </td>
                   </tr>
                 ))}

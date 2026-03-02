@@ -8,13 +8,14 @@ export async function GET() {
 
   const admin = createAdminClient();
 
-  const [logsResult, unlinkedResult, authorsResult] = await Promise.all([
+  const [logsResult, unlinkedResult, unlinkedSlotsResult, authorsResult] = await Promise.all([
     admin
       .from("author_linking_logs")
       .select("*")
       .order("started_at", { ascending: false })
       .limit(20),
     admin.rpc("count_unlinked_articles"),
+    admin.rpc("count_unlinked_author_slots"),
     admin.from("article_authors").select("id", { count: "exact", head: true }),
   ]);
 
@@ -56,6 +57,7 @@ export async function GET() {
     latest: enrichedLogs[0] ?? null,
     logs: enrichedLogs,
     unlinkedCount: (unlinkedResult.data as number | null) ?? 0,
+    unlinkedAuthorSlots: (unlinkedSlotsResult.data as number | null) ?? 0,
     totalAuthors: authorsResult.count ?? 0,
   });
 }
