@@ -107,14 +107,17 @@ export default async function SpecialtyImportPage({
   const c1Approved  = get(1, "approved");
   const c2Approved  = get(2, "approved");
   const c2Pending   = get(2, "pending");
-  const c2Rejected  = get(2, "rejected");
+  // circle=3 are old-code rejections (before circle was frozen at import).
+  // Fold them into the rejected count so they show up correctly.
+  const c2Rejected  = get(2, "rejected") + get(3, "rejected");
   const c2Total     = c2Approved + c2Pending + c2Rejected;
   const c1Total     = stats.filter((r) => r.circle === 1).reduce((s, r) => s + Number(r.antal), 0);
+  const c3Total     = stats.filter((r) => r.circle === 3).reduce((s, r) => s + Number(r.antal), 0);
   const totalInDB   = stats.reduce((s, r) => s + Number(r.antal), 0);
   const tilgaengelige = c1Approved + c2Approved;
 
   // Balance checks
-  const balanceAll  = c1Total + c2Total === totalInDB; // all articles in circle 1 or 2
+  const balanceAll  = c1Total + c2Total + c3Total === totalInDB;
   const balanceTilg = tilgaengelige === c1Approved + c2Approved; // always definitionally true
 
   // ── Import logs ────────────────────────────────────────────────────────────
