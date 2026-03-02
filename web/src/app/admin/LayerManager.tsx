@@ -280,8 +280,8 @@ function Circle1Tab({ specialty }: { specialty: string }) {
         body: JSON.stringify({}),
       });
       const d = (await res.json()) as { ok: boolean; jobId?: string; error?: string };
-      if (d.ok && d.jobId) {
-        setJobId(d.jobId);
+      if (d.ok) {
+        setJobId(d.jobId ?? null);
         await fetchLogs();
       } else {
         setImportError(d.error ?? "Failed to start import");
@@ -575,8 +575,8 @@ function Circle2Tab({ specialty }: { specialty: string }) {
         method: "POST",
       });
       const d = (await res.json()) as { ok: boolean; jobId?: string; error?: string };
-      if (d.ok && d.jobId) {
-        setJobId(d.jobId);
+      if (d.ok) {
+        setJobId(d.jobId ?? null);
         await fetchLogs();
       } else {
         setImportError(d.error ?? "Failed to start import");
