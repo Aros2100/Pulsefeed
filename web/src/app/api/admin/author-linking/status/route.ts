@@ -22,7 +22,7 @@ export async function GET() {
       .select("new_authors, duplicates, rejected")
       .in("status", ["completed", "running"]),
     admin
-      .from("rejected_authors")
+      .from("rejected_authors" as never)
       .select("id", { count: "exact", head: true }),
   ]);
 

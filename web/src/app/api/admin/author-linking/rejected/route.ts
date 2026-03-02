@@ -9,7 +9,7 @@ export async function GET() {
   const admin = createAdminClient();
 
   const { data, error } = await admin
-    .from("rejected_authors")
+    .from("rejected_authors" as never)
     .select(`
       id,
       pubmed_id,
