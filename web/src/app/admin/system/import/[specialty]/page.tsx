@@ -98,7 +98,7 @@ export default async function SpecialtyImportPage({
     "get_specialty_article_stats" as never,
     { specialty_slug: specialty } as never
   );
-  const stats = (statsRows as StatRow[]) ?? [];
+  const stats = (statsRows as unknown as StatRow[]) ?? [];
 
   function get(c: number, s: string) {
     return Number(stats.find((r) => r.circle === c && r.status === s)?.antal ?? 0);
