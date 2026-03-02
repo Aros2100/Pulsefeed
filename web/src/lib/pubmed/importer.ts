@@ -704,16 +704,9 @@ export async function runImport(
     };
   }
 
-  // 2. Create or reuse log entry
-  let logId = existingLogId ?? null;
-  if (!logId) {
-    const { data: log } = await admin
-      .from("import_logs")
-      .insert({ filter_id: filterId ?? null, status: "running", trigger })
-      .select("id")
-      .single();
-    logId = log?.id ?? null;
-  }
+  // 2. Each filter gets its own log row
+  const globalLogId = existingLogId ?? null;
+  let logId = globalLogId; // track last used for return value
 
   for (const filter of filters) {
     // Guard: specialty must be a non-empty string — never insert without it
@@ -725,6 +718,23 @@ export async function runImport(
     }
     const specialty = String(filter.specialty).trim();
 
+    // Create per-filter log entry
+    let filterLogId = globalLogId;
+    if (!filterLogId) {
+      const { data: filterLog } = await admin
+        .from("import_logs")
+        .insert({ filter_id: filter.id, status: "running", trigger })
+        .select("id")
+        .single();
+      filterLogId = filterLog?.id ?? null;
+      logId = filterLogId;
+    }
+
+    let filterImported = 0;
+    let filterFetched = 0;
+    let filterSkipped = 0;
+    const filterErrors: string[] = [];
+
     try {
       await sleep(RATE_LIMIT_MS);
 
@@ -732,7 +742,7 @@ export async function runImport(
       const tSearch = Date.now();
       const pmids = await fetchPubMedIds(filter.query_string, filter.max_results ?? 100);
       console.log(`[import] fetchPubMedIds: ${Date.now() - tSearch}ms`);
-      totalFetched += pmids.length;
+      filterFetched = pmids.length;
       if (!pmids.length) continue;
 
       // 4. Deduplicate
@@ -744,7 +754,7 @@ export async function runImport(
           .in("pubmed_id", pmids);
         const existingSet = new Set(existing?.map((r) => r.pubmed_id) ?? []);
         newPmids = pmids.filter((id) => !existingSet.has(id));
-        totalSkipped += pmids.length - newPmids.length;
+        filterSkipped = pmids.length - newPmids.length;
       }
 
       // 5. Fetch & upsert in batches
@@ -806,7 +816,7 @@ export async function runImport(
           if (upsertErr) {
             errors.push(`Upsert batch error: ${upsertErr.message}`);
           } else {
-            totalImported += batch.length;
+            filterImported += batch.length;
           }
 
           if (i + BATCH_SIZE < articles.length) await sleep(RATE_LIMIT_MS);
@@ -819,25 +829,29 @@ export async function runImport(
         .update({ last_run_at: new Date().toISOString() })
         .eq("id", filter.id);
     } catch (err) {
-      errors.push(
-        `Filter "${filter.name}": ${err instanceof Error ? err.message : String(err)}`
-      );
+      const msg = `Filter "${filter.name}": ${err instanceof Error ? err.message : String(err)}`;
+      filterErrors.push(msg);
+      errors.push(msg);
     }
-  }
 
-  // 6. Finalise log
-  if (logId) {
-    await admin
-      .from("import_logs")
-      .update({
-        status: errors.length > 0 && totalImported === 0 ? "failed" : "completed",
-        articles_fetched: totalFetched,
-        articles_imported: totalImported,
-        articles_skipped: totalSkipped,
-        errors: errors.length > 0 ? errors : null,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", logId);
+    // 6. Finalise log for this filter
+    if (filterLogId) {
+      await admin
+        .from("import_logs")
+        .update({
+          status: filterErrors.length > 0 && filterImported === 0 ? "failed" : "completed",
+          articles_fetched: filterFetched,
+          articles_imported: filterImported,
+          articles_skipped: filterSkipped,
+          errors: filterErrors.length > 0 ? filterErrors : null,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", filterLogId);
+    }
+
+    totalFetched   += filterFetched;
+    totalImported  += filterImported;
+    totalSkipped   += filterSkipped;
   }
 
   return { logId, imported: totalImported, skipped: totalSkipped, errors };

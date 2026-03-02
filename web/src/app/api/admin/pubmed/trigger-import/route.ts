@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { runImport } from "@/lib/pubmed/importer";
 
@@ -15,24 +14,8 @@ export async function POST(request: NextRequest) {
     // Body is optional
   }
 
-  const admin = createAdminClient();
+  // Fire-and-forget — runImport opretter selv import_logs rækker pr. filter
+  void runImport(filterId, false, undefined, "manual");
 
-  const { data: log, error } = await admin
-    .from("import_logs")
-    .insert({ filter_id: filterId ?? null, status: "running", trigger: "manual" })
-    .select("id")
-    .single();
-
-  if (error || !log?.id) {
-    return NextResponse.json(
-      { ok: false, error: "Failed to create import job" },
-      { status: 500 }
-    );
-  }
-
-  // Fire-and-forget — works in Node.js dev server.
-  // In Vercel production, replace with a proper queue (e.g. Vercel Queues).
-  void runImport(filterId, false, log.id, "manual");
-
-  return NextResponse.json({ ok: true, jobId: log.id });
+  return NextResponse.json({ ok: true });
 }

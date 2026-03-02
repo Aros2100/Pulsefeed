@@ -299,35 +299,57 @@ export default function AuthorLinkingPage() {
             <div style={{ padding: "48px", textAlign: "center", fontSize: "13px", color: "#888" }}>
               Ingen import-kørsler endnu
             </div>
-          ) : (
+          ) : (() => {
+            const withAccumulated = [...overview]
+              .sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime())
+              .reduce<(ImportOverviewRow & { accumulated: number })[]>((acc, row, i) => {
+                const prev = acc[i - 1]?.accumulated ?? 0;
+                return [...acc, { ...row, accumulated: prev + row.unlinked_author_slots }];
+              }, [])
+              .reverse();
+            return (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
                   <th style={thStyle}>Dato</th>
-                  <th style={thStyle}>Cirkel</th>
                   <th style={thStyle}>Filter</th>
                   <th style={{ ...thStyle, textAlign: "right" }}>Artikler importeret</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>Forfattere i kø</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>Akkumuleret</th>
                   <th style={{ ...thStyle, textAlign: "right" }}>Nye ✅</th>
                   <th style={{ ...thStyle, textAlign: "right" }}>Dubletter 🔄</th>
                   <th style={{ ...thStyle, textAlign: "right" }}>Afvist ❌</th>
-                  <th style={{ ...thStyle, textAlign: "right" }}>Forfattere i kø</th>
                   <th style={thStyle}>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {overview.map((row) => (
+                {withAccumulated.map((row) => (
                   <tr key={row.id}>
                     <td style={{ ...tdStyle, whiteSpace: "nowrap", color: "#5a6a85" }}>
                       {fmt(row.started_at)}
                     </td>
-                    <td style={{ ...tdStyle, color: "#5a6a85" }}>
-                      {row.circle != null ? `C${row.circle}` : "—"}
-                    </td>
-                    <td style={{ ...tdStyle, color: row.filter_name ? "#1a1a1a" : "#bbb" }}>
-                      {row.filter_name ?? "—"}
+                    <td style={tdStyle}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        {row.circle != null && (
+                          <span style={{
+                            fontSize: "10px", fontWeight: 700, padding: "1px 6px",
+                            borderRadius: "999px", background: row.circle === 1 ? "#eff6ff" : "#f5f3ff",
+                            color: row.circle === 1 ? "#1d4ed8" : "#7c3aed", border: "1px solid currentColor",
+                          }}>
+                            C{row.circle}
+                          </span>
+                        )}
+                        <span style={{ color: row.filter_name ? "#1a1a1a" : "#bbb" }}>{row.filter_name ?? "—"}</span>
+                      </div>
                     </td>
                     <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
                       {row.articles_imported.toLocaleString("da-DK")}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: row.unlinked_author_slots > 0 ? "#d97706" : "#bbb" }}>
+                      {row.unlinked_author_slots > 0 ? row.unlinked_author_slots.toLocaleString("da-DK") : "—"}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>
+                      {row.accumulated.toLocaleString("da-DK")}
                     </td>
                     <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: row.new_authors != null ? "#15803d" : "#bbb" }}>
                       {row.new_authors != null ? row.new_authors.toLocaleString("da-DK") : "—"}
@@ -338,9 +360,6 @@ export default function AuthorLinkingPage() {
                     <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: row.rejected != null && row.rejected > 0 ? "#d97706" : "#bbb" }}>
                       {row.rejected != null && row.rejected > 0 ? row.rejected.toLocaleString("da-DK") : "—"}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: row.unlinked_author_slots > 0 ? "#d97706" : "#bbb" }}>
-                      {row.unlinked_author_slots > 0 ? row.unlinked_author_slots.toLocaleString("da-DK") : "—"}
-                    </td>
                     <td style={tdStyle}>
                       <LinkingStatusBadge status={row.linking_status} />
                     </td>
@@ -348,7 +367,8 @@ export default function AuthorLinkingPage() {
                 ))}
               </tbody>
             </table>
-          )}
+            );
+          })()}
         </div>
 
       </div>

@@ -16,11 +16,11 @@ export async function GET() {
       .limit(20),
     admin.rpc("count_unlinked_articles"),
     admin.rpc("count_unlinked_author_slots" as never),
-    admin.from("article_authors").select("id", { count: "exact", head: true }),
+    admin.from("authors").select("id", { count: "exact", head: true }),
     admin
       .from("author_linking_logs")
       .select("new_authors, duplicates, rejected")
-      .eq("status", "completed"),
+      .in("status", ["completed", "running"]),
   ]);
 
   const logs = logsResult.data ?? [];

@@ -65,7 +65,25 @@ export async function runImportCircle2(
 
   if (sourcesErr) throw new Error(`Failed to fetch sources: ${sourcesErr.message}`);
 
-  const logId = existingLogId ?? null;
+  // Opret log-række hvis ingen eksisterende er givet
+  let logId = existingLogId ?? null;
+  if (!logId) {
+    const { data: filter } = await admin
+      .from("pubmed_filters")
+      .select("id")
+      .eq("specialty", specialty)
+      .eq("circle", 2)
+      .eq("active", true)
+      .limit(1)
+      .maybeSingle();
+
+    const { data: newLog } = await admin
+      .from("import_logs")
+      .insert({ filter_id: filter?.id ?? null, status: "running", trigger })
+      .select("id")
+      .single();
+    logId = newLog?.id ?? null;
+  }
 
   if (!sources?.length) {
     if (logId) {

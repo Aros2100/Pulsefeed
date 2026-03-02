@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { runImportCircle2 } from "@/lib/pubmed/importer-circle2";
@@ -16,23 +15,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const admin = createAdminClient();
+  // Fire-and-forget — runImportCircle2 opretter selv import_logs rækken
+  void runImportCircle2(specialty, undefined, "manual");
 
-  const { data: log, error } = await admin
-    .from("import_logs")
-    .insert({ filter_id: null, status: "running", trigger: "manual" })
-    .select("id")
-    .single();
-
-  if (error || !log?.id) {
-    return NextResponse.json(
-      { ok: false, error: "Failed to create import job" },
-      { status: 500 }
-    );
-  }
-
-  // Fire-and-forget
-  void runImportCircle2(specialty, log.id, "manual");
-
-  return NextResponse.json({ ok: true, jobId: log.id });
+  return NextResponse.json({ ok: true });
 }
