@@ -29,6 +29,16 @@ interface ImportOverviewRow {
   rejected: number | null;
 }
 
+interface RejectedRow {
+  id: string;
+  pubmed_id: string;
+  position: number | null;
+  raw_data: Record<string, unknown>;
+  reason: string;
+  created_at: string;
+  articles: { id: string; title: string } | null;
+}
+
 interface StatusResponse {
   ok: boolean;
   latest: AuthorLinkingLog | null;
@@ -38,6 +48,7 @@ interface StatusResponse {
   totalNew: number;
   totalDuplicates: number;
   totalRejected: number;
+  rejectedAuthorsCount: number;
 }
 
 interface ImportOverviewResponse {
@@ -124,6 +135,9 @@ export default function AuthorLinkingPage() {
   const [overview, setOverview] = useState<ImportOverviewRow[] | null>(null);
   const [starting, setStarting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showRejected, setShowRejected] = useState(false);
+  const [rejectedRows, setRejectedRows] = useState<RejectedRow[] | null>(null);
+  const [loadingRejected, setLoadingRejected] = useState(false);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -151,6 +165,15 @@ export default function AuthorLinkingPage() {
     const id = setInterval(() => { void fetchAll(); }, 3000);
     return () => clearInterval(id);
   }, [isRunning, fetchAll]);
+
+  async function handleShowRejected() {
+    setShowRejected(true);
+    setLoadingRejected(true);
+    const res = await fetch("/api/admin/author-linking/rejected");
+    const json = (await res.json()) as { ok: boolean; rows: RejectedRow[] };
+    if (json.ok) setRejectedRows(json.rows);
+    setLoadingRejected(false);
+  }
 
   async function handleStart() {
     setStarting(true);
@@ -252,19 +275,32 @@ export default function AuthorLinkingPage() {
                 · {status.latest.authors_linked.toLocaleString("da-DK")} forfattere koblet
               </div>
             )}
-            <button
-              onClick={() => { void handleStart(); }}
-              disabled={isRunning || starting}
-              style={{
-                padding: "8px 20px", borderRadius: "6px", border: "none",
-                background: isRunning || starting ? "#e5e7eb" : "#E83B2A",
-                color: isRunning || starting ? "#9ca3af" : "#fff",
-                fontWeight: 600, fontSize: "13px",
-                cursor: isRunning || starting ? "not-allowed" : "pointer",
-              }}
-            >
-              {isRunning ? "Kører…" : starting ? "Starter…" : "Kør forfatter-import"}
-            </button>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                onClick={() => { void handleShowRejected(); }}
+                style={{
+                  padding: "8px 20px", borderRadius: "6px",
+                  border: "1px solid #e5e7eb",
+                  background: "#fff", color: "#1a1a1a",
+                  fontWeight: 600, fontSize: "13px", cursor: "pointer",
+                }}
+              >
+                Se afviste ({status?.rejectedAuthorsCount ?? 0})
+              </button>
+              <button
+                onClick={() => { void handleStart(); }}
+                disabled={isRunning || starting}
+                style={{
+                  padding: "8px 20px", borderRadius: "6px", border: "none",
+                  background: isRunning || starting ? "#e5e7eb" : "#E83B2A",
+                  color: isRunning || starting ? "#9ca3af" : "#fff",
+                  fontWeight: 600, fontSize: "13px",
+                  cursor: isRunning || starting ? "not-allowed" : "pointer",
+                }}
+              >
+                {isRunning ? "Kører…" : starting ? "Starter…" : "Kør forfatter-import"}
+              </button>
+            </div>
             {actionError && (
               <div style={{ fontSize: "12px", color: "#b91c1c" }}>{actionError}</div>
             )}
@@ -370,6 +406,72 @@ export default function AuthorLinkingPage() {
             );
           })()}
         </div>
+
+        {showRejected && (
+          <div style={{
+            background: "#fff", borderRadius: "10px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
+            overflow: "hidden", marginTop: "24px",
+          }}>
+            <div style={{
+              background: "#EEF2F7", borderBottom: "1px solid #dde3ed",
+              padding: "10px 24px", display: "flex",
+              alignItems: "center", justifyContent: "space-between",
+            }}>
+              <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700 }}>
+                Afviste forfattere
+              </span>
+              <button onClick={() => setShowRejected(false)} style={{ fontSize: "12px", color: "#888", background: "none", border: "none", cursor: "pointer" }}>
+                Luk
+              </button>
+            </div>
+
+            {loadingRejected ? (
+              <div style={{ padding: "32px", textAlign: "center", fontSize: "13px", color: "#888" }}>Indlæser…</div>
+            ) : !rejectedRows?.length ? (
+              <div style={{ padding: "32px", textAlign: "center", fontSize: "13px", color: "#888" }}>Ingen afviste forfattere</div>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>PMID</th>
+                    <th style={thStyle}>Artikel</th>
+                    <th style={thStyle}>Position</th>
+                    <th style={thStyle}>Navn i JSONB</th>
+                    <th style={thStyle}>Affiliation</th>
+                    <th style={thStyle}>Årsag</th>
+                    <th style={thStyle}>Dato</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rejectedRows.map((row) => (
+                    <tr key={row.id}>
+                      <td style={tdStyle}>{row.pubmed_id}</td>
+                      <td style={{ ...tdStyle, maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#5a6a85" }}>
+                        {row.articles?.title ?? "—"}
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: "center" }}>{row.position ?? "—"}</td>
+                      <td style={tdStyle}>
+                        {[row.raw_data?.foreName, row.raw_data?.lastName].filter(Boolean).join(" ") || <span style={{ color: "#bbb" }}>—</span>}
+                      </td>
+                      <td style={{ ...tdStyle, maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#5a6a85" }}>
+                        {String(row.raw_data?.affiliation ?? "—")}
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{ fontSize: "11px", color: "#d97706", fontWeight: 600 }}>
+                          {row.reason}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, color: "#5a6a85", whiteSpace: "nowrap" }}>
+                        {fmt(row.created_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
 
       </div>
     </div>

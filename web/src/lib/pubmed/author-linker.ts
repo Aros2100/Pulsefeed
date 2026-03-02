@@ -53,14 +53,34 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
           orcid:       a.orcid != null ? String(a.orcid) : null,
         }));
 
+        const rejectedAuthors = authors.filter(
+          (a) => !a.lastName?.trim() && !a.orcid?.trim()
+        );
+
         console.log(`[author-linker] calling linkAuthorsToArticle for PMID ${article.pubmed_id} (${authors.length} authors)`);
         await linkAuthorsToArticle(admin, article.id, authors)
-          .then((result) => {
+          .then(async (result) => {
             newAuthors  += result.new;
             duplicates  += result.duplicates;
             rejected    += result.rejected;
             authorsLinked += result.new + result.duplicates;
             console.log(`[author-linker] linked PMID ${article.pubmed_id} — new=${result.new} dup=${result.duplicates} rejected=${result.rejected}`);
+
+            if (rejectedAuthors.length > 0) {
+              const rejects = rejectedAuthors.map((a, idx) => ({
+                article_id:     article.id,
+                pubmed_id:      article.pubmed_id,
+                position:       rawAuthors.findIndex(
+                  (r) => r.lastName === a.lastName && r.foreName === a.foreName
+                ) + 1 || idx + 1,
+                raw_data:       rawAuthors.find(
+                  (r) => r.lastName === a.lastName && r.foreName === a.foreName
+                ) ?? {},
+                reason:         "no_lastname_no_orcid",
+                linking_log_id: logId,
+              }));
+              await admin.from("rejected_authors").insert(rejects);
+            }
           })
           .catch((e) => {
             const msg = `PMID ${article.pubmed_id}: ${e instanceof Error ? e.message : String(e)}`;

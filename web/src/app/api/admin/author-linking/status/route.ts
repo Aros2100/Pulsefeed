@@ -8,7 +8,7 @@ export async function GET() {
 
   const admin = createAdminClient();
 
-  const [logsResult, unlinkedResult, unlinkedSlotsResult, authorsResult, totalsResult] = await Promise.all([
+  const [logsResult, unlinkedResult, unlinkedSlotsResult, authorsResult, totalsResult, rejectedAuthorsResult] = await Promise.all([
     admin
       .from("author_linking_logs")
       .select("*")
@@ -21,6 +21,9 @@ export async function GET() {
       .from("author_linking_logs")
       .select("new_authors, duplicates, rejected")
       .in("status", ["completed", "running"]),
+    admin
+      .from("rejected_authors")
+      .select("id", { count: "exact", head: true }),
   ]);
 
   const logs = logsResult.data ?? [];
@@ -71,5 +74,6 @@ export async function GET() {
     totalNew,
     totalDuplicates,
     totalRejected,
+    rejectedAuthorsCount: rejectedAuthorsResult.count ?? 0,
   });
 }
