@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
   } else if (editor_verdict === "not_relevant") {
     const { error: updateError } = await admin
       .from("articles")
-      .update({ specialty_tags: [], verified: false, status: "rejected" })
+      .update({ verified: false, status: "rejected" })
       .eq("id", article_id);
     if (updateError) {
       return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
