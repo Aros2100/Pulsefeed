@@ -36,8 +36,9 @@ export async function POST(request: NextRequest) {
   const { specialty, module, verdicts } = result.data;
   const admin = createAdminClient();
 
-  // Get the current user id from auth (admin client uses service role, so we resolve via the JWT)
-  const editorId: string | null = auth.userId ?? null;
+  // user_id FK currently references public.users — pass null to avoid constraint
+  // violations until the FK target is confirmed. Auth is already enforced above.
+  const editorId: string | null = null;
 
   const approvedIds = verdicts.filter((v) => v.verdict === "approved").map((v) => v.article_id);
   const rejectedIds = verdicts.filter((v) => v.verdict === "rejected").map((v) => v.article_id);
