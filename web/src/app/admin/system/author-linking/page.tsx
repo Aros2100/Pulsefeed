@@ -12,6 +12,8 @@ interface AuthorLinkingLog {
   articles_processed: number;
   authors_linked: number;
   errors: string[];
+  import_log_id: string | null;
+  import_filter_name: string | null;
 }
 
 interface StatusResponse {
@@ -19,6 +21,7 @@ interface StatusResponse {
   latest: AuthorLinkingLog | null;
   logs: AuthorLinkingLog[];
   unlinkedCount: number;
+  totalAuthors: number;
 }
 
 function fmt(iso: string | null) {
@@ -98,21 +101,18 @@ export default function AuthorLinkingPage() {
     try {
       const res = await fetch("/api/admin/author-linking/status");
       const json = (await res.json()) as StatusResponse;
-      console.log("[author-linking] status response:", JSON.stringify(json, null, 2));
       if (json.ok) setData(json);
     } catch (e) {
       console.error("[author-linking] fetchStatus error:", e);
     }
   }, []);
 
-  // Initial load
   useEffect(() => {
     void fetchStatus();
   }, [fetchStatus]);
 
   const isRunning = data?.latest?.status === "running";
 
-  // Poll every 3s while running; interval is owned by the effect and cleaned up automatically
   useEffect(() => {
     if (!isRunning) return;
     const id = setInterval(() => { void fetchStatus(); }, 3000);
@@ -169,7 +169,7 @@ export default function AuthorLinkingPage() {
           </p>
         </div>
 
-        {/* Status card */}
+        {/* Summary stats + action */}
         <div style={{
           background: "#fff",
           borderRadius: "10px",
@@ -181,12 +181,22 @@ export default function AuthorLinkingPage() {
           justifyContent: "space-between",
           gap: "24px",
         }}>
-          <div>
-            <div style={{ fontSize: "13px", color: "#5a6a85", marginBottom: "4px" }}>
-              Artikler uden forfattere
+          <div style={{ display: "flex", gap: "40px" }}>
+            <div>
+              <div style={{ fontSize: "13px", color: "#5a6a85", marginBottom: "4px" }}>
+                Artikler uden forfattere
+              </div>
+              <div style={{ fontSize: "28px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                {data == null ? "—" : data.unlinkedCount.toLocaleString("da-DK")}
+              </div>
             </div>
-            <div style={{ fontSize: "28px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-              {data == null ? "—" : data.unlinkedCount.toLocaleString("da-DK")}
+            <div>
+              <div style={{ fontSize: "13px", color: "#5a6a85", marginBottom: "4px" }}>
+                Forfattere i DB
+              </div>
+              <div style={{ fontSize: "28px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                {data == null ? "—" : data.totalAuthors.toLocaleString("da-DK")}
+              </div>
             </div>
           </div>
 
@@ -254,10 +264,11 @@ export default function AuthorLinkingPage() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Startet</th>
+                  <th style={thStyle}>Dato</th>
+                  <th style={thStyle}>Import</th>
+                  <th style={thStyle}>Artikler processeret</th>
+                  <th style={thStyle}>Forfattere linket</th>
                   <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Artikler</th>
-                  <th style={thStyle}>Forfattere koblet</th>
                   <th style={thStyle}>Varighed</th>
                   <th style={thStyle}>Fejl</th>
                 </tr>
@@ -268,14 +279,17 @@ export default function AuthorLinkingPage() {
                     <td style={{ ...tdStyle, whiteSpace: "nowrap", color: "#5a6a85" }}>
                       {fmt(log.started_at)}
                     </td>
+                    <td style={{ ...tdStyle, color: log.import_filter_name ? "#1a1a1a" : "#bbb" }}>
+                      {log.import_filter_name ?? "—"}
+                    </td>
+                    <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
+                      {log.articles_processed.toLocaleString("da-DK")}
+                    </td>
+                    <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
+                      {log.authors_linked.toLocaleString("da-DK")}
+                    </td>
                     <td style={tdStyle}>
                       <StatusBadge status={log.status} />
-                    </td>
-                    <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
-                      {log.articles_processed}
-                    </td>
-                    <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
-                      {log.authors_linked}
                     </td>
                     <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums", color: "#888" }}>
                       {duration(log)}

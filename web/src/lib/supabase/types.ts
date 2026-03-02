@@ -124,7 +124,7 @@ export type Database = {
           source_id: string | null
           specialty_confidence: number | null
           specialty_tags: string[]
-          status: string
+          status: string | null
           subspecialty: string | null
           substances: Json
           title: string
@@ -171,7 +171,7 @@ export type Database = {
           source_id?: string | null
           specialty_confidence?: number | null
           specialty_tags?: string[]
-          status?: string
+          status?: string | null
           subspecialty?: string | null
           substances?: Json
           title: string
@@ -218,7 +218,7 @@ export type Database = {
           source_id?: string | null
           specialty_confidence?: number | null
           specialty_tags?: string[]
-          status?: string
+          status?: string | null
           subspecialty?: string | null
           substances?: Json
           title?: string
@@ -242,6 +242,7 @@ export type Database = {
           completed_at: string | null
           errors: Json | null
           id: string
+          import_log_id: string | null
           started_at: string | null
           status: string | null
         }
@@ -251,6 +252,7 @@ export type Database = {
           completed_at?: string | null
           errors?: Json | null
           id?: string
+          import_log_id?: string | null
           started_at?: string | null
           status?: string | null
         }
@@ -260,10 +262,19 @@ export type Database = {
           completed_at?: string | null
           errors?: Json | null
           id?: string
+          import_log_id?: string | null
           started_at?: string | null
           status?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "author_linking_logs_import_log_id_fkey"
+            columns: ["import_log_id"]
+            isOneToOne: false
+            referencedRelation: "import_logs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       authors: {
         Row: {

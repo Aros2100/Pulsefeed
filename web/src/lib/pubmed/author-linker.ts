@@ -3,13 +3,20 @@ import { linkAuthorsToArticle, type Author } from "@/lib/pubmed/importer";
 
 const BATCH_SIZE = 20;
 
-export async function runAuthorLinking(logId: string): Promise<void> {
+export async function runAuthorLinking(logId: string, importLogId?: string): Promise<void> {
   const admin = createAdminClient();
   const errors: string[] = [];
   let articlesProcessed = 0;
   let authorsLinked = 0;
 
   try {
+    if (importLogId) {
+      await admin
+        .from("author_linking_logs")
+        .update({ import_log_id: importLogId })
+        .eq("id", logId);
+    }
+
     while (true) {
       // Always fetch at offset 0 — linked articles are removed from the unlinked
       // set by the NOT IN clause, so the result shrinks as we process each batch.
