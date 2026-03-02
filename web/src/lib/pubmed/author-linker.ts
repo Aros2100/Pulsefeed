@@ -79,7 +79,7 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
                 reason:         "no_lastname_no_orcid",
                 linking_log_id: logId,
               }));
-              await admin.from("rejected_authors" as never).insert(rejects);
+              await admin.from("rejected_authors" as never).insert(rejects as never);
             }
           })
           .catch((e) => {
