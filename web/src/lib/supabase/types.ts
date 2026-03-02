@@ -240,9 +240,12 @@ export type Database = {
           articles_processed: number | null
           authors_linked: number | null
           completed_at: string | null
+          duplicates: number
           errors: Json | null
           id: string
           import_log_id: string | null
+          new_authors: number
+          rejected: number
           started_at: string | null
           status: string | null
         }
@@ -250,9 +253,12 @@ export type Database = {
           articles_processed?: number | null
           authors_linked?: number | null
           completed_at?: string | null
+          duplicates?: number
           errors?: Json | null
           id?: string
           import_log_id?: string | null
+          new_authors?: number
+          rejected?: number
           started_at?: string | null
           status?: string | null
         }
@@ -260,9 +266,12 @@ export type Database = {
           articles_processed?: number | null
           authors_linked?: number | null
           completed_at?: string | null
+          duplicates?: number
           errors?: Json | null
           id?: string
           import_log_id?: string | null
+          new_authors?: number
+          rejected?: number
           started_at?: string | null
           status?: string | null
         }

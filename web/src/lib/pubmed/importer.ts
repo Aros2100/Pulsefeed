@@ -104,6 +104,8 @@ export interface Author {
   orcid: string | null;
 }
 
+export type AuthorOutcome = "new" | "duplicate" | "rejected";
+
 function parseAuthors(authorList: unknown): Author[] {
   const raw = (authorList as Record<string, unknown> | undefined)?.Author;
   return toArray(raw).map((a) => {
@@ -257,7 +259,10 @@ async function fetchOpenAlexId(
   }
 }
 
-async function resolveAuthorId(admin: AdminClient, author: Author): Promise<string> {
+async function resolveAuthorId(
+  admin: AdminClient,
+  author: Author
+): Promise<{ id: string; outcome: AuthorOutcome }> {
   const displayName = [author.foreName, author.lastName].filter(Boolean).join(" ").trim();
 
   // 1. ORCID path
@@ -269,7 +274,7 @@ async function resolveAuthorId(admin: AdminClient, author: Author): Promise<stri
       .eq("orcid", orcid)
       .maybeSingle();
 
-    if (existing) return existing.id;
+    if (existing) return { id: existing.id, outcome: "duplicate" };
 
     await sleep(150); // polite rate limit for OpenAlex
     const openalexId = await fetchOpenAlexId(orcid, displayName, author.affiliation);
@@ -289,7 +294,7 @@ async function resolveAuthorId(admin: AdminClient, author: Author): Promise<stri
       .select("id")
       .single();
 
-    return created!.id;
+    return { id: created!.id, outcome: "new" };
   }
 
   // 2. Fuzzy match path (no ORCID)
@@ -313,7 +318,7 @@ async function resolveAuthorId(admin: AdminClient, author: Author): Promise<stri
       }
     }
 
-    if (bestScore > 0.85 && bestId) return bestId;
+    if (bestScore > 0.85 && bestId) return { id: bestId, outcome: "duplicate" };
   }
 
   // 3. No match — create new author
@@ -334,19 +339,30 @@ async function resolveAuthorId(admin: AdminClient, author: Author): Promise<stri
     .select("id")
     .single();
 
-  return created!.id;
+  return { id: created!.id, outcome: "new" };
 }
 
 export async function linkAuthorsToArticle(
   admin: AdminClient,
   articleId: string,
   authors: Author[]
-): Promise<void> {
+): Promise<{ new: number; duplicates: number; rejected: number }> {
+  let newCount = 0;
+  let dupCount = 0;
+  let rejectedCount = 0;
+
   for (let i = 0; i < authors.length; i++) {
     const author = authors[i];
+
+    // Reject authors with no name and no ORCID — cannot be resolved
+    if (!author.lastName && !author.orcid) {
+      rejectedCount++;
+      continue;
+    }
+
     const authorName = [author.foreName, author.lastName].filter(Boolean).join(" ");
     const tResolve = Date.now();
-    const authorId = await resolveAuthorId(admin, author);
+    const { id: authorId, outcome } = await resolveAuthorId(admin, author);
     console.log(`[import] resolveAuthorId "${authorName}": ${Date.now() - tResolve}ms`);
 
     const { error } = await admin.from("article_authors").insert({
@@ -357,11 +373,19 @@ export async function linkAuthorsToArticle(
       orcid_on_paper: author.orcid ? normalizeOrcid(author.orcid) : null,
     });
 
-    // Ignore duplicate key violations (article already linked to this author)
-    if (error && error.code !== "23505") {
+    if (error && error.code === "23505") {
+      // Duplicate key — article already linked to this author
+      dupCount++;
+    } else if (error) {
       throw new Error(`article_authors insert: ${error.message}`);
+    } else if (outcome === "new") {
+      newCount++;
+    } else {
+      dupCount++;
     }
   }
+
+  return { new: newCount, duplicates: dupCount, rejected: rejectedCount };
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────────

@@ -8,6 +8,9 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
   const errors: string[] = [];
   let articlesProcessed = 0;
   let authorsLinked = 0;
+  let newAuthors = 0;
+  let duplicates = 0;
+  let rejected = 0;
 
   try {
     if (importLogId) {
@@ -52,9 +55,12 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
 
         console.log(`[author-linker] calling linkAuthorsToArticle for PMID ${article.pubmed_id} (${authors.length} authors)`);
         await linkAuthorsToArticle(admin, article.id, authors)
-          .then(() => {
-            authorsLinked += authors.length;
-            console.log(`[author-linker] linked ${authors.length} authors for PMID ${article.pubmed_id} — authorsLinked now ${authorsLinked}`);
+          .then((result) => {
+            newAuthors  += result.new;
+            duplicates  += result.duplicates;
+            rejected    += result.rejected;
+            authorsLinked += result.new + result.duplicates;
+            console.log(`[author-linker] linked PMID ${article.pubmed_id} — new=${result.new} dup=${result.duplicates} rejected=${result.rejected}`);
           })
           .catch((e) => {
             const msg = `PMID ${article.pubmed_id}: ${e instanceof Error ? e.message : String(e)}`;
@@ -69,7 +75,7 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
       console.log(`[author-linker] writing progress to DB — logId=${logId} articles_processed=${articlesProcessed} authors_linked=${authorsLinked}`);
       const { error: updateErr } = await admin
         .from("author_linking_logs")
-        .update({ articles_processed: articlesProcessed, authors_linked: authorsLinked })
+        .update({ articles_processed: articlesProcessed, authors_linked: authorsLinked, new_authors: newAuthors, duplicates, rejected })
         .eq("id", logId);
       if (updateErr) {
         console.error(`[author-linker] progress update failed:`, updateErr.message);
@@ -90,6 +96,9 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
         completed_at: new Date().toISOString(),
         articles_processed: articlesProcessed,
         authors_linked: authorsLinked,
+        new_authors: newAuthors,
+        duplicates,
+        rejected,
         errors: errors.length > 0 ? errors : [],
       })
       .eq("id", logId);

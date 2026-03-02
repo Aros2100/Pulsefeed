@@ -24,6 +24,9 @@ interface ImportOverviewRow {
   authors_linked: number | null;
   linking_status: string | null;
   unlinked_author_slots: number;
+  new_authors: number | null;
+  duplicates: number | null;
+  rejected: number | null;
 }
 
 interface StatusResponse {
@@ -32,6 +35,9 @@ interface StatusResponse {
   unlinkedCount: number;
   unlinkedAuthorSlots: number;
   totalAuthors: number;
+  totalNew: number;
+  totalDuplicates: number;
+  totalRejected: number;
 }
 
 interface ImportOverviewResponse {
@@ -204,31 +210,39 @@ export default function AuthorLinkingPage() {
           justifyContent: "space-between",
           gap: "24px",
         }}>
-          <div style={{ display: "flex", gap: "40px" }}>
-            <div>
-              <div style={{ fontSize: "13px", color: "#5a6a85", marginBottom: "4px" }}>
-                Artikler uden forfattere
-              </div>
-              <div style={{ fontSize: "28px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                {status == null ? "—" : status.unlinkedCount.toLocaleString("da-DK")}
-              </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px", flex: 1 }}>
+            {/* Hero stats row */}
+            <div style={{ display: "flex", gap: "32px", flexWrap: "wrap" }}>
+              {[
+                { label: "Artikler uden forfattere", value: status?.unlinkedCount,       color: "#1a1a1a" },
+                { label: "Forfatter-slots i kø",     value: status?.unlinkedAuthorSlots, color: "#1a1a1a" },
+                { label: "Forfattere i DB",           value: status?.totalAuthors,        color: "#1a1a1a" },
+                { label: "Nye forfattere ✅",          value: status?.totalNew,            color: "#15803d" },
+                { label: "Dubletter 🔄",              value: status?.totalDuplicates,     color: "#1d4ed8" },
+                { label: "Afvist ❌",                 value: status?.totalRejected,       color: "#d97706" },
+              ].map(({ label, value, color }) => (
+                <div key={label}>
+                  <div style={{ fontSize: "12px", color: "#5a6a85", marginBottom: "4px" }}>{label}</div>
+                  <div style={{ fontSize: "26px", fontWeight: 700, fontVariantNumeric: "tabular-nums", color }}>
+                    {value == null ? "—" : value.toLocaleString("da-DK")}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div>
-              <div style={{ fontSize: "13px", color: "#5a6a85", marginBottom: "4px" }}>
-                Forfatter-slots i kø
-              </div>
-              <div style={{ fontSize: "28px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                {status == null ? "—" : status.unlinkedAuthorSlots.toLocaleString("da-DK")}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: "13px", color: "#5a6a85", marginBottom: "4px" }}>
-                Forfattere i DB
-              </div>
-              <div style={{ fontSize: "28px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                {status == null ? "—" : status.totalAuthors.toLocaleString("da-DK")}
-              </div>
-            </div>
+            {/* Balance check */}
+            {status != null && (status.totalNew + status.totalDuplicates + status.totalRejected) > 0 && (() => {
+              const processed = status.totalNew + status.totalDuplicates + status.totalRejected;
+              const linked    = status.totalNew + status.totalDuplicates;
+              const ok        = processed === linked + status.totalRejected;
+              return (
+                <div style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ fontWeight: 700, color: ok ? "#15803d" : "#b91c1c" }}>{ok ? "✓" : "✗"}</span>
+                  <span style={{ color: "#5a6a85" }}>
+                    Balance: Nye ({status.totalNew.toLocaleString("da-DK")}) + Dubletter ({status.totalDuplicates.toLocaleString("da-DK")}) + Afvist ({status.totalRejected.toLocaleString("da-DK")}) = {processed.toLocaleString("da-DK")} slots processeret
+                  </span>
+                </div>
+              );
+            })()}
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
@@ -293,7 +307,9 @@ export default function AuthorLinkingPage() {
                   <th style={thStyle}>Cirkel</th>
                   <th style={thStyle}>Filter</th>
                   <th style={{ ...thStyle, textAlign: "right" }}>Artikler importeret</th>
-                  <th style={{ ...thStyle, textAlign: "right" }}>Forfattere linket</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>Nye ✅</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>Dubletter 🔄</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>Afvist ❌</th>
                   <th style={{ ...thStyle, textAlign: "right" }}>Forfattere i kø</th>
                   <th style={thStyle}>Status</th>
                 </tr>
@@ -313,8 +329,14 @@ export default function AuthorLinkingPage() {
                     <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
                       {row.articles_imported.toLocaleString("da-DK")}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: row.authors_linked != null ? "#1a1a1a" : "#bbb" }}>
-                      {row.authors_linked != null ? row.authors_linked.toLocaleString("da-DK") : "—"}
+                    <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: row.new_authors != null ? "#15803d" : "#bbb" }}>
+                      {row.new_authors != null ? row.new_authors.toLocaleString("da-DK") : "—"}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: row.duplicates != null ? "#1d4ed8" : "#bbb" }}>
+                      {row.duplicates != null ? row.duplicates.toLocaleString("da-DK") : "—"}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: row.rejected != null && row.rejected > 0 ? "#d97706" : "#bbb" }}>
+                      {row.rejected != null && row.rejected > 0 ? row.rejected.toLocaleString("da-DK") : "—"}
                     </td>
                     <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: row.unlinked_author_slots > 0 ? "#d97706" : "#bbb" }}>
                       {row.unlinked_author_slots > 0 ? row.unlinked_author_slots.toLocaleString("da-DK") : "—"}

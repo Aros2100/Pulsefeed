@@ -16,7 +16,7 @@ export async function GET() {
       articles_imported,
       trigger,
       pubmed_filters(name, circle),
-      author_linking_logs(articles_processed, authors_linked, status)
+      author_linking_logs(articles_processed, authors_linked, status, new_authors, duplicates, rejected)
     `)
     .order("started_at", { ascending: false })
     .limit(50);
@@ -26,7 +26,7 @@ export async function GET() {
   }
 
   type Filter = { name: string; circle: number | null } | null;
-  type LinkingLog = { articles_processed: number; authors_linked: number; status: string };
+  type LinkingLog = { articles_processed: number; authors_linked: number; status: string; new_authors: number | null; duplicates: number | null; rejected: number | null };
 
   const ids = (data ?? []).map((il) => il.id);
 
@@ -54,6 +54,9 @@ export async function GET() {
       circle: filter?.circle ?? null,
       authors_linked: linking?.authors_linked ?? null,
       linking_status: linking?.status ?? null,
+      new_authors: linking?.new_authors ?? null,
+      duplicates: linking?.duplicates ?? null,
+      rejected: linking?.rejected ?? null,
       unlinked_author_slots: slotsByLogId.get(il.id) ?? 0,
     };
   });

@@ -8,7 +8,7 @@ export async function GET() {
 
   const admin = createAdminClient();
 
-  const [logsResult, unlinkedResult, unlinkedSlotsResult, authorsResult] = await Promise.all([
+  const [logsResult, unlinkedResult, unlinkedSlotsResult, authorsResult, totalsResult] = await Promise.all([
     admin
       .from("author_linking_logs")
       .select("*")
@@ -17,6 +17,10 @@ export async function GET() {
     admin.rpc("count_unlinked_articles"),
     admin.rpc("count_unlinked_author_slots"),
     admin.from("article_authors").select("id", { count: "exact", head: true }),
+    admin
+      .from("author_linking_logs")
+      .select("new_authors, duplicates, rejected")
+      .eq("status", "completed"),
   ]);
 
   const logs = logsResult.data ?? [];
@@ -52,6 +56,11 @@ export async function GET() {
     };
   });
 
+  const totals = totalsResult.data ?? [];
+  const totalNew        = totals.reduce((s, r) => s + ((r as Record<string, number>).new_authors ?? 0), 0);
+  const totalDuplicates = totals.reduce((s, r) => s + ((r as Record<string, number>).duplicates  ?? 0), 0);
+  const totalRejected   = totals.reduce((s, r) => s + ((r as Record<string, number>).rejected    ?? 0), 0);
+
   return NextResponse.json({
     ok: true,
     latest: enrichedLogs[0] ?? null,
@@ -59,5 +68,8 @@ export async function GET() {
     unlinkedCount: (unlinkedResult.data as number | null) ?? 0,
     unlinkedAuthorSlots: (unlinkedSlotsResult.data as number | null) ?? 0,
     totalAuthors: authorsResult.count ?? 0,
+    totalNew,
+    totalDuplicates,
+    totalRejected,
   });
 }
