@@ -199,31 +199,30 @@ function Circle1Tab({ specialty }: { specialty: string }) {
   }, [specialty]);
 
   const fetchLogs = useCallback(async () => {
-    const res = await fetch(`/api/admin/import-logs?specialty=${specialty}`);
+    const res = await fetch(`/api/admin/import-logs?specialty=${specialty}&circle=1`);
     const d = (await res.json()) as { ok: boolean; logs?: ImportLog[] };
-    if (d.ok) setLogs(d.logs ?? []);
+    if (d.ok) {
+      setLogs(d.logs ?? []);
+      const hasRunning = (d.logs ?? []).some((l) => l.status === "running");
+      if (!hasRunning) {
+        setImporting(false);
+        setJobId(null);
+      }
+    }
     setLoadingLogs(false);
   }, [specialty]);
 
   useEffect(() => { void fetchFilters(); }, [fetchFilters]);
   useEffect(() => { void fetchLogs(); }, [fetchLogs]);
 
-  // Poll while running
+  // Poll while import is running
   useEffect(() => {
-    if (!jobId) return;
+    if (!importing) return;
     const interval = setInterval(async () => {
-      const res = await fetch(`/api/admin/pubmed/import-status?jobId=${jobId}`);
-      const d = (await res.json()) as { ok: boolean; log?: ImportLog };
-      if (!d.ok || !d.log) return;
-      if (d.log.status !== "running") {
-        clearInterval(interval);
-        setJobId(null);
-        setImporting(false);
-        await fetchLogs();
-      }
+      await fetchLogs();
     }, 3000);
     return () => clearInterval(interval);
-  }, [jobId, fetchLogs]);
+  }, [importing, fetchLogs]);
 
   function openCreate() { setForm(EMPTY_FILTER_FORM); setShowQuery(false); setFormError(null); setEditingId("new"); }
   function openEdit(f: Filter) {
@@ -521,9 +520,16 @@ function Circle2Tab({ specialty }: { specialty: string }) {
   }, [specialty]);
 
   const fetchLogs = useCallback(async () => {
-    const res = await fetch(`/api/admin/import-logs?specialty=${specialty}`);
+    const res = await fetch(`/api/admin/import-logs?specialty=${specialty}&circle=2`);
     const d = (await res.json()) as { ok: boolean; logs?: ImportLog[] };
-    if (d.ok) setLogs(d.logs ?? []);
+    if (d.ok) {
+      setLogs(d.logs ?? []);
+      const hasRunning = (d.logs ?? []).some((l) => l.status === "running");
+      if (!hasRunning) {
+        setImporting(false);
+        setJobId(null);
+      }
+    }
     setLoadingLogs(false);
   }, [specialty]);
 
@@ -532,20 +538,12 @@ function Circle2Tab({ specialty }: { specialty: string }) {
 
   // Poll while import is running
   useEffect(() => {
-    if (!jobId) return;
+    if (!importing) return;
     const interval = setInterval(async () => {
-      const res = await fetch(`/api/admin/pubmed/import-status?jobId=${jobId}`);
-      const d = (await res.json()) as { ok: boolean; log?: ImportLog };
-      if (!d.ok || !d.log) return;
-      if (d.log.status !== "running") {
-        clearInterval(interval);
-        setJobId(null);
-        setImporting(false);
-        await fetchLogs();
-      }
+      await fetchLogs();
     }, 3000);
     return () => clearInterval(interval);
-  }, [jobId, fetchLogs]);
+  }, [importing, fetchLogs]);
 
   async function handleSaveAffiliation() {
     setSavingAffiliation(true);
