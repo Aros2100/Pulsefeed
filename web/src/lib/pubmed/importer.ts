@@ -213,21 +213,39 @@ function computeMatchConfidence(
   }
 
   const authorLast = normalizeNameStr(author.lastName);
-  const authorFirstInitial = normalizeNameStr(author.foreName).charAt(0);
+  const authorFirstFull = normalizeNameStr(author.foreName);
+  const authorFirstInitial = authorFirstFull.charAt(0);
   const parts = candidateFull.split(" ");
   const lastMatch = parts.some((p) => p === authorLast);
-  const firstMatch = authorFirstInitial && parts.some((p) => p.charAt(0) === authorFirstInitial);
+  const firstInitialMatch = authorFirstInitial && parts.some((p) => p.charAt(0) === authorFirstInitial);
 
-  if (lastMatch && firstMatch) {
+  // Full first name match scores higher than initial-only match
+  const firstFullMatch = authorFirstFull.length > 1 && parts.some((p) => p === authorFirstFull);
+
+  if (lastMatch && firstFullMatch) {
+    // Full name match — high confidence
     if (author.affiliation && candidate.affiliations.length > 0) {
       const affLower = author.affiliation.toLowerCase();
       const matched = candidate.affiliations.some((a) => {
         const al = a.toLowerCase();
         return al.includes(affLower.slice(0, 20)) || affLower.includes(al.slice(0, 20));
       });
-      return matched ? 0.90 : 0.75;
+      return matched ? 0.90 : 0.80;
     }
-    return 0.75;
+    return 0.80;
+  }
+
+  if (lastMatch && firstInitialMatch) {
+    // Initial-only match — lower confidence, below threshold
+    if (author.affiliation && candidate.affiliations.length > 0) {
+      const affLower = author.affiliation.toLowerCase();
+      const matched = candidate.affiliations.some((a) => {
+        const al = a.toLowerCase();
+        return al.includes(affLower.slice(0, 20)) || affLower.includes(al.slice(0, 20));
+      });
+      return matched ? 0.80 : 0.60;
+    }
+    return 0.60;
   }
 
   return 0;
