@@ -1,6 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseAffiliation } from "@/lib/affiliations";
+import { runQualityChecks } from "@/lib/pubmed/quality-checks";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -876,6 +877,22 @@ export async function runImport(
     totalFetched   += filterFetched;
     totalImported  += filterImported;
     totalSkipped   += filterSkipped;
+
+    // 7. Quality checks
+    if (filterLogId) {
+      try {
+        const qc = await runQualityChecks(filterLogId);
+        if (!qc.passed) {
+          console.warn(
+            `[import] Quality checks failed for filter "${filter.name}" (${filterLogId}): ` +
+            `${qc.failedChecks}/${qc.totalChecks} checks failed — ` +
+            qc.checks.filter(c => !c.passed).map(c => c.message).join("; ")
+          );
+        }
+      } catch (qcErr) {
+        console.warn(`[import] Quality checks threw for ${filterLogId}:`, qcErr);
+      }
+    }
   }
 
   return { logId, imported: totalImported, skipped: totalSkipped, errors };
