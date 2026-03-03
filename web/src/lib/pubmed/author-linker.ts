@@ -127,19 +127,17 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
     console.log(`[author-linker] done — articles=${articlesProcessed} authors=${authorsLinked} errors=${errors.length}`);
 
     // Linking quality checks
-    if (importLogId) {
-      try {
-        const qc = await runLinkingChecks(importLogId);
-        if (!qc.passed) {
-          console.warn(
-            `[author-linker] Linking checks failed for import log ${importLogId}: ` +
-            `${qc.failedChecks}/${qc.totalChecks} checks failed — ` +
-            qc.checks.filter(c => !c.passed).map(c => c.message).join("; ")
-          );
-        }
-      } catch (qcErr) {
-        console.warn(`[author-linker] Linking checks threw for ${importLogId}:`, qcErr);
+    try {
+      const qc = await runLinkingChecks(logId);
+      if (!qc.passed) {
+        console.warn(
+          `[author-linker] Linking checks failed for linking log ${logId}: ` +
+          `${qc.failedChecks}/${qc.totalChecks} checks failed — ` +
+          qc.checks.filter(c => !c.passed).map(c => c.message).join("; ")
+        );
       }
+    } catch (qcErr) {
+      console.warn(`[author-linker] Linking checks threw for ${logId}:`, qcErr);
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

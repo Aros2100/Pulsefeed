@@ -22,7 +22,7 @@ interface QualityCheckResult {
 }
 
 async function saveChecks(
-  importLogId: string,
+  importLogId: string | null,
   checkType: "article" | "linking",
   checks: CheckResult[]
 ): Promise<QualityCheckResult> {
@@ -154,49 +154,43 @@ export async function runArticleChecks(
 
 /**
  * Kører efter author-linking.
+ * Tager authorLinkingLogId (id fra author_linking_logs).
  * Checks: rejected_authors_below_threshold, author_linking_rate, no_suspect_author_names.
+ * Gemmer med import_log_id = author_linking_logs.import_log_id (kan være null).
  */
 export async function runLinkingChecks(
-  importLogId: string
+  authorLinkingLogId: string
 ): Promise<QualityCheckResult> {
   const supabase = createAdminClient();
 
-  const { data: importLog, error: logError } = await supabase
-    .from("import_logs" as never)
-    .select("started_at, completed_at")
-    .eq("id", importLogId)
+  const { data: linkingLog, error: logError } = await supabase
+    .from("author_linking_logs" as never)
+    .select("started_at, completed_at, import_log_id, new_authors, duplicates, rejected")
+    .eq("id", authorLinkingLogId)
     .single();
 
-  if (logError || !importLog) {
-    throw new Error(`Import log not found: ${importLogId}`);
+  if (logError || !linkingLog) {
+    throw new Error(`Author linking log not found: ${authorLinkingLogId}`);
   }
 
-  const log = importLog as Record<string, unknown>;
+  const ll = linkingLog as Record<string, unknown>;
   const checks: CheckResult[] = [];
-  const startedAt = log.started_at as string;
-  const completedAt = (log.completed_at as string) || new Date().toISOString();
+  const startedAt = ll.started_at as string;
+  const completedAt = (ll.completed_at as string) || new Date().toISOString();
+  const importLogId = (ll.import_log_id as string | null) ?? null;
 
   // Check 1: Rejected authors rate < 10%
-  const { data: linkingLog } = await supabase
-    .from("author_linking_logs" as never)
-    .select("new_authors, duplicates, rejected")
-    .eq("import_log_id", importLogId)
-    .single();
-
-  if (linkingLog) {
-    const ll = linkingLog as Record<string, number>;
-    const total = (ll.new_authors ?? 0) + (ll.duplicates ?? 0) + (ll.rejected ?? 0);
-    const rejectedRate = total > 0 ? (ll.rejected ?? 0) / total : 0;
-    checks.push({
-      name: "rejected_authors_below_threshold",
-      passed: rejectedRate < 0.1,
-      expected: "< 10%",
-      actual: `${(rejectedRate * 100).toFixed(1)}% (${ll.rejected}/${total})`,
-      message: rejectedRate < 0.1
-        ? `Afvisningsrate: ${(rejectedRate * 100).toFixed(1)}%`
-        : `Høj afvisningsrate: ${(rejectedRate * 100).toFixed(1)}% — tjek parser`,
-    });
-  }
+  const total = ((ll.new_authors as number) ?? 0) + ((ll.duplicates as number) ?? 0) + ((ll.rejected as number) ?? 0);
+  const rejectedRate = total > 0 ? ((ll.rejected as number) ?? 0) / total : 0;
+  checks.push({
+    name: "rejected_authors_below_threshold",
+    passed: rejectedRate < 0.1,
+    expected: "< 10%",
+    actual: `${(rejectedRate * 100).toFixed(1)}% (${ll.rejected}/${total})`,
+    message: rejectedRate < 0.1
+      ? `Afvisningsrate: ${(rejectedRate * 100).toFixed(1)}%`
+      : `Høj afvisningsrate: ${(rejectedRate * 100).toFixed(1)}% — tjek parser`,
+  });
 
   // Check 2: Author linking-rate > 80%
   const { data: articlesInWindow } = await supabase
