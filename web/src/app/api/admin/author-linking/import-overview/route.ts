@@ -8,8 +8,8 @@ export async function GET() {
 
   const admin = createAdminClient();
 
-  const { data, error } = await admin
-    .from("import_logs")
+  const { data, error } = await (admin
+    .from("import_logs" as never)
     .select(`
       id,
       started_at,
@@ -20,7 +20,7 @@ export async function GET() {
       author_linking_logs(articles_processed, authors_linked, status, new_authors, duplicates, rejected)
     `)
     .order("started_at", { ascending: false })
-    .limit(50);
+    .limit(50)) as unknown as { data: Record<string, unknown>[] | null; error: { message: string } | null };
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -30,7 +30,7 @@ export async function GET() {
   type Filter = { name: string; circle: number | null } | { name: string; circle: number | null }[] | null;
   type LinkingLog = { articles_processed: number; authors_linked: number; status: string; new_authors: number | null; duplicates: number | null; rejected: number | null };
 
-  const ids = (data ?? []).map((il) => il.id);
+  const ids = (data ?? []).map((il) => il.id as string);
 
   // Fetch unlinked author slots per import log in one RPC call
   const { data: slotsRows } = await admin.rpc(
@@ -47,13 +47,14 @@ export async function GET() {
     const filter = Array.isArray(filterRaw) ? (filterRaw[0] ?? null) : filterRaw;
     const linkingLogs = (il.author_linking_logs ?? []) as LinkingLog[];
     const linking = linkingLogs[0] ?? null;
+    const id = il.id as string;
 
     return {
-      id: il.id,
-      started_at: il.started_at,
-      articles_imported: il.articles_imported,
-      author_slots_imported: il.author_slots_imported ?? 0,
-      trigger: il.trigger,
+      id,
+      started_at: il.started_at as string,
+      articles_imported: (il.articles_imported as number) ?? 0,
+      author_slots_imported: (il.author_slots_imported as number) ?? 0,
+      trigger: il.trigger as string | null,
       filter_name: filter?.name ?? null,
       circle: filter?.circle ?? null,
       authors_linked: linking?.authors_linked ?? null,
@@ -61,7 +62,7 @@ export async function GET() {
       new_authors: linking?.new_authors ?? null,
       duplicates: linking?.duplicates ?? null,
       rejected: linking?.rejected ?? null,
-      unlinked_author_slots: slotsByLogId.get(il.id) ?? 0,
+      unlinked_author_slots: slotsByLogId.get(id) ?? 0,
     };
   });
 
