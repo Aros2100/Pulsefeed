@@ -1,6 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { parseAffiliation } from "@/lib/affiliations";
+import { parseAffiliation, extractEmail, stripEmailFromAffiliation } from "@/lib/affiliations";
 import { runArticleChecks } from "@/lib/pubmed/quality-checks";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -297,7 +297,9 @@ async function resolveAuthorId(
 
     await sleep(150); // polite rate limit for OpenAlex
     const openalexId = await fetchOpenAlexId(orcid, displayName, author.affiliation);
-    const affiliations = author.affiliation ? [author.affiliation] : [];
+    const email = author.affiliation ? extractEmail(author.affiliation) : null;
+    const cleanAffiliation = author.affiliation ? stripEmailFromAffiliation(author.affiliation) : null;
+    const affiliations = cleanAffiliation ? [cleanAffiliation] : [];
     const parsed = parseAffiliation(affiliations);
 
     const { data: created } = await admin
@@ -306,6 +308,7 @@ async function resolveAuthorId(
         display_name: displayName || "Unknown",
         orcid,
         openalex_id: openalexId,
+        email,
         affiliations,
         match_confidence: 1.0,
         ...parsed,
@@ -343,13 +346,16 @@ async function resolveAuthorId(
   // 3. No match — create new author
   await sleep(150);
   const openalexId = await fetchOpenAlexId(null, displayName, author.affiliation);
-  const affiliations = author.affiliation ? [author.affiliation] : [];
+  const email = author.affiliation ? extractEmail(author.affiliation) : null;
+  const cleanAffiliation = author.affiliation ? stripEmailFromAffiliation(author.affiliation) : null;
+  const affiliations = cleanAffiliation ? [cleanAffiliation] : [];
   const parsed = await parseAffiliation(affiliations);
 
   const { data: created } = await admin
     .from("authors")
     .insert({
       display_name: displayName || "Unknown",
+      email,
       affiliations,
       openalex_id: openalexId,
       match_confidence: 0.8,

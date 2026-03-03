@@ -44,6 +44,32 @@ function isUSStateFull(s: string): boolean {
 
 const USA_RE = /^USA?$/i;
 
+/** Regex that matches a bare email address anywhere in a string */
+const EMAIL_RE = /[\w.+\-]+@[\w.\-]+\.[a-z]{2,}/i;
+
+/**
+ * Extracts the first email address found in an affiliation string.
+ * Strips "Electronic address:" / "E-mail:" prefix if present.
+ */
+export function extractEmail(raw: string): string | null {
+  const match = raw.match(EMAIL_RE);
+  return match?.[0] ?? null;
+}
+
+/**
+ * Removes all email addresses (and their "Electronic address:" / "E-mail:" labels)
+ * from an affiliation string, collapsing extra whitespace.
+ */
+export function stripEmailFromAffiliation(raw: string): string {
+  return raw
+    .replace(/\.\s*Electronic address:\s*[\w.+\-]+@[\w.\-]+\.[a-z]{2,}/gi, "")
+    .replace(/\.\s*E-mail:\s*[\w.+\-]+@[\w.\-]+\.[a-z]{2,}/gi, "")
+    .replace(/\.\s*email:\s*[\w.+\-]+@[\w.\-]+\.[a-z]{2,}/gi, "")
+    .replace(/[\w.+\-]+@[\w.\-]+\.[a-z]{2,}/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 /** Strip email addresses and Electronic address appended after country */
 function stripTrailingEmail(s: string): string {
   return s
