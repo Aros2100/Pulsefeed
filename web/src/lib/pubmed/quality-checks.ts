@@ -1,0 +1,204 @@
+/**
+ * Import Quality Checks
+ * Kører automatisk efter import + author-linking.
+ * Gemmer resultater i import_quality_checks-tabellen.
+ */
+
+import { createAdminClient } from "@/lib/supabase/admin";
+
+interface CheckResult {
+  name: string;
+  passed: boolean;
+  expected: string;
+  actual: string | number;
+  message: string;
+}
+
+interface QualityCheckResult {
+  passed: boolean;
+  totalChecks: number;
+  failedChecks: number;
+  checks: CheckResult[];
+}
+
+export async function runQualityChecks(
+  importLogId: string
+): Promise<QualityCheckResult> {
+  const supabase = createAdminClient();
+
+  const { data: importLog, error: logError } = await supabase
+    .from("import_logs" as never)
+    .select("*")
+    .eq("id", importLogId)
+    .single();
+
+  if (logError || !importLog) {
+    throw new Error(`Import log not found: ${importLogId}`);
+  }
+
+  const log = importLog as Record<string, unknown>;
+  const checks: CheckResult[] = [];
+  const startedAt = log.started_at as string;
+  const completedAt = (log.completed_at as string) || new Date().toISOString();
+
+  // Check 1: Import har artikler
+  checks.push({
+    name: "import_has_articles",
+    passed: (log.articles_imported as number) > 0,
+    expected: "> 0",
+    actual: log.articles_imported as number,
+    message: (log.articles_imported as number) > 0
+      ? `${log.articles_imported} artikler importeret`
+      : "Ingen artikler importeret — tom kørsel",
+  });
+
+  // Check 2: Alle artikler har title
+  const { count: noTitle } = await supabase
+    .from("articles" as never)
+    .select("*", { count: "exact", head: true })
+    .is("title", null)
+    .gte("imported_at", startedAt)
+    .lte("imported_at", completedAt);
+
+  checks.push({
+    name: "all_articles_have_title",
+    passed: (noTitle ?? 0) === 0,
+    expected: "0",
+    actual: noTitle ?? 0,
+    message: (noTitle ?? 0) === 0
+      ? "Alle artikler har title"
+      : `${noTitle} artikler mangler title`,
+  });
+
+  // Check 3: Alle artikler har abstract
+  const { count: noAbstract } = await supabase
+    .from("articles" as never)
+    .select("*", { count: "exact", head: true })
+    .is("abstract", null)
+    .gte("imported_at", startedAt)
+    .lte("imported_at", completedAt);
+
+  checks.push({
+    name: "all_articles_have_abstract",
+    passed: (noAbstract ?? 0) === 0,
+    expected: "0",
+    actual: noAbstract ?? 0,
+    message: (noAbstract ?? 0) === 0
+      ? "Alle artikler har abstract"
+      : `${noAbstract} artikler mangler abstract`,
+  });
+
+  // Check 4: Alle artikler har authors JSONB
+  const { data: emptyAuthors } = await supabase
+    .from("articles" as never)
+    .select("id", { count: "exact" })
+    .gte("imported_at", startedAt)
+    .lte("imported_at", completedAt)
+    .or("authors.is.null,authors.eq.[]");
+
+  const emptyCount = emptyAuthors?.length ?? 0;
+  checks.push({
+    name: "all_articles_have_authors_jsonb",
+    passed: emptyCount === 0,
+    expected: "0",
+    actual: emptyCount,
+    message: emptyCount === 0
+      ? "Alle artikler har mindst 1 forfatter i JSONB"
+      : `${emptyCount} artikler har tom/null authors JSONB`,
+  });
+
+  // Check 5: Rejected authors rate < 10%
+  const { data: linkingLog } = await supabase
+    .from("author_linking_logs" as never)
+    .select("new_authors, duplicates, rejected")
+    .eq("import_log_id", importLogId)
+    .single();
+
+  if (linkingLog) {
+    const ll = linkingLog as Record<string, number>;
+    const total = (ll.new_authors ?? 0) + (ll.duplicates ?? 0) + (ll.rejected ?? 0);
+    const rejectedRate = total > 0 ? (ll.rejected ?? 0) / total : 0;
+    checks.push({
+      name: "rejected_authors_below_threshold",
+      passed: rejectedRate < 0.1,
+      expected: "< 10%",
+      actual: `${(rejectedRate * 100).toFixed(1)}% (${ll.rejected}/${total})`,
+      message: rejectedRate < 0.1
+        ? `Afvisningsrate: ${(rejectedRate * 100).toFixed(1)}%`
+        : `Høj afvisningsrate: ${(rejectedRate * 100).toFixed(1)}% — tjek parser`,
+    });
+  }
+
+  // Check 6: Author linking-rate > 80%
+  const { data: articlesInWindow } = await supabase
+    .from("articles" as never)
+    .select("id, authors")
+    .gte("imported_at", startedAt)
+    .lte("imported_at", completedAt);
+
+  if (articlesInWindow && articlesInWindow.length > 0) {
+    const articleIds = (articlesInWindow as Array<{ id: string; authors: unknown[] }>).map(a => a.id);
+    const { count: linkedCount } = await supabase
+      .from("article_authors" as never)
+      .select("*", { count: "exact", head: true })
+      .in("article_id", articleIds);
+
+    const expectedSlots = (articlesInWindow as Array<{ id: string; authors: unknown[] }>).reduce(
+      (sum, a) => sum + (Array.isArray(a.authors) ? a.authors.length : 0), 0
+    );
+    const linkingRate = expectedSlots > 0 ? (linkedCount ?? 0) / expectedSlots : 1;
+
+    checks.push({
+      name: "author_linking_rate",
+      passed: linkingRate > 0.8,
+      expected: "> 80%",
+      actual: `${(linkingRate * 100).toFixed(1)}% (${linkedCount}/${expectedSlots})`,
+      message: linkingRate > 0.8
+        ? `Linking-rate: ${(linkingRate * 100).toFixed(1)}%`
+        : `Lav linking-rate: ${(linkingRate * 100).toFixed(1)}% — mulig parser-fejl`,
+    });
+  }
+
+  // Check 7: Ingen suspekte forfatternavne
+  const { count: suspectNames } = await supabase
+    .from("authors" as never)
+    .select("*", { count: "exact", head: true })
+    .gte("created_at", startedAt)
+    .lte("created_at", completedAt)
+    .or("display_name.like.%@%,display_name.like.%http%,display_name.like.%[%");
+
+  checks.push({
+    name: "no_suspect_author_names",
+    passed: (suspectNames ?? 0) === 0,
+    expected: "0",
+    actual: suspectNames ?? 0,
+    message: (suspectNames ?? 0) === 0
+      ? "Ingen suspekte forfatternavne"
+      : `${suspectNames} forfattere med suspekte tegn i navn`,
+  });
+
+  // Check 8: Import log status er "completed"
+  checks.push({
+    name: "import_completed",
+    passed: log.status === "completed",
+    expected: "completed",
+    actual: log.status as string,
+    message: log.status === "completed"
+      ? "Import afsluttet korrekt"
+      : `Import status: ${log.status}`,
+  });
+
+  // Gem i DB
+  const failedChecks = checks.filter(c => !c.passed).length;
+  const passed = failedChecks === 0;
+
+  await supabase.from("import_quality_checks" as never).insert({
+    import_log_id: importLogId,
+    passed,
+    total_checks: checks.length,
+    failed_checks: failedChecks,
+    checks,
+  } as never);
+
+  return { passed, totalChecks: checks.length, failedChecks, checks };
+}
