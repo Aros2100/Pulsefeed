@@ -687,6 +687,7 @@ export async function runImport(
   let totalImported = 0;
   let totalSkipped = 0;
   let totalFetched = 0;
+  let totalAuthorSlots = 0;
 
   // 1. Load filters
   let q = admin.from("pubmed_filters").select("*").eq("active", true);
@@ -817,6 +818,10 @@ export async function runImport(
             errors.push(`Upsert batch error: ${upsertErr.message}`);
           } else {
             filterImported += batch.length;
+            totalAuthorSlots += batch.reduce((sum, a) => {
+              const authors = (a.authors as unknown as unknown[]) ?? [];
+              return sum + authors.length;
+            }, 0);
           }
 
           if (i + BATCH_SIZE < articles.length) await sleep(RATE_LIMIT_MS);
@@ -843,6 +848,7 @@ export async function runImport(
           articles_fetched: filterFetched,
           articles_imported: filterImported,
           articles_skipped: filterSkipped,
+          author_slots_imported: totalAuthorSlots,
           errors: filterErrors.length > 0 ? filterErrors : null,
           completed_at: new Date().toISOString(),
         })

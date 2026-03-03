@@ -54,6 +54,7 @@ export async function runImportCircle2(
   let totalImported = 0;
   let totalSkipped = 0;
   let totalFetched = 0;
+  let totalAuthorSlots = 0;
 
   // 1. Load active affiliation sources
   const { data: sources, error: sourcesErr } = await admin
@@ -170,6 +171,10 @@ export async function runImportCircle2(
             errors.push(`Upsert batch error: ${upsertErr.message}`);
           } else {
             totalImported += batch.length;
+            totalAuthorSlots += batch.reduce((sum, a) => {
+              const authors = (a.authors as unknown as unknown[]) ?? [];
+              return sum + authors.length;
+            }, 0);
           }
 
           if (i + BATCH_SIZE < articles.length) await sleep(RATE_LIMIT_MS);
@@ -197,6 +202,7 @@ export async function runImportCircle2(
         articles_fetched: totalFetched,
         articles_imported: totalImported,
         articles_skipped: totalSkipped,
+        author_slots_imported: totalAuthorSlots,
         errors: errors.length > 0 ? errors : null,
         completed_at: new Date().toISOString(),
       })

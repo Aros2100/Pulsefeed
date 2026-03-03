@@ -14,6 +14,7 @@ export async function GET() {
       id,
       started_at,
       articles_imported,
+      author_slots_imported,
       trigger,
       pubmed_filters(name, circle),
       author_linking_logs(articles_processed, authors_linked, status, new_authors, duplicates, rejected)
@@ -51,6 +52,7 @@ export async function GET() {
       id: il.id,
       started_at: il.started_at,
       articles_imported: il.articles_imported,
+      author_slots_imported: il.author_slots_imported ?? 0,
       trigger: il.trigger,
       filter_name: filter?.name ?? null,
       circle: filter?.circle ?? null,

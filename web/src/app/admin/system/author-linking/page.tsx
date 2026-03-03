@@ -18,6 +18,7 @@ interface ImportOverviewRow {
   id: string;
   started_at: string;
   articles_imported: number;
+  author_slots_imported: number;
   trigger: string | null;
   filter_name: string | null;
   circle: number | null;
@@ -238,7 +239,7 @@ export default function AuthorLinkingPage() {
             <div style={{ display: "flex", gap: "32px", flexWrap: "wrap" }}>
               {[
                 { label: "Artikler uden forfattere", value: status?.unlinkedCount,       color: "#1a1a1a" },
-                { label: "Forfatter-slots i kø",     value: status?.unlinkedAuthorSlots, color: "#1a1a1a" },
+                { label: "Afventer",                  value: status?.unlinkedAuthorSlots, color: "#1a1a1a" },
                 { label: "Forfattere i DB",           value: status?.totalAuthors,        color: "#1a1a1a" },
                 { label: "Nye forfattere ✅",          value: status?.totalNew,            color: "#15803d" },
                 { label: "Dubletter 🔄",              value: status?.totalDuplicates,     color: "#1d4ed8" },
@@ -340,7 +341,7 @@ export default function AuthorLinkingPage() {
               .sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime())
               .reduce<(ImportOverviewRow & { accumulated: number })[]>((acc, row, i) => {
                 const prev = acc[i - 1]?.accumulated ?? 0;
-                return [...acc, { ...row, accumulated: prev + row.unlinked_author_slots }];
+                return [...acc, { ...row, accumulated: prev + row.author_slots_imported }];
               }, [])
               .reverse();
             return (
@@ -350,7 +351,7 @@ export default function AuthorLinkingPage() {
                   <th style={thStyle}>Dato</th>
                   <th style={thStyle}>Filter</th>
                   <th style={{ ...thStyle, textAlign: "right" }}>Artikler importeret</th>
-                  <th style={{ ...thStyle, textAlign: "right" }}>Forfattere i kø</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>Afventer</th>
                   <th style={{ ...thStyle, textAlign: "right" }}>Akkumuleret</th>
                   <th style={{ ...thStyle, textAlign: "right" }}>Nye ✅</th>
                   <th style={{ ...thStyle, textAlign: "right" }}>Dubletter 🔄</th>
