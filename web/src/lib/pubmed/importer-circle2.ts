@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchPubMedIds, fetchArticleDetails } from "./importer";
-import { runQualityChecks } from "@/lib/pubmed/quality-checks";
+import { runArticleChecks } from "@/lib/pubmed/quality-checks";
 import type { Json } from "@/lib/supabase/types";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -211,16 +211,16 @@ export async function runImportCircle2(
 
     // Quality checks
     try {
-      const qc = await runQualityChecks(logId);
+      const qc = await runArticleChecks(logId);
       if (!qc.passed) {
         console.warn(
-          `[import-circle2] Quality checks failed for specialty "${specialty}" (${logId}): ` +
+          `[import-circle2] Article checks failed for specialty "${specialty}" (${logId}): ` +
           `${qc.failedChecks}/${qc.totalChecks} checks failed — ` +
           qc.checks.filter(c => !c.passed).map(c => c.message).join("; ")
         );
       }
     } catch (qcErr) {
-      console.warn(`[import-circle2] Quality checks threw for ${logId}:`, qcErr);
+      console.warn(`[import-circle2] Article checks threw for ${logId}:`, qcErr);
     }
   }
 

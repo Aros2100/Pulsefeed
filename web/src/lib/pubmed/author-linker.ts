@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { linkAuthorsToArticle, decodeHtmlEntities, type Author } from "@/lib/pubmed/importer";
+import { runLinkingChecks } from "@/lib/pubmed/quality-checks";
 
 const BATCH_SIZE = 20;
 
@@ -124,6 +125,22 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
       .eq("id", logId);
 
     console.log(`[author-linker] done — articles=${articlesProcessed} authors=${authorsLinked} errors=${errors.length}`);
+
+    // Linking quality checks
+    if (importLogId) {
+      try {
+        const qc = await runLinkingChecks(importLogId);
+        if (!qc.passed) {
+          console.warn(
+            `[author-linker] Linking checks failed for import log ${importLogId}: ` +
+            `${qc.failedChecks}/${qc.totalChecks} checks failed — ` +
+            qc.checks.filter(c => !c.passed).map(c => c.message).join("; ")
+          );
+        }
+      } catch (qcErr) {
+        console.warn(`[author-linker] Linking checks threw for ${importLogId}:`, qcErr);
+      }
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[author-linker] fatal error:`, e);
