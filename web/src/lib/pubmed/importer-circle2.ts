@@ -196,18 +196,23 @@ export async function runImportCircle2(
 
   // Finalise log
   if (logId) {
-    await admin
+    const finalizePayload = {
+      status: errors.length > 0 && totalImported === 0 ? "failed" : "completed",
+      articles_fetched: totalFetched,
+      articles_imported: totalImported,
+      articles_skipped: totalSkipped,
+      author_slots_imported: totalAuthorSlots,
+      errors: errors.length > 0 ? errors : null,
+      completed_at: new Date().toISOString(),
+    };
+    console.log(`[import-circle2] finalizing log ${logId}:`, JSON.stringify(finalizePayload));
+    const { error: finalizeErr } = await admin
       .from("import_logs")
-      .update({
-        status: errors.length > 0 && totalImported === 0 ? "failed" : "completed",
-        articles_fetched: totalFetched,
-        articles_imported: totalImported,
-        articles_skipped: totalSkipped,
-        author_slots_imported: totalAuthorSlots,
-        errors: errors.length > 0 ? errors : null,
-        completed_at: new Date().toISOString(),
-      })
+      .update(finalizePayload)
       .eq("id", logId);
+    if (finalizeErr) {
+      console.error(`[import-circle2] Failed to finalize log ${logId}:`, finalizeErr.message);
+    }
 
     // Quality checks
     try {

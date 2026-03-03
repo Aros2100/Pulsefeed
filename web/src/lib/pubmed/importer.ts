@@ -866,18 +866,23 @@ export async function runImport(
 
     // 6. Finalise log for this filter
     if (filterLogId) {
-      await admin
+      const finalizePayload = {
+        status: filterErrors.length > 0 && filterImported === 0 ? "failed" : "completed",
+        articles_fetched: filterFetched,
+        articles_imported: filterImported,
+        articles_skipped: filterSkipped,
+        author_slots_imported: totalAuthorSlots,
+        errors: filterErrors.length > 0 ? filterErrors : null,
+        completed_at: new Date().toISOString(),
+      };
+      console.log(`[import] finalizing log ${filterLogId}:`, JSON.stringify(finalizePayload));
+      const { error: finalizeErr } = await admin
         .from("import_logs")
-        .update({
-          status: filterErrors.length > 0 && filterImported === 0 ? "failed" : "completed",
-          articles_fetched: filterFetched,
-          articles_imported: filterImported,
-          articles_skipped: filterSkipped,
-          author_slots_imported: totalAuthorSlots,
-          errors: filterErrors.length > 0 ? filterErrors : null,
-          completed_at: new Date().toISOString(),
-        })
+        .update(finalizePayload)
         .eq("id", filterLogId);
+      if (finalizeErr) {
+        console.error(`[import] Failed to finalize log ${filterLogId}:`, finalizeErr.message);
+      }
     }
 
     totalFetched   += filterFetched;
