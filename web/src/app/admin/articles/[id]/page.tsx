@@ -93,7 +93,7 @@ function EnrichedCard({ p }: { p: P }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       <KV label="AI beslutning"       value={p.ai_decision ? <Badge color={p.ai_decision === "approved" ? "green" : "red"}>{String(p.ai_decision)}</Badge> : null} />
-      <KV label="Specialty confidence" value={conf != null ? `${(conf * 100).toFixed(1)}%` : null} />
+      <KV label="Specialty confidence" value={conf != null ? `${conf.toFixed(1)}%` : null} />
       <KV label="Model"               value={p.model_version as string | null} />
       {Array.isArray(p.specialty_tags) && (p.specialty_tags as string[]).length > 0 && (
         <KV label="Specialty tags" value={
