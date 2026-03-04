@@ -80,11 +80,20 @@ function stripTrailingEmail(s: string): string {
     .trim();
 }
 
-// ── Department cleanup ────────────────────────────────────────────────────────
+// ── Field cleanup helpers ─────────────────────────────────────────────────────
 
 /** Strip leading numbers PubMed sometimes prepends: "2Department of …" */
 function stripLeadingNumber(s: string): string {
   return s.replace(/^\d+/, "").trim();
+}
+
+/**
+ * Strip country/city remnants prepended to a field from multi-affiliation strings.
+ * e.g. "Poland. .;Department of…" → "Department of…"
+ * Pattern: short word + period + optional whitespace + period/semicolons
+ */
+function stripCountryPrefix(s: string): string {
+  return s.replace(/^[A-Za-z][a-z'-]{1,25}\.\s*[;.]+\s*/g, "").trim();
 }
 
 // ── Core parser ───────────────────────────────────────────────────────────────
@@ -98,8 +107,11 @@ function stripLeadingNumber(s: string): string {
  *  - US two-letter state abbreviations in city position ("MD", "TN")
  *  - US full state names in city position ("Tennessee", "Ohio")
  *  - Email addresses appended to country ("China. Electronic address: x@y.com")
- *  - Leading numbers on department ("2Department of Neurosurgery")
+ *  - Leading numbers on all fields ("2Department of Neurosurgery")
  *  - Standalone zip codes in city position
+ *  - Country/punctuation remnants at start of department/hospital ("Poland. .;")
+ *  - Deduplication when department === hospital
+ *  - Swap when department/hospital are assigned to the wrong field
  */
 export function parseAffiliation(
   affiliations: string[] | null
@@ -122,7 +134,7 @@ export function parseAffiliation(
 
   // ── Country ────────────────────────────────────────────────────────────────
   const rawCountry = parts[parts.length - 1] ?? "";
-  const country = stripTrailingEmail(rawCountry) || null;
+  let country = stripTrailingEmail(rawCountry) || null;
 
   // ── City ───────────────────────────────────────────────────────────────────
   let city: string | null = null;
@@ -169,29 +181,49 @@ export function parseAffiliation(
 
   for (const part of parts) {
     if (!hospital && HOSPITAL_RE.test(part)) hospital = part;
-    if (!department && DEPT_RE.test(part))   department = stripLeadingNumber(part);
+    if (!department && DEPT_RE.test(part))   department = part;
     if (hospital && department) break;
   }
 
   // Fallback positional heuristics
   if (!department && !hospital) {
-    department = stripLeadingNumber(parts[0] ?? "");
+    department = parts[0] ?? "";
     hospital   = parts.length > 1 ? parts[1] : null;
   } else if (!department) {
-    const fallback = stripLeadingNumber(parts[0] ?? "");
+    const fallback = parts[0] ?? "";
     if (fallback !== hospital) department = fallback || null;
   } else if (!hospital && parts.length > 1) {
     const fallback = parts.find((p) => p !== department) ?? null;
     if (fallback !== department) hospital = fallback;
   }
 
-  // Clean up empty strings from stripLeadingNumber
-  if (department === "") department = null;
+  // ── Post-processing ────────────────────────────────────────────────────────
 
-  return {
-    department: department ? stripLeadingNumber(department) || null : null,
-    hospital:   hospital   ? stripLeadingNumber(hospital)   || null : null,
-    city:       city       ? stripLeadingNumber(city)       || null : null,
-    country:    country    ? stripLeadingNumber(country)    || null : null,
-  };
+  // Strip leading numbers, country prefixes, and empty strings on all fields
+  if (department) department = stripCountryPrefix(stripLeadingNumber(department)) || null;
+  if (hospital)   hospital   = stripCountryPrefix(stripLeadingNumber(hospital))   || null;
+  if (city)       city       = stripLeadingNumber(city)                            || null;
+  if (country)    country    = stripLeadingNumber(country)                         || null;
+
+  // Swap if department and hospital are assigned to the wrong field
+  // (e.g. hospital slot has "Department of X", department slot has "Amrita Medical Centre")
+  if (department && hospital && HOSPITAL_RE.test(department) && DEPT_RE.test(hospital)) {
+    [department, hospital] = [hospital, department];
+  }
+
+  // Deduplicate: if both fields have the same value, keep the one matching its RE
+  if (department && hospital && department.toLowerCase() === hospital.toLowerCase()) {
+    if (HOSPITAL_RE.test(department)) {
+      hospital = department;
+      department = null;
+    } else {
+      hospital = null;
+    }
+  }
+
+  // Clean up empty strings
+  if (department === "") department = null;
+  if (hospital   === "") hospital   = null;
+
+  return { department, hospital, city, country };
 }

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { parseAffiliation } from "@/lib/affiliations";
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
@@ -70,7 +71,7 @@ export default async function AdminAuthorDetailPage({
 
   const { data: author } = await admin
     .from("authors")
-    .select("id, display_name, article_count, orcid, match_confidence, department, hospital, city, country")
+    .select("id, display_name, article_count, orcid, match_confidence, department, hospital, city, country, affiliations")
     .eq("id", id)
     .single();
 
@@ -118,10 +119,45 @@ export default async function AdminAuthorDetailPage({
           <CardHeader label="Profile" />
           <CardBody>
             <FactRow label="Name" value={author.display_name} />
-            {author.department && <FactRow label="Department" value={author.department} />}
-            {author.hospital  && <FactRow label="Hospital"   value={author.hospital} />}
-            {author.city      && <FactRow label="City"       value={author.city} />}
-            {author.country   && <FactRow label="Country"    value={author.country} />}
+            {(() => {
+              const rawAffiliations = (author as { affiliations?: string[] | null }).affiliations;
+              const rawText = rawAffiliations?.[0] ?? null;
+              const parsed = parseAffiliation(rawAffiliations ?? null);
+              const badges = [
+                parsed.department && { label: "Dept", value: parsed.department },
+                parsed.hospital   && { label: "Hospital", value: parsed.hospital },
+                parsed.city       && { label: "City", value: parsed.city },
+                parsed.country    && { label: "Country", value: parsed.country },
+              ].filter(Boolean) as { label: string; value: string }[];
+              if (!rawText && badges.length === 0) return null;
+              return (
+                <FactRow
+                  label="Affiliation"
+                  value={
+                    <div>
+                      {rawText && (
+                        <p style={{ margin: "0 0 6px 0", fontSize: "14px", color: "#1a1a1a", lineHeight: 1.4 }}>
+                          {rawText}
+                        </p>
+                      )}
+                      {badges.length > 0 && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                          {badges.map((b) => (
+                            <span key={b.label} style={{
+                              fontSize: "11px", color: "#5a6a85",
+                              background: "#EEF2F7", borderRadius: "4px",
+                              padding: "2px 6px", lineHeight: 1.4,
+                            }}>
+                              {b.label}: {b.value}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              );
+            })()}
             {author.orcid && (
               <FactRow
                 label="ORCID"

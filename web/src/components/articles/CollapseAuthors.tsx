@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { parseAffiliation } from "@/lib/affiliations";
 
 interface Author {
   id?: string;
@@ -43,11 +44,35 @@ export default function CollapseAuthors({ authors }: { authors: Author[] }) {
                   ORCID: {a.orcid}
                 </a>
               )}
-              {a.affiliation && (
-                <p style={{ fontSize: "12px", color: "#9ca3af", margin: "2px 0 0 0", lineHeight: 1.4 }}>
-                  {a.affiliation}
-                </p>
-              )}
+              {a.affiliation && (() => {
+                const parsed = parseAffiliation([a.affiliation!]);
+                const badges = [
+                  parsed.department && { label: "Dept", value: parsed.department },
+                  parsed.hospital   && { label: "Hospital", value: parsed.hospital },
+                  parsed.city       && { label: "City", value: parsed.city },
+                  parsed.country    && { label: "Country", value: parsed.country },
+                ].filter(Boolean) as { label: string; value: string }[];
+                return (
+                  <div style={{ marginTop: "4px" }}>
+                    <p style={{ fontSize: "12px", color: "#9ca3af", margin: "0 0 4px 0", lineHeight: 1.4 }}>
+                      {a.affiliation}
+                    </p>
+                    {badges.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                        {badges.map((b) => (
+                          <span key={b.label} style={{
+                            fontSize: "11px", color: "#5a6a85",
+                            background: "#EEF2F7", borderRadius: "4px",
+                            padding: "2px 6px", lineHeight: 1.4,
+                          }}>
+                            {b.label}: {b.value}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </li>
           );
         })}
