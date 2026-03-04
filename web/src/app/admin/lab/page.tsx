@@ -21,7 +21,7 @@ export default async function LabPage() {
   const { data: profile } = await supabase
     .from("users")
     .select("specialty_slugs")
-    .eq("id", user.id)
+    .eq("id", user!.id)
     .single();
 
   const userSpecialties: string[] = (profile?.specialty_slugs as string[] | null) ?? [];
