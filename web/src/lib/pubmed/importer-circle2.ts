@@ -66,9 +66,9 @@ export async function runImportCircle2(
     .eq("type", "affiliation")
     .eq("active", true);
 
-  if (sourcesErr) throw new Error(`Failed to fetch sources: ${sourcesErr.message}`);
-
-  // Opret log-række hvis ingen eksisterende er givet
+  // Log-rækken oprettes normalt af kalderen (trigger-import-circle2/route.ts) inden
+  // denne funktion kaldes — det sikrer at guarden mod concurrent imports virker.
+  // Hvis ingen logId er givet (f.eks. ved direkte kald) oprettes den her som fallback.
   let logId = existingLogId ?? null;
   if (!logId) {
     const { data: filter } = await admin
@@ -86,6 +86,17 @@ export async function runImportCircle2(
       .select("id")
       .single();
     logId = newLog?.id ?? null;
+  }
+
+  if (sourcesErr) {
+    if (logId) {
+      await admin.from("import_logs").update({
+        status: "failed",
+        errors: [`Failed to fetch sources: ${sourcesErr.message}`],
+        completed_at: new Date().toISOString(),
+      }).eq("id", logId);
+    }
+    return { logId, imported: 0, skipped: 0, errors: [`Failed to fetch sources: ${sourcesErr.message}`] };
   }
 
   if (!sources?.length) {
@@ -219,7 +230,6 @@ export async function runImportCircle2(
       errors: errors.length > 0 ? errors : null,
       completed_at: new Date().toISOString(),
     };
-    console.log(`[import-circle2] finalizing log ${logId}:`, JSON.stringify(finalizePayload));
     const { error: finalizeErr } = await admin
       .from("import_logs")
       .update(finalizePayload)
