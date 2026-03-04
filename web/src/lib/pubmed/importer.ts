@@ -715,8 +715,8 @@ export async function runImport(
   let totalFetched = 0;
   let totalAuthorSlots = 0;
 
-  // 1. Load filters
-  let q = admin.from("pubmed_filters").select("*").eq("active", true);
+  // 1. Load filters — eksplicit circle != 2 så C2-filtre ikke kører som C1
+  let q = admin.from("pubmed_filters").select("*").eq("active", true).neq("circle", 2);
   if (filterId) q = q.eq("id", filterId);
 
   const { data: filters, error: filtersErr } = await q;
