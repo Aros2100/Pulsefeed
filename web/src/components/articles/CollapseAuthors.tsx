@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 interface Author {
+  id?: string;
   lastName?: string;
   foreName?: string;
   affiliation?: string | null;
@@ -22,9 +24,15 @@ export default function CollapseAuthors({ authors }: { authors: Author[] }) {
           const name = [a.foreName, a.lastName].filter(Boolean).join(" ") || "—";
           return (
             <li key={i}>
-              <p style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A", margin: "0 0 2px 0" }}>
-                {name}
-              </p>
+              {a.id ? (
+                <Link href={`/admin/authors/${a.id}`} style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A", textDecoration: "none", display: "block", marginBottom: "2px" }}>
+                  {name}
+                </Link>
+              ) : (
+                <p style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A", margin: "0 0 2px 0" }}>
+                  {name}
+                </p>
+              )}
               {a.orcid && (
                 <a
                   href={`https://orcid.org/${a.orcid}`}

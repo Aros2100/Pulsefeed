@@ -124,7 +124,7 @@ function CardBody({ children }: { children: React.ReactNode }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function ArticleStamkort({ article }: { article: ArticleData }) {
+export default function ArticleStamkort({ article, authorIdByPosition }: { article: ArticleData; authorIdByPosition?: Map<number, string> }) {
   const authors   = cast<Author>(article.authors);
   const meshTerms = cast<MeshTerm>(article.mesh_terms);
   const grants    = cast<Grant>(article.grants);
@@ -217,26 +217,6 @@ export default function ArticleStamkort({ article }: { article: ArticleData }) {
 
   return (
     <>
-      {/* Title card */}
-      <Card>
-        <CardHeader label={topSpecialty ?? "Article"} />
-        <CardBody>
-          <h1 style={{ fontFamily: "var(--font-inter), Inter, sans-serif", fontSize: "23px", fontWeight: 700, lineHeight: 1.4, margin: 0 }}>
-            {article.title}
-          </h1>
-          <div style={{ fontSize: "13px", color: "#888", marginTop: "10px" }}>
-            {article.journal_abbr && `${article.journal_abbr} · `}
-            {publishedDisplay && `${publishedDisplay} · `}
-            <a href={pubmedUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
-              PMID {article.pubmed_id}
-            </a>
-            {doiUrl && (
-              <> · <a href={doiUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>DOI ↗</a></>
-            )}
-          </div>
-        </CardBody>
-      </Card>
-
       {/* Facts */}
       <Card id="facts">
         <CardHeader label="Facts" />
@@ -366,9 +346,10 @@ export default function ArticleStamkort({ article }: { article: ArticleData }) {
         <Card id="authors">
           <CardHeader label="Authors" />
           <CardBody>
-            <CollapseAuthors authors={authors.map((a) => ({
+            <CollapseAuthors authors={authors.map((a, i) => ({
               ...a,
               affiliation: a.affiliation ? decodeHtml(a.affiliation) : a.affiliation,
+              id: authorIdByPosition?.get(i + 1) ?? undefined,
             }))} />
           </CardBody>
         </Card>

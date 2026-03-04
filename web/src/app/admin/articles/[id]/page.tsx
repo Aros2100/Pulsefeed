@@ -244,13 +244,19 @@ export default async function AdminArticleLogPage({
   const { id } = await params;
   const admin = createAdminClient();
 
-  const [articleResult, eventsResult] = await Promise.all([
+  const [articleResult, eventsResult, authorLinksResult] = await Promise.all([
     admin.from("articles").select("*").eq("id", id).maybeSingle(),
     admin.from("article_events" as never).select("*").eq("article_id", id).order("created_at", { ascending: true }),
+    admin.from("article_authors").select("author_id, position").eq("article_id", id),
   ]);
 
   const article = articleResult.data;
   if (!article) notFound();
+
+  // Map position → author_id for linking author names
+  const authorIdByPosition = new Map(
+    (authorLinksResult.data ?? []).map((r) => [r.position as number, r.author_id as string])
+  );
 
   const events = (eventsResult.data ?? []) as {
     id: string;
@@ -267,7 +273,7 @@ export default async function AdminArticleLogPage({
 
   const pubmedTab = (
     <div style={{ padding: "4px 0 80px" }}>
-      <ArticleStamkort article={article} />
+      <ArticleStamkort article={article} authorIdByPosition={authorIdByPosition} />
     </div>
   );
 
@@ -357,19 +363,18 @@ export default async function AdminArticleLogPage({
 
         {/* Article header */}
         <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "24px", marginBottom: "24px" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", marginBottom: "12px" }}>
-            <h1 style={{ fontSize: "16px", fontWeight: 700, lineHeight: 1.4, margin: 0 }}>
-              {article.title}
-            </h1>
-            <span style={{ flexShrink: 0, fontSize: "11px", fontWeight: 700, borderRadius: "999px", padding: "3px 10px", border: `1px solid ${statusColor}20`, background: `${statusColor}10`, color: statusColor }}>
-              {article.status ?? "pending"}
-            </span>
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", fontSize: "12px", color: "#5a6a85" }}>
-            <span>PMID <strong style={{ color: "#1a1a1a" }}>{article.pubmed_id}</strong></span>
-            <span>Circle <strong style={{ color: "#1a1a1a" }}>{article.circle}</strong></span>
-            {article.journal_abbr && <span>{article.journal_abbr}</span>}
-            {article.published_date && <span>{article.published_date}</span>}
+          <h1 style={{ fontSize: "16px", fontWeight: 700, lineHeight: 1.4, margin: "0 0 12px" }}>
+            {article.title}
+          </h1>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            {((article.specialty_tags as string[] | null) ?? []).length > 0
+              ? (article.specialty_tags as string[]).map((tag) => (
+                  <span key={tag} style={{ fontSize: "11px", fontWeight: 700, borderRadius: "999px", padding: "3px 10px", border: "1px solid #bfdbfe", background: "#eff6ff", color: "#1d4ed8" }}>
+                    {specialtyLabel(tag)}
+                  </span>
+                ))
+              : <span style={{ fontSize: "12px", color: "#9ca3af" }}>Ingen speciale-tags</span>
+            }
           </div>
         </div>
 
