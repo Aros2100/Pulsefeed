@@ -35,13 +35,13 @@ export async function scoreArticle(
   activePrompt: ActivePrompt
 ): Promise<ScoreResult & { version: string }> {
   const content = activePrompt.prompt
-    .replace(/\{specialty\}/g, specialty)
-    .replace(/\{title\}/g,    article.title)
-    .replace(/\{abstract\}/g, article.abstract ?? "No abstract available");
+    .replace(/\{\{specialty\}\}|\{specialty\}/g, specialty)
+    .replace(/\{\{title\}\}|\{title\}/g,         article.title)
+    .replace(/\{\{abstract\}\}|\{abstract\}/g,   article.abstract ?? "No abstract available");
 
   const message = await trackedCall("specialty_tag_v1", {
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 100,
+    max_tokens: 256,
     messages: [{ role: "user", content }],
   });
 

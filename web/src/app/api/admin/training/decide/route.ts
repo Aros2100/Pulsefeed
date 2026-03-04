@@ -90,16 +90,27 @@ export async function POST(request: NextRequest) {
     } else {
       const remapTag = disagreement_reason ? TAG_REMAP[disagreement_reason] : undefined;
       const oldTags  = (oldArticle?.specialty_tags ?? []) as string[];
-      const newTags  = remapTag
-        ? [...new Set(oldTags.filter((t) => t !== "neurosurgery").concat(remapTag))]
-        : undefined;
 
-      const { error: updateError } = await admin
-        .from("articles")
-        .update({ verified: false, status: "rejected", ...(newTags ? { specialty_tags: newTags } : {}) })
-        .eq("id", article_id);
-      if (updateError) {
-        return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
+      if (remapTag) {
+        // Brug RPC der bypasser merge-triggeren så specialty fjernes rent
+        const newTags = [...new Set(oldTags.filter((t) => t !== specialty).concat(remapTag))];
+        const { error: updateError } = await admin.rpc("replace_article_specialty_tags", {
+          p_article_id: article_id,
+          p_tags:       newTags,
+          p_verified:   false,
+          p_status:     "rejected",
+        });
+        if (updateError) {
+          return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
+        }
+      } else {
+        const { error: updateError } = await admin
+          .from("articles")
+          .update({ verified: false, status: "rejected" })
+          .eq("id", article_id);
+        if (updateError) {
+          return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
+        }
       }
       void Promise.all([
         logArticleEvent(article_id, "status_changed", { from: oldArticle?.status ?? null, to: "rejected", changed_by: auth.userId }),

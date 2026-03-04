@@ -46,6 +46,17 @@ export async function POST(request: NextRequest) {
   // violations until the FK target is confirmed. Auth is already enforced above.
   const editorId: string | null = null;
 
+  // Hent aktiv model-version til at tagge lab_decisions med
+  const { data: activeVersion } = await admin
+    .from("model_versions")
+    .select("version")
+    .eq("specialty", specialty)
+    .eq("module", module)
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
+  const modelVersion = (activeVersion?.version as string | null) ?? null;
+
   const approvedIds = verdicts.filter((v) => v.verdict === "approved").map((v) => v.article_id);
   const rejectedIds = verdicts.filter((v) => v.verdict === "rejected").map((v) => v.article_id);
 
@@ -89,6 +100,7 @@ export async function POST(request: NextRequest) {
     ai_decision: v.ai_decision ?? null,
     ai_confidence: v.ai_confidence ?? null,
     disagreement_reason: v.disagreement_reason ?? null,
+    model_version: modelVersion,
   }));
 
   const { error: decisionsError } = await admin.from("lab_decisions").insert(decisionRows);
@@ -129,14 +141,18 @@ export async function POST(request: NextRequest) {
           .update({ verified: false, status: "rejected" })
           .in("id", rejectedRegularIds)
       : Promise.resolve({ error: null }),
-    // Per-article updates for remap rejections
+    // Per-article updates for remap rejections — bruger RPC der bypasser
+    // merge_article_specialty_tags-triggeren, så specialty fjernes rent.
     ...rejectedRemapVerdicts.map((v) => {
       const remapTag = TAG_REMAP[v.disagreement_reason!]!;
       const oldTags  = (oldMap.get(v.article_id)?.specialty_tags ?? []) as string[];
-      const newTags  = [...new Set(oldTags.filter((t) => t !== "neurosurgery").concat(remapTag))];
-      return admin.from("articles")
-        .update({ verified: false, status: "rejected", specialty_tags: newTags })
-        .eq("id", v.article_id);
+      const newTags  = [...new Set(oldTags.filter((t) => t !== specialty).concat(remapTag))];
+      return admin.rpc("replace_article_specialty_tags", {
+        p_article_id: v.article_id,
+        p_tags:       newTags,
+        p_verified:   false,
+        p_status:     "rejected",
+      });
     }),
   ]);
 
