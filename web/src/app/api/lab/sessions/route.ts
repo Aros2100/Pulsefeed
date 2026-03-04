@@ -58,7 +58,6 @@ export async function POST(request: NextRequest) {
     .map((v) => v.article_id);
 
   // 1. Create lab_session row
-  console.log("[lab/sessions] inserting lab_session", { specialty, module, verdicts: verdicts.length });
   const { data: session, error: sessionError } = await admin
     .from("lab_sessions")
     .insert({
@@ -79,7 +78,6 @@ export async function POST(request: NextRequest) {
   }
 
   const sessionId = session.id as string;
-  console.log("[lab/sessions] session created", sessionId);
 
   // 2. Insert lab_decisions (one per verdict)
   const decisionRows = verdicts.map((v) => ({
@@ -93,7 +91,6 @@ export async function POST(request: NextRequest) {
     disagreement_reason: v.disagreement_reason ?? null,
   }));
 
-  console.log("[lab/sessions] inserting lab_decisions", decisionRows.length);
   const { error: decisionsError } = await admin.from("lab_decisions").insert(decisionRows);
   if (decisionsError) {
     console.error("[lab/sessions] lab_decisions insert error:", decisionsError);
@@ -113,7 +110,6 @@ export async function POST(request: NextRequest) {
   );
 
   // 3. Apply article updates in parallel
-  console.log("[lab/sessions] updating articles — approved:", approvedIds.length, "rejected:", rejectedIds.length);
 
   // Fetch old status/verified before updating so we can record the transition
   const allChangedIds = [...approvedIds, ...rejectedIds];
@@ -158,7 +154,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: r.error.message }, { status: 500 });
     }
   }
-  console.log("[lab/sessions] all done");
 
   void Promise.all([
     ...approvedIds.flatMap((id) => {
@@ -197,7 +192,6 @@ export async function POST(request: NextRequest) {
 
           if (authors.length === 0) continue;
 
-          console.log(`[lab] linking authors for approved article PMID ${article.pubmed_id}`);
           await linkAuthorsToArticle(admin, article.id, authors).catch((e) => {
             console.error(`[lab] author linking failed for PMID ${article.pubmed_id}:`, e);
           });

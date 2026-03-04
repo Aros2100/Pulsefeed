@@ -25,8 +25,6 @@ export async function GET() {
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
-  console.log("[import-overview] første række raw:", JSON.stringify(data?.[0], null, 2));
-
   type Filter = { name: string; circle: number | null } | { name: string; circle: number | null }[] | null;
   type LinkingLog = { articles_processed: number; authors_linked: number; status: string; new_authors: number | null; duplicates: number | null; rejected: number | null };
 

@@ -319,7 +319,6 @@ export default function AdminArticleListClient() {
                       {col.sortable && <SortArrow field={col.key} sortBy={sort_by} sortDir={sort_dir} />}
                     </th>
                   ))}
-                  <th style={{ ...thStyle, width: "40px" }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -334,12 +333,14 @@ export default function AdminArticleListClient() {
                     >
                       {/* Title */}
                       <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", maxWidth: "340px" }}>
-                        <div style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                          {a.title}
-                        </div>
-                        {count > 0 && (
-                          <div style={{ fontSize: "11px", color: "#aaa", marginTop: "2px" }}>{count} forfattere</div>
-                        )}
+                        <Link href={`/admin/articles/${a.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                          <div style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                            {a.title}
+                          </div>
+                          {count > 0 && (
+                            <div style={{ fontSize: "11px", color: "#aaa", marginTop: "2px" }}>{count} forfattere</div>
+                          )}
+                        </Link>
                       </td>
                       {/* Journal */}
                       <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", fontSize: "12px", color: "#5a6a85", whiteSpace: "nowrap" }}>
@@ -370,15 +371,6 @@ export default function AdminArticleListClient() {
                         ) : (
                           <span style={{ color: "#ccc" }}>—</span>
                         )}
-                      </td>
-                      {/* Link */}
-                      <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", whiteSpace: "nowrap" }}>
-                        <Link
-                          href={`/admin/articles/${a.id}`}
-                          style={{ fontSize: "12px", color: "#E83B2A", fontWeight: 600, textDecoration: "none" }}
-                        >
-                          →
-                        </Link>
                       </td>
                     </tr>
                   );

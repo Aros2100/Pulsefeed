@@ -19,7 +19,6 @@ const schema = z.object({
   ai_verdict: z.enum(["relevant", "not_relevant", "unsure"]).nullable().optional(),
   ai_confidence: z.number().int().min(0).max(100).nullable().optional(),
   disagreement_reason: z.string().optional(),
-  disagreement_comment: z.string().max(200).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -41,11 +40,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { article_id, specialty, editor_verdict, ai_verdict, ai_confidence, disagreement_reason, disagreement_comment } =
+  const { article_id, specialty, editor_verdict, ai_verdict, ai_confidence, disagreement_reason } =
     result.data;
-
-  const agreement =
-    ai_verdict != null ? editor_verdict === ai_verdict : null;
 
   const admin = createAdminClient();
 

@@ -141,15 +141,6 @@ export default async function SpecialtyImportPage({
   const { data: logs } = await logsQuery;
   const importLogs = logs ?? [];
 
-  console.log("[import-overview] stats rows:", JSON.stringify(stats));
-  console.log("[import-overview] computed:", { c1Total, c2Total, totalInDB, tilgaengelige });
-  console.log("[import-overview] import_logs:", importLogs.map((l) => ({
-    id: l.id,
-    started_at: l.started_at,
-    articles_imported: l.articles_imported,
-    status: l.status,
-  })));
-
   // Accumulated: newest row = totalInDB (all circles), each older row -= previous imported
   const baseTotal = totalInDB;
   let running = baseTotal;
