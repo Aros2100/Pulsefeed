@@ -4,6 +4,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { linkAuthorsToArticle, type Author } from "@/lib/pubmed/importer";
+import { logArticleEvent } from "@/lib/article-events";
+
+const TAG_REMAP: Record<string, string> = {
+  "Neuroscience":        "neuroscience",
+  "Basic neuro research": "basic_neuro_research",
+};
 
 const schema = z.object({
   specialty: z.string().refine(
@@ -42,6 +48,14 @@ export async function POST(request: NextRequest) {
 
   const approvedIds = verdicts.filter((v) => v.verdict === "approved").map((v) => v.article_id);
   const rejectedIds = verdicts.filter((v) => v.verdict === "rejected").map((v) => v.article_id);
+
+  // Split rejected into those needing specialty_tags remap and regular rejections
+  const rejectedRemapVerdicts = verdicts.filter(
+    (v) => v.verdict === "rejected" && v.disagreement_reason != null && TAG_REMAP[v.disagreement_reason] != null
+  );
+  const rejectedRegularIds = verdicts
+    .filter((v) => v.verdict === "rejected" && (v.disagreement_reason == null || TAG_REMAP[v.disagreement_reason] == null))
+    .map((v) => v.article_id);
 
   // 1. Create lab_session row
   console.log("[lab/sessions] inserting lab_session", { specialty, module, verdicts: verdicts.length });
@@ -86,19 +100,48 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: decisionsError.message }, { status: 500 });
   }
 
+  void Promise.all(
+    verdicts.map((v) =>
+      logArticleEvent(v.article_id, "lab_decision", {
+        module,
+        editor_verdict:      v.verdict,
+        ai_verdict:          v.ai_decision ?? null,
+        confidence:          v.ai_confidence ?? null,
+        disagreement_reason: v.disagreement_reason ?? null,
+      })
+    )
+  );
+
   // 3. Apply article updates in parallel
   console.log("[lab/sessions] updating articles — approved:", approvedIds.length, "rejected:", rejectedIds.length);
-  const [approvedResult, rejectedResult] = await Promise.all([
+
+  // Fetch old status/verified before updating so we can record the transition
+  const allChangedIds = [...approvedIds, ...rejectedIds];
+  const { data: oldArticles } = allChangedIds.length > 0
+    ? await admin.from("articles").select("id, status, verified, specialty_tags").in("id", allChangedIds)
+    : { data: [] };
+  const oldMap = new Map((oldArticles ?? []).map((a) => [a.id as string, a as { id: string; status: string | null; verified: boolean | null; specialty_tags: string[] | null }]));
+
+  const [approvedResult, rejectedResult, ...remapResults] = await Promise.all([
     approvedIds.length > 0
       ? admin.from("articles")
           .update({ verified: true, status: "approved", specialty_tags: [specialty] })
           .in("id", approvedIds)
       : Promise.resolve({ error: null }),
-    rejectedIds.length > 0
+    rejectedRegularIds.length > 0
       ? admin.from("articles")
           .update({ verified: false, status: "rejected" })
-          .in("id", rejectedIds)
+          .in("id", rejectedRegularIds)
       : Promise.resolve({ error: null }),
+    // Per-article updates for remap rejections
+    ...rejectedRemapVerdicts.map((v) => {
+      const remapTag = TAG_REMAP[v.disagreement_reason!]!;
+      const oldTags  = (oldMap.get(v.article_id)?.specialty_tags ?? []) as string[];
+      const newTags  = [...new Set(oldTags.filter((t) => t !== "neurosurgery").concat(remapTag))];
+      return admin.from("articles")
+        .update({ verified: false, status: "rejected", specialty_tags: newTags })
+        .eq("id", v.article_id);
+    }),
   ]);
 
   if (approvedResult.error) {
@@ -109,7 +152,30 @@ export async function POST(request: NextRequest) {
     console.error("[lab/sessions] articles rejected update error:", rejectedResult.error);
     return NextResponse.json({ ok: false, error: rejectedResult.error.message }, { status: 500 });
   }
+  for (const r of remapResults) {
+    if (r.error) {
+      console.error("[lab/sessions] articles remap update error:", r.error);
+      return NextResponse.json({ ok: false, error: r.error.message }, { status: 500 });
+    }
+  }
   console.log("[lab/sessions] all done");
+
+  void Promise.all([
+    ...approvedIds.flatMap((id) => {
+      const old = oldMap.get(id);
+      return [
+        logArticleEvent(id, "status_changed", { from: old?.status ?? null, to: "approved",  changed_by: auth.userId }),
+        logArticleEvent(id, "verified",        { from: old?.verified ?? null, to: true,      changed_by: auth.userId }),
+      ];
+    }),
+    ...rejectedIds.flatMap((id) => {
+      const old = oldMap.get(id);
+      return [
+        logArticleEvent(id, "status_changed", { from: old?.status ?? null, to: "rejected", changed_by: auth.userId }),
+        logArticleEvent(id, "verified",        { from: old?.verified ?? null, to: false,    changed_by: auth.userId }),
+      ];
+    }),
+  ]);
 
   // Background: link authors for approved articles (fire-and-forget)
   if (approvedIds.length > 0) {

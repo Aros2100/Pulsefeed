@@ -1,6 +1,4 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import Header from "@/components/Header";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
@@ -74,7 +72,6 @@ function accuracyColor(v: number | null): string {
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   const { data: profile } = await supabase
     .from("users").select("specialty_slugs").eq("id", user.id).single();
@@ -257,7 +254,6 @@ export default async function DashboardPage() {
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
-      <Header />
       <div style={{ maxWidth: "900px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
         {/* Heading */}

@@ -723,8 +723,8 @@ function Circle2Tab({ specialty }: { specialty: string }) {
 
 type Tab = "circle1" | "circle2";
 
-export default function LayerManager({ specialty, label }: { specialty: string; label: string }) {
-  const [activeTab, setActiveTab] = useState<Tab>("circle1");
+export default function LayerManager({ specialty, label, initialTab = "circle1" }: { specialty: string; label: string; initialTab?: Tab }) {
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "circle1", label: "Circle 1 — Trusted Journals" },
@@ -742,8 +742,8 @@ export default function LayerManager({ specialty, label }: { specialty: string; 
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 80px" }}>
         {/* Back link */}
         <div style={{ marginBottom: "20px" }}>
-          <Link href="/admin/system/import" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
-            ← Import
+          <Link href="/admin/system" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+            ← System
           </Link>
         </div>
 

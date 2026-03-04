@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { getActivePrompt, scoreArticle } from "@/lib/lab/scorer";
+import { logArticleEvent } from "@/lib/article-events";
 
 const BATCH_SIZE = 10;
 
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
   // Find all unscored C2 articles
   const { data: articles, error: fetchError } = await admin
     .from("articles")
-    .select("id, title, abstract")
+    .select("id, title, abstract, specialty_tags")
     .eq("status", "pending")
     .is("specialty_confidence", null);
 
@@ -68,6 +69,12 @@ export async function POST(request: NextRequest) {
           })
           .eq("id", article.id);
         if (error) throw new Error(error.message);
+        void logArticleEvent(article.id, "enriched", {
+          ai_decision:          score.ai_decision,
+          specialty_confidence: score.confidence,
+          model_version:        score.version,
+          specialty_tags:       article.specialty_tags,
+        });
         return score;
       })
     );

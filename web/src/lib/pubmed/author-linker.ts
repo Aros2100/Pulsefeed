@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { linkAuthorsToArticle, decodeHtmlEntities, type Author } from "@/lib/pubmed/importer";
 import { runLinkingChecks } from "@/lib/pubmed/quality-checks";
+import { logArticleEvent } from "@/lib/article-events";
 
 const BATCH_SIZE = 20;
 
@@ -82,6 +83,13 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
               }));
               await admin.from("rejected_authors" as never).insert(rejects as never);
             }
+
+            void logArticleEvent(article.id, "author_linked", {
+              authors_linked: result.new + result.duplicates,
+              new:        result.new,
+              duplicates: result.duplicates,
+              rejected:   result.rejected,
+            });
           })
           .catch((e) => {
             const msg = `PMID ${article.pubmed_id}: ${e instanceof Error ? e.message : String(e)}`;

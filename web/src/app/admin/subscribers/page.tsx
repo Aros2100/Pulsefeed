@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from "react";
 import type { Database } from "@/lib/supabase/types";
 
 type UserRow = Database["public"]["Tables"]["users"]["Row"];
-import Header from "@/components/Header";
 
 const SPECIALTIES: Record<string, string> = {
   neurosurgery: "Neurosurgery",
@@ -453,8 +452,6 @@ export default function SubscribersPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <Header />
-
       <main className="mx-auto max-w-6xl w-full px-4 sm:px-6 py-8">
         {/* Back link */}
         <div className="mb-4">

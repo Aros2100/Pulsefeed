@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Header from "@/components/Header";
 
 interface ImportLog {
   id: string;
@@ -113,7 +112,6 @@ export default function LogsPage() {
       color: "#1a1a1a",
       minHeight: "100vh",
     }}>
-      <Header />
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
         {/* Back + Heading */}

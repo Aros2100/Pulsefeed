@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import Header from "@/components/Header";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 
@@ -168,14 +167,12 @@ export default async function SpecialtyImportPage({
       color: "#1a1a1a",
       minHeight: "100vh",
     }}>
-      <Header />
-
       <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
         {/* Breadcrumb */}
         <div style={{ marginBottom: "8px", fontSize: "13px", color: "#5a6a85" }}>
-          <Link href="/admin/system/import" style={{ color: "#5a6a85", textDecoration: "none" }}>
-            ← Import
+          <Link href="/admin/system" style={{ color: "#5a6a85", textDecoration: "none" }}>
+            ← System
           </Link>
         </div>
 

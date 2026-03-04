@@ -3,6 +3,12 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { logArticleEvent } from "@/lib/article-events";
+
+const TAG_REMAP: Record<string, string> = {
+  "Neuroscience":        "neuroscience",
+  "Basic neuro research": "basic_neuro_research",
+};
 
 const schema = z.object({
   article_id: z.string().uuid(),
@@ -57,21 +63,52 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: insertError.message }, { status: 500 });
   }
 
-  if (editor_verdict === "relevant") {
-    const { error: updateError } = await admin
+  void logArticleEvent(article_id, "lab_decision", {
+    module:              "specialty_tags",
+    editor_verdict,
+    ai_verdict:          ai_verdict ?? null,
+    confidence:          ai_confidence ?? null,
+    disagreement_reason: disagreement_reason ?? null,
+  });
+
+  if (editor_verdict === "relevant" || editor_verdict === "not_relevant") {
+    // Fetch old values before updating so we can record the transition
+    const { data: oldArticle } = await admin
       .from("articles")
-      .update({ specialty_tags: [specialty], verified: true, status: "approved" })
-      .eq("id", article_id);
-    if (updateError) {
-      return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
-    }
-  } else if (editor_verdict === "not_relevant") {
-    const { error: updateError } = await admin
-      .from("articles")
-      .update({ verified: false, status: "rejected" })
-      .eq("id", article_id);
-    if (updateError) {
-      return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
+      .select("status, verified, specialty_tags")
+      .eq("id", article_id)
+      .maybeSingle();
+
+    if (editor_verdict === "relevant") {
+      const { error: updateError } = await admin
+        .from("articles")
+        .update({ specialty_tags: [specialty], verified: true, status: "approved" })
+        .eq("id", article_id);
+      if (updateError) {
+        return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
+      }
+      void Promise.all([
+        logArticleEvent(article_id, "status_changed", { from: oldArticle?.status ?? null, to: "approved", changed_by: auth.userId }),
+        logArticleEvent(article_id, "verified",        { from: oldArticle?.verified ?? null, to: true,      changed_by: auth.userId }),
+      ]);
+    } else {
+      const remapTag = disagreement_reason ? TAG_REMAP[disagreement_reason] : undefined;
+      const oldTags  = (oldArticle?.specialty_tags ?? []) as string[];
+      const newTags  = remapTag
+        ? [...new Set(oldTags.filter((t) => t !== "neurosurgery").concat(remapTag))]
+        : undefined;
+
+      const { error: updateError } = await admin
+        .from("articles")
+        .update({ verified: false, status: "rejected", ...(newTags ? { specialty_tags: newTags } : {}) })
+        .eq("id", article_id);
+      if (updateError) {
+        return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
+      }
+      void Promise.all([
+        logArticleEvent(article_id, "status_changed", { from: oldArticle?.status ?? null, to: "rejected", changed_by: auth.userId }),
+        logArticleEvent(article_id, "verified",        { from: oldArticle?.verified ?? null, to: false,    changed_by: auth.userId }),
+      ]);
     }
   }
   // unsure: no article update

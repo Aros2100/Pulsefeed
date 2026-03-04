@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchPubMedIds, fetchArticleDetails } from "./importer";
 import { runArticleChecks } from "@/lib/pubmed/quality-checks";
+import { logArticleEvent } from "@/lib/article-events";
 import type { Json } from "@/lib/supabase/types";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -176,6 +177,19 @@ export async function runImportCircle2(
               const authors = (a.authors as unknown as unknown[]) ?? [];
               return sum + authors.length;
             }, 0);
+
+            // Fire-and-forget — logArticleEvent catches its own errors
+            void Promise.all(
+              (upsertedRows ?? []).map((row) =>
+                logArticleEvent(row.id, "imported", {
+                  circle: 2,
+                  status: "pending",
+                  specialty_tags: [specialty],
+                  pubmed_id: row.pubmed_id,
+                  import_log_id: logId,
+                })
+              )
+            );
           }
 
           if (i + BATCH_SIZE < articles.length) await sleep(RATE_LIMIT_MS);

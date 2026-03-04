@@ -109,6 +109,20 @@ async function saveFeedback(
       impact_factor: null,
     });
   if (error) console.error("newsletter_feedback insert failed:", error.message);
+
+  void (supabase as any)
+    .from("article_events")
+    .insert({
+      article_id: article.id,
+      event_type: "feedback",
+      payload: {
+        week:               weekNumber,
+        year:               new Date().getFullYear(),
+        news_value:         article.news_value,
+        clinical_relevance: article.clinical_relevance,
+        decision,
+      },
+    });
 }
 
 export default function NewsletterSelectClient({ articles, specialtyLabel, weekNumber }: Props) {

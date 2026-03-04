@@ -1,6 +1,4 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import Header from "@/components/Header";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
@@ -19,7 +17,6 @@ function fmtDate(iso: string | null): string {
 export default async function LabPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   const { data: profile } = await supabase
     .from("users")
@@ -70,8 +67,6 @@ export default async function LabPage() {
       color: "#1a1a1a",
       minHeight: "100vh",
     }}>
-      <Header />
-
       <div style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
         {/* Back link */}

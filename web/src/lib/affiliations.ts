@@ -178,9 +178,11 @@ export function parseAffiliation(
     department = stripLeadingNumber(parts[0] ?? "");
     hospital   = parts.length > 1 ? parts[1] : null;
   } else if (!department) {
-    department = stripLeadingNumber(parts[0] ?? "");
+    const fallback = stripLeadingNumber(parts[0] ?? "");
+    if (fallback !== hospital) department = fallback || null;
   } else if (!hospital && parts.length > 1) {
-    hospital = parts.find((p) => p !== department) ?? null;
+    const fallback = parts.find((p) => p !== department) ?? null;
+    if (fallback !== department) hospital = fallback;
   }
 
   // Clean up empty strings from stripLeadingNumber
