@@ -277,9 +277,9 @@ export default async function AdminArticleLogPage({
     </div>
   );
 
-  const SECTIONS: { title: string; types: string[] }[] = [
-    { title: "Indlæsning af artikel",    types: ["imported"] },
-    { title: "Indlæsning af forfattere", types: ["author_linked"] },
+  const SECTIONS: { title: string; types: string[]; alwaysShow?: boolean }[] = [
+    { title: "Indlæsning af artikel",    types: ["imported"],      alwaysShow: true },
+    { title: "Indlæsning af forfattere", types: ["author_linked"], alwaysShow: true },
     { title: "Speciale scoring",         types: ["enriched"] },
     { title: "Validering",               types: ["lab_decision"] },
   ];
@@ -287,7 +287,7 @@ export default async function AdminArticleLogPage({
   const grouped = SECTIONS.map((s) => ({
     ...s,
     events: events.filter((ev) => s.types.includes(ev.event_type)),
-  }));
+  })).filter((s) => s.alwaysShow || s.events.length > 0);
 
   // Pre-pair status_changed / verified events onto their nearest lab_decision (within 60s)
   const statusChangedEvents = events.filter((ev) => ev.event_type === "status_changed");
