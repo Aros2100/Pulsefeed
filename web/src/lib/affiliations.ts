@@ -188,5 +188,10 @@ export function parseAffiliation(
   // Clean up empty strings from stripLeadingNumber
   if (department === "") department = null;
 
-  return { department, hospital, city, country };
+  return {
+    department: department ? stripLeadingNumber(department) || null : null,
+    hospital:   hospital   ? stripLeadingNumber(hospital)   || null : null,
+    city:       city       ? stripLeadingNumber(city)       || null : null,
+    country:    country    ? stripLeadingNumber(country)    || null : null,
+  };
 }
