@@ -39,13 +39,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
-  // Find all unscored C2 articles — never re-score already enriched articles
+  // Find all unscored C2 articles — never re-score already scored articles
   const { data: articles, error: fetchError } = await admin
     .from("articles")
     .select("id, title, abstract, specialty_tags")
     .eq("status", "pending")
-    .is("specialty_confidence", null)
-    .is("enriched_at", null);
+    .is("specialty_scored_at", null);
 
   if (fetchError) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
@@ -67,6 +66,7 @@ export async function POST(request: NextRequest) {
             specialty_confidence: score.confidence,
             ai_decision: score.ai_decision,
             model_version: score.version,
+            specialty_scored_at: new Date().toISOString(),
           })
           .eq("id", article.id);
         if (error) throw new Error(error.message);
