@@ -131,9 +131,9 @@ function LabDecisionCard({ p }: { p: P }) {
         } />
       )}
       {confidence != null && <KV label="AI confidence" value={`${confidence.toFixed(1)}%`} />}
-      {Boolean(p.disagreement_reason) && (
+      {p.disagreement_reason ? (
         <KV label="Årsag til uenighed" value={<span style={{ color: "#b91c1c" }}>{String(p.disagreement_reason)}</span>} />
-      )}
+      ) : null}
     </div>
   );
 }
@@ -142,9 +142,9 @@ function FeedbackCard({ p }: { p: P }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       <KV label="Uge / År"        value={p.week != null ? `Uge ${p.week}, ${p.year}` : null} />
-      {Boolean(p.decision) && (
+      {p.decision ? (
         <KV label="Beslutning" value={<Badge color={p.decision === "selected" ? "green" : "gray"}>{String(p.decision)}</Badge>} />
-      )}
+      ) : null}
       {p.news_value != null         && <KV label="Nyhedsværdi"    value={`${p.news_value} / 5`} />}
       {p.clinical_relevance != null && <KV label="Klinisk relevans" value={String(p.clinical_relevance)} />}
     </div>
@@ -154,11 +154,11 @@ function FeedbackCard({ p }: { p: P }) {
 function StatusChangedCard({ p }: { p: P }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-      {p.from && <KV label="Fra" value={<Badge color="gray">{String(p.from)}</Badge>} />}
-      {p.to   && <KV label="Til" value={
+      {p.from ? <KV label="Fra" value={<Badge color="gray">{String(p.from)}</Badge>} /> : null}
+      {p.to ? <KV label="Til" value={
         <Badge color={p.to === "approved" ? "green" : p.to === "rejected" ? "red" : "orange"}>{String(p.to)}</Badge>
-      } />}
-      {p.reason && <KV label="Årsag" value={String(p.reason)} />}
+      } /> : null}
+      {p.reason ? <KV label="Årsag" value={String(p.reason)} /> : null}
     </div>
   );
 }
@@ -167,7 +167,7 @@ function VerifiedCard({ p }: { p: P }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       <KV label="Verificeret" value={<Badge color={p.verified ? "green" : "red"}>{p.verified ? "Ja" : "Nej"}</Badge>} />
-      {p.by && <KV label="Af" value={String(p.by)} />}
+      {p.by ? <KV label="Af" value={String(p.by)} /> : null}
     </div>
   );
 }
@@ -190,7 +190,7 @@ function QualityCheckCard({ p }: { p: P }) {
       {passed != null && (
         <KV label="Resultat" value={<Badge color={passed ? "green" : "red"}>{passed ? "Passed" : "Failed"}</Badge>} />
       )}
-      {p.message && <KV label="Besked" value={String(p.message)} />}
+      {p.message ? <KV label="Besked" value={String(p.message)} /> : null}
     </div>
   );
 }
