@@ -39,12 +39,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
-  // Find all unscored C2 articles
+  // Find all unscored C2 articles — never re-score already enriched articles
   const { data: articles, error: fetchError } = await admin
     .from("articles")
     .select("id, title, abstract, specialty_tags")
     .eq("status", "pending")
-    .is("specialty_confidence", null);
+    .is("specialty_confidence", null)
+    .is("enriched_at", null);
 
   if (fetchError) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
