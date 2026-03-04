@@ -123,6 +123,7 @@ export type Database = {
           short_resume: string | null
           source_id: string | null
           specialty_confidence: number | null
+          specialty_scored_at: string | null
           specialty_tags: string[]
           status: string | null
           subspecialty: string | null
@@ -170,6 +171,7 @@ export type Database = {
           short_resume?: string | null
           source_id?: string | null
           specialty_confidence?: number | null
+          specialty_scored_at?: string | null
           specialty_tags?: string[]
           status?: string | null
           subspecialty?: string | null
@@ -217,6 +219,7 @@ export type Database = {
           short_resume?: string | null
           source_id?: string | null
           specialty_confidence?: number | null
+          specialty_scored_at?: string | null
           specialty_tags?: string[]
           status?: string | null
           subspecialty?: string | null

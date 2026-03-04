@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   const { data: article } = await admin
     .from("articles")
-    .select("title, abstract, specialty_confidence")
+    .select("title, abstract, specialty_confidence, ai_decision, specialty_scored_at")
     .eq("id", articleId)
     .single();
 
@@ -33,10 +33,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Article not found" }, { status: 404 });
   }
 
-  // Return cached score if already computed
-  if (article.specialty_confidence != null) {
-    const score = article.specialty_confidence as number;
-    return NextResponse.json({ ok: true, verdict: scoreToVerdict(score), confidence: score });
+  // Return stored score if article has already been scored — no new AI call
+  if (article.specialty_scored_at != null || article.specialty_confidence != null) {
+    const score = article.specialty_confidence as number | null;
+    const storedDecision = article.ai_decision as string | null;
+    const verdict: AIVerdict =
+      storedDecision === "approved" ? "relevant" :
+      storedDecision === "rejected" ? "not_relevant" :
+      score != null ? scoreToVerdict(score) : "unsure";
+    return NextResponse.json({ ok: true, verdict, confidence: score });
   }
 
   const content = [

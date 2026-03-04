@@ -39,12 +39,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
-  // Find all unscored C2 articles — never re-score already scored articles
+  // Find articles that have never been scored.
+  // Guard on BOTH fields: specialty_scored_at (primary) + specialty_confidence (fallback
+  // before migration 0048 has been applied to all envs) to prevent re-scoring.
   const { data: articles, error: fetchError } = await admin
     .from("articles")
     .select("id, title, abstract, specialty_tags")
     .eq("status", "pending")
-    .is("specialty_scored_at", null);
+    .is("specialty_scored_at", null)
+    .is("specialty_confidence", null);
 
   if (fetchError) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
