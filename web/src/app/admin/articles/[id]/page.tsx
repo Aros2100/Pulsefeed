@@ -108,13 +108,15 @@ function EnrichedCard({ p }: { p: P }) {
   );
 }
 
-function LabDecisionCard({ p }: { p: P }) {
+function LabDecisionCard({ p, statusChange, verifiedChange }: { p: P; statusChange?: P; verifiedChange?: P }) {
   const editorVerdict = p.editor_verdict as string | null;
   const aiVerdict     = p.ai_verdict as string | null;
   const confidence    = p.confidence as number | null;
   const agree         = !aiVerdict || editorVerdict === aiVerdict;
   const verdictColor  = (v: string) =>
     v === "approved" || v === "relevant" ? "green" : v === "unsure" ? "orange" : "red";
+  const statusColor   = (v: string) =>
+    v === "approved" ? "green" : v === "rejected" ? "red" : "orange";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       <KV label="Modul"      value={p.module as string | null} />
@@ -134,6 +136,24 @@ function LabDecisionCard({ p }: { p: P }) {
       {p.disagreement_reason ? (
         <KV label="Årsag til uenighed" value={<span style={{ color: "#b91c1c" }}>{String(p.disagreement_reason)}</span>} />
       ) : null}
+      {statusChange?.from != null && statusChange?.to != null && (
+        <KV label="Status" value={
+          <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <Badge color={statusColor(String(statusChange.from))}>{String(statusChange.from)}</Badge>
+            <span style={{ fontSize: "11px", color: "#9ca3af" }}>→</span>
+            <Badge color={statusColor(String(statusChange.to))}>{String(statusChange.to)}</Badge>
+          </span>
+        } />
+      )}
+      {verifiedChange?.to != null && (
+        <KV label="Verificeret" value={
+          <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <Badge color={verifiedChange.from ? "green" : "gray"}>{verifiedChange.from ? "Ja" : "Nej"}</Badge>
+            <span style={{ fontSize: "11px", color: "#9ca3af" }}>→</span>
+            <Badge color={verifiedChange.to ? "green" : "red"}>{verifiedChange.to ? "Ja" : "Nej"}</Badge>
+          </span>
+        } />
+      )}
     </div>
   );
 }
@@ -255,13 +275,26 @@ export default async function AdminArticleLogPage({
     { title: "Indlæsning af artikel",    types: ["imported"] },
     { title: "Indlæsning af forfattere", types: ["author_linked"] },
     { title: "Speciale scoring",         types: ["enriched"] },
-    { title: "Validering",               types: ["lab_decision", "status_changed", "verified"] },
+    { title: "Validering",               types: ["lab_decision"] },
   ];
 
   const grouped = SECTIONS.map((s) => ({
     ...s,
     events: events.filter((ev) => s.types.includes(ev.event_type)),
   }));
+
+  // Pre-pair status_changed / verified events onto their nearest lab_decision (within 60s)
+  const statusChangedEvents = events.filter((ev) => ev.event_type === "status_changed");
+  const verifiedEvents      = events.filter((ev) => ev.event_type === "verified");
+
+  function findClosest(source: typeof events[0], candidates: typeof events) {
+    const t = new Date(source.created_at).getTime();
+    return candidates.reduce<typeof events[0] | null>((best, c) => {
+      const diff = Math.abs(new Date(c.created_at).getTime() - t);
+      const bestDiff = best ? Math.abs(new Date(best.created_at).getTime() - t) : Infinity;
+      return diff < bestDiff && diff < 60_000 ? c : best;
+    }, null);
+  }
 
   const historikTab = (
     <div style={{ padding: "4px 0 80px" }}>
@@ -292,7 +325,14 @@ export default async function AdminArticleLogPage({
                             <span style={{ fontSize: "12px", fontWeight: 700, color: c.dot, textTransform: "uppercase", letterSpacing: "0.06em" }}>{c.label}</span>
                             <span style={{ fontSize: "11px", color: "#9ca3af" }}>{fmt(ev.created_at)}</span>
                           </div>
-                          <EventCard eventType={ev.event_type} payload={ev.payload} />
+                          {ev.event_type === "lab_decision"
+                            ? <LabDecisionCard
+                                p={ev.payload}
+                                statusChange={findClosest(ev, statusChangedEvents)?.payload}
+                                verifiedChange={findClosest(ev, verifiedEvents)?.payload}
+                              />
+                            : <EventCard eventType={ev.event_type} payload={ev.payload} />
+                          }
                         </div>
                       </div>
                     );
