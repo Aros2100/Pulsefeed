@@ -74,7 +74,7 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   const { data: profile } = await supabase
-    .from("users").select("specialty_slugs").eq("id", user.id).single();
+    .from("users").select("specialty_slugs").eq("id", user!.id).single();
 
   const userSpecialties: string[] = (profile?.specialty_slugs as string[] | null) ?? [];
   const activeSpec =
