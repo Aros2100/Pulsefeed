@@ -175,9 +175,10 @@ export async function runImportCircle2(
             status:            "pending",
           }));
 
+          // ON CONFLICT (pubmed_id) DO NOTHING — never overwrite status/verified/specialty_tags
           const { data: upsertedRows, error: upsertErr } = await admin
             .from("articles")
-            .upsert(batch, { onConflict: "pubmed_id" })
+            .upsert(batch, { onConflict: "pubmed_id", ignoreDuplicates: true })
             .select("id, pubmed_id");
 
           if (upsertErr) {

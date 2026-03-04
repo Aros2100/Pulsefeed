@@ -775,10 +775,11 @@ export async function runImport(
       // 4. Deduplicate
       let newPmids = pmids;
       if (!force) {
-        const { data: existing } = await admin
+        const { data: existing, error: dedupErr } = await admin
           .from("articles")
           .select("pubmed_id")
           .in("pubmed_id", pmids);
+        if (dedupErr) throw new Error(`Dedup query failed: ${dedupErr.message}`);
         const existingSet = new Set(existing?.map((r) => r.pubmed_id) ?? []);
         newPmids = pmids.filter((id) => !existingSet.has(id));
         filterSkipped = pmids.length - newPmids.length;
@@ -834,10 +835,10 @@ export async function runImport(
             );
           }
 
-          // ON CONFLICT (pubmed_id) DO UPDATE — DB trigger merges specialty_tags
+          // ON CONFLICT (pubmed_id) DO NOTHING — never overwrite status/verified/specialty_tags
           const { data: upsertedRows, error: upsertErr } = await admin
             .from("articles")
-            .upsert(batch, { onConflict: "pubmed_id" })
+            .upsert(batch, { onConflict: "pubmed_id", ignoreDuplicates: true })
             .select("id, pubmed_id");
 
           if (upsertErr) {
