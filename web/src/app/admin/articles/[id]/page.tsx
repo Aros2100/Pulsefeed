@@ -251,40 +251,58 @@ export default async function AdminArticleLogPage({
     </div>
   );
 
+  const SECTIONS: { title: string; types: string[] }[] = [
+    { title: "Indlæsning af artikel",    types: ["imported"] },
+    { title: "Indlæsning af forfattere", types: ["author_linked"] },
+    { title: "Speciale scoring",         types: ["enriched"] },
+    { title: "Validering",               types: ["lab_decision", "status_changed", "verified"] },
+  ];
+
+  const grouped = SECTIONS.map((s) => ({
+    ...s,
+    events: events.filter((ev) => s.types.includes(ev.event_type)),
+  }));
+
   const historikTab = (
     <div style={{ padding: "4px 0 80px" }}>
-      <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#5a6a85", marginBottom: "20px" }}>
-        Historik · {events.length} begivenheder
-      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+        {grouped.map((section) => (
+          <div key={section.title}>
+            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#5a6a85", marginBottom: "16px", paddingBottom: "8px", borderBottom: "1px solid #e5e7eb" }}>
+              {section.title}
+            </div>
 
-      <div style={{ position: "relative" }}>
-        <div style={{ position: "absolute", left: "15px", top: "8px", bottom: "8px", width: "2px", background: "#e5e7eb" }} />
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          {events.map((ev) => {
-            const c = COLORS[ev.event_type] ?? FALLBACK_COLOR;
-            return (
-              <div key={ev.id} style={{ display: "flex", gap: "20px", alignItems: "flex-start", paddingBottom: "24px" }}>
-                <div style={{ flexShrink: 0, width: "32px", height: "32px", borderRadius: "50%", background: c.bg, border: `2px solid ${c.border}`, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1, position: "relative" }}>
-                  <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: c.dot }} />
-                </div>
-                <div style={{ flex: 1, background: "#fff", borderRadius: "8px", border: `1px solid ${c.border}`, padding: "14px 16px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 700, color: c.dot, textTransform: "uppercase", letterSpacing: "0.06em" }}>{c.label}</span>
-                    <span style={{ fontSize: "11px", color: "#9ca3af" }}>{fmt(ev.created_at)}</span>
-                  </div>
-                  <EventCard eventType={ev.event_type} payload={ev.payload} />
+            {section.events.length === 0 ? (
+              <div style={{ fontSize: "13px", color: "#9ca3af" }}>
+                Ikke gennemført endnu
+              </div>
+            ) : (
+              <div style={{ position: "relative" }}>
+                <div style={{ position: "absolute", left: "15px", top: "8px", bottom: "8px", width: "2px", background: "#e5e7eb" }} />
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {section.events.map((ev) => {
+                    const c = COLORS[ev.event_type] ?? FALLBACK_COLOR;
+                    return (
+                      <div key={ev.id} style={{ display: "flex", gap: "20px", alignItems: "flex-start", paddingBottom: "24px" }}>
+                        <div style={{ flexShrink: 0, width: "32px", height: "32px", borderRadius: "50%", background: c.bg, border: `2px solid ${c.border}`, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1, position: "relative" }}>
+                          <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: c.dot }} />
+                        </div>
+                        <div style={{ flex: 1, background: "#fff", borderRadius: "8px", border: `1px solid ${c.border}`, padding: "14px 16px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                            <span style={{ fontSize: "12px", fontWeight: 700, color: c.dot, textTransform: "uppercase", letterSpacing: "0.06em" }}>{c.label}</span>
+                            <span style={{ fontSize: "11px", color: "#9ca3af" }}>{fmt(ev.created_at)}</span>
+                          </div>
+                          <EventCard eventType={ev.event_type} payload={ev.payload} />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            );
-          })}
-        </div>
+            )}
+          </div>
+        ))}
       </div>
-
-      {events.length === 0 && (
-        <div style={{ textAlign: "center", padding: "48px", fontSize: "13px", color: "#888" }}>
-          Ingen historik fundet for denne artikel
-        </div>
-      )}
     </div>
   );
 
