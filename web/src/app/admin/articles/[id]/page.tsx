@@ -83,7 +83,7 @@ function ImportedCard({ p }: { p: P }) {
           </span>
         } />
       )}
-      {p.filter_name && <KV label="Filter" value={String(p.filter_name)} />}
+      {p.filter_name ? <KV label="Filter" value={String(p.filter_name)} /> : null}
     </div>
   );
 }
