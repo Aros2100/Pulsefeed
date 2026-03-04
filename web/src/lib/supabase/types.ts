@@ -841,6 +841,15 @@ export type Database = {
         }[]
       }
       generate_referral_code: { Args: never; Returns: string }
+      replace_article_specialty_tags: {
+        Args: {
+          p_article_id: string
+          p_tags: string[]
+          p_verified?: boolean
+          p_status?: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
