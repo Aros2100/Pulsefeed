@@ -4,10 +4,11 @@ import pLimit from "p-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
-import { getActivePrompt, scoreArticle } from "@/lib/lab/scorer";
+import { getActivePrompt, scoreArticle, type ActivePrompt } from "@/lib/lab/scorer";
 import { logArticleEvent } from "@/lib/article-events";
 
-const CONCURRENCY = 5;
+const CONCURRENCY  = 2;  // 2 concurrent × ~1s each ≈ 120 req/min — safely under 50 req/min limit
+const BATCH_LIMIT  = 50; // score at most 50 articles per call (one minute's worth at 2 concurrent)
 
 const schema = z.object({
   specialty: z.string().refine(
@@ -15,6 +16,31 @@ const schema = z.object({
     { message: "Invalid specialty" }
   ),
 });
+
+type Article = { id: string; title: string; abstract: string | null; specialty_tags: string[] | null };
+
+async function scoreWithRetry(
+  article: Article,
+  specialty: string,
+  activePrompt: ActivePrompt,
+  retries = 3
+) {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      return await scoreArticle(article, specialty, activePrompt);
+    } catch (err: unknown) {
+      const status = (err as { status?: number })?.status;
+      if (status === 429 && attempt < retries - 1) {
+        const waitMs = (attempt + 1) * 60_000; // 60s, 120s, 180s
+        console.warn(`[score-batch] rate limited — waiting ${waitMs / 1000}s before retry ${attempt + 1}/${retries - 1}`);
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("Max retries exceeded");
+}
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
@@ -40,7 +66,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
-  // Find articles that have never been scored.
+  // Fetch next BATCH_LIMIT unscored articles — don't attempt the entire queue at once.
   // Guard on BOTH fields: specialty_scored_at (primary) + specialty_confidence (fallback
   // before migration 0048 has been applied to all envs) to prevent re-scoring.
   const { data: articles, error: fetchError } = await admin
@@ -49,7 +75,8 @@ export async function POST(request: NextRequest) {
     .eq("status", "pending")
     .is("specialty_scored_at", null)
     .is("specialty_confidence", null)
-    .order("circle", { ascending: false, nullsFirst: false });
+    .order("circle", { ascending: false, nullsFirst: false })
+    .limit(BATCH_LIMIT);
 
   if (fetchError) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
@@ -59,20 +86,20 @@ export async function POST(request: NextRequest) {
   let scored = 0;
   const failedIds: string[] = [];
 
-  // Process all articles in parallel, capped at CONCURRENCY concurrent Claude calls
-  const limit = pLimit(CONCURRENCY);
+  // Process up to BATCH_LIMIT articles in parallel, capped at CONCURRENCY concurrent Claude calls
+  const limiter = pLimit(CONCURRENCY);
 
   const results = await Promise.allSettled(
     toScore.map((article) =>
-      limit(async () => {
-        const score = await scoreArticle(article, specialty, activePrompt);
+      limiter(async () => {
+        const score = await scoreWithRetry(article, specialty, activePrompt);
         const { error } = await admin
           .from("articles")
           .update({
             specialty_confidence: score.confidence,
-            ai_decision: score.ai_decision,
-            model_version: score.version,
-            specialty_scored_at: new Date().toISOString(),
+            ai_decision:          score.ai_decision,
+            model_version:        score.version,
+            specialty_scored_at:  new Date().toISOString(),
           })
           .eq("id", article.id);
         if (error) throw new Error(error.message);
