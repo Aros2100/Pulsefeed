@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS circle_3_sources (
 -- Værdier er bynavne/hospitalnavne — ingen PubMed-syntax.
 -- Query bygges automatisk: ("Copenhagen"[AD] AND neurosurg*[AD])
 INSERT INTO circle_3_sources (specialty, type, value, description, max_results) VALUES
-  ('neurosurgery', 'affiliation', 'Copenhagen',  'Rigshospitalet',              500),
-  ('neurosurgery', 'affiliation', 'Aarhus',      'Aarhus University Hospital',  500),
-  ('neurosurgery', 'affiliation', 'Odense',      'Odense University Hospital',  500),
-  ('neurosurgery', 'affiliation', 'Aalborg',     'Aalborg University Hospital', 500);
+  ('neurosurgery', 'affiliation', 'Rigshospitalet',            'Rigshospitalet',              500),
+  ('neurosurgery', 'affiliation', 'Aarhus University Hospital',  'Aarhus University Hospital',  500),
+  ('neurosurgery', 'affiliation', 'Odense University Hospital',  'Odense University Hospital',  500),
+  ('neurosurgery', 'affiliation', 'Aalborg University Hospital', 'Aalborg University Hospital', 500);

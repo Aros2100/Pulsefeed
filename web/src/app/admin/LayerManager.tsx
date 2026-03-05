@@ -840,7 +840,7 @@ function Circle3Tab() {
           </p>
           <textarea
             rows={8}
-            placeholder={"Copenhagen\nAarhus\nOdense\nAalborg"}
+            placeholder={"Rigshospitalet\nAarhus University Hospital\nOdense University Hospital\nAalborg University Hospital"}
             value={sourceText}
             onChange={(e) => setSourceText(e.target.value)}
             className={`${inputClass} resize-y`}
