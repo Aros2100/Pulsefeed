@@ -16,26 +16,17 @@ function sleep(ms: number) {
 /**
  * Builds a PubMed query for Danish institutional sources.
  *
- * Each source value may be "Hospital, Department" (with comma) or just "Hospital".
- * We extract the hospital name (part before the first comma) and combine it with
- * a neurosurgery filter to avoid exact-phrase brittleness:
+ * Each value is a plain location or hospital name — no PubMed syntax needed.
+ * The function always produces:
  *
- *   "Rigshospitalet, Department of Neurosurgery"
- *     → ("Rigshospitalet"[AD] AND "neurosurg"[AD])
+ *   "Copenhagen"  →  ("Copenhagen"[AD] AND neurosurg*[AD])
+ *   "Rigshospitalet"  →  ("Rigshospitalet"[AD] AND neurosurg*[AD])
  *
- *   "Rigshospitalet"
- *     → ("Rigshospitalet"[AD] AND "neurosurg"[AD])
- *
- * Sources joined with OR.
+ * All clauses joined with OR.
  */
 function buildC3Query(terms: string[]): string {
   return terms
-    .map((t) => {
-      const v = t.trim();
-      const commaIdx = v.indexOf(",");
-      const hospital = commaIdx > 0 ? v.slice(0, commaIdx).trim() : v;
-      return `("${hospital}"[AD] AND "neurosurg"[AD])`;
-    })
+    .map((t) => `("${t.trim()}"[AD] AND neurosurg*[AD])`)
     .join(" OR ");
 }
 

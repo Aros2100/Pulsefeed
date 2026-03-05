@@ -17,9 +17,11 @@ CREATE TABLE IF NOT EXISTS circle_3_sources (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Seed: danske neurokirurgiske afdelinger ───────────────────────────────
+-- ── Seed: danske byer med neurokirurgiske afdelinger ────────────────────
+-- Værdier er bynavne/hospitalnavne — ingen PubMed-syntax.
+-- Query bygges automatisk: ("Copenhagen"[AD] AND neurosurg*[AD])
 INSERT INTO circle_3_sources (specialty, type, value, description, max_results) VALUES
-  ('neurosurgery', 'affiliation', 'Rigshospitalet, Department of Neurosurgery',          'Rigshospitalet',              500),
-  ('neurosurgery', 'affiliation', 'Aarhus University Hospital, Department of Neurosurgery', 'Aarhus University Hospital',  500),
-  ('neurosurgery', 'affiliation', 'Odense University Hospital, Department of Neurosurgery',  'Odense University Hospital',  500),
-  ('neurosurgery', 'affiliation', 'Aalborg University Hospital, Department of Neurosurgery', 'Aalborg University Hospital', 500);
+  ('neurosurgery', 'affiliation', 'Copenhagen',  'Rigshospitalet',              500),
+  ('neurosurgery', 'affiliation', 'Aarhus',      'Aarhus University Hospital',  500),
+  ('neurosurgery', 'affiliation', 'Odense',      'Odense University Hospital',  500),
+  ('neurosurgery', 'affiliation', 'Aalborg',     'Aalborg University Hospital', 500);

@@ -836,11 +836,11 @@ function Circle3Tab() {
         </div>
         <div style={{ padding: "20px" }}>
           <p style={{ fontSize: "12px", color: "#5a6a85", marginBottom: "10px", lineHeight: 1.5 }}>
-            Ét hospital/afdeling per linje. Søges som affiliation (<code style={{ fontFamily: "monospace" }}>"Rigshospitalet, Department of Neurosurgery"[AD]</code>). Artikler importeres som <strong>godkendte og verificerede</strong> (circle=3, status=approved, verified=true, country=Denmark).
+            Ét bynavn eller hospitalsnavn per linje — ingen PubMed-syntax. Hvert navn kombineres automatisk med <code style={{ fontFamily: "monospace" }}>neurosurg*[AD]</code>, fx <code style={{ fontFamily: "monospace" }}>("Copenhagen"[AD] AND neurosurg*[AD])</code>.
           </p>
           <textarea
             rows={8}
-            placeholder={"Rigshospitalet, Department of Neurosurgery\nAarhus University Hospital, Department of Neurosurgery"}
+            placeholder={"Copenhagen\nAarhus\nOdense\nAalborg"}
             value={sourceText}
             onChange={(e) => setSourceText(e.target.value)}
             className={`${inputClass} resize-y`}
