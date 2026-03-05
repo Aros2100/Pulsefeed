@@ -39,6 +39,7 @@ export default async function ProfilePage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+
   const { data: profile } = await supabase
     .from("users")
     .select("name, specialty_slugs, author_id")

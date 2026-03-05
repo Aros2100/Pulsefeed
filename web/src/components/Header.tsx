@@ -82,7 +82,7 @@ export default function Header() {
           </div>
         )}
         {firstName && (
-          <span style={{ fontSize: "14px", color: "#5a6a85" }}>{firstName}</span>
+          <a href="/profile" style={{ fontSize: "14px", color: "#5a6a85", textDecoration: "none" }}>{firstName}</a>
         )}
         <button
           onClick={handleLogout}
