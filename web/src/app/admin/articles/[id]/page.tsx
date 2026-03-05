@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 import ArticleStamkort from "@/components/articles/ArticleStamkort";
 import AdminArticleTabs from "./AdminArticleTabs";
+import ArticleEditableFields from "./ArticleEditableFields";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -265,10 +266,6 @@ export default async function AdminArticleLogPage({
     created_at: string;
   }[];
 
-  const statusColor = article.status === "approved" ? "#15803d"
-    : article.status === "rejected" ? "#b91c1c"
-    : "#d97706";
-
   // ── Tab content ───────────────────────────────────────────────────────────────
 
   const pubmedTab = (
@@ -363,19 +360,15 @@ export default async function AdminArticleLogPage({
 
         {/* Article header */}
         <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "24px", marginBottom: "24px" }}>
-          <h1 style={{ fontSize: "16px", fontWeight: 700, lineHeight: 1.4, margin: "0 0 12px" }}>
-            {article.title}
+          <h1 style={{ fontSize: "16px", fontWeight: 700, lineHeight: 1.4, margin: "0 0 16px" }}>
+            {article.title as string}
           </h1>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-            {((article.specialty_tags as string[] | null) ?? []).length > 0
-              ? (article.specialty_tags as string[]).map((tag) => (
-                  <span key={tag} style={{ fontSize: "11px", fontWeight: 700, borderRadius: "999px", padding: "3px 10px", border: "1px solid #bfdbfe", background: "#eff6ff", color: "#1d4ed8" }}>
-                    {specialtyLabel(tag)}
-                  </span>
-                ))
-              : <span style={{ fontSize: "12px", color: "#9ca3af" }}>Ingen speciale-tags</span>
-            }
-          </div>
+          <ArticleEditableFields
+            articleId={id}
+            initialTags={(article.specialty_tags as string[] | null) ?? []}
+            initialStatus={(article.status as string | null) ?? "pending"}
+            initialVerified={(article.verified as boolean | null) ?? false}
+          />
         </div>
 
       </div>
