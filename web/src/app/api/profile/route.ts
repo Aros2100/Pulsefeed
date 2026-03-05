@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 
@@ -34,5 +35,6 @@ export async function PATCH(request: NextRequest) {
   const { error } = await supabase.from("users").update(updateData).eq("id", user.id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
+  revalidatePath("/profile");
   return NextResponse.json({ ok: true });
 }
