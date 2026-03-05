@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 
 interface ArticleItem {
-  id:            string;
-  title:         string;
-  journal_abbr:  string | null;
+  id:             string;
+  title:          string;
+  journal_abbr:   string | null;
   published_date: string | null;
-  saved_id:      string;
+  saved_id:       string;
 }
 
 interface Project {
@@ -23,8 +23,97 @@ interface Props {
   projectArticles: { project: Project; articles: ArticleItem[] }[];
 }
 
-function ArticleRow({ item, onRemove }: { item: ArticleItem; onRemove: (id: string) => void }) {
+// ── Dropdown item ──────────────────────────────────────────────────────────────
+
+function DropdownItem({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={onClick}
+      style={{
+        padding: "8px 14px", fontSize: "13px", cursor: "pointer",
+        color: active ? "#E83B2A" : "#1a1a1a",
+        background: hovered ? "#f5f7fa" : "transparent",
+        display: "flex", alignItems: "center", gap: "6px",
+      }}
+    >
+      <span style={{ width: "14px", flexShrink: 0 }}>{active ? "✓" : ""}</span>
+      {label}
+    </div>
+  );
+}
+
+// ── Move dropdown ─────────────────────────────────────────────────────────────
+
+function MoveDropdown({
+  projects,
+  currentProjectId,
+  onMove,
+  onClose,
+}: {
+  projects:         Project[];
+  currentProjectId: string | null;
+  onMove:           (projectId: string | null) => void;
+  onClose:          () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: "absolute", right: 0, top: "calc(100% + 4px)", zIndex: 50,
+        background: "#fff", borderRadius: "8px",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+        border: "1px solid #eee", minWidth: "180px", overflow: "hidden",
+      }}
+    >
+      <DropdownItem
+        label="No project"
+        active={currentProjectId === null}
+        onClick={() => { onMove(null); onClose(); }}
+      />
+      {projects.length > 0 && <div style={{ height: "1px", background: "#f0f0f0", margin: "2px 0" }} />}
+      {projects.map((p) => (
+        <DropdownItem
+          key={p.id}
+          label={p.name}
+          active={currentProjectId === p.id}
+          onClick={() => { onMove(p.id); onClose(); }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── Article row ───────────────────────────────────────────────────────────────
+
+function ArticleRow({
+  item,
+  projects,
+  currentProjectId,
+  onRemove,
+  onMove,
+}: {
+  item:             ArticleItem;
+  projects:         Project[];
+  currentProjectId: string | null;
+  onRemove:         (id: string) => void;
+  onMove:           (articleId: string, projectId: string | null) => void;
+}) {
+  const [showMove, setShowMove] = useState(false);
   const meta = [item.journal_abbr, item.published_date?.slice(0, 7)].filter(Boolean).join(" · ");
+
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderTop: "1px solid #f0f0f0" }}>
       <div style={{ minWidth: 0, flex: 1 }}>
@@ -33,27 +122,85 @@ function ArticleRow({ item, onRemove }: { item: ArticleItem; onRemove: (id: stri
         </Link>
         {meta && <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>{meta}</div>}
       </div>
-      <button
-        onClick={() => onRemove(item.id)}
-        title="Remove"
-        style={{ marginLeft: "16px", flexShrink: 0, background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "18px", lineHeight: 1, padding: "2px 6px" }}
-      >
-        ×
-      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "16px", flexShrink: 0 }}>
+        {/* Move button */}
+        <div style={{ position: "relative" }}>
+          <button
+            onClick={() => setShowMove((v) => !v)}
+            style={{
+              background: "none", border: "1px solid #dde3ed", borderRadius: "6px",
+              cursor: "pointer", color: "#5a6a85", fontSize: "12px", padding: "3px 10px",
+            }}
+          >
+            Move →
+          </button>
+          {showMove && (
+            <MoveDropdown
+              projects={projects}
+              currentProjectId={currentProjectId}
+              onMove={(projectId) => onMove(item.id, projectId)}
+              onClose={() => setShowMove(false)}
+            />
+          )}
+        </div>
+        {/* Remove button */}
+        <button
+          onClick={() => onRemove(item.id)}
+          title="Remove"
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "18px", lineHeight: 1, padding: "2px 6px" }}
+        >
+          ×
+        </button>
+      </div>
     </div>
   );
 }
 
-export default function SavedPageClient({ projects: initialProjects, unsorted: initialUnsorted, projectArticles: initial }: Props) {
+// ── Page client ───────────────────────────────────────────────────────────────
+
+export default function SavedPageClient({ projects: _p, unsorted: initialUnsorted, projectArticles: initial }: Props) {
   const [unsorted,        setUnsorted]        = useState(initialUnsorted);
   const [projectArticles, setProjectArticles] = useState(initial);
   const [newProjectName,  setNewProjectName]  = useState("");
   const [showInput,       setShowInput]       = useState(false);
 
+  // Derive project list from current state so newly created projects appear immediately
+  const allProjects = projectArticles.map((pa) => pa.project);
+
   async function removeArticle(articleId: string) {
     await fetch(`/api/articles/${articleId}/save`, { method: "DELETE" });
     setUnsorted((prev) => prev.filter((a) => a.id !== articleId));
     setProjectArticles((prev) => prev.map((pa) => ({ ...pa, articles: pa.articles.filter((a) => a.id !== articleId) })));
+  }
+
+  async function moveArticle(articleId: string, projectId: string | null) {
+    // Find the article in current state (sync read from closure is fine here)
+    let article: ArticleItem | undefined =
+      unsorted.find((a) => a.id === articleId) ??
+      projectArticles.flatMap((pa) => pa.articles).find((a) => a.id === articleId);
+    if (!article) return;
+
+    const art = article;
+
+    // Optimistic update: remove from old location, add to new
+    setUnsorted((prev) => {
+      const without = prev.filter((a) => a.id !== articleId);
+      return projectId === null ? [...without, art] : without;
+    });
+    setProjectArticles((prev) =>
+      prev.map((pa) => {
+        const without = pa.articles.filter((a) => a.id !== articleId);
+        const articles = pa.project.id === projectId ? [...without, art] : without;
+        return { ...pa, articles };
+      })
+    );
+
+    // Persist
+    await fetch(`/api/articles/${articleId}/save`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId }),
+    });
   }
 
   async function deleteProject(projectId: string) {
@@ -91,7 +238,13 @@ export default function SavedPageClient({ projects: initialProjects, unsorted: i
         {cardHeader(`Unsorted · ${unsorted.length} articles`)}
         {unsorted.length === 0
           ? <div style={{ padding: "24px", fontSize: "14px", color: "#888" }}>No unsorted articles</div>
-          : unsorted.map((item) => <ArticleRow key={item.id} item={item} onRemove={removeArticle} />)
+          : unsorted.map((item) => (
+              <ArticleRow
+                key={item.id} item={item}
+                projects={allProjects} currentProjectId={null}
+                onRemove={removeArticle} onMove={moveArticle}
+              />
+            ))
         }
       </div>
 
@@ -105,7 +258,13 @@ export default function SavedPageClient({ projects: initialProjects, unsorted: i
             {cardHeader(`${project.name} · ${articles.length} articles`, () => deleteProject(project.id))}
             {articles.length === 0
               ? <div style={{ padding: "24px", fontSize: "14px", color: "#888" }}>No articles in this project</div>
-              : articles.map((item) => <ArticleRow key={item.id} item={item} onRemove={removeArticle} />)
+              : articles.map((item) => (
+                  <ArticleRow
+                    key={item.id} item={item}
+                    projects={allProjects} currentProjectId={project.id}
+                    onRemove={removeArticle} onMove={moveArticle}
+                  />
+                ))
             }
           </div>
         </div>

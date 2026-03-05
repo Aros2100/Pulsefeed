@@ -26,6 +26,24 @@ export async function POST(request: NextRequest, { params }: Params) {
   return NextResponse.json({ ok: true, saved: true });
 }
 
+export async function PATCH(request: NextRequest, { params }: Params) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+
+  const { id: articleId } = await params;
+  const { project_id } = await request.json() as { project_id: string | null };
+
+  const { error } = await supabase
+    .from("saved_articles")
+    .update({ project_id })
+    .eq("user_id", user.id)
+    .eq("article_id", articleId);
+
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
+
 export async function DELETE(_request: NextRequest, { params }: Params) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
