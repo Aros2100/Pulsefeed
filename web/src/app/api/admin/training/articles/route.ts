@@ -21,7 +21,9 @@ export async function GET(request: NextRequest) {
     .from("articles")
     .select("id, title, journal_abbr, journal_title, published_date, abstract, pubmed_id, authors, specialty_confidence, circle")
     .eq("status", "pending")
-    .order("specialty_confidence", { ascending: true, nullsFirst: false })
+    .order("circle", { ascending: false })                          // C3 before C2
+    .order("imported_at", { ascending: true })                     // oldest first within same circle
+    .order("specialty_confidence", { ascending: true, nullsFirst: false })  // tiebreaker
     .limit(100);
 
   if (error) {
