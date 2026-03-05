@@ -12,6 +12,7 @@ type ActionState = "idle" | "loading" | "done" | "error";
 export default function ImportDashboardActions({ specialtySlugs, subset }: Props) {
   const [c1State,   setC1State]   = useState<ActionState>("idle");
   const [c2State,   setC2State]   = useState<ActionState>("idle");
+  const [c3State,   setC3State]   = useState<ActionState>("idle");
   const [linkState, setLinkState] = useState<ActionState>("idle");
 
   async function triggerC1() {
@@ -33,6 +34,15 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
     } catch { setC2State("error"); }
   }
 
+  async function triggerC3() {
+    setC3State("loading");
+    try {
+      const res  = await fetch("/api/admin/pubmed/trigger-import-circle3", { method: "POST" });
+      const json = (await res.json()) as { ok: boolean };
+      setC3State(json.ok ? "done" : "error");
+    } catch { setC3State("error"); }
+  }
+
   async function triggerLinking() {
     setLinkState("loading");
     try {
@@ -45,6 +55,7 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
   const allActions: { label: string; state: ActionState; trigger: () => Promise<void>; group: "articles" | "linking" }[] = [
     { label: "Kør C1 import",         state: c1State,   trigger: triggerC1,      group: "articles" },
     { label: "Kør C2 import",         state: c2State,   trigger: triggerC2,      group: "articles" },
+    { label: "Kør C3 import",         state: c3State,   trigger: triggerC3,      group: "articles" },
     { label: "Kør forfatter-linking",  state: linkState, trigger: triggerLinking, group: "linking"  },
   ];
   const actions = allActions.filter((a) => a.group === subset);

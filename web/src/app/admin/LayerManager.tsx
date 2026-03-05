@@ -719,9 +719,210 @@ function Circle2Tab({ specialty }: { specialty: string }) {
   );
 }
 
+// ─── Tab 3: Circle 3 ─────────────────────────────────────────────────────────
+
+interface Circle3Source {
+  id: string;
+  specialty: string;
+  type: string;
+  value: string;
+  description: string | null;
+  max_results: number | null;
+  active: boolean;
+  last_run_at: string | null;
+}
+
+function Circle3Tab() {
+  const [sourceText, setSourceText] = useState("");
+  const [maxResults, setMaxResults] = useState(500);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const [logs, setLogs] = useState<ImportLog[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const fetchSources = useCallback(async () => {
+    const res = await fetch("/api/admin/circle3-sources");
+    const d = (await res.json()) as { ok: boolean; sources?: Circle3Source[] };
+    if (d.ok) {
+      const rows = (d.sources ?? []).filter((s) => s.type === "affiliation");
+      setSourceText(rows.map((s) => s.value).join("\n"));
+      if (rows.length > 0 && rows[0].max_results) setMaxResults(rows[0].max_results);
+    }
+  }, []);
+
+  const fetchLogs = useCallback(async () => {
+    const res = await fetch("/api/admin/import-logs?circle=3");
+    const d = (await res.json()) as { ok: boolean; logs?: ImportLog[] };
+    if (d.ok) {
+      setLogs(d.logs ?? []);
+      if (!(d.logs ?? []).some((l) => l.status === "running")) {
+        setImporting(false);
+      }
+    }
+    setLoadingLogs(false);
+  }, []);
+
+  useEffect(() => { void fetchSources(); }, [fetchSources]);
+  useEffect(() => { void fetchLogs(); }, [fetchLogs]);
+
+  useEffect(() => {
+    if (!importing) return;
+    const interval = setInterval(() => { void fetchLogs(); }, 3000);
+    return () => clearInterval(interval);
+  }, [importing, fetchLogs]);
+
+  async function handleSave() {
+    setSaving(true);
+    setSaveError(null);
+    setSaved(false);
+    const terms = sourceText.split("\n").map((t) => t.trim()).filter(Boolean);
+    const res = await fetch("/api/admin/circle3-sources", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ terms, max_results: maxResults }),
+    });
+    const d = (await res.json()) as { ok: boolean; error?: string };
+    if (!d.ok) {
+      setSaveError(d.error ?? "Something went wrong");
+    } else {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    }
+    setSaving(false);
+  }
+
+  async function handleRunImport() {
+    setImporting(true);
+    setImportError(null);
+    try {
+      const res = await fetch("/api/admin/pubmed/trigger-import-circle3", { method: "POST" });
+      const d = (await res.json()) as { ok: boolean; error?: string };
+      if (d.ok) {
+        await fetchLogs();
+      } else {
+        setImportError(d.error ?? "Failed to start import");
+        setImporting(false);
+      }
+    } catch {
+      setImportError("Network error. Please try again.");
+      setImporting(false);
+    }
+  }
+
+  return (
+    <div>
+      {/* Kilder */}
+      <div style={card}>
+        <div style={sectionHeader}>
+          <span style={accentLabel}>Danske afdelinger (affiliation-søgning)</span>
+          <button
+            onClick={handleRunImport}
+            disabled={importing}
+            className={btnPrimary}
+            style={{ padding: "5px 14px", fontSize: "12px", display: "inline-flex", alignItems: "center", gap: "6px" }}
+          >
+            {importing && (
+              <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+            )}
+            {importing ? "Importing…" : "Run import"}
+          </button>
+        </div>
+        <div style={{ padding: "20px" }}>
+          <p style={{ fontSize: "12px", color: "#5a6a85", marginBottom: "10px", lineHeight: 1.5 }}>
+            Ét hospital/afdeling per linje. Søges som affiliation (<code style={{ fontFamily: "monospace" }}>"Rigshospitalet, Department of Neurosurgery"[AD]</code>). Artikler importeres som <strong>godkendte og verificerede</strong> (circle=3, status=approved, verified=true, country=Denmark).
+          </p>
+          <textarea
+            rows={8}
+            placeholder={"Rigshospitalet, Department of Neurosurgery\nAarhus University Hospital, Department of Neurosurgery"}
+            value={sourceText}
+            onChange={(e) => setSourceText(e.target.value)}
+            className={`${inputClass} resize-y`}
+            style={{ fontFamily: "monospace", fontSize: "13px" }}
+          />
+          <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "16px" }}>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">Max results per kørsel</label>
+              <input
+                type="number"
+                min={1}
+                max={10000}
+                value={maxResults}
+                onChange={(e) => setMaxResults(Math.max(1, parseInt(e.target.value) || 500))}
+                className={inputClass}
+                style={{ width: "120px" }}
+              />
+            </div>
+          </div>
+          {saveError && (
+            <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5">
+              <p className="text-sm text-red-700">{saveError}</p>
+            </div>
+          )}
+          {importError && (
+            <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5">
+              <p className="text-sm text-red-700">{importError}</p>
+            </div>
+          )}
+          <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "10px" }}>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className={btnPrimary}
+              style={{ padding: "6px 16px", fontSize: "12px" }}
+            >
+              {saving ? "Gemmer…" : "Gem"}
+            </button>
+            {saved && <span style={{ fontSize: "12px", color: "#15803d" }}>Gemt</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Import log */}
+      <div style={card}>
+        <div style={sectionHeader}>
+          <span style={accentLabel}>Import Log</span>
+        </div>
+        {loadingLogs ? (
+          <div style={{ padding: "32px", textAlign: "center", fontSize: "13px", color: "#888" }}>Loading logs…</div>
+        ) : logs.length === 0 ? (
+          <div style={{ padding: "32px", textAlign: "center", fontSize: "13px", color: "#888" }}>No import runs yet</div>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                {["Date", "Status", "Imported", "Skipped", "Duration"].map((h) => (
+                  <th key={h} style={tableHeaderCell}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {logs.slice(0, 5).map((log) => (
+                <tr key={log.id}>
+                  <td style={{ ...tableCell, whiteSpace: "nowrap", color: "#5a6a85" }}>{fmt(log.started_at)}</td>
+                  <td style={tableCell}><StatusBadge status={log.status} /></td>
+                  <td style={{ ...tableCell, fontVariantNumeric: "tabular-nums" }}>{log.articles_imported}</td>
+                  <td style={{ ...tableCell, fontVariantNumeric: "tabular-nums", color: "#888" }}>{log.articles_skipped}</td>
+                  <td style={{ ...tableCell, fontVariantNumeric: "tabular-nums", color: "#888" }}>{duration(log)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-type Tab = "circle1" | "circle2";
+type Tab = "circle1" | "circle2" | "circle3";
 
 export default function LayerManager({ specialty, label, initialTab = "circle1" }: { specialty: string; label: string; initialTab?: Tab }) {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
@@ -729,6 +930,7 @@ export default function LayerManager({ specialty, label, initialTab = "circle1" 
   const tabs: { id: Tab; label: string }[] = [
     { id: "circle1", label: "Circle 1 — Trusted Journals" },
     { id: "circle2", label: "Circle 2 — Extended Sources" },
+    { id: "circle3", label: "Circle 3 — Danish Sources" },
   ];
 
   return (
@@ -789,6 +991,7 @@ export default function LayerManager({ specialty, label, initialTab = "circle1" 
         {/* Tab content */}
         {activeTab === "circle1" && <Circle1Tab specialty={specialty} />}
         {activeTab === "circle2" && <Circle2Tab specialty={specialty} />}
+        {activeTab === "circle3" && <Circle3Tab />}
       </div>
     </div>
   );

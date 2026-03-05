@@ -7,7 +7,9 @@ export async function GET(request: NextRequest) {
   if (!auth.ok) return auth.response;
 
   const { searchParams } = new URL(request.url);
-  const specialty = searchParams.get("specialty");
+  const specialty  = searchParams.get("specialty");
+  const circleStr  = searchParams.get("circle");
+  const circle     = circleStr ? parseInt(circleStr) : null;
   const limit = Math.min(Math.max(1, parseInt(searchParams.get("limit") ?? "10")), 100);
 
   const admin = createAdminClient();
@@ -18,7 +20,10 @@ export async function GET(request: NextRequest) {
     .order("started_at", { ascending: false })
     .limit(limit);
 
-  if (specialty) {
+  // Filter by circle column when provided (e.g. circle=3 for C3 imports)
+  if (circle !== null && !isNaN(circle)) {
+    logsQuery = logsQuery.eq("circle" as never, circle);
+  } else if (specialty) {
     // Get filter IDs belonging to this specialty, then include logs that either
     // reference one of those filters OR have no specific filter (null = all filters run).
     const { data: filters } = await admin
