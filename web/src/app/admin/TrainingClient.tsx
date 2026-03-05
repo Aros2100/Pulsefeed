@@ -68,7 +68,13 @@ function applyConfFilter(articles: TrainingArticle[], filter: ConfidenceFilter):
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 function ConfidenceBadge({ score }: { score: number | null }) {
-  if (score == null) return null;
+  if (score == null) {
+    return (
+      <span style={{ fontSize: "10px", fontWeight: 700, background: "#f1f5f9", color: "#94a3b8", border: "1px solid #e2e8f0", borderRadius: "4px", padding: "1px 6px", flexShrink: 0 }}>
+        Not scored
+      </span>
+    );
+  }
   const bg     = score >= 70 ? "#f0fdf4" : score >= 40 ? "#fefce8" : "#fef2f2";
   const color  = score >= 70 ? "#15803d" : score >= 40 ? "#d97706" : "#dc2626";
   const border = score >= 70 ? "#bbf7d0" : score >= 40 ? "#fde68a" : "#fecaca";
@@ -104,7 +110,13 @@ function AITopbarBadge({ ai }: { ai: AIData | undefined }) {
     );
   }
   const score = ai.confidence;
-  if (score == null) return <span style={{ fontSize: "12px", color: "#aaa" }}>AI: —</span>;
+  if (score == null) {
+    return (
+      <span style={{ fontSize: "12px", fontWeight: 600, background: "#f1f5f9", color: "#94a3b8", border: "1px solid #e2e8f0", borderRadius: "999px", padding: "3px 12px", whiteSpace: "nowrap" }}>
+        Not scored
+      </span>
+    );
+  }
 
   const bg     = score >= 70 ? "#f0fdf4" : score >= 40 ? "#fefce8" : "#fef2f2";
   const color  = score >= 70 ? "#15803d" : score >= 40 ? "#d97706" : "#dc2626";

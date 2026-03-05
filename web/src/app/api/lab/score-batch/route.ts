@@ -123,11 +123,17 @@ export async function POST(request: NextRequest) {
     }
   });
 
-  // Mark failed articles as uncertain so they don't get stuck unscored
+  // Mark failed articles with null confidence (not 0) so the UI shows "Not scored"
+  // rather than "0% confident". Set specialty_scored_at so they aren't re-queued
+  // on the next scoring run — a human can still decide them in the Lab.
   if (failedIds.length > 0) {
     const { error: fallbackError } = await admin
       .from("articles")
-      .update({ specialty_confidence: 0, ai_decision: "uncertain" })
+      .update({
+        specialty_confidence: null,
+        ai_decision:          null,
+        specialty_scored_at:  new Date().toISOString(),
+      })
       .in("id", failedIds);
     if (fallbackError) {
       console.error("[score-batch] fallback update error:", fallbackError);
