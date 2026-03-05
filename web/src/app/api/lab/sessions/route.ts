@@ -10,6 +10,8 @@ const TAG_REMAP: Record<string, string> = {
   "Neuroscience":        "neuroscience",
   "Basic neuro research": "basic_neuro_research",
   "Oncology":            "oncology",
+  "Anesthesiology":      "anesthesiology",
+  "ENT":                 "ent",
 };
 
 const schema = z.object({

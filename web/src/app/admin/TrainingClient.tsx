@@ -171,6 +171,7 @@ export default function TrainingClient({ specialty, label }: Props) {
   const [verdicts, setVerdicts]               = useState<Record<string, EditorVerdict | null>>({});
   // Disagreement reasons — only used when verdict=not_relevant and AI said relevant
   const [reasons, setReasons]                 = useState<Record<string, string>>({});
+  const [otherText, setOtherText]             = useState<Record<string, string>>({});
   // AI data per article
   const [aiData, setAiData]                   = useState<Record<string, AIData>>({});
 
@@ -437,7 +438,9 @@ export default function TrainingClient({ specialty, label }: Props) {
           verdict: v.verdict === "relevant" ? "approved" : "rejected",
           ai_decision: v.ai_verdict === "relevant" ? "approved" : v.ai_verdict === "not_relevant" ? "rejected" : null,
           ai_confidence: v.ai_confidence,
-          disagreement_reason: isDisagreement ? (reasons[v.article_id] ?? null) : null,
+          disagreement_reason: isDisagreement
+            ? (reasons[v.article_id] === "Other" ? (otherText[v.article_id] || null) : (reasons[v.article_id] ?? null))
+            : null,
         } as { article_id: string; verdict: "approved" | "rejected"; ai_decision: "approved" | "rejected" | null; ai_confidence: number | null; disagreement_reason: string | null };
       });
 
@@ -701,15 +704,13 @@ export default function TrainingClient({ specialty, label }: Props) {
 
                   const options = isFalsePositive
                     ? [
-                        "Forkert speciale",
-                        "Ikke klinisk relevant",
-                        "Case report / editorial",
-                        "Dyrestudie",
-                        "Fremmedsprog",
                         "Neuroscience",
                         "Basic neuro research",
                         "Oncology",
-                        "Andet",
+                        "Anesthesiology",
+                        "ENT",
+                        "Ikke klinisk relevant",
+                        "Other",
                       ]
                     : [
                         "Klinisk relevant trods lav AI-score",
@@ -720,27 +721,49 @@ export default function TrainingClient({ specialty, label }: Props) {
                         "Andet",
                       ];
 
+                  const selectedReason = reasons[currentArticle.id] ?? "";
+
                   return (
-                    <select
-                      value={reasons[currentArticle.id] ?? ""}
-                      onChange={(e) => setReasons((prev) => ({ ...prev, [currentArticle.id]: e.target.value }))}
-                      style={{
-                        fontSize: "12px",
-                        padding: "7px 10px",
-                        borderRadius: "8px",
-                        border: "1px solid #fecaca",
-                        background: "#fff8f7",
-                        color: reasons[currentArticle.id] ? "#1a1a1a" : "#b91c1c",
-                        cursor: "pointer",
-                        outline: "none",
-                        minWidth: "180px",
-                      }}
-                    >
-                      <option value="">Vælg årsag…</option>
-                      {options.map((o) => (
-                        <option key={o} value={o}>{o}</option>
-                      ))}
-                    </select>
+                    <>
+                      <select
+                        value={selectedReason}
+                        onChange={(e) => setReasons((prev) => ({ ...prev, [currentArticle.id]: e.target.value }))}
+                        style={{
+                          fontSize: "12px",
+                          padding: "7px 10px",
+                          borderRadius: "8px",
+                          border: "1px solid #fecaca",
+                          background: "#fff8f7",
+                          color: selectedReason ? "#1a1a1a" : "#b91c1c",
+                          cursor: "pointer",
+                          outline: "none",
+                          minWidth: "180px",
+                        }}
+                      >
+                        <option value="">Vælg årsag…</option>
+                        {options.map((o) => (
+                          <option key={o} value={o}>{o}</option>
+                        ))}
+                      </select>
+                      {selectedReason === "Other" && (
+                        <input
+                          type="text"
+                          placeholder="Beskriv årsag…"
+                          value={otherText[currentArticle.id] ?? ""}
+                          onChange={(e) => setOtherText((prev) => ({ ...prev, [currentArticle.id]: e.target.value }))}
+                          style={{
+                            fontSize: "12px",
+                            padding: "7px 10px",
+                            borderRadius: "8px",
+                            border: "1px solid #fecaca",
+                            background: "#fff8f7",
+                            color: "#1a1a1a",
+                            outline: "none",
+                            minWidth: "180px",
+                          }}
+                        />
+                      )}
+                    </>
                   );
                 })()}
 

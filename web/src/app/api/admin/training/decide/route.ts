@@ -9,6 +9,8 @@ const TAG_REMAP: Record<string, string> = {
   "Neuroscience":        "neuroscience",
   "Basic neuro research": "basic_neuro_research",
   "Oncology":            "oncology",
+  "Anesthesiology":      "anesthesiology",
+  "ENT":                 "ent",
 };
 
 const schema = z.object({
@@ -95,7 +97,7 @@ export async function POST(request: NextRequest) {
       if (remapTag) {
         // Brug RPC der bypasser merge-triggeren så specialty fjernes rent
         const newTags = [...new Set(oldTags.filter((t) => t !== specialty).concat(remapTag))];
-        const { error: updateError } = await admin.rpc("replace_article_specialty_tags", {
+        const { error: updateError } = await admin.rpc("replace_article_specialty_tags" as never, {
           p_article_id: article_id,
           p_tags:       newTags,
           p_verified:   false,
