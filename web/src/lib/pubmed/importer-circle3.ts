@@ -156,8 +156,8 @@ export async function runImportCircle3(
             issn_print:        a.issnPrint,
             specialty_tags:    ["neurosurgery"],
             circle:            3,
-            verified:          true,
-            status:            "approved",
+            verified:          false,
+            status:            "pending",
             country:           "Denmark",
           }));
 
@@ -180,7 +180,7 @@ export async function runImportCircle3(
               (upsertedRows ?? []).map((row) =>
                 logArticleEvent(row.id, "imported", {
                   circle: 3,
-                  status: "approved",
+                  status: "pending",
                   specialty_tags: ["neurosurgery"],
                   pubmed_id: row.pubmed_id,
                   import_log_id: logId,
