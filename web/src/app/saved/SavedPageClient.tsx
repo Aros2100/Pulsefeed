@@ -220,9 +220,9 @@ export default function SavedPageClient({ projects: _p, unsorted: initialUnsorte
     }
   }
 
-  const card: React.CSSProperties = { background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", overflow: "hidden", marginBottom: "16px" };
+  const card: React.CSSProperties = { background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", marginBottom: "16px" };
   const cardHeader = (label: string, onDelete?: () => void): React.ReactNode => (
-    <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+    <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: "10px 10px 0 0" }}>
       <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>{label}</span>
       {onDelete && (
         <button onClick={onDelete} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "16px", lineHeight: 1, padding: "0 4px" }} title="Delete project">×</button>
