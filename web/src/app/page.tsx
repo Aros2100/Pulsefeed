@@ -155,10 +155,12 @@ export default async function DashboardPage() {
   ];
 
   const quickLinks = [
-    { icon: "✉️", title: "Newsletters", desc: "View your previous digests", href: "/newsletters" },
-    { icon: "🔍", title: "Keyword search", desc: "Search across all articles", href: "/search" },
-    { icon: "👤", title: "Authors", desc: "Browse and follow researchers", href: "/authors" },
-    { icon: "📑", title: "My Publications", desc: "Your indexed articles", href: "#publications" },
+    { icon: "✉️", title: "Newsletters",    desc: "View your previous digests",    href: "/newsletters" },
+    { icon: "🔍", title: "Search",         desc: "Search across all articles",    href: "/search" },
+    { icon: "🔖", title: "Saved",          desc: "Articles you bookmarked",       href: "/saved" },
+    { icon: "📖", title: "History",        desc: "Recently read articles",        href: "/history" },
+    { icon: "👤", title: "Authors",        desc: "Browse and follow researchers", href: "/authors" },
+    { icon: "⚙️", title: "My Profile",    desc: "Account and preferences",       href: "/profile" },
   ];
 
   return (
@@ -208,7 +210,7 @@ export default async function DashboardPage() {
         }}>
           Quick access
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
           {quickLinks.map((btn) => (
             <Link
               key={btn.title}

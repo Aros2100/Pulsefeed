@@ -3,6 +3,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 import Header from "@/components/Header";
+import ProfileAvatarUpload from "./ProfileAvatarUpload";
+import ProfileEditClient from "./ProfileEditClient";
+import ProfilePrivacyClient from "./ProfilePrivacyClient";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -14,47 +17,42 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function CardHeader({ label }: { label: string }) {
   return (
-    <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
-        {label}
-      </div>
-      <span style={{ fontSize: "12px", color: "#b0bac8", cursor: "not-allowed" }}>
-        Coming soon
-      </span>
+    <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
+      <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>{label}</div>
     </div>
   );
 }
 
-function InfoRow({ label, value, first }: { label: string; value: React.ReactNode; first?: boolean }) {
-  return (
-    <div style={{ padding: "16px 24px", borderTop: first ? undefined : "1px solid #f0f0f0" }}>
-      <div style={{ fontSize: "12px", color: "#888", marginBottom: "4px" }}>{label}</div>
-      <div style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a" }}>{value}</div>
-    </div>
-  );
-}
+const card: React.CSSProperties = {
+  background: "#fff", borderRadius: "10px",
+  boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
+  overflow: "hidden", marginBottom: "28px",
+};
 
 export default async function ProfilePage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-
-  const { data: profile } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: profile } = await (supabase as any)
     .from("users")
-    .select("name, specialty_slugs, author_id")
+    .select("name, specialty_slugs, author_id, avatar_url, is_public, email_notifications")
     .eq("id", user.id)
-    .single();
+    .single() as { data: { name: string | null; specialty_slugs: string[] | null; author_id: string | null; avatar_url: string | null; is_public: boolean | null; email_notifications: boolean | null } | null };
 
   const specialtySlugs: string[] = profile?.specialty_slugs ?? [];
+  const specialtyLabels = Object.fromEntries(SPECIALTIES.map((s) => [s.slug, s.label as string]));
 
-  const card: React.CSSProperties = {
-    background: "#fff",
-    borderRadius: "10px",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
-    overflow: "hidden",
-    marginBottom: "28px",
-  };
+  // Count publications if author is linked
+  let articleCount = 0;
+  if (profile?.author_id) {
+    const { count } = await supabase
+      .from("article_authors")
+      .select("*", { count: "exact", head: true })
+      .eq("author_id", profile.author_id as string);
+    articleCount = count ?? 0;
+  }
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -68,34 +66,40 @@ export default async function ProfilePage() {
           <div style={{ fontSize: "14px", color: "#888", marginTop: "4px" }}>Manage your account and preferences</div>
         </div>
 
+        {/* Avatar */}
+        <ProfileAvatarUpload
+          avatarUrl={(profile?.avatar_url as string | null) ?? null}
+          displayName={(profile?.name as string | null) ?? user.email ?? "?"}
+        />
+
         {/* Section 1 — Account */}
         <SectionLabel>Account</SectionLabel>
         <div style={card}>
           <CardHeader label="Personal information" />
-          <InfoRow first label="Name"  value={profile?.name  ?? "—"} />
-          <InfoRow       label="Email" value={user.email     ?? "—"} />
+          <div style={{ padding: "4px 0 0" }}>
+            <div style={{ padding: "12px 24px", borderBottom: "1px solid #f0f0f0" }}>
+              <div style={{ fontSize: "12px", color: "#888", marginBottom: "2px" }}>Email</div>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a" }}>{user.email ?? "—"}</div>
+            </div>
+            <ProfileEditClient
+              initialName={(profile?.name as string | null) ?? ""}
+              initialSpecialtySlugs={specialtySlugs}
+            />
+          </div>
         </div>
 
-        {/* Section 2 — Specialty */}
-        <SectionLabel>Specialty</SectionLabel>
+        {/* Section 2 — Privacy + Notifications */}
+        <SectionLabel>Privacy & Notifications</SectionLabel>
         <div style={card}>
-          <CardHeader label="Your specialties" />
-          <div style={{ padding: "16px 24px" }}>
-            {specialtySlugs.length === 0 ? (
-              <span style={{ fontSize: "14px", color: "#888" }}>No specialty configured</span>
-            ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                {specialtySlugs.map((slug) => {
-                  const label = SPECIALTIES.find((s) => s.slug === slug)?.label ?? slug;
-                  return (
-                    <span key={slug} style={{ background: "#EEF2F7", borderRadius: "6px", padding: "4px 10px", fontSize: "12px", fontWeight: 600, color: "#1a1a1a" }}>
-                      {label}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          <CardHeader label="Profile visibility" />
+          <ProfilePrivacyClient
+            initialIsPublic={(profile?.is_public as boolean | null) ?? false}
+            initialEmailNotifications={(profile?.email_notifications as boolean | null) ?? true}
+            name={(profile?.name as string | null) ?? ""}
+            specialtySlugs={specialtySlugs}
+            articleCount={articleCount}
+            specialtyLabels={specialtyLabels}
+          />
         </div>
 
         {/* Section 3 — Author Profile */}
@@ -106,7 +110,7 @@ export default async function ProfilePage() {
               <span style={{ background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0", borderRadius: "999px", padding: "4px 12px", fontSize: "12px", fontWeight: 700 }}>
                 Linked ✓
               </span>
-              <span style={{ fontSize: "14px", color: "#1a1a1a" }}>Author profile connected</span>
+              <span style={{ fontSize: "14px", color: "#1a1a1a" }}>Author profile connected · {articleCount} publications</span>
             </div>
             <Link href="/profile/link-author" style={{ fontSize: "13px", color: "#4f46e5", fontWeight: 600, textDecoration: "none" }}>
               Change →

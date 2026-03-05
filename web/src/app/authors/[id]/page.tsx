@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import Header from "@/components/Header";
+import FollowButton from "@/components/FollowButton";
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
@@ -80,6 +81,14 @@ export default async function AuthorDetailPage({
 
   if (!author) notFound();
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: followRow } = await (supabase as any)
+    .from("author_follows")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("author_id", id)
+    .maybeSingle();
+
   const { data: articleRows } = await supabase
     .from("article_authors")
     .select("position, articles(id, title, journal_abbr, published_date, news_value)")
@@ -110,11 +119,16 @@ export default async function AuthorDetailPage({
         <Card>
           <CardHeader label="Author" />
           <CardBody>
-            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>
-              {author.display_name}
-            </h1>
-            <div style={{ fontSize: "13px", color: "#888" }}>
-              {count} article{count !== 1 ? "s" : ""} indexed
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
+              <div>
+                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>
+                  {author.display_name}
+                </h1>
+                <div style={{ fontSize: "13px", color: "#888" }}>
+                  {count} article{count !== 1 ? "s" : ""} indexed
+                </div>
+              </div>
+              <FollowButton authorId={id} initialFollowing={!!followRow} />
             </div>
           </CardBody>
         </Card>

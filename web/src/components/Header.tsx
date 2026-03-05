@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
+import NotificationBell from "@/components/NotificationBell";
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null);
@@ -81,6 +82,7 @@ export default function Header() {
             </button>
           </div>
         )}
+        <NotificationBell />
         {firstName && (
           <a href="/profile" style={{ fontSize: "14px", color: "#5a6a85", textDecoration: "none" }}>{firstName}</a>
         )}
