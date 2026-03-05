@@ -23,13 +23,15 @@ export async function POST(request: NextRequest) {
   if (uploadError) return NextResponse.json({ ok: false, error: uploadError.message }, { status: 500 });
 
   const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
+  // Append cache-busting timestamp so the browser fetches the new image
+  const cacheBustedUrl = `${publicUrl}?t=${Date.now()}`;
 
   const { error: updateError } = await supabase
     .from("users")
-    .update({ avatar_url: publicUrl })
+    .update({ avatar_url: cacheBustedUrl })
     .eq("id", user.id);
 
   if (updateError) return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
 
-  return NextResponse.json({ ok: true, avatar_url: publicUrl });
+  return NextResponse.json({ ok: true, avatar_url: cacheBustedUrl });
 }

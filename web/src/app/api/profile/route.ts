@@ -3,11 +3,11 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 
 const schema = z.object({
-  name:                z.string().min(1).optional(),
+  name:                z.string().optional(),
   specialty_slugs:     z.array(z.string()).optional(),
   is_public:           z.boolean().optional(),
   email_notifications: z.boolean().optional(),
-}).refine((d) => Object.keys(d).length > 0, { message: "No fields provided" });
+});
 
 export async function PATCH(request: NextRequest) {
   const supabase = await createClient();
@@ -23,7 +23,15 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
   }
 
-  const { error } = await supabase.from("users").update(result.data).eq("id", user.id);
+  // Strip undefined values so we only update what was explicitly sent
+  const updateData = Object.fromEntries(
+    Object.entries(result.data).filter(([, v]) => v !== undefined)
+  );
+  if (Object.keys(updateData).length === 0) {
+    return NextResponse.json({ ok: false, error: "No fields provided" }, { status: 400 });
+  }
+
+  const { error } = await supabase.from("users").update(updateData).eq("id", user.id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });

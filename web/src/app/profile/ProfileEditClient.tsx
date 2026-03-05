@@ -4,8 +4,10 @@ import { useState } from "react";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 
 interface Props {
-  initialName:          string;
+  initialName:           string;
   initialSpecialtySlugs: string[];
+  onNameSaved?:          (name: string) => void;
+  onSpecialtiesSaved?:   (slugs: string[]) => void;
 }
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -32,7 +34,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
 export { Toggle };
 
-export default function ProfileEditClient({ initialName, initialSpecialtySlugs }: Props) {
+export default function ProfileEditClient({ initialName, initialSpecialtySlugs, onNameSaved, onSpecialtiesSaved }: Props) {
   const [editingName, setEditingName]         = useState(false);
   const [name,        setName]                = useState(initialName);
   const [nameInput,   setNameInput]           = useState(initialName);
@@ -50,15 +52,23 @@ export default function ProfileEditClient({ initialName, initialSpecialtySlugs }
 
   async function saveName() {
     setSaving("name"); setError(null);
-    try { await patch({ name: nameInput }); setName(nameInput); setEditingName(false); }
-    catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    try {
+      await patch({ name: nameInput });
+      setName(nameInput);
+      setEditingName(false);
+      onNameSaved?.(nameInput);
+    } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
     setSaving(null);
   }
 
   async function saveSpec() {
     setSaving("spec"); setError(null);
-    try { await patch({ specialty_slugs: tempSlugs }); setSlugs(tempSlugs); setEditingSpec(false); }
-    catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    try {
+      await patch({ specialty_slugs: tempSlugs });
+      setSlugs(tempSlugs);
+      setEditingSpec(false);
+      onSpecialtiesSaved?.(tempSlugs);
+    } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
     setSaving(null);
   }
 

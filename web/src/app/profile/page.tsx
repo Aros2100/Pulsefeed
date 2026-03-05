@@ -4,8 +4,13 @@ import { createClient } from "@/lib/supabase/server";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 import Header from "@/components/Header";
 import ProfileAvatarUpload from "./ProfileAvatarUpload";
-import ProfileEditClient from "./ProfileEditClient";
-import ProfilePrivacyClient from "./ProfilePrivacyClient";
+import ProfileClient from "./ProfileClient";
+
+const card: React.CSSProperties = {
+  background: "#fff", borderRadius: "10px",
+  boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
+  overflow: "hidden", marginBottom: "28px",
+};
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -15,20 +20,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function CardHeader({ label }: { label: string }) {
-  return (
-    <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
-      <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>{label}</div>
-    </div>
-  );
-}
-
-const card: React.CSSProperties = {
-  background: "#fff", borderRadius: "10px",
-  boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
-  overflow: "hidden", marginBottom: "28px",
-};
-
 export default async function ProfilePage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -36,20 +27,33 @@ export default async function ProfilePage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("name, specialty_slugs, author_id, avatar_url, is_public, email_notifications")
+    .select("name, specialty_slugs, author_id, avatar_url, is_public, email_notifications, role_type")
     .eq("id", user.id)
     .single();
 
-  const specialtySlugs: string[] = profile?.specialty_slugs ?? [];
-  const specialtyLabels = Object.fromEntries(SPECIALTIES.map((s) => [s.slug, s.label as string]));
+  const specialtySlugs: string[]       = profile?.specialty_slugs ?? [];
+  const specialtyLabels                = Object.fromEntries(SPECIALTIES.map((s) => [s.slug, s.label as string]));
 
-  let articleCount = 0;
+  // Parallel: article count + author city/country
+  let articleCount  = 0;
+  let authorCity:    string | null = null;
+  let authorCountry: string | null = null;
+
   if (profile?.author_id) {
-    const { count } = await supabase
-      .from("article_authors")
-      .select("*", { count: "exact", head: true })
-      .eq("author_id", profile.author_id);
-    articleCount = count ?? 0;
+    const [{ count }, { data: authorRow }] = await Promise.all([
+      supabase
+        .from("article_authors")
+        .select("*", { count: "exact", head: true })
+        .eq("author_id", profile.author_id),
+      supabase
+        .from("authors")
+        .select("city, country")
+        .eq("id", profile.author_id)
+        .single(),
+    ]);
+    articleCount  = count ?? 0;
+    authorCity    = authorRow?.city    ?? null;
+    authorCountry = authorRow?.country ?? null;
   }
 
   return (
@@ -68,34 +72,21 @@ export default async function ProfilePage() {
           displayName={profile?.name ?? user.email ?? "?"}
         />
 
-        <SectionLabel>Account</SectionLabel>
-        <div style={card}>
-          <CardHeader label="Personal information" />
-          <div style={{ padding: "4px 0 0" }}>
-            <div style={{ padding: "12px 24px", borderBottom: "1px solid #f0f0f0" }}>
-              <div style={{ fontSize: "12px", color: "#888", marginBottom: "2px" }}>Email</div>
-              <div style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a" }}>{user.email ?? "—"}</div>
-            </div>
-            <ProfileEditClient
-              initialName={profile?.name ?? ""}
-              initialSpecialtySlugs={specialtySlugs}
-            />
-          </div>
-        </div>
+        {/* Account + Privacy cards are client-rendered so they share name/specialtySlugs state */}
+        <ProfileClient
+          email={user.email ?? ""}
+          initialName={profile?.name ?? ""}
+          initialSpecialtySlugs={specialtySlugs}
+          initialIsPublic={profile?.is_public ?? false}
+          initialEmailNotifications={profile?.email_notifications ?? true}
+          articleCount={articleCount}
+          specialtyLabels={specialtyLabels}
+          roleType={profile?.role_type ?? null}
+          authorCity={authorCity}
+          authorCountry={authorCountry}
+        />
 
-        <SectionLabel>Privacy & Notifications</SectionLabel>
-        <div style={card}>
-          <CardHeader label="Profile visibility" />
-          <ProfilePrivacyClient
-            initialIsPublic={profile?.is_public ?? false}
-            initialEmailNotifications={profile?.email_notifications ?? true}
-            name={profile?.name ?? ""}
-            specialtySlugs={specialtySlugs}
-            articleCount={articleCount}
-            specialtyLabels={specialtyLabels}
-          />
-        </div>
-
+        {/* Author Profile */}
         <SectionLabel>Author Profile</SectionLabel>
         {profile?.author_id ? (
           <div style={{ ...card, padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
