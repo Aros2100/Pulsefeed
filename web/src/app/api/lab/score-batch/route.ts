@@ -47,7 +47,8 @@ export async function POST(request: NextRequest) {
     .select("id, title, abstract, specialty_tags")
     .eq("status", "pending")
     .is("specialty_scored_at", null)
-    .is("specialty_confidence", null);
+    .is("specialty_confidence", null)
+    .order("circle", { ascending: false, nullsFirst: false });
 
   if (fetchError) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
