@@ -14,16 +14,27 @@ function sleep(ms: number) {
 }
 
 /**
- * Builds a PubMed [AD] query from affiliation terms.
- * Single word (no spaces) → wildcard: term*[AD]
- * Multiple words → quoted phrase: "spine surgery"[AD]
- * Terms joined with OR.
+ * Builds a PubMed query for Danish institutional sources.
+ *
+ * Each source value may be "Hospital, Department" (with comma) or just "Hospital".
+ * We extract the hospital name (part before the first comma) and combine it with
+ * a neurosurgery filter to avoid exact-phrase brittleness:
+ *
+ *   "Rigshospitalet, Department of Neurosurgery"
+ *     → ("Rigshospitalet"[AD] AND "neurosurg"[AD])
+ *
+ *   "Rigshospitalet"
+ *     → ("Rigshospitalet"[AD] AND "neurosurg"[AD])
+ *
+ * Sources joined with OR.
  */
-function buildAffiliationQuery(terms: string[]): string {
+function buildC3Query(terms: string[]): string {
   return terms
     .map((t) => {
       const v = t.trim();
-      return /\s/.test(v) ? `"${v}"[AD]` : `${v}*[AD]`;
+      const commaIdx = v.indexOf(",");
+      const hospital = commaIdx > 0 ? v.slice(0, commaIdx).trim() : v;
+      return `("${hospital}"[AD] AND "neurosurg"[AD])`;
     })
     .join(" OR ");
 }
@@ -103,7 +114,7 @@ export async function runImportCircle3(
   try {
     // 2. Build combined query
     const terms = sources.map((s) => s.value);
-    const query = buildAffiliationQuery(terms);
+    const query = buildC3Query(terms);
     const maxResults = Math.max(...sources.map((s) => s.max_results ?? 500));
 
     await sleep(RATE_LIMIT_MS);
