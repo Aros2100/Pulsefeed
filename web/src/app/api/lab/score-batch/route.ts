@@ -1,12 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import pLimit from "p-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { getActivePrompt, scoreArticle } from "@/lib/lab/scorer";
 import { logArticleEvent } from "@/lib/article-events";
 
-const BATCH_SIZE = 10;
+const CONCURRENCY = 5;
 
 const schema = z.object({
   specialty: z.string().refine(
@@ -58,11 +59,12 @@ export async function POST(request: NextRequest) {
   let scored = 0;
   const failedIds: string[] = [];
 
-  // Process in parallel batches
-  for (let i = 0; i < toScore.length; i += BATCH_SIZE) {
-    const batch = toScore.slice(i, i + BATCH_SIZE);
-    const results = await Promise.allSettled(
-      batch.map(async (article) => {
+  // Process all articles in parallel, capped at CONCURRENCY concurrent Claude calls
+  const limit = pLimit(CONCURRENCY);
+
+  const results = await Promise.allSettled(
+    toScore.map((article) =>
+      limit(async () => {
         const score = await scoreArticle(article, specialty, activePrompt);
         const { error } = await admin
           .from("articles")
@@ -82,17 +84,17 @@ export async function POST(request: NextRequest) {
         });
         return score;
       })
-    );
-    results.forEach((r, j) => {
-      const article = batch[j];
-      if (r.status === "fulfilled") {
-        scored++;
-      } else {
-        console.error(`[score-batch] failed article ${article.id}:`, r.reason);
-        failedIds.push(article.id);
-      }
-    });
-  }
+    )
+  );
+
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") {
+      scored++;
+    } else {
+      console.error(`[score-batch] failed article ${toScore[i].id}:`, r.reason);
+      failedIds.push(toScore[i].id);
+    }
+  });
 
   // Mark failed articles as uncertain so they don't get stuck unscored
   if (failedIds.length > 0) {
