@@ -71,11 +71,15 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
+  // Sync name from auth metadata into public.users if not already set
+  const metaName = (user.user_metadata?.name as string | undefined) ?? null;
+
   const { error: userError } = await supabase
     .from("users")
     .update({
       role_type,
       onboarding_completed: true,
+      ...(metaName ? { name: metaName } : {}),
       ...(author_id !== undefined ? { author_id } : {}),
       ...profileFields,
     })

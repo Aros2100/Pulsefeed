@@ -71,13 +71,13 @@ export default async function ProfilePage() {
 
         <ProfileAvatarUpload
           avatarUrl={profile?.avatar_url ?? null}
-          displayName={profile?.name ?? user.email ?? "?"}
+          displayName={profile?.name || (user.user_metadata?.name as string | undefined) || user.email || "?"}
         />
 
         {/* Account + Privacy cards are client-rendered so they share name/specialtySlugs state */}
         <ProfileClient
           email={user.email ?? ""}
-          initialName={profile?.name ?? ""}
+          initialName={profile?.name || (user.user_metadata?.name as string) || ""}
           initialSpecialtySlugs={specialtySlugs}
           initialIsPublic={profile?.is_public ?? false}
           initialEmailNotifications={profile?.email_notifications ?? true}
