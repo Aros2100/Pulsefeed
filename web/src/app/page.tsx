@@ -233,7 +233,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* My Publications or link-author prompt */}
-        {profile?.author_id ? (
+        {profile?.author_id && (
           <div id="publications" style={{ marginTop: "28px" }}>
             <div style={{
               fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85",
@@ -287,31 +287,10 @@ export default async function DashboardPage() {
               )}
             </div>
           </div>
-        ) : (
-          <div id="publications" style={{ marginTop: "20px" }}>
-            <div style={{
-              border: "1.5px dashed #c7d2e0",
-              borderRadius: "10px",
-              padding: "14px 20px",
-              background: "#fafbfd",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}>
-              <div style={{ fontSize: "13px", color: "#5a6a85" }}>
-                Are you a published author?
-              </div>
-              <Link
-                href="/profile/link-author"
-                style={{ fontSize: "13px", color: "#4f46e5", fontWeight: 600, textDecoration: "none" }}
-              >
-                Link your profile →
-              </Link>
-            </div>
-          </div>
         )}
 
       </div>
     </div>
   );
+
 }
