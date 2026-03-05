@@ -7,8 +7,9 @@ import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { getActivePrompt, scoreArticle, type ActivePrompt } from "@/lib/lab/scorer";
 import { logArticleEvent } from "@/lib/article-events";
 
-const CONCURRENCY  = 2;  // 2 concurrent × ~1s each ≈ 120 req/min — safely under 50 req/min limit
-const BATCH_LIMIT  = 50; // score at most 50 articles per call (one minute's worth at 2 concurrent)
+const CONCURRENCY  = 1;    // sequential to avoid bursting the 50 req/min limit
+const DELAY_MS     = 1300; // 1300ms between requests ≈ 46 req/min, safely under 50
+const BATCH_LIMIT  = 50;   // score at most 50 articles per call (~65s total)
 
 const schema = z.object({
   specialty: z.string().refine(
@@ -18,6 +19,15 @@ const schema = z.object({
 });
 
 type Article = { id: string; title: string; abstract: string | null; specialty_tags: string[] | null };
+
+async function scoreWithDelay(
+  article: Article,
+  specialty: string,
+  activePrompt: ActivePrompt
+) {
+  await new Promise((r) => setTimeout(r, DELAY_MS));
+  return scoreWithRetry(article, specialty, activePrompt);
+}
 
 async function scoreWithRetry(
   article: Article,
@@ -86,13 +96,14 @@ export async function POST(request: NextRequest) {
   let scored = 0;
   const failedIds: string[] = [];
 
-  // Process up to BATCH_LIMIT articles in parallel, capped at CONCURRENCY concurrent Claude calls
+  // Process sequentially with a fixed delay between requests to stay under the
+  // 50 req/min rate limit. CONCURRENCY=1 + DELAY_MS=1300 ≈ 46 req/min.
   const limiter = pLimit(CONCURRENCY);
 
   const results = await Promise.allSettled(
     toScore.map((article) =>
       limiter(async () => {
-        const score = await scoreWithRetry(article, specialty, activePrompt);
+        const score = await scoreWithDelay(article, specialty, activePrompt);
         const { error } = await admin
           .from("articles")
           .update({
