@@ -32,7 +32,16 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "No fields provided" }, { status: 400 });
   }
 
-  const { error } = await supabase.from("users").update(updateData).eq("id", user.id);
+  console.log("updateData:", JSON.stringify(updateData));
+
+  const { error, data } = await supabase
+    .from("users")
+    .update(updateData)
+    .eq("id", user.id)
+    .select();
+
+  console.log("update result:", JSON.stringify({ error, data }));
+
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   revalidatePath("/profile");
