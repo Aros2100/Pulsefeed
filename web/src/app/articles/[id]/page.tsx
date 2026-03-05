@@ -19,12 +19,10 @@ export default async function ArticleDetailPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
   const [{ data: article }, { data: savedRow }, { data: projectRows }] = await Promise.all([
     supabase.from("articles").select("*").eq("id", id).eq("status", "approved").single(),
-    db.from("saved_articles").select("project_id").eq("user_id", user.id).eq("article_id", id).maybeSingle(),
-    db.from("projects").select("id, name").eq("user_id", user.id).order("created_at", { ascending: false }),
+    supabase.from("saved_articles").select("project_id").eq("user_id", user.id).eq("article_id", id).maybeSingle(),
+    supabase.from("projects").select("id, name").eq("user_id", user.id).order("created_at", { ascending: false }),
   ]);
 
   if (!article) notFound();
@@ -48,10 +46,9 @@ export default async function ArticleDetailPage({
     { id: "citation", label: "Cite" },
   ].filter((x): x is NonNullable<typeof x> => x !== null);
 
-  const projects  = (projectRows ?? []) as unknown as { id: string; name: string }[];
-  const saved     = savedRow as { project_id: string | null } | null;
-  const isSaved   = !!saved;
-  const projectId = saved?.project_id ?? null;
+  const projects  = (projectRows ?? []) as { id: string; name: string }[];
+  const isSaved   = !!savedRow;
+  const projectId = savedRow?.project_id ?? null;
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>

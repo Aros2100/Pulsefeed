@@ -5,22 +5,18 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.NEWSLETTER_FROM_EMAIL ?? "PulseFeed <notifications@pulsefeed.dk>";
 
 export interface NotificationPayload {
-  userId:  string;
-  type:    string;
-  title:   string;
+  userId:   string;
+  type:     string;
+  title:    string;
   message?: string;
-  link?:   string;
+  link?:    string;
 }
 
 export async function sendNotification(payload: NotificationPayload) {
   const { userId, type, title, message, link } = payload;
   const admin = createAdminClient();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = admin as any;
-
-  // Insert into notifications table
-  await db.from("notifications").insert({
+  await admin.from("notifications").insert({
     user_id: userId,
     type,
     title,
@@ -28,8 +24,7 @@ export async function sendNotification(payload: NotificationPayload) {
     link:    link ?? null,
   });
 
-  // Check email preference
-  const { data: userRow } = await db
+  const { data: userRow } = await admin
     .from("users")
     .select("email_notifications")
     .eq("id", userId)
@@ -37,7 +32,6 @@ export async function sendNotification(payload: NotificationPayload) {
 
   if (!userRow?.email_notifications) return;
 
-  // Get email from auth
   const { data: { user } } = await admin.auth.admin.getUserById(userId);
   if (!user?.email) return;
 

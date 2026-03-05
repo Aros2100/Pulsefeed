@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import Header from "@/components/Header";
 import SavedPageClient from "./SavedPageClient";
@@ -7,20 +6,20 @@ import SavedPageClient from "./SavedPageClient";
 interface SavedArticle {
   id:           string;
   project_id:   string | null;
-  article_id:   string;
-  saved_at:     string;
+  article_id:   string | null;
+  saved_at:     string | null;
   articles: {
-    id:            string;
-    title:         string;
-    journal_abbr:  string | null;
+    id:             string;
+    title:          string;
+    journal_abbr:   string | null;
     published_date: string | null;
-  };
+  } | null;
 }
 
 interface Project {
   id:         string;
   name:       string;
-  created_at: string;
+  created_at: string | null; // nullable per DB schema
 }
 
 export default async function SavedPage() {
@@ -28,19 +27,29 @@ export default async function SavedPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any;
   const [{ data: projectRows }, { data: savedRows }] = await Promise.all([
-    db.from("projects").select("id, name, created_at").eq("user_id", user.id).order("created_at", { ascending: false }),
-    db.from("saved_articles")
+    supabase.from("projects").select("id, name, created_at").eq("user_id", user.id).order("created_at", { ascending: false }),
+    supabase.from("saved_articles")
       .select("id, project_id, article_id, saved_at, articles(id, title, journal_abbr, published_date)")
       .eq("user_id", user.id)
       .order("saved_at", { ascending: false }),
   ]);
 
-  const projects   = (projectRows ?? []) as unknown as Project[];
-  const allSaved   = (savedRows   ?? []) as unknown as SavedArticle[];
-  const unsorted   = allSaved.filter((s) => s.project_id === null);
+  const projects = (projectRows ?? []) as Project[];
+  const allSaved = (savedRows   ?? []) as SavedArticle[];
+  const unsorted = allSaved.filter((s) => s.project_id === null);
+
+  type ArticleItem = { id: string; title: string; journal_abbr: string | null; published_date: string | null; saved_id: string };
+
+  function toItem(s: SavedArticle): ArticleItem {
+    return {
+      id:             s.article_id ?? "",
+      title:          s.articles?.title ?? "",
+      journal_abbr:   s.articles?.journal_abbr ?? null,
+      published_date: s.articles?.published_date ?? null,
+      saved_id:       s.id,
+    };
+  }
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -54,12 +63,10 @@ export default async function SavedPage() {
 
         <SavedPageClient
           projects={projects}
-          unsorted={unsorted.map((s) => ({ id: s.article_id, title: s.articles.title, journal_abbr: s.articles.journal_abbr, published_date: s.articles.published_date, saved_id: s.id }))}
+          unsorted={unsorted.map(toItem)}
           projectArticles={projects.map((p) => ({
             project: p,
-            articles: allSaved
-              .filter((s) => s.project_id === p.id)
-              .map((s) => ({ id: s.article_id, title: s.articles.title, journal_abbr: s.articles.journal_abbr, published_date: s.articles.published_date, saved_id: s.id })),
+            articles: allSaved.filter((s) => s.project_id === p.id).map(toItem),
           }))}
         />
       </div>

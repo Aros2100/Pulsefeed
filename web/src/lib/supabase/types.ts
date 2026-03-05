@@ -718,19 +718,210 @@ export type Database = {
           },
         ]
       }
+      author_follows: {
+        Row: {
+          id: string
+          user_id: string | null
+          author_id: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          author_id?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          author_id?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "author_follows_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "author_follows_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "authors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string | null
+          type: string
+          title: string
+          message: string | null
+          link: string | null
+          read: boolean | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          type: string
+          title: string
+          message?: string | null
+          link?: string | null
+          read?: boolean | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          type?: string
+          title?: string
+          message?: string | null
+          link?: string | null
+          read?: boolean | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          id: string
+          user_id: string | null
+          name: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          name: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          name?: string
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reading_history: {
+        Row: {
+          id: string
+          user_id: string | null
+          article_id: string | null
+          visited_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          article_id?: string | null
+          visited_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          article_id?: string | null
+          visited_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reading_history_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reading_history_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_articles: {
+        Row: {
+          id: string
+          user_id: string | null
+          article_id: string | null
+          project_id: string | null
+          saved_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          article_id?: string | null
+          project_id?: string | null
+          saved_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          article_id?: string | null
+          project_id?: string | null
+          saved_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_articles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_articles_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_articles_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           author_id: string | null
+          avatar_url: string | null
           city: string | null
           country: string | null
           created_at: string
           department: string | null
           email: string
           email_format: string
+          email_notifications: boolean | null
           first_name: string | null
           frequency: string
           hospital: string | null
           id: string
+          is_public: boolean | null
           last_name: string | null
           name: string
           notes: string
@@ -752,16 +943,19 @@ export type Database = {
         }
         Insert: {
           author_id?: string | null
+          avatar_url?: string | null
           city?: string | null
           country?: string | null
           created_at?: string
           department?: string | null
           email: string
           email_format?: string
+          email_notifications?: boolean | null
           first_name?: string | null
           frequency?: string
           hospital?: string | null
           id: string
+          is_public?: boolean | null
           last_name?: string | null
           name?: string
           notes?: string
@@ -783,16 +977,19 @@ export type Database = {
         }
         Update: {
           author_id?: string | null
+          avatar_url?: string | null
           city?: string | null
           country?: string | null
           created_at?: string
           department?: string | null
           email?: string
           email_format?: string
+          email_notifications?: boolean | null
           first_name?: string | null
           frequency?: string
           hospital?: string | null
           id?: string
+          is_public?: boolean | null
           last_name?: string | null
           name?: string
           notes?: string

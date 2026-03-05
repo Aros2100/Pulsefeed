@@ -24,8 +24,7 @@ export async function POST(request: NextRequest) {
 
   const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: updateError } = await (supabase as any)
+  const { error: updateError } = await supabase
     .from("users")
     .update({ avatar_url: publicUrl })
     .eq("id", user.id);

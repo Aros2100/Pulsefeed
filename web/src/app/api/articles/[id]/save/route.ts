@@ -16,13 +16,12 @@ export async function POST(request: NextRequest, { params }: Params) {
     project_id = body.project_id ?? null;
   } catch { /* no body */ }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any).from("saved_articles").upsert(
+  const { error } = await supabase.from("saved_articles").upsert(
     { user_id: user.id, article_id: articleId, project_id, saved_at: new Date().toISOString() },
     { onConflict: "user_id,article_id" }
   );
 
-  if (error) return NextResponse.json({ ok: false, error: (error as { message: string }).message }, { status: 500 });
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true, saved: true });
 }
@@ -34,14 +33,13 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
 
   const { id: articleId } = await params;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from("saved_articles")
     .delete()
     .eq("user_id", user.id)
     .eq("article_id", articleId);
 
-  if (error) return NextResponse.json({ ok: false, error: (error as { message: string }).message }, { status: 500 });
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true, saved: false });
 }

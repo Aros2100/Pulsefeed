@@ -8,14 +8,13 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
   const { id } = await params;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from("projects")
     .delete()
     .eq("id", id)
     .eq("user_id", user.id);
 
-  if (error) return NextResponse.json({ ok: false, error: (error as { message: string }).message }, { status: 500 });
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });
 }

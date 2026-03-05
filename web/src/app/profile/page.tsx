@@ -34,23 +34,21 @@ export default async function ProfilePage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: profile } = await (supabase as any)
+  const { data: profile } = await supabase
     .from("users")
     .select("name, specialty_slugs, author_id, avatar_url, is_public, email_notifications")
     .eq("id", user.id)
-    .single() as { data: { name: string | null; specialty_slugs: string[] | null; author_id: string | null; avatar_url: string | null; is_public: boolean | null; email_notifications: boolean | null } | null };
+    .single();
 
   const specialtySlugs: string[] = profile?.specialty_slugs ?? [];
   const specialtyLabels = Object.fromEntries(SPECIALTIES.map((s) => [s.slug, s.label as string]));
 
-  // Count publications if author is linked
   let articleCount = 0;
   if (profile?.author_id) {
     const { count } = await supabase
       .from("article_authors")
       .select("*", { count: "exact", head: true })
-      .eq("author_id", profile.author_id as string);
+      .eq("author_id", profile.author_id);
     articleCount = count ?? 0;
   }
 
@@ -60,19 +58,16 @@ export default async function ProfilePage() {
 
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
-        {/* Page title */}
         <div style={{ marginBottom: "28px" }}>
           <div style={{ fontSize: "26px", fontWeight: 700 }}>My Profile</div>
           <div style={{ fontSize: "14px", color: "#888", marginTop: "4px" }}>Manage your account and preferences</div>
         </div>
 
-        {/* Avatar */}
         <ProfileAvatarUpload
-          avatarUrl={(profile?.avatar_url as string | null) ?? null}
-          displayName={(profile?.name as string | null) ?? user.email ?? "?"}
+          avatarUrl={profile?.avatar_url ?? null}
+          displayName={profile?.name ?? user.email ?? "?"}
         />
 
-        {/* Section 1 — Account */}
         <SectionLabel>Account</SectionLabel>
         <div style={card}>
           <CardHeader label="Personal information" />
@@ -82,27 +77,25 @@ export default async function ProfilePage() {
               <div style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a" }}>{user.email ?? "—"}</div>
             </div>
             <ProfileEditClient
-              initialName={(profile?.name as string | null) ?? ""}
+              initialName={profile?.name ?? ""}
               initialSpecialtySlugs={specialtySlugs}
             />
           </div>
         </div>
 
-        {/* Section 2 — Privacy + Notifications */}
         <SectionLabel>Privacy & Notifications</SectionLabel>
         <div style={card}>
           <CardHeader label="Profile visibility" />
           <ProfilePrivacyClient
-            initialIsPublic={(profile?.is_public as boolean | null) ?? false}
-            initialEmailNotifications={(profile?.email_notifications as boolean | null) ?? true}
-            name={(profile?.name as string | null) ?? ""}
+            initialIsPublic={profile?.is_public ?? false}
+            initialEmailNotifications={profile?.email_notifications ?? true}
+            name={profile?.name ?? ""}
             specialtySlugs={specialtySlugs}
             articleCount={articleCount}
             specialtyLabels={specialtyLabels}
           />
         </div>
 
-        {/* Section 3 — Author Profile */}
         <SectionLabel>Author Profile</SectionLabel>
         {profile?.author_id ? (
           <div style={{ ...card, padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>

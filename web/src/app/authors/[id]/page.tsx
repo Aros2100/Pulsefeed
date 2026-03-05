@@ -81,8 +81,7 @@ export default async function AuthorDetailPage({
 
   if (!author) notFound();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: followRow } = await (supabase as any)
+  const { data: followRow } = await supabase
     .from("author_follows")
     .select("id")
     .eq("user_id", user.id)

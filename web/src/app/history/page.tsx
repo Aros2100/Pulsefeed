@@ -5,14 +5,13 @@ import Header from "@/components/Header";
 import RelativeTime from "@/components/RelativeTime";
 
 interface HistoryRow {
-  visited_at: string;
+  visited_at: string | null;
   articles: {
-    id:            string;
-    title:         string;
-    journal_abbr:  string | null;
+    id:             string;
+    title:          string;
+    journal_abbr:   string | null;
     published_date: string | null;
-    news_value:    number | null;
-  };
+  } | null;
 }
 
 export default async function HistoryPage() {
@@ -20,15 +19,14 @@ export default async function HistoryPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: rows } = await (supabase as any)
+  const { data: rows } = await supabase
     .from("reading_history")
-    .select("visited_at, articles(id, title, journal_abbr, published_date, news_value)")
+    .select("visited_at, articles(id, title, journal_abbr, published_date)")
     .eq("user_id", user.id)
     .order("visited_at", { ascending: false })
     .limit(100);
 
-  const history = (rows ?? []) as unknown as HistoryRow[];
+  const history = (rows ?? []) as HistoryRow[];
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -52,9 +50,10 @@ export default async function HistoryPage() {
           ) : (
             history.map((row, i) => {
               const a    = row.articles;
+              if (!a) return null;
               const meta = [a.journal_abbr, a.published_date?.slice(0, 7)].filter(Boolean).join(" · ");
               return (
-                <div key={a.id + row.visited_at} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderTop: i === 0 ? undefined : "1px solid #f0f0f0" }}>
+                <div key={a.id + (row.visited_at ?? "")} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderTop: i === 0 ? undefined : "1px solid #f0f0f0" }}>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <Link href={`/articles/${a.id}`} style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a", textDecoration: "none" }}>
                       {a.title}
@@ -62,7 +61,7 @@ export default async function HistoryPage() {
                     {meta && <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>{meta}</div>}
                   </div>
                   <div style={{ marginLeft: "16px", flexShrink: 0, fontSize: "12px", color: "#9ca3af", whiteSpace: "nowrap" }}>
-                    <RelativeTime iso={row.visited_at} />
+                    {row.visited_at && <RelativeTime iso={row.visited_at} />}
                   </div>
                 </div>
               );

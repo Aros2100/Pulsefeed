@@ -23,9 +23,8 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any).from("users").update(result.data).eq("id", user.id);
-  if (error) return NextResponse.json({ ok: false, error: (error as { message: string }).message }, { status: 500 });
+  const { error } = await supabase.from("users").update(result.data).eq("id", user.id);
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });
 }
