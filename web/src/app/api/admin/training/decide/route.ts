@@ -97,7 +97,8 @@ export async function POST(request: NextRequest) {
       if (remapTag) {
         // Brug RPC der bypasser merge-triggeren så specialty fjernes rent
         const newTags = [...new Set(oldTags.filter((t) => t !== specialty).concat(remapTag))];
-        const { error: updateError } = await admin.rpc("replace_article_specialty_tags" as never, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: updateError } = await (admin as any).rpc("replace_article_specialty_tags", {
           p_article_id: article_id,
           p_tags:       newTags,
           p_verified:   false,
