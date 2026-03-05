@@ -34,12 +34,13 @@ function stars(value: number | null): string {
   return "★".repeat(v) + "☆".repeat(5 - v);
 }
 
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "";
   try {
-    return new Date(dateStr).toLocaleDateString("en-GB", {
-      day: "numeric", month: "short", year: "numeric",
-    });
+    const d = new Date(dateStr);
+    return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
   } catch {
     return "";
   }
