@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { SPECIALTIES } from "@/lib/auth/specialties";
 
 interface ArticleRow {
   id: string;
@@ -90,8 +89,15 @@ export default function AdminArticleListClient() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [specialtyTags, setSpecialtyTags] = useState<string[]>([]);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [searchInput, setSearchInput] = useState("");
+
+  useEffect(() => {
+    void fetch("/api/admin/articles/specialty-tags")
+      .then((r) => r.json() as Promise<{ ok: boolean; tags: string[] }>)
+      .then((j) => { if (j.ok) setSpecialtyTags(j.tags); });
+  }, []);
 
   const fetchArticles = useCallback(async (f: Filters) => {
     setLoading(true);
@@ -221,7 +227,7 @@ export default function AdminArticleListClient() {
             value={filters.specialty}
             onChange={(v) => setFilter("specialty", v)}
             placeholder="Specialty: Alle"
-            options={SPECIALTIES.map((s) => ({ value: s.slug, label: s.label }))}
+            options={specialtyTags.map((t) => ({ value: t, label: t }))}
           />
         </div>
         {/* Row 2: extra filters */}
