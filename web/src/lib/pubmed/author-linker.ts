@@ -2,12 +2,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { linkAuthorsToArticle, decodeHtmlEntities, type Author } from "@/lib/pubmed/importer";
 import { runLinkingChecks } from "@/lib/pubmed/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
+import { notifyFollowedAuthorPublications } from "@/lib/notifications/followedAuthorNotify";
 
 const BATCH_SIZE = 20;
 
 export async function runAuthorLinking(logId: string, importLogId?: string): Promise<void> {
   const admin = createAdminClient();
   const errors: string[] = [];
+  const linkedArticleIds: string[] = [];
   let articlesProcessed = 0;
   let authorsLinked = 0;
   let newAuthors = 0;
@@ -84,6 +86,8 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
               await admin.from("rejected_authors" as never).insert(rejects as never);
             }
 
+            linkedArticleIds.push(article.id);
+
             void logArticleEvent(article.id, "author_linked", {
               authors_linked: result.new + result.duplicates,
               new:        result.new,
@@ -115,6 +119,13 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
       console.log(`[author-linker] batch done — articles=${articlesProcessed} authors=${authorsLinked}`);
 
       if (batch.length < BATCH_SIZE) break;
+    }
+
+    // Notify users who follow any of the newly linked authors (fire-and-forget)
+    if (linkedArticleIds.length > 0) {
+      void notifyFollowedAuthorPublications(linkedArticleIds).catch((e) => {
+        console.warn("[author-linker] notifyFollowedAuthorPublications error:", e);
+      });
     }
 
     // Mark completed
