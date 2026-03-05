@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import SaveButton from "@/components/SaveButton";
 
 interface Article {
   id: string;
@@ -16,9 +17,13 @@ interface Article {
   imported_at: string;
 }
 
+interface Project { id: string; name: string }
+
 interface Props {
-  articles: Article[];
+  articles:      Article[];
   specialtyLabel: string;
+  savedMap:      Record<string, string | null>;   // articleId → projectId | null
+  projects:      Project[];
 }
 
 type Filter = "all" | "clinical_trials" | "high_impact" | "this_week";
@@ -76,18 +81,18 @@ function applyFilter(articles: Article[], filter: Filter): Article[] {
   }
 }
 
-export default function ArticleListClient({ articles, specialtyLabel }: Props) {
-  const [filter, setFilter] = useState<Filter>("all");
+export default function ArticleListClient({ articles, specialtyLabel, savedMap, projects }: Props) {
+  const [filter, setFilter]     = useState<Filter>("all");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const router = useRouter();
 
   const filtered = applyFilter(articles, filter);
 
   const filters: { key: Filter; label: string }[] = [
-    { key: "all", label: "All" },
+    { key: "all",            label: "All" },
     { key: "clinical_trials", label: "Clinical trials" },
-    { key: "high_impact", label: "High impact" },
-    { key: "this_week", label: "This week" },
+    { key: "high_impact",    label: "High impact" },
+    { key: "this_week",      label: "This week" },
   ];
 
   return (
@@ -168,12 +173,14 @@ export default function ArticleListClient({ articles, specialtyLabel }: Props) {
             </div>
           ) : (
             filtered.map((article, i) => {
-              const rel = relevanceInfo(article.clinical_relevance);
+              const rel      = relevanceInfo(article.clinical_relevance);
               const isHovered = hoveredId === article.id;
-              const author = firstAuthor(article.authors);
-              const date = formatDate(article.published_date);
-              const meta = [article.journal_abbr, date].filter(Boolean).join(" · ");
-              const pubType = article.publication_types?.[0];
+              const author   = firstAuthor(article.authors);
+              const date     = formatDate(article.published_date);
+              const meta     = [article.journal_abbr, date].filter(Boolean).join(" · ");
+              const pubType  = article.publication_types?.[0];
+              const isSaved  = article.id in savedMap;
+              const savedPid = savedMap[article.id] ?? null;
 
               return (
                 <div
@@ -222,21 +229,33 @@ export default function ArticleListClient({ articles, specialtyLabel }: Props) {
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px", minWidth: "90px", paddingTop: "2px" }}>
-                    {article.news_value && (
-                      <div style={{ fontSize: "13px", color: "#f4a100", letterSpacing: "1px" }}>
-                        {stars(article.news_value)}
-                      </div>
-                    )}
-                    {rel && (
-                      <div style={{
-                        fontSize: "11px", padding: "2px 8px", borderRadius: "10px",
-                        fontWeight: 600, whiteSpace: "nowrap",
-                        background: rel.bg, color: rel.color,
-                      }}>
-                        {rel.label}
-                      </div>
-                    )}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px", paddingTop: "2px" }}>
+                    {/* Save button — stopPropagation so row click doesn't navigate */}
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <SaveButton
+                        articleId={article.id}
+                        initialSaved={isSaved}
+                        initialProjectId={savedPid}
+                        projects={projects}
+                      />
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
+                      {article.news_value && (
+                        <div style={{ fontSize: "13px", color: "#f4a100", letterSpacing: "1px" }}>
+                          {stars(article.news_value)}
+                        </div>
+                      )}
+                      {rel && (
+                        <div style={{
+                          fontSize: "11px", padding: "2px 8px", borderRadius: "10px",
+                          fontWeight: 600, whiteSpace: "nowrap",
+                          background: rel.bg, color: rel.color,
+                        }}>
+                          {rel.label}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

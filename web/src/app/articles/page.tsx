@@ -25,12 +25,22 @@ export default async function ArticlesPage() {
     articlesQuery = articlesQuery.contains("specialty_tags", specialtySlugs);
   }
 
-  const { data: articles } = await articlesQuery;
+  const [{ data: articles }, { data: savedRows }, { data: projectRows }] = await Promise.all([
+    articlesQuery,
+    supabase.from("saved_articles").select("article_id, project_id").eq("user_id", user.id),
+    supabase.from("projects").select("id, name").eq("user_id", user.id).order("created_at", { ascending: false }),
+  ]);
 
   const specialtyLabel = (profile?.specialty_slugs ?? [])
     .map((s) => SPECIALTIES.find((sp) => sp.slug === s)?.label)
     .filter(Boolean)
     .join(", ") || "All specialties";
+
+  // Build a map of articleId → projectId for saved state
+  const savedMap: Record<string, string | null> = {};
+  for (const row of savedRows ?? []) {
+    if (row.article_id) savedMap[row.article_id] = row.project_id ?? null;
+  }
 
   return (
     <div style={{ background: "#f5f7fa", minHeight: "100vh" }}>
@@ -38,6 +48,8 @@ export default async function ArticlesPage() {
       <ArticleListClient
         articles={articles ?? []}
         specialtyLabel={specialtyLabel}
+        savedMap={savedMap}
+        projects={(projectRows ?? []) as { id: string; name: string }[]}
       />
     </div>
   );
