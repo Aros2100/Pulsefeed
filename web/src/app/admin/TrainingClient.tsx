@@ -708,6 +708,7 @@ export default function TrainingClient({ specialty, label }: Props) {
                         "Fremmedsprog",
                         "Neuroscience",
                         "Basic neuro research",
+                        "Oncology",
                         "Andet",
                       ]
                     : [
