@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import pLimit from "p-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -68,7 +68,6 @@ export async function POST(request: NextRequest) {
   const { specialty } = result.data;
   const admin = createAdminClient();
 
-  // Fetch active prompt once for the whole batch (throws if not found)
   let activePrompt;
   try {
     activePrompt = await getActivePrompt(specialty, "specialty_tag");
@@ -76,9 +75,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
-  // Fetch next BATCH_LIMIT unscored articles — don't attempt the entire queue at once.
-  // Guard on BOTH fields: specialty_scored_at (primary) + specialty_confidence (fallback
-  // before migration 0048 has been applied to all envs) to prevent re-scoring.
   const { data: articles, error: fetchError } = await admin
     .from("articles")
     .select("id, title, abstract, specialty_tags")
@@ -93,64 +89,79 @@ export async function POST(request: NextRequest) {
   }
 
   const toScore = articles ?? [];
-  let scored = 0;
-  const failedIds: string[] = [];
 
-  // Process sequentially with a fixed delay between requests to stay under the
-  // 50 req/min rate limit. CONCURRENCY=1 + DELAY_MS=1300 ≈ 46 req/min.
-  const limiter = pLimit(CONCURRENCY);
+  // Stream SSE progress events so the client can show a live countdown
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      function send(data: object) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+      }
 
-  const results = await Promise.allSettled(
-    toScore.map((article) =>
-      limiter(async () => {
-        const score = await scoreWithDelay(article, specialty, activePrompt);
-        const { error } = await admin
-          .from("articles")
-          .update({
-            specialty_confidence: score.confidence,
-            ai_decision:          score.ai_decision,
-            model_version:        score.version,
-            specialty_scored_at:  new Date().toISOString(),
-          })
-          .eq("id", article.id);
-        if (error) throw new Error(error.message);
-        void logArticleEvent(article.id, "enriched", {
-          ai_decision:          score.ai_decision,
-          specialty_confidence: score.confidence,
-          model_version:        score.version,
-          specialty_tags:       article.specialty_tags,
-        });
-        return score;
-      })
-    )
-  );
+      let scored = 0;
+      const failedIds: string[] = [];
+      const limiter = pLimit(CONCURRENCY);
 
-  results.forEach((r, i) => {
-    if (r.status === "fulfilled") {
-      scored++;
-    } else {
-      console.error(`[score-batch] failed article ${toScore[i].id}:`, r.reason);
-      failedIds.push(toScore[i].id);
-    }
+      try {
+        await Promise.all(
+          toScore.map((article) =>
+            limiter(async () => {
+              try {
+                const score = await scoreWithDelay(article, specialty, activePrompt!);
+                const { error } = await admin
+                  .from("articles")
+                  .update({
+                    specialty_confidence: score.confidence,
+                    ai_decision:          score.ai_decision,
+                    model_version:        score.version,
+                    specialty_scored_at:  new Date().toISOString(),
+                  })
+                  .eq("id", article.id);
+                if (error) throw new Error(error.message);
+                void logArticleEvent(article.id, "enriched", {
+                  ai_decision:          score.ai_decision,
+                  specialty_confidence: score.confidence,
+                  model_version:        score.version,
+                  specialty_tags:       article.specialty_tags,
+                });
+                scored++;
+              } catch (e) {
+                console.error(`[score-batch] failed article ${article.id}:`, e);
+                failedIds.push(article.id);
+              }
+              // Emit progress after every article (success or failure)
+              send({ scored, total: toScore.length });
+            })
+          )
+        );
+
+        // Mark failed articles with null confidence so UI shows "Not scored"
+        if (failedIds.length > 0) {
+          await admin
+            .from("articles")
+            .update({
+              specialty_confidence: null,
+              ai_decision:          null,
+              specialty_scored_at:  new Date().toISOString(),
+            })
+            .in("id", failedIds);
+        }
+
+        console.log(`[score-batch] done — scored: ${scored}, failed: ${failedIds.length}, total: ${toScore.length}`);
+        send({ done: true, scored, failed: failedIds.length, total: toScore.length });
+      } catch (e) {
+        send({ done: true, error: String(e), scored, failed: failedIds.length, total: toScore.length });
+      } finally {
+        controller.close();
+      }
+    },
   });
 
-  // Mark failed articles with null confidence (not 0) so the UI shows "Not scored"
-  // rather than "0% confident". Set specialty_scored_at so they aren't re-queued
-  // on the next scoring run — a human can still decide them in the Lab.
-  if (failedIds.length > 0) {
-    const { error: fallbackError } = await admin
-      .from("articles")
-      .update({
-        specialty_confidence: null,
-        ai_decision:          null,
-        specialty_scored_at:  new Date().toISOString(),
-      })
-      .in("id", failedIds);
-    if (fallbackError) {
-      console.error("[score-batch] fallback update error:", fallbackError);
-    }
-  }
-
-  console.log(`[score-batch] done — scored: ${scored}, failed: ${failedIds.length}, total: ${toScore.length}`);
-  return NextResponse.json({ ok: true, scored, failed: failedIds.length, total: toScore.length });
+  return new Response(stream, {
+    headers: {
+      "Content-Type":  "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection":    "keep-alive",
+    },
+  });
 }

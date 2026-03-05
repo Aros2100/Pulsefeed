@@ -189,6 +189,7 @@ export default function TrainingClient({ specialty, label }: Props) {
 
   const [scoring, setScoring]                 = useState(false);
   const [scoringCount, setScoringCount]       = useState(0);
+  const [scoringProgress, setScoringProgress] = useState<{ scored: number; total: number } | null>(null);
   const [saving, setSaving]                   = useState(false);
   const [toast, setToast]                     = useState<string | null>(null);
   const [pendingHref, setPendingHref]         = useState<string | null>(null);
@@ -218,15 +219,39 @@ export default function TrainingClient({ specialty, label }: Props) {
       if (unscored.length > 0) {
         setScoring(true);
         setScoringCount(unscored.length);
+        setScoringProgress(null);
         setLoading(false);
 
-        await fetch("/api/lab/score-batch", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ specialty }),
-        }).catch(() => null);
+        try {
+          const response = await fetch("/api/lab/score-batch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ specialty }),
+          });
+
+          const reader = response.body!.getReader();
+          const decoder = new TextDecoder();
+
+          outer: while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            for (const line of decoder.decode(value).split("\n")) {
+              if (!line.startsWith("data: ")) continue;
+              try {
+                const data = JSON.parse(line.slice(6)) as {
+                  scored?: number; total?: number; done?: boolean;
+                };
+                if (data.done) break outer;
+                if (data.scored !== undefined && data.total !== undefined) {
+                  setScoringProgress({ scored: data.scored, total: data.total });
+                }
+              } catch { /* ignore malformed events */ }
+            }
+          }
+        } catch { /* network error — proceed to reload anyway */ }
 
         setScoring(false);
+        setScoringProgress(null);
 
         // Reload with fresh scores
         const d2 = await fetch(`/api/admin/training/articles?specialty=${specialty}`)
@@ -526,7 +551,11 @@ export default function TrainingClient({ specialty, label }: Props) {
       <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f5f7fa", gap: "16px" }}>
         <Spinner size={28} />
         <div style={{ fontSize: "16px", fontWeight: 600, color: "#1a1a1a" }}>Scorer artikler med AI…</div>
-        <div style={{ fontSize: "13px", color: "#888" }}>{scoringCount} artikel{scoringCount !== 1 ? "er" : ""} afventer scoring</div>
+        <div style={{ fontSize: "13px", color: "#888" }}>
+          {scoringProgress
+            ? `Scoring ${scoringProgress.scored} / ${scoringProgress.total}…`
+            : `${scoringCount} artikel${scoringCount !== 1 ? "er" : ""} afventer scoring`}
+        </div>
       </div>
     );
   }
