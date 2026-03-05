@@ -17,6 +17,7 @@ interface TrainingArticle {
   pubmed_id: string;
   authors: unknown;
   specialty_confidence: number | null;
+  circle: number | null;
 }
 
 interface AIData {
@@ -74,6 +75,21 @@ function ConfidenceBadge({ score }: { score: number | null }) {
   return (
     <span style={{ fontSize: "10px", fontWeight: 700, background: bg, color, border: `1px solid ${border}`, borderRadius: "4px", padding: "1px 6px", flexShrink: 0 }}>
       {score}%
+    </span>
+  );
+}
+
+function CircleBadge({ circle }: { circle: number | null }) {
+  if (circle == null) return null;
+  const colors: Record<number, { bg: string; color: string }> = {
+    1: { bg: "#eff6ff", color: "#1d4ed8" },
+    2: { bg: "#f5f3ff", color: "#7c3aed" },
+    3: { bg: "#f0fdf4", color: "#15803d" },
+  };
+  const c = colors[circle] ?? { bg: "#f1f5f9", color: "#475569" };
+  return (
+    <span style={{ fontSize: "10px", fontWeight: 700, background: c.bg, color: c.color, borderRadius: "4px", padding: "1px 5px", flexShrink: 0 }}>
+      C{circle}
     </span>
   );
 }
@@ -581,6 +597,7 @@ export default function TrainingClient({ specialty, label }: Props) {
                       <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
                         {verdict === "relevant"     && <span style={{ fontSize: "10px", fontWeight: 700, color: "#15803d" }}>✓</span>}
                         {verdict === "not_relevant" && <span style={{ fontSize: "10px", fontWeight: 700, color: "#b91c1c" }}>✗</span>}
+                        <CircleBadge circle={article.circle} />
                         <ConfidenceBadge score={article.specialty_confidence} />
                       </div>
                     </div>
