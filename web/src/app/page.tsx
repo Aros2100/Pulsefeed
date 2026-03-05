@@ -160,6 +160,7 @@ export default async function DashboardPage() {
     { icon: "🔖", title: "Saved",          desc: "Articles you bookmarked",       href: "/saved" },
     { icon: "📖", title: "History",        desc: "Recently read articles",        href: "/history" },
     { icon: "👤", title: "Authors",        desc: "Browse and follow researchers", href: "/authors" },
+    { icon: "👥", title: "Following",      desc: "Authors you follow",            href: "/following" },
     { icon: "⚙️", title: "My Profile",    desc: "Account and preferences",       href: "/profile" },
   ];
 
