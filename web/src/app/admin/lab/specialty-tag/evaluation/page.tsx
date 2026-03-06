@@ -59,40 +59,42 @@ function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDe
             {journal} · {fmtDate(row.decided_at)}
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-          {confidence != null && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {confidence != null && (
+              <span style={{
+                fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px",
+                background: confidence >= 70 ? "#f0fdf4" : confidence >= 40 ? "#fefce8" : "#fef2f2",
+                color:      confidence >= 70 ? "#15803d" : confidence >= 40 ? "#d97706" : "#dc2626",
+                border:     `1px solid ${confidence >= 70 ? "#bbf7d0" : confidence >= 40 ? "#fde68a" : "#fecaca"}`,
+              }}>
+                AI: {confidence}%
+              </span>
+            )}
             <span style={{
               fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px",
-              background: confidence >= 70 ? "#f0fdf4" : confidence >= 40 ? "#fefce8" : "#fef2f2",
-              color:      confidence >= 70 ? "#15803d" : confidence >= 40 ? "#d97706" : "#dc2626",
-              border:     `1px solid ${confidence >= 70 ? "#bbf7d0" : confidence >= 40 ? "#fde68a" : "#fecaca"}`,
+              background: row.ai_decision === "approved" ? "#f0fdf4" : "#fef2f2",
+              color:      row.ai_decision === "approved" ? "#15803d"  : "#dc2626",
+              border:     `1px solid ${row.ai_decision === "approved" ? "#bbf7d0" : "#fecaca"}`,
             }}>
-              AI: {confidence}%
+              AI: {row.ai_decision}
+            </span>
+            <span style={{
+              fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px",
+              background: row.decision === "approved" ? "#eff6ff" : "#f5f3ff",
+              color:      row.decision === "approved" ? "#1d4ed8"  : "#7c3aed",
+              border:     `1px solid ${row.decision === "approved" ? "#bfdbfe" : "#ddd6fe"}`,
+            }}>
+              Human: {row.decision}
+            </span>
+          </div>
+          {row.disagreement_reason && (
+            <span style={{ fontSize: "11px", color: "#7c3aed", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "4px", padding: "2px 8px" }}>
+              {row.disagreement_reason}
             </span>
           )}
-          <span style={{
-            fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px",
-            background: row.ai_decision === "approved" ? "#f0fdf4" : "#fef2f2",
-            color:      row.ai_decision === "approved" ? "#15803d"  : "#dc2626",
-            border:     `1px solid ${row.ai_decision === "approved" ? "#bbf7d0" : "#fecaca"}`,
-          }}>
-            AI: {row.ai_decision}
-          </span>
-          <span style={{
-            fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px",
-            background: row.decision === "approved" ? "#eff6ff" : "#f5f3ff",
-            color:      row.decision === "approved" ? "#1d4ed8"  : "#7c3aed",
-            border:     `1px solid ${row.decision === "approved" ? "#bfdbfe" : "#ddd6fe"}`,
-          }}>
-            Human: {row.decision}
-          </span>
         </div>
       </div>
-      {row.disagreement_reason && (
-        <div style={{ marginTop: "6px", fontSize: "12px", color: "#7c3aed", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "6px", padding: "4px 10px", display: "inline-block" }}>
-          Reason: {row.disagreement_reason}
-        </div>
-      )}
       {abstract && (
         <details style={{ marginTop: "8px" }}>
           <summary style={{ fontSize: "12px", color: "#5a6a85", cursor: "pointer", userSelect: "none", listStyle: "none" }}>
