@@ -182,14 +182,14 @@ export default async function EvaluationPage() {
   // False positive: human rejected, AI approved  (prompt too lenient)
   const falsePositives = disagreements.filter((d) => d.decision === "rejected" && d.ai_decision === "approved");
 
-  // Data sufficiency
-  const hasSufficientData = total >= 100;
+  // Data sufficiency — based on disagreement count
+  const hasSufficientData = totalDisagree >= 100;
   const dataBanner =
-    total < 100
-      ? { bg: "#fef2f2", border: "#fecaca", dot: "#dc2626", text: "#b91c1c", msg: `Insufficient data — need at least 100 decisions to identify reliable trends (${total} so far)` }
-      : total < 200
-      ? { bg: "#fefce8", border: "#fde68a", dot: "#d97706", text: "#92400e", msg: `Limited data — trends may not be fully representative (${total} decisions)` }
-      : { bg: "#f0fdf4", border: "#bbf7d0", dot: "#15803d", text: "#14532d", msg: `Sufficient data for reliable trend analysis (${total} decisions)` };
+    totalDisagree < 100
+      ? { bg: "#fef2f2", border: "#fecaca", dot: "#dc2626", text: "#b91c1c", msg: `Insufficient data — need at least 100 disagreements to identify reliable trends (${totalDisagree} so far)` }
+      : totalDisagree < 200
+      ? { bg: "#fefce8", border: "#fde68a", dot: "#d97706", text: "#92400e", msg: `Limited data — trends may not be fully representative (${totalDisagree} disagreements)` }
+      : { bg: "#f0fdf4", border: "#bbf7d0", dot: "#15803d", text: "#14532d", msg: `Sufficient data for reliable trend analysis (${totalDisagree} disagreements)` };
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -230,7 +230,7 @@ export default async function EvaluationPage() {
             </Link>
           ) : (
             <span
-              title="Need at least 100 decisions first"
+              title="Need at least 100 disagreements first"
               style={{ flexShrink: 0, fontSize: "13px", fontWeight: 700, background: "#e2e8f0", color: "#94a3b8", borderRadius: "7px", padding: "7px 16px", whiteSpace: "nowrap", cursor: "not-allowed" }}
             >
               Optimize model →
