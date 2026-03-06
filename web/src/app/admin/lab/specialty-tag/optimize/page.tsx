@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
-import PatternAnalysis from "../dashboard/PatternAnalysis";
+import PatternAnalysis, { type OptimizationRun } from "../dashboard/PatternAnalysis";
 
 export default async function OptimizePage() {
   const supabase = await createClient();
@@ -24,15 +24,28 @@ export default async function OptimizePage() {
 
   const admin = createAdminClient();
 
-  // Count disagreements for the data sufficiency banner
-  const { data: rawDecisions } = await admin
-    .from("lab_decisions")
-    .select("decision, ai_decision")
-    .eq("specialty", specialty)
-    .eq("module", "specialty_tag")
-    .not("ai_decision", "is", null);
+  const [decisionsRes, latestRunRes] = await Promise.all([
+    // Count disagreements for banner
+    admin
+      .from("lab_decisions")
+      .select("decision, ai_decision")
+      .eq("specialty", specialty)
+      .eq("module", "specialty_tag")
+      .not("ai_decision", "is", null),
 
-  const totalDisagree = (rawDecisions ?? []).filter((d) => d.decision !== d.ai_decision).length;
+    // Latest saved run
+    admin
+      .from("model_optimization_runs" as never)
+      .select("id, base_version, base_prompt_text, total_decisions, fp_count, fn_count, fp_patterns, fn_patterns, recommended_changes, improved_prompt, created_at")
+      .eq("specialty", specialty)
+      .eq("module", "specialty_tag")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const totalDisagree = (decisionsRes.data ?? []).filter((d) => d.decision !== d.ai_decision).length;
+  const latestRun     = (latestRunRes.data ?? null) as OptimizationRun | null;
 
   const hasSufficientData = totalDisagree >= 50;
   const dataBanner =
@@ -72,25 +85,13 @@ export default async function OptimizePage() {
           <span style={{ fontSize: "13px", color: dataBanner.text, fontWeight: 500 }}>{dataBanner.msg}</span>
         </div>
 
-        {/* Pattern analysis card */}
-        {hasSufficientData ? (
-          <PatternAnalysis specialty={specialty} module="specialty_tag" />
-        ) : (
-          <div style={{
-            background: "#fff", borderRadius: "10px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
-            overflow: "hidden",
-          }}>
-            <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
-              <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase" as const, fontWeight: 700 }}>
-                AI Mønsteranalyse
-              </span>
-            </div>
-            <div style={{ padding: "24px", fontSize: "13px", color: "#aaa" }}>
-              Collect at least 50 disagreements in the training sessions before running the analysis.
-            </div>
-          </div>
-        )}
+        {/* Pattern analysis */}
+        <PatternAnalysis
+          specialty={specialty}
+          module="specialty_tag"
+          initialRun={latestRun}
+          disabled={!hasSufficientData}
+        />
 
       </div>
     </div>

@@ -3,9 +3,41 @@
 import { useState } from "react";
 import type { PatternAnalysisResult } from "@/app/api/lab/analyze-patterns/route";
 
+export interface OptimizationRun {
+  id: string;
+  base_version: string;
+  base_prompt_text: string | null;
+  total_decisions: number | null;
+  fp_count: number | null;
+  fn_count: number | null;
+  fp_patterns: string[];
+  fn_patterns: string[];
+  recommended_changes: string | null;
+  improved_prompt: string | null;
+  created_at: string;
+}
+
 interface Props {
   specialty: string;
   module: string;
+  initialRun?: OptimizationRun | null;
+  disabled?: boolean;
+}
+
+function runToResult(run: OptimizationRun): PatternAnalysisResult {
+  return {
+    false_positive_patterns: run.fp_patterns ?? [],
+    false_negative_patterns: run.fn_patterns ?? [],
+    recommended_changes:     run.recommended_changes ?? "",
+    improved_prompt:         run.improved_prompt ?? "",
+    current_prompt:          run.base_prompt_text ?? "",
+  };
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("da-DK", {
+    day: "numeric", month: "short", year: "numeric",
+  });
 }
 
 function Spinner({ size = 14 }: { size?: number }) {
@@ -100,15 +132,20 @@ function PromptDiff({ oldPrompt, newPrompt }: { oldPrompt: string; newPrompt: st
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function PatternAnalysis({ specialty, module }: Props) {
-  const [loading, setLoading] = useState(false);
-  const [result,  setResult]  = useState<PatternAnalysisResult | null>(null);
-  const [error,   setError]   = useState<string | null>(null);
+export default function PatternAnalysis({ specialty, module, initialRun, disabled }: Props) {
+  const [loading,  setLoading]  = useState(false);
+  const [result,   setResult]   = useState<PatternAnalysisResult | null>(
+    initialRun ? runToResult(initialRun) : null
+  );
+  const [savedRun, setSavedRun] = useState<OptimizationRun | null>(initialRun ?? null);
+  const [error,    setError]    = useState<string | null>(null);
 
   async function handleAnalyze() {
+    if (disabled) return;
     setLoading(true);
     setError(null);
     setResult(null);
+    setSavedRun(null);
     try {
       const res  = await fetch("/api/lab/analyze-patterns", {
         method: "POST",
@@ -139,6 +176,9 @@ export default function PatternAnalysis({ specialty, module }: Props) {
     letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "8px",
   };
 
+  const isDisabled = disabled || loading;
+  const totalDisagreements = savedRun ? (savedRun.fp_count ?? 0) + (savedRun.fn_count ?? 0) : null;
+
   return (
     <div style={{
       background: "#fff", borderRadius: "10px", marginBottom: "16px",
@@ -150,24 +190,32 @@ export default function PatternAnalysis({ specialty, module }: Props) {
         background: "#EEF2F7", borderBottom: "1px solid #dde3ed",
         padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
-        <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase" as const, fontWeight: 700 }}>
-          AI Mønsteranalyse
-        </span>
+        <div>
+          <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase" as const, fontWeight: 700 }}>
+            AI Mønsteranalyse
+          </span>
+          {savedRun && (
+            <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>
+              Analyseret {formatDate(savedRun.created_at)} · Baseret på {totalDisagreements} uenigheder · {savedRun.base_version}
+            </div>
+          )}
+        </div>
         <button
           type="button"
           onClick={handleAnalyze}
-          disabled={loading}
+          disabled={isDisabled}
+          title={disabled ? "Utilstrækkelig data — kræver mindst 50 uenigheder" : undefined}
           style={{
             fontSize: "12px", fontWeight: 700,
-            background: loading ? "#f0f2f5" : "#1a1a1a",
-            color: loading ? "#aaa" : "#fff",
+            background: isDisabled ? "#f0f2f5" : "#1a1a1a",
+            color: isDisabled ? "#aaa" : "#fff",
             border: "none", borderRadius: "6px", padding: "5px 14px",
-            cursor: loading ? "not-allowed" : "pointer",
+            cursor: isDisabled ? "not-allowed" : "pointer",
             display: "inline-flex", alignItems: "center", gap: "6px",
           }}
         >
           {loading && <Spinner size={12} />}
-          {loading ? "Analyserer…" : "Analyser mønstre"}
+          {loading ? "Analyserer…" : "Kør ny analyse"}
         </button>
       </div>
 
@@ -175,7 +223,10 @@ export default function PatternAnalysis({ specialty, module }: Props) {
       <div style={{ padding: "20px 24px" }}>
         {!result && !error && !loading && (
           <p style={{ fontSize: "13px", color: "#aaa", margin: 0 }}>
-            Klik "Analyser mønstre" for at identificere mønstre i AI/human-uenigheder og få et forbedret prompt-forslag.
+            {disabled
+              ? "Utilstrækkelig data — kræver mindst 50 uenigheder for at køre mønsteranalyse."
+              : "Ingen analyse endnu — klik \"Kør ny analyse\" for at identificere mønstre i AI/human-uenigheder og få et forbedret prompt-forslag."
+            }
           </p>
         )}
 

@@ -119,7 +119,24 @@ Respond in JSON only — no markdown, no backticks:
 
     const raw = (message.content[0] as { type: string; text: string }).text.trim();
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    const result = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as PatternAnalysisResult;
+    const result = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as Omit<PatternAnalysisResult, "current_prompt">;
+
+    // Persist to DB (fire-and-forget — don't block response)
+    admin.from("model_optimization_runs" as never).insert({
+      specialty,
+      module,
+      base_version:        activePrompt.version,
+      base_prompt_text:    activePrompt.prompt,
+      total_decisions:     rows.length,
+      fp_count:            falsePositives.length,
+      fn_count:            falseNegatives.length,
+      fp_patterns:         result.false_positive_patterns,
+      fn_patterns:         result.false_negative_patterns,
+      recommended_changes: result.recommended_changes,
+      improved_prompt:     result.improved_prompt,
+    } as never).then(({ error }: { error: unknown }) => {
+      if (error) console.error("[analyze-patterns] DB insert failed:", error);
+    });
 
     return NextResponse.json({ ok: true, ...result, current_prompt: activePrompt.prompt });
   } catch (e) {
