@@ -434,9 +434,19 @@ export default function SimulatorClient({
                         <tr key={d.article_id} style={{ background: i % 2 === 1 ? "#fafafa" : "#fff" }}>
                           {/* Titel */}
                           <td style={{ ...tdStyle, maxWidth: "280px" }}>
-                            <div style={{ fontWeight: 500, lineHeight: 1.4, marginBottom: "2px" }}>
+                            <a
+                              href={`/articles/${d.article_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                fontWeight: 500, lineHeight: 1.4, display: "block", marginBottom: "2px",
+                                color: "inherit", textDecoration: "none",
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                              onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                            >
                               {d.title}
-                            </div>
+                            </a>
                           </td>
 
                           {/* Journal */}
