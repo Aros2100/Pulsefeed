@@ -13,7 +13,7 @@ const navCards = [
   { href: "/admin/authors",       icon: "🧑‍🔬", title: "Authors",     desc: "Browse researchers indexed in the database" },
   { href: "/admin/subscribers",   icon: "👥", title: "Subscribers", desc: "Manage users, statuses, and preferences" },
   { href: "/admin/lab",           icon: "🧪", title: "The Lab",     desc: "Train and improve the AI models" },
-  { href: "/admin/system/import", icon: "⚙️", title: "System",      desc: "Import configuration and logs" },
+  { href: "/admin/system",        icon: "⚙️", title: "System",      desc: "Import configuration and logs" },
 ];
 
 export default async function AdminDashboard() {
