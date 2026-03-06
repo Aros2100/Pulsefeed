@@ -183,11 +183,11 @@ export default async function EvaluationPage() {
   const falsePositives = disagreements.filter((d) => d.decision === "rejected" && d.ai_decision === "approved");
 
   // Data sufficiency — based on disagreement count
-  const hasSufficientData = totalDisagree >= 100;
+  const hasSufficientData = totalDisagree >= 50;
   const dataBanner =
-    totalDisagree < 100
-      ? { bg: "#fef2f2", border: "#fecaca", dot: "#dc2626", text: "#b91c1c", msg: `Insufficient data — need at least 100 disagreements to identify reliable trends (${totalDisagree} so far)` }
-      : totalDisagree < 200
+    totalDisagree < 50
+      ? { bg: "#fef2f2", border: "#fecaca", dot: "#dc2626", text: "#b91c1c", msg: `Insufficient data — need at least 50 disagreements to identify reliable trends (${totalDisagree} so far)` }
+      : totalDisagree < 100
       ? { bg: "#fefce8", border: "#fde68a", dot: "#d97706", text: "#92400e", msg: `Limited data — trends may not be fully representative (${totalDisagree} disagreements)` }
       : { bg: "#f0fdf4", border: "#bbf7d0", dot: "#15803d", text: "#14532d", msg: `Sufficient data for reliable trend analysis (${totalDisagree} disagreements)` };
 
