@@ -375,6 +375,7 @@ export default async function DashboardPage() {
           versions={versions}
           specialty={specialty}
           module="specialty_tag"
+          totalDecisions={total}
         />
 
         {/* 6 ── AI usage */}

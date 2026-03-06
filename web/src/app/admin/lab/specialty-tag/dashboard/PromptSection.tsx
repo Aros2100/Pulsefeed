@@ -19,6 +19,7 @@ interface Props {
   versions: ModelVersion[];
   specialty: string;
   module: string;
+  totalDecisions: number;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -81,7 +82,7 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function PromptSection({ versions, specialty, module }: Props) {
+export default function PromptSection({ versions, specialty, module, totalDecisions }: Props) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [confirmId, setConfirmId]     = useState<string | null>(null);
   const [activating, setActivating]   = useState(false);
@@ -147,6 +148,8 @@ export default function PromptSection({ versions, specialty, module }: Props) {
     return v.accuracy > activeVersion.accuracy;
   }
 
+  const hasSufficientData = totalDecisions >= 100;
+
   // ── Styles ────────────────────────────────────────────────────────────────
 
   const sectionLabel: React.CSSProperties = {
@@ -157,9 +160,35 @@ export default function PromptSection({ versions, specialty, module }: Props) {
   return (
     <>
       {/* ── Section heading ── */}
-      <div style={{ marginBottom: "6px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
         <div style={sectionLabel}>Prompt Evolution</div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ fontSize: "11px", color: "#888" }}>Step 2 — add improved version</span>
+          {hasSufficientData ? (
+            <button
+              onClick={() => { setEditPrompt(""); setEditNotes(""); setSaveErr(null); setModalOpen(true); }}
+              style={{ fontSize: "12px", fontWeight: 700, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: "6px", padding: "5px 13px", cursor: "pointer" }}
+            >
+              + Tilføj ny version
+            </button>
+          ) : (
+            <span
+              title={`Need at least 100 decisions first (${totalDecisions} so far)`}
+              style={{ fontSize: "12px", fontWeight: 700, background: "#e2e8f0", color: "#94a3b8", borderRadius: "6px", padding: "5px 13px", cursor: "not-allowed" }}
+            >
+              + Tilføj ny version
+            </span>
+          )}
+        </div>
       </div>
+      {!hasSufficientData && (
+        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "7px", padding: "9px 14px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#dc2626", flexShrink: 0, display: "inline-block" }} />
+          <span style={{ fontSize: "12px", color: "#b91c1c" }}>
+            Need at least 100 validated decisions before optimizing the prompt ({totalDecisions} so far)
+          </span>
+        </div>
+      )}
       <p style={{ fontSize: "12px", color: "#888", margin: "0 0 14px" }}>
         Prompten kan opdateres, når en ny version har opnået højere nøjagtighed end den nuværende aktive — målt på validerede artikler i The Lab.
       </p>

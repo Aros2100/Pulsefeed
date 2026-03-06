@@ -153,6 +153,25 @@ export default async function EvaluationPage() {
     articleMap = Object.fromEntries((articles ?? []).map((a) => [a.id, a]));
   }
 
+  // False positives: AI approved, human rejected
+  const falsePositivesRaw = allDecisions.filter((d) => d.decision === "rejected" && d.ai_decision === "approved");
+  console.log(
+    "[FP analysis] false_positives:",
+    JSON.stringify(
+      falsePositivesRaw.map((d) => ({
+        article_id:          d.article_id,
+        ai_confidence:       d.ai_confidence,
+        disagreement_reason: d.disagreement_reason,
+        decided_at:          d.decided_at,
+        title:               d.article_id ? (articleMap[d.article_id]?.title ?? null) : null,
+        journal:             d.article_id ? (articleMap[d.article_id]?.journal_abbr ?? null) : null,
+        abstract:            d.article_id ? (articleMap[d.article_id]?.abstract ?? null) : null,
+      })),
+      null,
+      2
+    )
+  );
+
   // Stats
   const total           = allDecisions.length;
   const totalDisagree   = disagreements.length;
@@ -162,6 +181,15 @@ export default async function EvaluationPage() {
   const falseNegatives = disagreements.filter((d) => d.decision === "approved" && d.ai_decision === "rejected");
   // False positive: human rejected, AI approved  (prompt too lenient)
   const falsePositives = disagreements.filter((d) => d.decision === "rejected" && d.ai_decision === "approved");
+
+  // Data sufficiency
+  const hasSufficientData = total >= 100;
+  const dataBanner =
+    total < 100
+      ? { bg: "#fef2f2", border: "#fecaca", dot: "#dc2626", text: "#b91c1c", msg: `Insufficient data — need at least 100 decisions to identify reliable trends (${total} so far)` }
+      : total < 200
+      ? { bg: "#fefce8", border: "#fde68a", dot: "#d97706", text: "#92400e", msg: `Limited data — trends may not be fully representative (${total} decisions)` }
+      : { bg: "#f0fdf4", border: "#bbf7d0", dot: "#15803d", text: "#14532d", msg: `Sufficient data for reliable trend analysis (${total} decisions)` };
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -175,7 +203,7 @@ export default async function EvaluationPage() {
         </div>
 
         {/* Heading */}
-        <div style={{ marginBottom: "32px" }}>
+        <div style={{ marginBottom: "20px" }}>
           <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
             Prompt Evaluation · Specialty Tag
           </div>
@@ -185,6 +213,29 @@ export default async function EvaluationPage() {
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
             Cases where AI and human decisions differed — use these to refine the prompt
           </p>
+        </div>
+
+        {/* Data sufficiency banner */}
+        <div style={{ background: dataBanner.bg, border: `1px solid ${dataBanner.border}`, borderRadius: "8px", padding: "10px 16px", marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: dataBanner.dot, flexShrink: 0, display: "inline-block" }} />
+            <span style={{ fontSize: "13px", color: dataBanner.text, fontWeight: 500 }}>{dataBanner.msg}</span>
+          </div>
+          {hasSufficientData ? (
+            <Link
+              href="/admin/lab/specialty-tag/dashboard"
+              style={{ flexShrink: 0, fontSize: "13px", fontWeight: 700, background: "#1a1a1a", color: "#fff", borderRadius: "7px", padding: "7px 16px", textDecoration: "none", whiteSpace: "nowrap" }}
+            >
+              Optimize model →
+            </Link>
+          ) : (
+            <span
+              title="Need at least 100 decisions first"
+              style={{ flexShrink: 0, fontSize: "13px", fontWeight: 700, background: "#e2e8f0", color: "#94a3b8", borderRadius: "7px", padding: "7px 16px", whiteSpace: "nowrap", cursor: "not-allowed" }}
+            >
+              Optimize model →
+            </span>
+          )}
         </div>
 
         {/* Summary stats */}
