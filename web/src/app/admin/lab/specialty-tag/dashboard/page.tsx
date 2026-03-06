@@ -7,24 +7,6 @@ import PromptSection, { type ModelVersion } from "./PromptSection";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function weekStart(): string {
-  const d = new Date();
-  const day = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() - (day - 1));
-  d.setUTCHours(0, 0, 0, 0);
-  return d.toISOString();
-}
-
-function monthStart(): string {
-  const d = new Date();
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString();
-}
-
-function fmt$(n: number): string {
-  if (n < 0.001) return `$${(n * 100).toFixed(4)}¢`;
-  return `$${n.toFixed(4)}`;
-}
-
 function isoWeekKey(date: Date): string {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const day = d.getUTCDay() || 7;
@@ -86,7 +68,7 @@ export default async function DashboardPage() {
   const admin = createAdminClient();
 
   // Fetch everything in parallel
-  const [decisionsRes, queueRes, sessionsRes, versionsRes, weekUsageRes, monthUsageRes, allUsageRes] = await Promise.all([
+  const [decisionsRes, queueRes, sessionsRes, versionsRes] = await Promise.all([
     admin
       .from("lab_decisions")
       .select("ai_decision, decision, ai_confidence, decided_at, session_id, model_version")
@@ -112,9 +94,6 @@ export default async function DashboardPage() {
       .eq("specialty", specialty)
       .eq("module", "specialty_tag")
       .order("activated_at", { ascending: false }),
-    admin.from("api_usage").select("model_key, total_tokens, cost_usd").gte("called_at", weekStart()),
-    admin.from("api_usage").select("cost_usd").gte("called_at", monthStart()),
-    admin.from("api_usage").select("cost_usd"),
   ]);
 
   if (decisionsRes.error) console.error("[dashboard] lab_decisions query failed:", decisionsRes.error.message);
@@ -220,23 +199,6 @@ export default async function DashboardPage() {
       generated_by:   (v.generated_by as string | null) ?? "manual",
     };
   });
-
-  // ── AI usage ────────────────────────────────────────────────────────────────
-  const costThisWeek  = (weekUsageRes.data ?? []).reduce((s, r) => s + Number(r.cost_usd ?? 0), 0);
-  const costThisMonth = (monthUsageRes.data ?? []).reduce((s, r) => s + Number(r.cost_usd ?? 0), 0);
-  const costAllTime   = (allUsageRes.data ?? []).reduce((s, r) => s + Number(r.cost_usd ?? 0), 0);
-  const daysElapsed   = Math.max(1, new Date().getUTCDate());
-  const daysInMonth   = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 0)).getUTCDate();
-  const estMonthly    = (costThisMonth / daysElapsed) * daysInMonth;
-  const byModel: Record<string, { tokens: number; cost: number }> = {};
-  for (const row of weekUsageRes.data ?? []) {
-    const k = row.model_key as string;
-    if (!byModel[k]) byModel[k] = { tokens: 0, cost: 0 };
-    byModel[k].tokens += (row.total_tokens as number) ?? 0;
-    byModel[k].cost   += Number(row.cost_usd ?? 0);
-  }
-  const modelEntries = Object.entries(byModel).sort((a, b) => b[1].cost - a[1].cost);
-  const hasUsage = costAllTime > 0;
 
   // ── Shared card style ────────────────────────────────────────────────────────
   const card: React.CSSProperties = {
@@ -388,57 +350,6 @@ export default async function DashboardPage() {
           totalDisagreements={falsePositives + falseNegatives}
         />
 
-        {/* 6 ── AI usage */}
-        <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", overflow: "hidden", marginTop: "32px" }}>
-          <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700 }}>
-              Claude API
-            </span>
-            <span style={{ fontSize: "11px", color: "#888" }}>All time: {fmt$(costAllTime)}</span>
-          </div>
-
-          <div style={{ padding: "20px 24px" }}>
-            {!hasUsage ? (
-              <div style={{ fontSize: "13px", color: "#aaa" }}>No API calls recorded yet.</div>
-            ) : (
-              <>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "24px", marginBottom: "20px" }}>
-                  <div>
-                    <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>This week</div>
-                    <div style={{ fontSize: "22px", fontWeight: 700 }}>{fmt$(costThisWeek)}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>This month</div>
-                    <div style={{ fontSize: "22px", fontWeight: 700 }}>{fmt$(costThisMonth)}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Est. this month</div>
-                    <div style={{ fontSize: "22px", fontWeight: 700 }}>{fmt$(estMonthly)}</div>
-                  </div>
-                </div>
-
-                {modelEntries.length > 0 && (
-                  <div style={{ borderTop: "1px solid #f0f2f5", paddingTop: "16px" }}>
-                    <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px" }}>
-                      This week by model
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      {modelEntries.map(([key, v]) => (
-                        <div key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "13px" }}>
-                          <span style={{ color: "#5a6a85", fontFamily: "monospace" }}>{key}</span>
-                          <div style={{ display: "flex", gap: "20px" }}>
-                            <span style={{ color: "#888" }}>{v.tokens.toLocaleString()} tok</span>
-                            <span style={{ fontWeight: 600 }}>{fmt$(v.cost)}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
 
       </div>
     </div>
