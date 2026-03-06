@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import PatternAnalysis from "./PatternAnalysis";
 
 export interface ModelVersion {
   id: string;
@@ -193,9 +192,6 @@ export default function PromptSection({ versions, specialty, module, totalDisagr
       <p style={{ fontSize: "12px", color: "#888", margin: "0 0 14px" }}>
         Prompten kan opdateres, når en ny version har opnået højere nøjagtighed end den nuværende aktive — målt på validerede artikler i The Lab.
       </p>
-
-      {/* ── AI Mønsteranalyse ── */}
-      <PatternAnalysis specialty={specialty} module={module} />
 
       {versions.length === 0 && (
         <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "24px", fontSize: "13px", color: "#aaa", marginBottom: "16px" }}>

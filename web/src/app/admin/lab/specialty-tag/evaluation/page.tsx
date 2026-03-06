@@ -223,7 +223,7 @@ export default async function EvaluationPage() {
           </div>
           {hasSufficientData ? (
             <Link
-              href="/admin/lab/specialty-tag/dashboard"
+              href="/admin/lab/specialty-tag/optimize"
               style={{ flexShrink: 0, fontSize: "13px", fontWeight: 700, background: "#1a1a1a", color: "#fff", borderRadius: "7px", padding: "7px 16px", textDecoration: "none", whiteSpace: "nowrap" }}
             >
               Optimize model →
