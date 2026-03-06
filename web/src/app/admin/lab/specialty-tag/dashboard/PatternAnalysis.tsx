@@ -17,6 +17,88 @@ function Spinner({ size = 14 }: { size?: number }) {
   );
 }
 
+// ── Line-level diff (LCS) ─────────────────────────────────────────────────────
+
+type DiffLine = { type: "unchanged" | "removed" | "added"; text: string };
+
+function diffLines(oldText: string, newText: string): DiffLine[] {
+  const a = oldText.split("\n");
+  const b = newText.split("\n");
+  const m = a.length;
+  const n = b.length;
+
+  // Build LCS table
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1] + 1
+        : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+
+  // Backtrack
+  const result: DiffLine[] = [];
+  let i = m, j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+      result.unshift({ type: "unchanged", text: a[i - 1] });
+      i--; j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      result.unshift({ type: "added",   text: b[j - 1] }); j--;
+    } else {
+      result.unshift({ type: "removed", text: a[i - 1] }); i--;
+    }
+  }
+  return result;
+}
+
+// ── PromptDiff ────────────────────────────────────────────────────────────────
+
+function PromptDiff({ oldPrompt, newPrompt }: { oldPrompt: string; newPrompt: string }) {
+  const lines = diffLines(oldPrompt, newPrompt);
+  return (
+    <div style={{
+      border: "1px solid #e8ecf1", borderRadius: "8px", overflow: "auto",
+      background: "#f8f9fb", fontFamily: "ui-monospace, 'Cascadia Code', monospace",
+      fontSize: "12px", lineHeight: 1.7,
+    }}>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <tbody>
+          {lines.map((line, i) => {
+            const isRemoved  = line.type === "removed";
+            const isAdded    = line.type === "added";
+            const bg    = isRemoved ? "#fff1f0" : isAdded ? "#f0fff4" : "transparent";
+            const color = isRemoved ? "#b91c1c"  : isAdded ? "#15803d"  : "#2a2a2a";
+            const prefix = isRemoved ? "−" : isAdded ? "+" : " ";
+            return (
+              <tr key={i} style={{ background: bg }}>
+                <td style={{
+                  width: "20px", padding: "0 8px", textAlign: "center",
+                  color, fontWeight: 700, userSelect: "none" as const,
+                  borderRight: "1px solid #e8ecf1",
+                }}>
+                  {prefix}
+                </td>
+                <td style={{
+                  padding: "1px 14px", color, whiteSpace: "pre-wrap" as const,
+                  wordBreak: "break-word" as const,
+                  textDecoration: isRemoved ? "line-through" : "none",
+                  opacity: isRemoved ? 0.7 : 1,
+                }}>
+                  {line.text || " "}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function PatternAnalysis({ specialty, module }: Props) {
   const [loading, setLoading] = useState(false);
   const [result,  setResult]  = useState<PatternAnalysisResult | null>(null);
@@ -41,6 +123,7 @@ export default function PatternAnalysis({ specialty, module }: Props) {
           false_negative_patterns: data.false_negative_patterns ?? [],
           recommended_changes:     data.recommended_changes     ?? "",
           improved_prompt:         data.improved_prompt         ?? "",
+          current_prompt:          data.current_prompt          ?? "",
         });
       }
     } catch {
@@ -50,13 +133,18 @@ export default function PatternAnalysis({ specialty, module }: Props) {
     }
   }
 
+  const labelStyle: React.CSSProperties = {
+    fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
+    letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "8px",
+  };
+
   return (
     <div style={{
       background: "#fff", borderRadius: "10px", marginBottom: "16px",
       boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
       overflow: "hidden",
     }}>
-      {/* Card header */}
+      {/* Header */}
       <div style={{
         background: "#EEF2F7", borderBottom: "1px solid #dde3ed",
         padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -82,7 +170,7 @@ export default function PatternAnalysis({ specialty, module }: Props) {
         </button>
       </div>
 
-      {/* Card body */}
+      {/* Body */}
       <div style={{ padding: "20px 24px" }}>
         {!result && !error && !loading && (
           <p style={{ fontSize: "13px", color: "#aaa", margin: 0 }}>
@@ -106,63 +194,58 @@ export default function PatternAnalysis({ specialty, module }: Props) {
         {result && (
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
-            {/* False positive patterns */}
+            {/* False positive patterns — bullets, no background */}
             <div>
-              <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "8px" }}>
-                Fejlgodkendelser — AI for lempelig
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              <div style={labelStyle}>Fejlgodkendelser — AI for lempelig</div>
+              <ul style={{ margin: 0, paddingLeft: "18px", display: "flex", flexDirection: "column", gap: "4px" }}>
                 {result.false_positive_patterns.map((p, i) => (
-                  <span key={i} style={{ fontSize: "12px", background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: "5px", padding: "4px 10px" }}>
-                    {p}
-                  </span>
+                  <li key={i} style={{ fontSize: "13px", color: "#2a2a2a", lineHeight: 1.5 }}>{p}</li>
                 ))}
-              </div>
+              </ul>
             </div>
 
-            {/* False negative patterns */}
+            {/* False negative patterns — bullets, no background */}
             <div>
-              <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "8px" }}>
-                Fejlafvisninger — AI for streng
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              <div style={labelStyle}>Fejlafvisninger — AI for streng</div>
+              <ul style={{ margin: 0, paddingLeft: "18px", display: "flex", flexDirection: "column", gap: "4px" }}>
                 {result.false_negative_patterns.map((p, i) => (
-                  <span key={i} style={{ fontSize: "12px", background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0", borderRadius: "5px", padding: "4px 10px" }}>
-                    {p}
-                  </span>
+                  <li key={i} style={{ fontSize: "13px", color: "#2a2a2a", lineHeight: 1.5 }}>{p}</li>
                 ))}
-              </div>
+              </ul>
             </div>
 
             {/* Recommended changes */}
             <div>
-              <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "8px" }}>
-                Anbefalede ændringer
-              </div>
+              <div style={labelStyle}>Anbefalede ændringer</div>
               <div style={{ fontSize: "13px", color: "#2a2a2a", lineHeight: 1.7, background: "#f8f9fb", border: "1px solid #e8ecf1", borderRadius: "8px", padding: "14px 16px", whiteSpace: "pre-wrap" }}>
                 {result.recommended_changes}
               </div>
             </div>
 
-            {/* Improved prompt */}
+            {/* Improved prompt — diff view */}
             <div>
-              <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "8px" }}>
-                Forbedret prompt
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                <div style={labelStyle}>Forbedret prompt</div>
+                <div style={{ display: "flex", gap: "12px", fontSize: "11px" }}>
+                  <span style={{ color: "#b91c1c" }}>— fjernet</span>
+                  <span style={{ color: "#15803d" }}>+ tilføjet</span>
+                </div>
               </div>
-              <textarea
-                readOnly
-                value={result.improved_prompt}
-                rows={14}
-                style={{
-                  width: "100%", boxSizing: "border-box",
-                  padding: "12px 14px",
-                  border: "1px solid #e8ecf1", borderRadius: "8px",
-                  background: "#f8f9fb",
-                  fontFamily: "ui-monospace, 'Cascadia Code', monospace",
-                  fontSize: "12px", lineHeight: 1.7, color: "#2a2a2a",
-                  resize: "vertical",
-                }}
-              />
+              {result.current_prompt
+                ? <PromptDiff oldPrompt={result.current_prompt} newPrompt={result.improved_prompt} />
+                : (
+                  <pre style={{
+                    margin: 0, padding: "12px 14px",
+                    border: "1px solid #e8ecf1", borderRadius: "8px",
+                    background: "#f8f9fb",
+                    fontFamily: "ui-monospace, 'Cascadia Code', monospace",
+                    fontSize: "12px", lineHeight: 1.7, color: "#2a2a2a",
+                    whiteSpace: "pre-wrap", wordBreak: "break-word",
+                  }}>
+                    {result.improved_prompt}
+                  </pre>
+                )
+              }
             </div>
 
           </div>

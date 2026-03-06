@@ -26,6 +26,7 @@ export interface PatternAnalysisResult {
   false_negative_patterns: string[];
   recommended_changes: string;
   improved_prompt: string;
+  current_prompt: string;
 }
 
 function formatList(items: DisagreementRow[], max = 50): string {
@@ -120,7 +121,7 @@ Respond in JSON only — no markdown, no backticks:
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const result = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as PatternAnalysisResult;
 
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({ ok: true, ...result, current_prompt: activePrompt.prompt });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
