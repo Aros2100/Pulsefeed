@@ -216,6 +216,24 @@ export default async function LabPage() {
               >
                 Se performance →
               </Link>
+              <Link
+                href="/admin/lab/specialty-tag/evaluation"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  borderRadius: "8px",
+                  padding: "10px 16px",
+                  background: "transparent",
+                  border: "1px solid #dde3ed",
+                  color: "#5a6a85",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  textDecoration: "none",
+                }}
+              >
+                Prompt evaluation →
+              </Link>
             </div>
           </div>
         </div>
