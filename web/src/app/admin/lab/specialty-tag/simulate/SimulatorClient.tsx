@@ -212,7 +212,7 @@ export default function SimulatorClient({
     try {
       await consumeSSE(
         "/api/lab/score-batch",
-        { specialty },
+        { specialty, scoreAll: true },
         (data) => {
           if (data.scored !== undefined) {
             setRescoreProgress({

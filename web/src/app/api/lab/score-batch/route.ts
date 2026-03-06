@@ -16,6 +16,7 @@ const schema = z.object({
     (v) => (SPECIALTY_SLUGS as readonly string[]).includes(v),
     { message: "Invalid specialty" }
   ),
+  scoreAll: z.boolean().default(false),
 });
 
 type Article = { id: string; title: string; abstract: string | null; specialty_tags: string[] | null };
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
   }
 
-  const { specialty } = result.data;
+  const { specialty, scoreAll } = result.data;
   const admin = createAdminClient();
 
   let activePrompt;
@@ -75,14 +76,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
-  const { data: articles, error: fetchError } = await admin
+  // When scoreAll=true (triggered by model activation): fetch all pending articles
+  // that haven't been scored yet OR were scored with a different model version.
+  // When scoreAll=false (manual Lab session): only fetch unscored articles, cap at 50.
+  const baseQuery = admin
     .from("articles")
     .select("id, title, abstract, specialty_tags")
     .eq("status", "pending")
-    .is("specialty_scored_at", null)
-    .is("specialty_confidence", null)
-    .order("circle", { ascending: false, nullsFirst: false })
-    .limit(BATCH_LIMIT);
+    .order("circle", { ascending: false, nullsFirst: false });
+
+  const { data: articles, error: fetchError } = scoreAll
+    ? await baseQuery.or(`ai_decision.is.null,model_version.neq.${activePrompt.version}`)
+    : await baseQuery
+        .is("specialty_scored_at", null)
+        .is("specialty_confidence", null)
+        .limit(BATCH_LIMIT);
 
   if (fetchError) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
