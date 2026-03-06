@@ -27,6 +27,7 @@ export interface PatternAnalysisResult {
   recommended_changes: string;
   improved_prompt: string;
   current_prompt: string;
+  run_id: string | null;
 }
 
 function formatList(items: DisagreementRow[], max = 50): string {
@@ -119,35 +120,44 @@ Respond in JSON only — no markdown, no backticks:
 
     const raw = (message.content[0] as { type: string; text: string }).text.trim();
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    const result = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as Omit<PatternAnalysisResult, "current_prompt">;
+    const result = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as Omit<PatternAnalysisResult, "current_prompt" | "run_id">;
 
-    // Persist to DB — must be awaited; fire-and-forget is not safe in serverless
-    // (execution context is frozen the moment a response is sent)
     console.log(`[analyze-patterns] inserting run: specialty=${specialty} module=${module} version=${activePrompt.version} fp=${falsePositives.length} fn=${falseNegatives.length}`);
 
-    const { error: insertError } = await (admin
-      .from("model_optimization_runs" as never)
-      .insert({
-        specialty,
-        module,
-        base_version:        activePrompt.version,
-        base_prompt_text:    activePrompt.prompt,
-        total_decisions:     rows.length,
-        fp_count:            falsePositives.length,
-        fn_count:            falseNegatives.length,
-        fp_patterns:         result.false_positive_patterns,
-        fn_patterns:         result.false_negative_patterns,
-        recommended_changes: result.recommended_changes,
-        improved_prompt:     result.improved_prompt,
-      } as never) as unknown as Promise<{ error: { message: string; code: string; details: string } | null }>);
+    type InsertResult = { data: Array<{ id: string }> | null; error: { message: string; code: string } | null };
+    const { data: insertData, error: insertError } = await (
+      admin
+        .from("model_optimization_runs" as never)
+        .insert({
+          specialty,
+          module,
+          base_version:        activePrompt.version,
+          base_prompt_text:    activePrompt.prompt,
+          total_decisions:     rows.length,
+          fp_count:            falsePositives.length,
+          fn_count:            falseNegatives.length,
+          fp_patterns:         result.false_positive_patterns,
+          fn_patterns:         result.false_negative_patterns,
+          recommended_changes: result.recommended_changes,
+          improved_prompt:     result.improved_prompt,
+        } as never)
+        .select("id") as unknown as Promise<InsertResult>
+    );
 
     if (insertError) {
       console.error("[analyze-patterns] DB insert failed:", JSON.stringify(insertError));
     } else {
-      console.log("[analyze-patterns] DB insert succeeded");
+      console.log("[analyze-patterns] DB insert succeeded, id:", insertData?.[0]?.id);
     }
 
-    return NextResponse.json({ ok: true, ...result, current_prompt: activePrompt.prompt });
+    const runId = insertData?.[0]?.id ?? null;
+
+    return NextResponse.json({
+      ok: true,
+      ...result,
+      current_prompt: activePrompt.prompt,
+      run_id: runId,
+    });
   } catch (e) {
     console.error("[analyze-patterns] unexpected error:", e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

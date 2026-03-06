@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
-import PatternAnalysis, { type OptimizationRun, type DisagreementEntry } from "../dashboard/PatternAnalysis";
+import PatternAnalysis, { type OptimizationRun } from "../dashboard/PatternAnalysis";
 
 export default async function OptimizePage() {
   const supabase = await createClient();
@@ -24,21 +24,13 @@ export default async function OptimizePage() {
 
   const admin = createAdminClient();
 
-  type RawDecision = {
-    decision: string;
-    ai_decision: string;
-    article_id: string | null;
-    articles: { title: string } | null;
-  };
-
   const [decisionsRes, latestRunRes] = await Promise.all([
     admin
       .from("lab_decisions")
-      .select("decision, ai_decision, article_id, articles(title)")
+      .select("decision, ai_decision")
       .eq("specialty", specialty)
       .eq("module", "specialty_tag")
-      .not("ai_decision", "is", null)
-      .order("decided_at", { ascending: false }),
+      .not("ai_decision", "is", null),
 
     admin
       .from("model_optimization_runs" as never)
@@ -50,30 +42,8 @@ export default async function OptimizePage() {
       .maybeSingle(),
   ]);
 
-  const allDecisions = (decisionsRes.data ?? []) as RawDecision[];
-  const totalDisagree = allDecisions.filter((d) => d.decision !== d.ai_decision).length;
+  const totalDisagree = (decisionsRes.data ?? []).filter((d) => d.decision !== d.ai_decision).length;
   const latestRun     = (latestRunRes.data ?? null) as OptimizationRun | null;
-
-  // Build deduplicated disagreement list (max 50, most recent first) for simulation
-  const seenIds = new Set<string>();
-  const disagreements: DisagreementEntry[] = [];
-  for (const d of allDecisions) {
-    if (
-      d.decision !== d.ai_decision &&
-      d.article_id &&
-      d.articles?.title &&
-      !seenIds.has(d.article_id)
-    ) {
-      seenIds.add(d.article_id);
-      disagreements.push({
-        article_id:       d.article_id,
-        title:            d.articles.title,
-        human_decision:   d.decision,
-        old_ai_decision:  d.ai_decision,
-      });
-      if (disagreements.length >= 50) break;
-    }
-  }
 
   const hasSufficientData = totalDisagree >= 50;
   const dataBanner =
@@ -113,13 +83,12 @@ export default async function OptimizePage() {
           <span style={{ fontSize: "13px", color: dataBanner.text, fontWeight: 500 }}>{dataBanner.msg}</span>
         </div>
 
-        {/* Pattern analysis + simulator */}
+        {/* Pattern analysis */}
         <PatternAnalysis
           specialty={specialty}
           module="specialty_tag"
           initialRun={latestRun}
           disabled={!hasSufficientData}
-          disagreements={disagreements}
         />
 
       </div>

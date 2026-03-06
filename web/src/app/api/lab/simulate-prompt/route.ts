@@ -18,11 +18,17 @@ const schema = z.object({
 
 type Article = { id: string; title: string; abstract: string | null };
 
+type ScoreResult = {
+  ai_decision: "approved" | "rejected";
+  confidence: number;
+  reason: string | null;
+};
+
 async function scoreWithPrompt(
   article: Article,
   specialty: string,
   promptTemplate: string
-): Promise<{ ai_decision: "approved" | "rejected"; confidence: number }> {
+): Promise<ScoreResult> {
   const content = promptTemplate
     .replace(/\{\{specialty\}\}|\{specialty\}/g, specialty)
     .replace(/\{\{title\}\}|\{title\}/g, article.title)
@@ -38,14 +44,18 @@ async function scoreWithPrompt(
 
   try {
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as { decision?: string; confidence?: number };
-    const confidence = Math.min(100, Math.max(0, Math.round(Number(parsed.confidence ?? 50))));
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as {
+      decision?: string;
+      confidence?: number;
+      reason?: string;
+    };
+    const confidence  = Math.min(100, Math.max(0, Math.round(Number(parsed.confidence ?? 50))));
     const ai_decision: "approved" | "rejected" = parsed.decision === "approved" ? "approved" : "rejected";
-    return { ai_decision, confidence };
+    return { ai_decision, confidence, reason: parsed.reason ?? null };
   } catch {
     const match = raw.match(/\d+/);
     const confidence = match ? Math.min(100, Math.max(0, parseInt(match[0], 10))) : 50;
-    return { ai_decision: confidence >= 50 ? "approved" : "rejected", confidence };
+    return { ai_decision: confidence >= 50 ? "approved" : "rejected", confidence, reason: null };
   }
 }
 
@@ -95,9 +105,10 @@ export async function POST(request: NextRequest) {
             send({
               scored,
               total,
-              article_id:  article.id,
-              decision:    result.ai_decision,
-              confidence:  result.confidence,
+              article_id: article.id,
+              decision:   result.ai_decision,
+              confidence: result.confidence,
+              reason:     result.reason,
             });
           } catch (e) {
             scored++;
