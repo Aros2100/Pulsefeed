@@ -83,10 +83,15 @@ Respond with the refined prompt text only — no explanation, no markdown.`;
         timestamp: new Date().toISOString(),
       };
 
+      const updatedIterations = [...existing, newIteration];
+
       await (
         admin
           .from("model_optimization_runs" as never)
-          .update({ refinement_iterations: [...existing, newIteration] } as never)
+          .update({
+            improved_prompt:         refined_prompt,
+            refinement_iterations:   updatedIterations,
+          } as never)
           .eq("id", run_id) as unknown as Promise<{ error: unknown }>
       );
     }
