@@ -129,16 +129,24 @@ export async function runImportCircle3(
         const fetched = await fetchArticleDetails(newPmids);
 
         // 5b. Verify neurosurgical affiliation locally — PubMed [AD] matching is
-        //     not always precise. Only keep articles where at least one author's
-        //     affiliation string contains "neurosurg" (case-insensitive).
+        //     not always precise and can match neurosurg* and a Danish hospital
+        //     name on DIFFERENT authors. Both conditions must appear on the SAME
+        //     author's affiliation string to qualify for circle 3.
+        const danishHospitals = sources.map((s) => s.value);
+        const danishPattern   = new RegExp(
+          danishHospitals.map((h) => h.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"),
+          "i"
+        );
         const articles = fetched.filter((a) =>
-          (a.authors as Array<{ affiliation?: string | null }>)
-            .some((au) => /neurosurg/i.test(au.affiliation ?? ""))
+          (a.authors as Array<{ affiliation?: string | null }>).some((au) => {
+            const aff = au.affiliation ?? "";
+            return /neurosurg/i.test(aff) && danishPattern.test(aff);
+          })
         );
         const filteredOut = fetched.length - articles.length;
         if (filteredOut > 0) {
           totalSkipped += filteredOut;
-          console.log(`[import-circle3] Filtered ${filteredOut} articles with no neurosurgical affiliation`);
+          console.log(`[import-circle3] Filtered ${filteredOut} articles lacking co-located neurosurg+Danish-hospital affiliation`);
         }
 
         // 6 + 7. Upsert + log events
