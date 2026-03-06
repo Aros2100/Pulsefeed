@@ -24,11 +24,12 @@ function CardHeader({ label, count, color }: { label: string; count: number; col
 }
 
 interface DisagreementRow {
-  article_id:    string | null;
-  decision:      string;
-  ai_decision:   string | null;
-  ai_confidence: number | null;
-  decided_at:    string | null;
+  article_id:           string | null;
+  decision:             string;
+  ai_decision:          string | null;
+  ai_confidence:        number | null;
+  decided_at:           string | null;
+  disagreement_reason:  string | null;
 }
 
 interface ArticleDetail {
@@ -87,6 +88,11 @@ function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDe
           </span>
         </div>
       </div>
+      {row.disagreement_reason && (
+        <div style={{ marginTop: "6px", fontSize: "12px", color: "#7c3aed", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "6px", padding: "4px 10px", display: "inline-block" }}>
+          Reason: {row.disagreement_reason}
+        </div>
+      )}
       {abstract && (
         <details style={{ marginTop: "8px" }}>
           <summary style={{ fontSize: "12px", color: "#5a6a85", cursor: "pointer", userSelect: "none", listStyle: "none" }}>
@@ -124,7 +130,7 @@ export default async function EvaluationPage() {
   // All decisions where AI gave a verdict (needed for agreement rate denominator)
   const { data: rawDecisions } = await admin
     .from("lab_decisions")
-    .select("article_id, decision, decided_at, ai_decision, ai_confidence")
+    .select("article_id, decision, decided_at, ai_decision, ai_confidence, disagreement_reason")
     .eq("specialty", specialty)
     .eq("module", "specialty_tag")
     .not("ai_decision", "is", null)
