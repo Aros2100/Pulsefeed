@@ -230,21 +230,11 @@ export default async function EvaluationPage({ searchParams }: Props) {
           <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
             Prompt Evaluation · Specialty Tag
           </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
-            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
-              AI/Human Disagreements · {specialtyLabel}
-            </h1>
-            {modelVersions.length > 0 && (
-              <VersionSelector versions={modelVersions} selected={selectedVersion} />
-            )}
-          </div>
+          <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
+            AI/Human Disagreements · {specialtyLabel}
+          </h1>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
             Cases where AI and human decisions differed — use these to refine the prompt
-            {selectedVersion && (
-              <span style={{ marginLeft: "8px", fontWeight: 600, color: "#5a6a85" }}>
-                · {selectedVersion}{selectedVersion === activeModelVersion ? " (aktiv)" : ""}
-              </span>
-            )}
           </p>
         </div>
 
@@ -273,10 +263,20 @@ export default async function EvaluationPage({ searchParams }: Props) {
 
         {/* Summary stats */}
         <div style={{ ...card, marginBottom: "28px" }}>
-          <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
-            <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
-              Summary
-            </span>
+          <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
+                Summary
+              </span>
+              {selectedVersion && (
+                <span style={{ fontSize: "11px", color: "#888" }}>
+                  {selectedVersion}{selectedVersion === activeModelVersion ? " · aktiv" : ""}
+                </span>
+              )}
+            </div>
+            {modelVersions.length > 1 && (
+              <VersionSelector versions={modelVersions} selected={selectedVersion} />
+            )}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
             {[
