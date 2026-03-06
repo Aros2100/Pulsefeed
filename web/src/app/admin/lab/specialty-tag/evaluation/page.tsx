@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
+import VersionSelector from "./VersionSelector";
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
@@ -109,7 +110,13 @@ function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDe
   );
 }
 
-export default async function EvaluationPage() {
+interface Props {
+  searchParams: Promise<{ version?: string }>;
+}
+
+export default async function EvaluationPage({ searchParams }: Props) {
+  const { version: versionParam } = await searchParams;
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -129,14 +136,30 @@ export default async function EvaluationPage() {
 
   const admin = createAdminClient();
 
-  // All decisions where AI gave a verdict (needed for agreement rate denominator)
-  const { data: rawDecisions } = await admin
+  // Fetch model versions for selector
+  const { data: modelVersionsData } = await admin
+    .from("model_versions")
+    .select("version, active")
+    .eq("specialty", specialty)
+    .eq("module", "specialty_tag")
+    .order("activated_at", { ascending: false });
+
+  const modelVersions = (modelVersionsData ?? []) as Array<{ version: string; active: boolean }>;
+  const activeModelVersion = modelVersions.find((v) => v.active)?.version ?? null;
+  const selectedVersion = versionParam ?? activeModelVersion;
+
+  // All decisions where AI gave a verdict (filtered by selected model version)
+  const baseQuery = admin
     .from("lab_decisions")
     .select("article_id, decision, decided_at, ai_decision, ai_confidence, disagreement_reason")
     .eq("specialty", specialty)
     .eq("module", "specialty_tag")
     .not("ai_decision", "is", null)
     .order("decided_at", { ascending: false });
+
+  const { data: rawDecisions } = selectedVersion
+    ? await baseQuery.eq("model_version", selectedVersion)
+    : await baseQuery;
 
   const allDecisions = (rawDecisions ?? []) as DisagreementRow[];
   const disagreements = allDecisions.filter((d) => d.decision !== d.ai_decision);
@@ -207,11 +230,21 @@ export default async function EvaluationPage() {
           <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
             Prompt Evaluation · Specialty Tag
           </div>
-          <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
-            AI/Human Disagreements · {specialtyLabel}
-          </h1>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
+              AI/Human Disagreements · {specialtyLabel}
+            </h1>
+            {modelVersions.length > 0 && (
+              <VersionSelector versions={modelVersions} selected={selectedVersion} />
+            )}
+          </div>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
             Cases where AI and human decisions differed — use these to refine the prompt
+            {selectedVersion && (
+              <span style={{ marginLeft: "8px", fontWeight: 600, color: "#5a6a85" }}>
+                · {selectedVersion}{selectedVersion === activeModelVersion ? " (aktiv)" : ""}
+              </span>
+            )}
           </p>
         </div>
 

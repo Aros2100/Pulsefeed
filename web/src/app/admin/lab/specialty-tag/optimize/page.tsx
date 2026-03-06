@@ -24,13 +24,34 @@ export default async function OptimizePage() {
 
   const admin = createAdminClient();
 
+  // Fetch active model version first (needed to scope disagreement count)
+  const { data: activeVersionData } = await admin
+    .from("model_versions")
+    .select("version")
+    .eq("specialty", specialty)
+    .eq("module", "specialty_tag")
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
+
+  const activeModelVersion = (activeVersionData?.version as string | null) ?? null;
+
   const [decisionsRes, latestRunRes] = await Promise.all([
-    admin
-      .from("lab_decisions")
-      .select("decision, ai_decision")
-      .eq("specialty", specialty)
-      .eq("module", "specialty_tag")
-      .not("ai_decision", "is", null),
+    (activeModelVersion
+      ? admin
+          .from("lab_decisions")
+          .select("decision, ai_decision")
+          .eq("specialty", specialty)
+          .eq("module", "specialty_tag")
+          .eq("model_version", activeModelVersion)
+          .not("ai_decision", "is", null)
+      : admin
+          .from("lab_decisions")
+          .select("decision, ai_decision")
+          .eq("specialty", specialty)
+          .eq("module", "specialty_tag")
+          .not("ai_decision", "is", null)
+    ),
 
     admin
       .from("model_optimization_runs" as never)
@@ -45,13 +66,14 @@ export default async function OptimizePage() {
   const totalDisagree = (decisionsRes.data ?? []).filter((d) => d.decision !== d.ai_decision).length;
   const latestRun     = (latestRunRes.data ?? null) as OptimizationRun | null;
 
+  const versionSuffix = activeModelVersion ? ` · ${activeModelVersion}` : "";
   const hasSufficientData = totalDisagree >= 50;
   const dataBanner =
     totalDisagree < 50
-      ? { bg: "#fef2f2", border: "#fecaca", dot: "#dc2626", text: "#b91c1c", msg: `Insufficient data — need at least 50 disagreements to identify reliable trends (${totalDisagree} so far)` }
+      ? { bg: "#fef2f2", border: "#fecaca", dot: "#dc2626", text: "#b91c1c", msg: `Insufficient data — need at least 50 disagreements to identify reliable trends (${totalDisagree} so far${versionSuffix})` }
       : totalDisagree < 100
-      ? { bg: "#fefce8", border: "#fde68a", dot: "#d97706", text: "#92400e", msg: `Limited data — trends may not be fully representative (${totalDisagree} disagreements)` }
-      : { bg: "#f0fdf4", border: "#bbf7d0", dot: "#15803d", text: "#14532d", msg: `Sufficient data for reliable trend analysis (${totalDisagree} disagreements)` };
+      ? { bg: "#fefce8", border: "#fde68a", dot: "#d97706", text: "#92400e", msg: `Limited data — trends may not be fully representative (${totalDisagree} disagreements${versionSuffix})` }
+      : { bg: "#f0fdf4", border: "#bbf7d0", dot: "#15803d", text: "#14532d", msg: `Sufficient data for reliable trend analysis (${totalDisagree} disagreements${versionSuffix})` };
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>

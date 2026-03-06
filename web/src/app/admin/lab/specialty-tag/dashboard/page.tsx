@@ -124,12 +124,17 @@ export default async function DashboardPage() {
   const queueCount = queueRes.count ?? 0;
   const sessions   = sessionsRes.data ?? [];
 
-  // ── Overall KPIs ────────────────────────────────────────────────────────────
-  const total          = decisions.length;
-  const correct        = decisions.filter((d) => d.ai_decision === d.decision).length;
+  // ── Overall KPIs (scoped to active model version) ───────────────────────────
+  const activeVersionName = ((versionsRes.data ?? []).find((v) => v.active)?.version as string | null) ?? null;
+  const kpiDecisions   = activeVersionName
+    ? decisions.filter((d) => (d.model_version as string | null) === activeVersionName)
+    : decisions;
+
+  const total          = kpiDecisions.length;
+  const correct        = kpiDecisions.filter((d) => d.ai_decision === d.decision).length;
   const accuracy       = pct(correct, total);
-  const falsePositives = decisions.filter((d) => d.ai_decision === "approved" && d.decision === "rejected").length;
-  const falseNegatives = decisions.filter((d) => d.ai_decision === "rejected" && d.decision === "approved").length;
+  const falsePositives = kpiDecisions.filter((d) => d.ai_decision === "approved" && d.decision === "rejected").length;
+  const falseNegatives = kpiDecisions.filter((d) => d.ai_decision === "rejected" && d.decision === "approved").length;
 
   // ── Weekly chart (last 12 weeks) ────────────────────────────────────────────
   const weekMap: Record<string, { total: number; correct: number }> = {};
@@ -272,7 +277,12 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        {/* 1 ── Overall KPI cards */}
+        {/* 1 ── Overall KPI cards (scoped to active version) */}
+        {activeVersionName && (
+          <div style={{ fontSize: "11px", color: "#888", marginBottom: "6px" }}>
+            Nøjagtighed for <span style={{ fontWeight: 700, color: "#5a6a85" }}>{activeVersionName}</span> (aktiv)
+          </div>
+        )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "12px", marginBottom: "16px" }}>
           {[
             { label: "Valideret i alt",   value: total,          sub: null },
