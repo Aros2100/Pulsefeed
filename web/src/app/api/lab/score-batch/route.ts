@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     .order("circle", { ascending: false, nullsFirst: false });
 
   const { data: articles, error: fetchError } = scoreAll
-    ? await baseQuery.or(`ai_decision.is.null,model_version.neq.${activePrompt.version}`)
+    ? await baseQuery.or(`ai_decision.is.null,model_version.neq.${activePrompt.version}`).limit(100)
     : await baseQuery
         .is("specialty_scored_at", null)
         .is("specialty_confidence", null)
