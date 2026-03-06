@@ -66,25 +66,26 @@ function PromptDiff({ oldPrompt, newPrompt }: { oldPrompt: string; newPrompt: st
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <tbody>
           {lines.map((line, i) => {
-            const isRemoved  = line.type === "removed";
-            const isAdded    = line.type === "added";
-            const bg    = isRemoved ? "#fff1f0" : isAdded ? "#f0fff4" : "transparent";
-            const color = isRemoved ? "#b91c1c"  : isAdded ? "#15803d"  : "#2a2a2a";
+            const isRemoved = line.type === "removed";
+            const isAdded   = line.type === "added";
+            const bg     = isRemoved ? "#ffd7d5" : isAdded ? "#ccffd8" : "transparent";
+            const color  = isRemoved ? "#9a1515"  : isAdded ? "#0f5c2e"  : "#2a2a2a";
             const prefix = isRemoved ? "−" : isAdded ? "+" : " ";
             return (
-              <tr key={i} style={{ background: bg }}>
+              <tr key={i}>
                 <td style={{
                   width: "20px", padding: "0 8px", textAlign: "center",
                   color, fontWeight: 700, userSelect: "none" as const,
+                  background: bg,
                   borderRight: "1px solid #e8ecf1",
                 }}>
                   {prefix}
                 </td>
                 <td style={{
-                  padding: "1px 14px", color, whiteSpace: "pre-wrap" as const,
+                  padding: "1px 14px", color, background: bg,
+                  whiteSpace: "pre-wrap" as const,
                   wordBreak: "break-word" as const,
                   textDecoration: isRemoved ? "line-through" : "none",
-                  opacity: isRemoved ? 0.7 : 1,
                 }}>
                   {line.text || " "}
                 </td>
