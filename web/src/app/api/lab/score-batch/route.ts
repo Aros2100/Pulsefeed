@@ -9,7 +9,7 @@ import { logArticleEvent } from "@/lib/article-events";
 
 const CONCURRENCY  = 1;    // sequential to avoid bursting the 50 req/min limit
 const DELAY_MS     = 1300; // 1300ms between requests ≈ 46 req/min, safely under 50
-const BATCH_LIMIT  = 50;   // score at most 50 articles per call (~65s total)
+const BATCH_LIMIT  = 100;  // score at most 100 articles per call (~130s total)
 
 const schema = z.object({
   specialty: z.string().refine(
