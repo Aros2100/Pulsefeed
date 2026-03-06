@@ -101,7 +101,11 @@ function DecisionBadge({ decision, confidence }: { decision: string; confidence?
         {isApproved ? "Godkendt" : "Afvist"}
       </span>
       {confidence != null && (
-        <span style={{ fontSize: "11px", color: "#888" }}>{confidence}%</span>
+        <span style={{
+          fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px",
+          background: isApproved ? "#dcfce7" : "#fee2e2",
+          color:      isApproved ? "#15803d" : "#b91c1c",
+        }}>{confidence}%</span>
       )}
     </span>
   );

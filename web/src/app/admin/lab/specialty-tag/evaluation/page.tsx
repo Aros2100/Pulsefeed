@@ -65,9 +65,9 @@ function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDe
             {confidence != null && (
               <span style={{
                 fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px",
-                background: confidence >= 70 ? "#f0fdf4" : confidence >= 40 ? "#fefce8" : "#fef2f2",
-                color:      confidence >= 70 ? "#15803d" : confidence >= 40 ? "#d97706" : "#dc2626",
-                border:     `1px solid ${confidence >= 70 ? "#bbf7d0" : confidence >= 40 ? "#fde68a" : "#fecaca"}`,
+                background: row.ai_decision === "approved" ? "#f0fdf4" : "#fef2f2",
+                color:      row.ai_decision === "approved" ? "#15803d" : "#dc2626",
+                border:     `1px solid ${row.ai_decision === "approved" ? "#bbf7d0" : "#fecaca"}`,
               }}>
                 AI: {confidence}%
               </span>
