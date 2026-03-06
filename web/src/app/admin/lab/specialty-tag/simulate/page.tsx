@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import SimulatorClient, { type SimulationDisagreement } from "./SimulatorClient";
+import SimulatorClient, { type SimulationDisagreement, type SimulationAgreement } from "./SimulatorClient";
 
 interface Props {
   searchParams: Promise<{ run_id?: string }>;
@@ -45,18 +45,45 @@ export default async function SimulatePage({ searchParams }: Props) {
 
   if (!run) redirect("/admin/lab/specialty-tag/optimize");
 
-  // Fetch disagreements with article details (most recent first, deduplicated)
-  const { data: rawDecisions } = await admin
-    .from("lab_decisions")
-    .select("decision, ai_decision, ai_confidence, disagreement_reason, article_id, articles(title, journal_title)")
+  // Fetch active model version (for regression sample)
+  const { data: activeVersionData } = await admin
+    .from("model_versions")
+    .select("version")
     .eq("specialty", run.specialty)
     .eq("module", run.module)
-    .not("ai_decision", "is", null)
-    .order("decided_at", { ascending: false });
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
 
-  const decisions = (rawDecisions ?? []) as RawDecision[];
+  const activeModelVersion = (activeVersionData?.version as string | null) ?? run.base_version;
 
-  // Deduplicate by article_id, keep only disagreements, cap at 50
+  // Fetch all decisions — used for both disagreements and regression sample
+  const [{ data: rawDecisions }, { data: rawAgreementData }] = await Promise.all([
+    // Disagreements: all decisions, most recent first (existing query)
+    admin
+      .from("lab_decisions")
+      .select("decision, ai_decision, ai_confidence, disagreement_reason, article_id, articles(title, journal_title)")
+      .eq("specialty", run.specialty)
+      .eq("module", run.module)
+      .not("ai_decision", "is", null)
+      .order("decided_at", { ascending: false }),
+
+    // Agreement sample: recent decisions with active model version where AI == human
+    admin
+      .from("lab_decisions")
+      .select("decision, ai_decision, ai_confidence, article_id, articles(title, journal_title)")
+      .eq("specialty", run.specialty)
+      .eq("module", run.module)
+      .eq("model_version", activeModelVersion)
+      .not("ai_decision", "is", null)
+      .order("decided_at", { ascending: false })
+      .limit(300),
+  ]);
+
+  const decisions       = (rawDecisions      ?? []) as RawDecision[];
+  const agreementData   = (rawAgreementData  ?? []) as RawDecision[];
+
+  // Build disagreements — deduplicate, cap at 50
   const seenIds = new Set<string>();
   const disagreements: SimulationDisagreement[] = [];
 
@@ -69,15 +96,38 @@ export default async function SimulatePage({ searchParams }: Props) {
     ) {
       seenIds.add(d.article_id);
       disagreements.push({
-        article_id:         d.article_id,
-        title:              d.articles.title,
-        journal_title:      d.articles.journal_title ?? null,
-        human_decision:     d.decision,
-        old_ai_decision:    d.ai_decision,
-        old_ai_confidence:  d.ai_confidence ?? null,
+        article_id:          d.article_id,
+        title:               d.articles.title,
+        journal_title:       d.articles.journal_title ?? null,
+        human_decision:      d.decision,
+        old_ai_decision:     d.ai_decision,
+        old_ai_confidence:   d.ai_confidence ?? null,
         disagreement_reason: d.disagreement_reason ?? null,
       });
       if (disagreements.length >= 50) break;
+    }
+  }
+
+  // Build regression sample — agreements only, no overlap with disagreements, cap at 50
+  const agreementArticles: SimulationAgreement[] = [];
+
+  for (const d of agreementData) {
+    if (
+      d.decision === d.ai_decision &&
+      d.article_id &&
+      d.articles?.title &&
+      !seenIds.has(d.article_id)
+    ) {
+      seenIds.add(d.article_id);
+      agreementArticles.push({
+        article_id:        d.article_id,
+        title:             d.articles.title,
+        journal_title:     d.articles.journal_title ?? null,
+        human_decision:    d.decision,
+        old_ai_decision:   d.ai_decision,
+        old_ai_confidence: d.ai_confidence ?? null,
+      });
+      if (agreementArticles.length >= 50) break;
     }
   }
 
@@ -89,6 +139,7 @@ export default async function SimulatePage({ searchParams }: Props) {
       baseVersion={run.base_version}
       initialPrompt={run.improved_prompt ?? ""}
       disagreements={disagreements}
+      agreementArticles={agreementArticles}
     />
   );
 }

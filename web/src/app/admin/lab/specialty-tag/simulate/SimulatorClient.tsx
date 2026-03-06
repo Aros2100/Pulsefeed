@@ -15,6 +15,15 @@ export interface SimulationDisagreement {
   disagreement_reason: string | null;
 }
 
+export interface SimulationAgreement {
+  article_id: string;
+  title: string;
+  journal_title: string | null;
+  human_decision: string;
+  old_ai_decision: string;
+  old_ai_confidence: number | null;
+}
+
 interface SimResult {
   decision: string;
   confidence: number;
@@ -28,9 +37,11 @@ interface Props {
   baseVersion: string;
   initialPrompt: string;
   disagreements: SimulationDisagreement[];
+  agreementArticles: SimulationAgreement[];
 }
 
-type Filter = "all" | "fixed" | "wrong";
+type Filter    = "all" | "fixed" | "wrong";
+type RegFilter = "all" | "ok" | "regression";
 
 // ── SSE helper ─────────────────────────────────────────────────────────────────
 
@@ -99,12 +110,13 @@ function DecisionBadge({ decision, confidence }: { decision: string; confidence?
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function SimulatorClient({
-  runId,
+  runId: _runId,
   specialty,
   module,
   baseVersion,
   initialPrompt,
   disagreements,
+  agreementArticles,
 }: Props) {
   // ── Prompt state ─────────────────────────────────────────────────────────
   const [promptText, setPromptText] = useState(initialPrompt);
@@ -113,11 +125,13 @@ export default function SimulatorClient({
   const [simRunning,  setSimRunning]  = useState(false);
   const [simProgress, setSimProgress] = useState<{ scored: number; total: number } | null>(null);
   const [simResults,  setSimResults]  = useState<Map<string, SimResult> | null>(null);
+  const [regResults,  setRegResults]  = useState<Map<string, SimResult> | null>(null);
   const [simDone,     setSimDone]     = useState(false);
   const [simError,    setSimError]    = useState<string | null>(null);
 
   // ── Filter state ──────────────────────────────────────────────────────────
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter,    setFilter]    = useState<Filter>("all");
+  const [regFilter, setRegFilter] = useState<RegFilter>("all");
 
   // ── Save state ────────────────────────────────────────────────────────────
   const [saving,       setSaving]       = useState(false);
@@ -132,38 +146,72 @@ export default function SimulatorClient({
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   async function handleSimulate() {
-    if (simRunning || disagreements.length === 0) return;
+    if (simRunning) return;
+    const totalArticles = disagreements.length + agreementArticles.length;
+    if (totalArticles === 0) return;
+
     setSimRunning(true);
     setSimError(null);
     setSimResults(null);
+    setRegResults(null);
     setSimDone(false);
-    setSimProgress({ scored: 0, total: disagreements.length });
+    setSimProgress({ scored: 0, total: totalArticles });
 
-    const newResults = new Map<string, SimResult>();
+    const newResults    = new Map<string, SimResult>();
+    const newRegResults = new Map<string, SimResult>();
+
     try {
-      await consumeSSE(
-        "/api/lab/simulate-prompt",
-        { specialty, prompt: promptText, article_ids: disagreements.map((d) => d.article_id) },
-        (data) => {
-          if (data.article_id && data.decision !== undefined) {
-            newResults.set(data.article_id as string, {
-              decision:   data.decision   as string,
-              confidence: (data.confidence as number) ?? 0,
-              reason:     (data.reason    as string | null) ?? null,
-            });
+      // Phase 1: Score disagreements (error correction)
+      if (disagreements.length > 0) {
+        await consumeSSE(
+          "/api/lab/simulate-prompt",
+          { specialty, prompt: promptText, article_ids: disagreements.map((d) => d.article_id) },
+          (data) => {
+            if (data.article_id && data.decision !== undefined) {
+              newResults.set(data.article_id as string, {
+                decision:   data.decision   as string,
+                confidence: (data.confidence as number) ?? 0,
+                reason:     (data.reason    as string | null) ?? null,
+              });
+            }
+            if (data.scored !== undefined) {
+              setSimProgress({
+                scored: data.scored as number,
+                total:  totalArticles,
+              });
+            }
           }
-          if (data.scored !== undefined) {
-            setSimProgress({
-              scored: data.scored as number,
-              total:  (data.total as number) ?? disagreements.length,
-            });
+        );
+      }
+
+      setSimResults(new Map(newResults));
+
+      // Phase 2: Score agreement sample (regression test)
+      if (agreementArticles.length > 0) {
+        const phase1Count = disagreements.length;
+        await consumeSSE(
+          "/api/lab/simulate-prompt",
+          { specialty, prompt: promptText, article_ids: agreementArticles.map((d) => d.article_id) },
+          (data) => {
+            if (data.article_id && data.decision !== undefined) {
+              newRegResults.set(data.article_id as string, {
+                decision:   data.decision   as string,
+                confidence: (data.confidence as number) ?? 0,
+                reason:     (data.reason    as string | null) ?? null,
+              });
+            }
+            if (data.scored !== undefined) {
+              setSimProgress({
+                scored: phase1Count + (data.scored as number),
+                total:  totalArticles,
+              });
+            }
           }
-          if (data.done) {
-            setSimResults(new Map(newResults));
-            setSimDone(true);
-          }
-        }
-      );
+        );
+      }
+
+      setRegResults(new Map(newRegResults));
+      setSimDone(true);
     } catch (e) {
       setSimError(String(e));
     } finally {
@@ -173,11 +221,13 @@ export default function SimulatorClient({
 
   function handleDiscard() {
     setSimResults(null);
+    setRegResults(null);
     setSimDone(false);
     setSimProgress(null);
     setSimError(null);
     setSaveError(null);
     setFilter("all");
+    setRegFilter("all");
     setPromptText(initialPrompt);
   }
 
@@ -241,11 +291,26 @@ export default function SimulatorClient({
     return { fixed, total, newAccuracy };
   })() : null;
 
+  const regressionSummary = (simDone && regResults && agreementArticles.length > 0) ? (() => {
+    const regressions = agreementArticles.filter(
+      (d) => regResults.get(d.article_id)?.decision !== d.human_decision
+    ).length;
+    return { regressions, total: agreementArticles.length };
+  })() : null;
+
   const filteredRows = disagreements.filter((d) => {
     if (!simResults || filter === "all") return true;
     const fixed = simResults.get(d.article_id)?.decision === d.human_decision;
     return filter === "fixed" ? fixed : !fixed;
   });
+
+  const filteredRegRows = agreementArticles.filter((d) => {
+    if (!regResults || regFilter === "all") return true;
+    const isRegression = regResults.get(d.article_id)?.decision !== d.human_decision;
+    return regFilter === "regression" ? isRegression : !isRegression;
+  });
+
+  const isDisabled = simRunning || (disagreements.length === 0 && agreementArticles.length === 0);
 
   // ── Styles ────────────────────────────────────────────────────────────────
 
@@ -305,7 +370,7 @@ export default function SimulatorClient({
             Simuler forbedret prompt
           </h1>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
-            Baseret på analyse af {specialty} · {baseVersion} · Kør simulation mod {disagreements.length} uenigheder
+            Baseret på analyse af {specialty} · {baseVersion} · {disagreements.length} uenigheder + {agreementArticles.length} regressionstest
           </p>
         </div>
 
@@ -319,13 +384,13 @@ export default function SimulatorClient({
                 <button
                   type="button"
                   onClick={handleSimulate}
-                  disabled={simRunning || disagreements.length === 0}
+                  disabled={isDisabled}
                   style={{
                     fontSize: "12px", fontWeight: 700,
-                    background: (simRunning || disagreements.length === 0) ? "#f0f2f5" : "#1a1a1a",
-                    color:      (simRunning || disagreements.length === 0) ? "#aaa"    : "#fff",
+                    background: isDisabled ? "#f0f2f5" : "#1a1a1a",
+                    color:      isDisabled ? "#aaa"    : "#fff",
                     border: "none", borderRadius: "6px", padding: "5px 14px",
-                    cursor: (simRunning || disagreements.length === 0) ? "not-allowed" : "pointer",
+                    cursor: isDisabled ? "not-allowed" : "pointer",
                     display: "inline-flex", alignItems: "center", gap: "6px",
                   }}
                 >
@@ -376,9 +441,18 @@ export default function SimulatorClient({
             </div>
           )}
 
-          {/* ── Results table ── */}
-          {simDone && simResults && (
+          {/* ── Section 1: Fejlrettelse ── */}
+          {simDone && simResults && disagreements.length > 0 && (
             <div style={cardStyle}>
+              <div style={headerStyle}>
+                <span style={sectionLabelStyle}>Sektion 1 · Fejlrettelse</span>
+                {summary && (
+                  <span style={{ fontSize: "12px", color: "#5a6a85" }}>
+                    {summary.fixed} / {summary.total} rettet
+                  </span>
+                )}
+              </div>
+
               {/* Filter bar */}
               <div style={{
                 padding: "12px 24px", borderBottom: "1px solid #e8ecf1",
@@ -432,7 +506,6 @@ export default function SimulatorClient({
                       const fixed = sim?.decision === d.human_decision;
                       return (
                         <tr key={d.article_id} style={{ background: i % 2 === 1 ? "#fafafa" : "#fff" }}>
-                          {/* Titel */}
                           <td style={{ ...tdStyle, maxWidth: "280px" }}>
                             <a
                               href={`/articles/${d.article_id}`}
@@ -448,18 +521,12 @@ export default function SimulatorClient({
                               {d.title}
                             </a>
                           </td>
-
-                          {/* Journal */}
                           <td style={{ ...tdStyle, color: "#5a6a85" }}>
                             {d.journal_title ?? <span style={{ color: "#ccc" }}>—</span>}
                           </td>
-
-                          {/* Human */}
                           <td style={tdStyle}>
                             <DecisionBadge decision={d.human_decision} />
                           </td>
-
-                          {/* Gammel AI */}
                           <td style={tdStyle}>
                             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                               <DecisionBadge decision={d.old_ai_decision} confidence={d.old_ai_confidence} />
@@ -470,8 +537,6 @@ export default function SimulatorClient({
                               )}
                             </div>
                           </td>
-
-                          {/* Ny AI */}
                           <td style={tdStyle}>
                             {sim ? (
                               <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -486,8 +551,6 @@ export default function SimulatorClient({
                               <span style={{ color: "#aaa" }}>—</span>
                             )}
                           </td>
-
-                          {/* Rettet? */}
                           <td style={{ ...tdStyle, textAlign: "center" }}>
                             {sim ? (
                               <span style={{
@@ -509,38 +572,185 @@ export default function SimulatorClient({
             </div>
           )}
 
+          {/* ── Section 2: Regressionstest ── */}
+          {simDone && regResults && agreementArticles.length > 0 && (
+            <div style={cardStyle}>
+              <div style={headerStyle}>
+                <span style={sectionLabelStyle}>Sektion 2 · Regressionstest</span>
+                {regressionSummary && (
+                  <span style={{ fontSize: "12px", color: "#5a6a85" }}>
+                    {regressionSummary.regressions} regression{regressionSummary.regressions !== 1 ? "er" : ""} / {regressionSummary.total}
+                  </span>
+                )}
+              </div>
+
+              {/* Filter bar */}
+              <div style={{
+                padding: "12px 24px", borderBottom: "1px solid #e8ecf1",
+                display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap",
+              }}>
+                <span style={{ fontSize: "12px", color: "#5a6a85", fontWeight: 600, marginRight: "4px" }}>Filter:</span>
+                {(["all", "ok", "regression"] as RegFilter[]).map((f) => {
+                  const labels: Record<RegFilter, string> = {
+                    all:        "Alle",
+                    ok:         "Kun OK ✅",
+                    regression: "Kun regressioner ❌",
+                  };
+                  return (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setRegFilter(f)}
+                      style={{
+                        fontSize: "12px", fontWeight: regFilter === f ? 700 : 500,
+                        background: regFilter === f ? "#1a1a1a" : "#f0f2f5",
+                        color:      regFilter === f ? "#fff"    : "#5a6a85",
+                        border: "none", borderRadius: "6px", padding: "4px 12px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {labels[f]}
+                    </button>
+                  );
+                })}
+                <span style={{ marginLeft: "auto", fontSize: "12px", color: "#888" }}>
+                  {filteredRegRows.length} artikel{filteredRegRows.length !== 1 ? "er" : ""}
+                </span>
+              </div>
+
+              {/* Table */}
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ ...thStyle, minWidth: "220px" }}>Titel</th>
+                      <th style={{ ...thStyle, minWidth: "120px" }}>Journal</th>
+                      <th style={{ ...thStyle, minWidth: "90px" }}>Human</th>
+                      <th style={{ ...thStyle, minWidth: "160px" }}>Gammel AI</th>
+                      <th style={{ ...thStyle, minWidth: "160px" }}>Ny AI</th>
+                      <th style={{ ...thStyle, minWidth: "120px", textAlign: "center" }}>Regression?</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRegRows.map((d, i) => {
+                      const sim          = regResults.get(d.article_id);
+                      const isRegression = sim?.decision !== d.human_decision;
+                      return (
+                        <tr key={d.article_id} style={{ background: i % 2 === 1 ? "#fafafa" : "#fff" }}>
+                          <td style={{ ...tdStyle, maxWidth: "280px" }}>
+                            <a
+                              href={`/articles/${d.article_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                fontWeight: 500, lineHeight: 1.4, display: "block", marginBottom: "2px",
+                                color: "inherit", textDecoration: "none",
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                              onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                            >
+                              {d.title}
+                            </a>
+                          </td>
+                          <td style={{ ...tdStyle, color: "#5a6a85" }}>
+                            {d.journal_title ?? <span style={{ color: "#ccc" }}>—</span>}
+                          </td>
+                          <td style={tdStyle}>
+                            <DecisionBadge decision={d.human_decision} />
+                          </td>
+                          <td style={tdStyle}>
+                            <DecisionBadge decision={d.old_ai_decision} confidence={d.old_ai_confidence} />
+                          </td>
+                          <td style={tdStyle}>
+                            {sim ? (
+                              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                <DecisionBadge decision={sim.decision} confidence={sim.confidence} />
+                                {sim.reason && (
+                                  <div style={{ fontSize: "11px", color: "#888", lineHeight: 1.4, fontStyle: "italic" }}>
+                                    {sim.reason}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ color: "#aaa" }}>—</span>
+                            )}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: "center" }}>
+                            {sim ? (
+                              <span style={{
+                                fontSize: "12px", fontWeight: 700,
+                                color: isRegression ? "#b91c1c" : "#15803d",
+                              }}>
+                                {isRegression ? "❌ Regression" : "✅ OK"}
+                              </span>
+                            ) : (
+                              <span style={{ color: "#aaa" }}>—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* ── Summary bar ── */}
-          {simDone && summary && (
+          {simDone && (summary ?? regressionSummary) && (
             <div style={{
               background: "#fff", borderRadius: "10px",
               boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
               padding: "16px 24px",
-              display: "flex", gap: "32px", flexWrap: "wrap", alignItems: "center",
+              display: "flex", flexDirection: "column", gap: "16px",
             }}>
-              <div>
-                <div style={{ fontSize: "11px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "3px" }}>
-                  Uenigheder rettet
-                </div>
-                <div style={{ fontSize: "18px", fontWeight: 700, color: "#1a1a1a" }}>
-                  {summary.fixed} / {summary.total}
-                </div>
+              <div style={{ display: "flex", gap: "32px", flexWrap: "wrap", alignItems: "center" }}>
+                {summary && (
+                  <>
+                    <div>
+                      <div style={{ fontSize: "11px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "3px" }}>
+                        Fejl rettet
+                      </div>
+                      <div style={{ fontSize: "18px", fontWeight: 700, color: "#1a1a1a" }}>
+                        {summary.fixed} / {summary.total}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "11px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "3px" }}>
+                        Ny nøjagtighed
+                      </div>
+                      <div style={{ fontSize: "18px", fontWeight: 700, color: summary.newAccuracy >= 50 ? "#15803d" : "#b91c1c" }}>
+                        {summary.newAccuracy}%
+                      </div>
+                    </div>
+                  </>
+                )}
+                {regressionSummary && (
+                  <div>
+                    <div style={{ fontSize: "11px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "3px" }}>
+                      Regressioner
+                    </div>
+                    <div style={{ fontSize: "18px", fontWeight: 700, color: regressionSummary.regressions > 5 ? "#b91c1c" : "#15803d" }}>
+                      {regressionSummary.regressions} / {regressionSummary.total}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div>
-                <div style={{ fontSize: "11px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "3px" }}>
-                  Ny nøjagtighed
+
+              {/* Regression warning/success banner */}
+              {regressionSummary && (
+                <div style={{
+                  borderRadius: "7px", padding: "10px 14px",
+                  background: regressionSummary.regressions > 5 ? "#fef2f2" : "#f0fdf4",
+                  border: `1px solid ${regressionSummary.regressions > 5 ? "#fecaca" : "#bbf7d0"}`,
+                  fontSize: "13px", fontWeight: 600,
+                  color: regressionSummary.regressions > 5 ? "#b91c1c" : "#15803d",
+                }}>
+                  {regressionSummary.regressions > 5
+                    ? `⚠️ Advarsel: den nye prompt introducerer regressioner (${regressionSummary.regressions} af ${regressionSummary.total})`
+                    : "✅ Ingen væsentlige regressioner"}
                 </div>
-                <div style={{ fontSize: "18px", fontWeight: 700, color: summary.newAccuracy >= 50 ? "#15803d" : "#b91c1c" }}>
-                  {summary.newAccuracy}%
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: "11px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "3px" }}>
-                  Forbedring vs. {baseVersion}
-                </div>
-                <div style={{ fontSize: "18px", fontWeight: 700, color: summary.newAccuracy > 0 ? "#15803d" : "#b91c1c" }}>
-                  {summary.newAccuracy > 0 ? "+" : ""}{summary.newAccuracy} pp
-                </div>
-              </div>
+              )}
             </div>
           )}
 
