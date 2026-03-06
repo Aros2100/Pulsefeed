@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 import ImportDashboardActions from "./ImportDashboardActions";
+import SystemNav from "../SystemNav";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -142,6 +143,7 @@ export default async function ImportDashboardPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
+      <SystemNav />
       <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
         {/* Breadcrumb */}
