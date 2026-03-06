@@ -148,7 +148,7 @@ export default function PromptSection({ versions, specialty, module, totalDisagr
     return v.accuracy > activeVersion.accuracy;
   }
 
-  const hasSufficientData = totalDisagreements >= 50;
+  const hasSufficientData = totalDisagreements >= 100;
 
   // ── Styles ────────────────────────────────────────────────────────────────
 
@@ -173,7 +173,7 @@ export default function PromptSection({ versions, specialty, module, totalDisagr
             </button>
           ) : (
             <span
-              title={`Need at least 50 disagreements first (${totalDisagreements} so far)`}
+              title={`Need at least 100 disagreements first (${totalDisagreements} so far)`}
               style={{ fontSize: "12px", fontWeight: 700, background: "#e2e8f0", color: "#94a3b8", borderRadius: "6px", padding: "5px 13px", cursor: "not-allowed" }}
             >
               + Tilføj ny version
@@ -185,7 +185,7 @@ export default function PromptSection({ versions, specialty, module, totalDisagr
         <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "7px", padding: "9px 14px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#dc2626", flexShrink: 0, display: "inline-block" }} />
           <span style={{ fontSize: "12px", color: "#b91c1c" }}>
-            Need at least 50 disagreements before optimizing the prompt ({totalDisagreements} so far)
+            Need at least 100 disagreements before optimizing the prompt ({totalDisagreements} so far)
           </span>
         </div>
       )}

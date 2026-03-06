@@ -67,13 +67,10 @@ export default async function OptimizePage() {
   const latestRun     = (latestRunRes.data ?? null) as OptimizationRun | null;
 
   const versionSuffix = activeModelVersion ? ` · ${activeModelVersion}` : "";
-  const hasSufficientData = totalDisagree >= 50;
-  const dataBanner =
-    totalDisagree < 50
-      ? { bg: "#fef2f2", border: "#fecaca", dot: "#dc2626", text: "#b91c1c", msg: `Insufficient data — need at least 50 disagreements to identify reliable trends (${totalDisagree} so far${versionSuffix})` }
-      : totalDisagree < 100
-      ? { bg: "#fefce8", border: "#fde68a", dot: "#d97706", text: "#92400e", msg: `Limited data — trends may not be fully representative (${totalDisagree} disagreements${versionSuffix})` }
-      : { bg: "#f0fdf4", border: "#bbf7d0", dot: "#15803d", text: "#14532d", msg: `Sufficient data for reliable trend analysis (${totalDisagree} disagreements${versionSuffix})` };
+  const hasSufficientData = totalDisagree >= 100;
+  const dataBanner = totalDisagree < 100
+    ? { bg: "#fef2f2", border: "#fecaca", dot: "#dc2626", text: "#b91c1c", msg: `Insufficient data — need at least 100 disagreements to identify reliable trends (${totalDisagree} so far${versionSuffix})` }
+    : { bg: "#f0fdf4", border: "#bbf7d0", dot: "#15803d", text: "#14532d", msg: `Sufficient data for reliable trend analysis (${totalDisagree} disagreements${versionSuffix})` };
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
