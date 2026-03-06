@@ -116,105 +116,122 @@ export async function runImportCircle2(
   }
 
   try {
-    // 2. Build combined query
-    const terms = sources.map((s) => s.value);
-    const query = buildAffiliationQuery(terms);
-    const maxResults = Math.max(...sources.map((s) => s.max_results ?? 100));
+    // Track PMIDs seen across all source iterations to avoid double-importing
+    const seenPmids = new Set<string>();
 
-    await sleep(RATE_LIMIT_MS);
+    // Pre-load existing pubmed_ids from DB once (used for cross-source dedup)
+    // We'll refresh per-source to catch articles inserted in earlier iterations.
 
-    // 3. ESearch
-    const pmids = await fetchPubMedIds(query, maxResults);
-    totalFetched = pmids.length;
+    // 2–7. Loop per source so each article gets its source_id populated
+    for (const source of sources) {
+      const query = buildAffiliationQuery([source.value]);
+      const maxResults = source.max_results ?? 100;
 
-    if (pmids.length > 0) {
-      // 4. Deduplicate
+      await sleep(RATE_LIMIT_MS);
+
+      // 3. ESearch for this source
+      const pmids = await fetchPubMedIds(query, maxResults);
+      totalFetched += pmids.length;
+
+      if (pmids.length === 0) continue;
+
+      // 4. Deduplicate — against DB and already-seen PMIDs from earlier sources
+      const unseenPmids = pmids.filter((id) => !seenPmids.has(id));
+      if (unseenPmids.length === 0) {
+        totalSkipped += pmids.length;
+        continue;
+      }
+
       const { data: existing } = await admin
         .from("articles")
         .select("pubmed_id")
-        .in("pubmed_id", pmids);
+        .in("pubmed_id", unseenPmids);
       const existingSet = new Set(existing?.map((r) => r.pubmed_id) ?? []);
-      const newPmids = pmids.filter((id) => !existingSet.has(id));
-      totalSkipped = pmids.length - newPmids.length;
+      const newPmids = unseenPmids.filter((id) => !existingSet.has(id));
+      totalSkipped += pmids.length - newPmids.length;
 
-      if (newPmids.length > 0) {
-        // 5. EFetch
-        const articles = await fetchArticleDetails(newPmids);
+      // Mark all as seen (including already-existing) so later sources skip them
+      for (const id of unseenPmids) seenPmids.add(id);
 
-        // 6 + 7. Upsert + link authors
-        for (let i = 0; i < articles.length; i += BATCH_SIZE) {
-          const batch = articles.slice(i, i + BATCH_SIZE).map((a) => ({
-            pubmed_id:         a.pubmedId,
-            doi:               a.doi,
-            pmc_id:            a.pmcId,
-            title:             a.title,
-            abstract:          a.abstract,
-            language:          a.language,
-            publication_types: a.publicationTypes,
-            mesh_terms:        a.meshTerms        as unknown as Json,
-            keywords:          a.keywords,
-            coi_statement:     a.coiStatement,
-            grants:            a.grants           as unknown as Json,
-            substances:        a.substances       as unknown as Json,
-            journal_abbr:      a.journalAbbr,
-            journal_title:     a.journalTitle,
-            published_year:    a.publishedYear,
-            published_date:    a.publishedDate,
-            date_completed:    a.dateCompleted,
-            volume:            a.volume,
-            issue:             a.issue,
-            authors:           a.authors          as unknown as Json,
-            article_number:    a.articleNumber,
-            pubmed_date:       a.pubmedDate,
-            pubmed_indexed_at: a.pubmedIndexedAt,
-            issn_electronic:   a.issnElectronic,
-            issn_print:        a.issnPrint,
-            specialty_tags:    [specialty],
-            circle:            2,
-            verified:          false,
-            status:            "pending",
-          }));
+      if (newPmids.length === 0) continue;
 
-          // ON CONFLICT (pubmed_id) DO NOTHING — never overwrite status/verified/specialty_tags
-          const { data: upsertedRows, error: upsertErr } = await admin
-            .from("articles")
-            .upsert(batch, { onConflict: "pubmed_id", ignoreDuplicates: true })
-            .select("id, pubmed_id");
+      // 5. EFetch
+      const articles = await fetchArticleDetails(newPmids);
 
-          if (upsertErr) {
-            errors.push(`Upsert batch error: ${upsertErr.message}`);
-          } else {
-            totalImported += batch.length;
-            totalAuthorSlots += batch.reduce((sum, a) => {
-              const authors = (a.authors as unknown as unknown[]) ?? [];
-              return sum + authors.length;
-            }, 0);
+      // 6 + 7. Upsert + link authors
+      for (let i = 0; i < articles.length; i += BATCH_SIZE) {
+        const batch = articles.slice(i, i + BATCH_SIZE).map((a) => ({
+          pubmed_id:         a.pubmedId,
+          doi:               a.doi,
+          pmc_id:            a.pmcId,
+          title:             a.title,
+          abstract:          a.abstract,
+          language:          a.language,
+          publication_types: a.publicationTypes,
+          mesh_terms:        a.meshTerms        as unknown as Json,
+          keywords:          a.keywords,
+          coi_statement:     a.coiStatement,
+          grants:            a.grants           as unknown as Json,
+          substances:        a.substances       as unknown as Json,
+          journal_abbr:      a.journalAbbr,
+          journal_title:     a.journalTitle,
+          published_year:    a.publishedYear,
+          published_date:    a.publishedDate,
+          date_completed:    a.dateCompleted,
+          volume:            a.volume,
+          issue:             a.issue,
+          authors:           a.authors          as unknown as Json,
+          article_number:    a.articleNumber,
+          pubmed_date:       a.pubmedDate,
+          pubmed_indexed_at: a.pubmedIndexedAt,
+          issn_electronic:   a.issnElectronic,
+          issn_print:        a.issnPrint,
+          specialty_tags:    [specialty],
+          circle:            2,
+          verified:          false,
+          status:            "pending",
+          source_id:         source.id,
+        }));
 
-            // Fire-and-forget — logArticleEvent catches its own errors
-            void Promise.all(
-              (upsertedRows ?? []).map((row) =>
-                logArticleEvent(row.id, "imported", {
-                  circle: 2,
-                  status: "pending",
-                  specialty_tags: [specialty],
-                  pubmed_id: row.pubmed_id,
-                  import_log_id: logId,
-                })
-              )
-            );
-          }
+        // ON CONFLICT (pubmed_id) DO NOTHING — never overwrite status/verified/specialty_tags
+        const { data: upsertedRows, error: upsertErr } = await admin
+          .from("articles")
+          .upsert(batch, { onConflict: "pubmed_id", ignoreDuplicates: true })
+          .select("id, pubmed_id");
 
-          if (i + BATCH_SIZE < articles.length) await sleep(RATE_LIMIT_MS);
+        if (upsertErr) {
+          errors.push(`Upsert batch error (source ${source.id}): ${upsertErr.message}`);
+        } else {
+          totalImported += batch.length;
+          totalAuthorSlots += batch.reduce((sum, a) => {
+            const authors = (a.authors as unknown as unknown[]) ?? [];
+            return sum + authors.length;
+          }, 0);
+
+          // Fire-and-forget — logArticleEvent catches its own errors
+          void Promise.all(
+            (upsertedRows ?? []).map((row) =>
+              logArticleEvent(row.id, "imported", {
+                circle:        2,
+                status:        "pending",
+                specialty_tags: [specialty],
+                pubmed_id:     row.pubmed_id,
+                import_log_id: logId,
+                source_id:     source.id,
+              })
+            )
+          );
         }
-      }
-    }
 
-    // 8. Update last_run_at for all affiliation sources
-    await admin
-      .from("circle_2_sources")
-      .update({ last_run_at: new Date().toISOString() })
-      .eq("specialty", specialty)
-      .eq("type", "affiliation");
+        if (i + BATCH_SIZE < articles.length) await sleep(RATE_LIMIT_MS);
+      }
+
+      // Update last_run_at for this source
+      await admin
+        .from("circle_2_sources")
+        .update({ last_run_at: new Date().toISOString() })
+        .eq("id", source.id);
+    }
 
   } catch (err) {
     errors.push(err instanceof Error ? err.message : String(err));

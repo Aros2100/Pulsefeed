@@ -126,7 +126,20 @@ export async function runImportCircle3(
 
       if (newPmids.length > 0) {
         // 5. EFetch
-        const articles = await fetchArticleDetails(newPmids);
+        const fetched = await fetchArticleDetails(newPmids);
+
+        // 5b. Verify neurosurgical affiliation locally — PubMed [AD] matching is
+        //     not always precise. Only keep articles where at least one author's
+        //     affiliation string contains "neurosurg" (case-insensitive).
+        const articles = fetched.filter((a) =>
+          (a.authors as Array<{ affiliation?: string | null }>)
+            .some((au) => /neurosurg/i.test(au.affiliation ?? ""))
+        );
+        const filteredOut = fetched.length - articles.length;
+        if (filteredOut > 0) {
+          totalSkipped += filteredOut;
+          console.log(`[import-circle3] Filtered ${filteredOut} articles with no neurosurgical affiliation`);
+        }
 
         // 6 + 7. Upsert + log events
         for (let i = 0; i < articles.length; i += BATCH_SIZE) {
