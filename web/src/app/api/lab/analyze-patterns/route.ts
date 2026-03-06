@@ -132,7 +132,6 @@ Respond in JSON only — no markdown, no backticks:
           specialty,
           module,
           base_version:        activePrompt.version,
-          base_prompt_text:    activePrompt.prompt,
           total_decisions:     rows.length,
           fp_count:            falsePositives.length,
           fn_count:            falseNegatives.length,

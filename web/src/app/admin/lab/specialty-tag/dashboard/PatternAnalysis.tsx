@@ -9,7 +9,6 @@ import type { PatternAnalysisResult } from "@/app/api/lab/analyze-patterns/route
 export interface OptimizationRun {
   id: string;
   base_version: string;
-  base_prompt_text: string | null;
   total_decisions: number | null;
   fp_count: number | null;
   fn_count: number | null;
@@ -37,7 +36,7 @@ function runToResult(run: OptimizationRun): PatternAnalysisResult {
     false_negative_patterns: run.fn_patterns ?? [],
     recommended_changes:     run.recommended_changes ?? "",
     improved_prompt:         run.improved_prompt ?? "",
-    current_prompt:          run.base_prompt_text ?? "",
+    current_prompt:          "",
     run_id:                  run.id,
   };
 }

@@ -55,7 +55,7 @@ export default async function OptimizePage() {
 
     admin
       .from("model_optimization_runs" as never)
-      .select("id, base_version, base_prompt_text, total_decisions, fp_count, fn_count, fp_patterns, fn_patterns, recommended_changes, improved_prompt, created_at")
+      .select("id, base_version, total_decisions, fp_count, fn_count, fp_patterns, fn_patterns, recommended_changes, improved_prompt, created_at")
       .eq("specialty", specialty)
       .eq("module", "specialty_tag")
       .order("created_at", { ascending: false })
