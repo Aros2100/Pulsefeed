@@ -136,13 +136,16 @@ function PromptDiff({ oldPrompt, newPrompt }: { oldPrompt: string; newPrompt: st
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function PatternAnalysis({ specialty, module, initialRun, disabled }: Props) {
-  const [loading,  setLoading]  = useState(false);
-  const [result,   setResult]   = useState<PatternAnalysisResult | null>(
+  const [loading,      setLoading]      = useState(false);
+  const [result,       setResult]       = useState<PatternAnalysisResult | null>(
     initialRun ? runToResult(initialRun) : null
   );
-  const [savedRun, setSavedRun] = useState<OptimizationRun | null>(initialRun ?? null);
-  const [runId,    setRunId]    = useState<string | null>(initialRun?.id ?? null);
-  const [error,    setError]    = useState<string | null>(null);
+  const [savedRun,     setSavedRun]     = useState<OptimizationRun | null>(initialRun ?? null);
+  const [runId,        setRunId]        = useState<string | null>(initialRun?.id ?? null);
+  const [error,        setError]        = useState<string | null>(null);
+  const [feedback,     setFeedback]     = useState("");
+  const [refining,     setRefining]     = useState(false);
+  const [refineError,  setRefineError]  = useState<string | null>(null);
 
   const isDisabled = disabled || loading;
   const totalDisagreements = savedRun
@@ -180,6 +183,37 @@ export default function PatternAnalysis({ specialty, module, initialRun, disable
       setError("Netværksfejl — prøv igen");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleRefine() {
+    if (!result || !feedback.trim()) return;
+    setRefining(true);
+    setRefineError(null);
+    try {
+      const res  = await fetch("/api/lab/refine-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          current_prompt: result.improved_prompt,
+          feedback:       feedback.trim(),
+          fp_patterns:    result.false_positive_patterns,
+          fn_patterns:    result.false_negative_patterns,
+          specialty,
+          run_id:         runId,
+        }),
+      });
+      const data = await res.json() as { ok: boolean; error?: string; refined_prompt?: string };
+      if (!data.ok) {
+        setRefineError(data.error ?? "Something went wrong");
+      } else {
+        setResult((prev) => prev ? { ...prev, improved_prompt: data.refined_prompt ?? prev.improved_prompt } : prev);
+        setFeedback("");
+      }
+    } catch {
+      setRefineError("Netværksfejl — prøv igen");
+    } finally {
+      setRefining(false);
     }
   }
 
@@ -302,6 +336,48 @@ export default function PatternAnalysis({ specialty, module, initialRun, disable
                   </pre>
                 )
               }
+            </div>
+
+            {/* Iterative refinement */}
+            <div style={{ borderTop: "1px solid #f0f2f5", paddingTop: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div style={labelStyle}>Din feedback til prompten</div>
+              <textarea
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Fx: 'Godkend TBI-artikler selvom de ikke er kirurgiske' eller 'Vær strengere på ren neurologi'"
+                rows={3}
+                style={{
+                  width: "100%", boxSizing: "border-box",
+                  fontSize: "13px", color: "#1a1a1a", lineHeight: 1.6,
+                  border: "1px solid #dde3ed", borderRadius: "8px",
+                  padding: "10px 12px", resize: "vertical",
+                  fontFamily: "var(--font-inter), Inter, sans-serif",
+                  outline: "none",
+                }}
+              />
+              {refineError && (
+                <div style={{ fontSize: "12px", color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "6px", padding: "8px 12px" }}>
+                  {refineError}
+                </div>
+              )}
+              <div>
+                <button
+                  type="button"
+                  onClick={handleRefine}
+                  disabled={refining || !feedback.trim()}
+                  style={{
+                    fontSize: "12px", fontWeight: 700,
+                    background: refining || !feedback.trim() ? "#f0f2f5" : "#1a1a1a",
+                    color:      refining || !feedback.trim() ? "#aaa"    : "#fff",
+                    border: "none", borderRadius: "6px", padding: "7px 16px",
+                    cursor: refining || !feedback.trim() ? "not-allowed" : "pointer",
+                    display: "inline-flex", alignItems: "center", gap: "6px",
+                  }}
+                >
+                  {refining && <Spinner size={12} />}
+                  {refining ? "Forfiner…" : "Forfin prompt med feedback"}
+                </button>
+              </div>
             </div>
 
             {/* Navigate to simulator */}
