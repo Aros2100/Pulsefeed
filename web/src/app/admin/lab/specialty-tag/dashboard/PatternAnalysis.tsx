@@ -65,7 +65,8 @@ export default function PatternAnalysis({ specialty, module }: Props) {
           AI Mønsteranalyse
         </span>
         <button
-          onClick={() => void handleAnalyze()}
+          type="button"
+          onClick={handleAnalyze}
           disabled={loading}
           style={{
             fontSize: "12px", fontWeight: 700,
