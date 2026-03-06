@@ -1,7 +1,6 @@
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.NEWSLETTER_FROM_EMAIL ?? "PulseFeed <notifications@pulsefeed.dk>";
 
 export interface NotificationPayload {
@@ -35,6 +34,7 @@ export async function sendNotification(payload: NotificationPayload) {
   const { data: { user } } = await admin.auth.admin.getUserById(userId);
   if (!user?.email) return;
 
+  const resend = new Resend(process.env.RESEND_API_KEY);
   const htmlBody = `
     <div style="font-family:Inter,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#f5f7fa">
       <div style="background:#fff;border-radius:10px;padding:28px;box-shadow:0 1px 3px rgba(0,0,0,0.07)">
