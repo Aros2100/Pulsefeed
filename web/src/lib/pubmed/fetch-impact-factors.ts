@@ -97,7 +97,7 @@ export async function runImpactFactorFetch(limit = 500): Promise<{ updated: numb
         impact_factor:            factor,
         journal_h_index:          hIndex,
         impact_factor_fetched_at: new Date().toISOString(),
-      })
+      } as never)
       .in("id", articleIds);
 
     if (updateError) {

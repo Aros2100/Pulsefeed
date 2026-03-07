@@ -71,7 +71,7 @@ export async function runCitationFetch(limit = 500): Promise<{ updated: number; 
       .update({
         citation_count:       count,
         citations_fetched_at: new Date().toISOString(),
-      })
+      } as never)
       .eq("id", row.id);
 
     if (updateError) {
