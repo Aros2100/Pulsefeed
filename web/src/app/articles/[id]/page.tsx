@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Header from "@/components/Header";
-import ArticleStamkort from "@/components/articles/ArticleStamkort";
+import ArticleStamkort, { type ArticleData } from "@/components/articles/ArticleStamkort";
 import SidebarNav from "./SidebarNav";
 import SaveButton from "@/components/SaveButton";
 import ArticleViewTracker from "./ArticleViewTracker";
@@ -77,7 +77,7 @@ export default async function ArticleDetailPage({
             />
           </div>
 
-          <ArticleStamkort article={article} />
+          <ArticleStamkort article={article as unknown as ArticleData} />
         </main>
       </div>
     </div>
