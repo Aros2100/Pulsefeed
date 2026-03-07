@@ -41,7 +41,9 @@ export default async function FollowingPage() {
       .in("id", authorIds);
 
     if (data) {
-      const map = Object.fromEntries(data.map((a) => [a.id, a]));
+      type AuthorRow = typeof authors[0];
+      const typedData = data as unknown as AuthorRow[];
+      const map = Object.fromEntries(typedData.map((a) => [a.id, a]));
       authors = authorIds.map((id) => map[id]).filter(Boolean);
     }
   }
