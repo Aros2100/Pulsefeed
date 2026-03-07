@@ -1,6 +1,7 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextRequest, after } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { runImport } from "@/lib/pubmed/importer";
+import { runCitationFetch } from "@/lib/pubmed/fetch-citations";
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
@@ -16,6 +17,10 @@ export async function POST(request: NextRequest) {
 
   // Fire-and-forget — runImport opretter selv import_logs rækker pr. filter
   void runImport(filterId, false, undefined, "manual");
+
+  after(async () => {
+    await runCitationFetch(200);
+  });
 
   return NextResponse.json({ ok: true });
 }

@@ -15,9 +15,10 @@ interface ArticleRow {
   specialty_tags: string[];
   verified: boolean | null;
   abstract: string | null;
+  evidence_score: number | null;
 }
 
-type SortField = "title" | "journal_abbr" | "published_date" | "imported_at" | "circle" | "status" | "verified";
+type SortField = "title" | "journal_abbr" | "published_date" | "imported_at" | "circle" | "status" | "verified" | "evidence_score";
 
 interface Filters {
   search: string;
@@ -168,13 +169,11 @@ export default function AdminArticleListClient() {
   };
 
   const columns: { key: SortField; label: string; sortable?: boolean }[] = [
-    { key: "title",        label: "Titel",       sortable: true },
-    { key: "journal_abbr", label: "Tidsskrift",   sortable: true },
-    { key: "published_date", label: "Publiceret", sortable: true },
-    { key: "imported_at",  label: "Importeret",   sortable: true },
-    { key: "circle",       label: "Circle",       sortable: true },
-    { key: "status",       label: "Status",       sortable: true },
-    { key: "verified",     label: "Verificeret",  sortable: true },
+    { key: "title",          label: "Titel",       sortable: true },
+    { key: "journal_abbr",   label: "Tidsskrift",  sortable: true },
+    { key: "published_date", label: "Publiceret",  sortable: true },
+    { key: "status",         label: "Status",         sortable: true },
+    { key: "evidence_score", label: "Evidence",       sortable: true },
   ];
 
   return (
@@ -356,26 +355,25 @@ export default function AdminArticleListClient() {
                       <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", fontSize: "12px", color: "#5a6a85", whiteSpace: "nowrap" }}>
                         {fmt(a.published_date)}
                       </td>
-                      {/* Imported */}
-                      <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", fontSize: "12px", color: "#5a6a85", whiteSpace: "nowrap" }}>
-                        {fmt(a.imported_at)}
-                      </td>
-                      {/* Circle */}
-                      <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", fontSize: "12px", color: "#5a6a85", whiteSpace: "nowrap" }}>
-                        {a.circle != null ? `C${a.circle}` : "—"}
-                      </td>
                       {/* Status */}
                       <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7" }}>
                         <span style={{ fontSize: "11px", fontWeight: 600, borderRadius: "999px", padding: "2px 8px", background: s.bg, color: s.color }}>
                           {st}
                         </span>
                       </td>
-                      {/* Verified */}
-                      <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", fontSize: "12px", whiteSpace: "nowrap" }}>
-                        {a.verified === true ? (
-                          <span style={{ color: "#15803d", fontWeight: 600 }}>✓</span>
+                      {/* Evidence */}
+                      <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", whiteSpace: "nowrap" }}>
+                        {a.evidence_score != null ? (
+                          <span style={{
+                            display: "inline-block", fontSize: "12px", fontWeight: 700,
+                            borderRadius: "6px", padding: "2px 9px",
+                            background: a.evidence_score >= 70 ? "#f0fdf4" : a.evidence_score >= 40 ? "#fffbeb" : "#fef2f2",
+                            color:      a.evidence_score >= 70 ? "#15803d" : a.evidence_score >= 40 ? "#d97706" : "#b91c1c",
+                          }}>
+                            {a.evidence_score}
+                          </span>
                         ) : (
-                          <span style={{ color: "#ccc" }}>—</span>
+                          <span style={{ color: "#ccc", fontSize: "12px" }}>—</span>
                         )}
                       </td>
                     </tr>

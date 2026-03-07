@@ -248,15 +248,20 @@ export default async function AdminArticleLogPage({
   const [articleResult, eventsResult, authorLinksResult] = await Promise.all([
     admin.from("articles").select("*").eq("id", id).maybeSingle(),
     admin.from("article_events" as never).select("*").eq("article_id", id).order("created_at", { ascending: true }),
-    admin.from("article_authors").select("author_id, position").eq("article_id", id),
+    admin.from("article_authors").select("author_id, position, authors(author_score)").eq("article_id", id),
   ]);
 
   const article = articleResult.data;
   if (!article) notFound();
 
-  // Map position → author_id for linking author names
+  // Map position → author_id and author_score for linking author names + scores
   const authorIdByPosition = new Map(
     (authorLinksResult.data ?? []).map((r) => [r.position as number, r.author_id as string])
+  );
+  const authorScoreByPosition = new Map(
+    (authorLinksResult.data ?? [])
+      .filter((r) => (r as { authors?: { author_score?: number | null } | null }).authors?.author_score != null)
+      .map((r) => [r.position as number, (r as { authors: { author_score: number } }).authors.author_score])
   );
 
   const events = (eventsResult.data ?? []) as {
@@ -270,7 +275,7 @@ export default async function AdminArticleLogPage({
 
   const pubmedTab = (
     <div style={{ padding: "4px 0 80px" }}>
-      <ArticleStamkort article={article} authorIdByPosition={authorIdByPosition} />
+      <ArticleStamkort article={article} authorIdByPosition={authorIdByPosition} authorScoreByPosition={authorScoreByPosition} />
     </div>
   );
 

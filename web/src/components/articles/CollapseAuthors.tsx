@@ -10,6 +10,7 @@ interface Author {
   foreName?: string;
   affiliation?: string | null;
   orcid?: string | null;
+  author_score?: number | null;
 }
 
 const INITIAL_COUNT = 3;
@@ -25,15 +26,26 @@ export default function CollapseAuthors({ authors }: { authors: Author[] }) {
           const name = [a.foreName, a.lastName].filter(Boolean).join(" ") || "—";
           return (
             <li key={i}>
-              {a.id ? (
-                <Link href={`/admin/authors/${a.id}`} style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A", textDecoration: "none", display: "block", marginBottom: "2px" }}>
-                  {name}
-                </Link>
-              ) : (
-                <p style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A", margin: "0 0 2px 0" }}>
-                  {name}
-                </p>
-              )}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "2px" }}>
+                {a.id ? (
+                  <Link href={`/admin/authors/${a.id}`} style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A", textDecoration: "none" }}>
+                    {name}
+                  </Link>
+                ) : (
+                  <span style={{ fontSize: "14px", fontWeight: 700, color: "#1A1A1A" }}>
+                    {name}
+                  </span>
+                )}
+                {a.author_score != null && (
+                  <span style={{
+                    fontSize: "11px", fontWeight: 700, borderRadius: "5px", padding: "1px 6px",
+                    background: a.author_score >= 35 ? "#f0fdf4" : a.author_score >= 15 ? "#fffbeb" : "#fef2f2",
+                    color:      a.author_score >= 35 ? "#15803d" : a.author_score >= 15 ? "#d97706" : "#b91c1c",
+                  }}>
+                    {a.author_score}
+                  </span>
+                )}
+              </div>
               {a.orcid && (
                 <a
                   href={`https://orcid.org/${a.orcid}`}

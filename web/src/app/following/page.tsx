@@ -31,12 +31,13 @@ export default async function FollowingPage() {
     city: string | null;
     country: string | null;
     article_count: number | null;
+    author_score: number | null;
   }[] = [];
 
   if (authorIds.length > 0) {
     const { data } = await supabase
       .from("authors")
-      .select("id, display_name, department, hospital, city, country, article_count")
+      .select("id, display_name, department, hospital, city, country, article_count, author_score")
       .in("id", authorIds);
 
     if (data) {

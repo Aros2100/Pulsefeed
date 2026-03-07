@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 
-const ALLOWED_SORT = ["title", "journal_abbr", "published_date", "imported_at", "circle", "status", "verified"] as const;
+const ALLOWED_SORT = ["title", "journal_abbr", "published_date", "imported_at", "circle", "status", "verified", "evidence_score"] as const;
 
 export async function GET(request: Request) {
   const auth = await requireAdmin();
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 
   let query = admin
     .from("articles")
-    .select("id, title, journal_abbr, published_date, imported_at, authors, status, circle, specialty_tags, verified, abstract", { count: "exact" });
+    .select("id, title, journal_abbr, published_date, imported_at, authors, status, circle, specialty_tags, verified, abstract, evidence_score", { count: "exact" });
 
   if (circle)    query = query.eq("circle", parseInt(circle, 10));
   if (status)    query = query.eq("status", status);

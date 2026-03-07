@@ -6,11 +6,22 @@ import { createClient } from "@/lib/supabase/client";
 
 const PAGE_SIZE = 50;
 
+function AuthorScoreBadge({ score }: { score: number }) {
+  const bg    = score >= 35 ? "#f0fdf4" : score >= 15 ? "#fffbeb" : "#fef2f2";
+  const color = score >= 35 ? "#15803d" : score >= 15 ? "#d97706" : "#b91c1c";
+  return (
+    <span style={{ fontSize: "12px", fontWeight: 700, borderRadius: "6px", padding: "2px 8px", background: bg, color }}>
+      {score}
+    </span>
+  );
+}
+
 interface Author {
   id: string;
   display_name: string;
   affiliations: string[] | null;
   article_count: number | null;
+  author_score: number | null;
 }
 
 export default function AdminAuthorsPage() {
@@ -34,7 +45,8 @@ export default function AdminAuthorsPage() {
 
       let req = supabase
         .from("authors")
-        .select("id, display_name, affiliations, article_count", { count: "exact" })
+        .select("id, display_name, affiliations, article_count, author_score", { count: "exact" })
+        .order("author_score", { ascending: false, nullsFirst: false })
         .order("article_count", { ascending: false, nullsFirst: false })
         .range(from, to);
 
@@ -133,7 +145,10 @@ export default function AdminAuthorsPage() {
                   </div>
                 )}
               </div>
-              <div style={{ marginLeft: "16px", flexShrink: 0 }}>
+              <div style={{ marginLeft: "16px", flexShrink: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                {author.author_score != null && (
+                  <AuthorScoreBadge score={author.author_score} />
+                )}
                 <span style={{
                   fontSize: "12px", fontWeight: 600,
                   color: "#fff", background: "#5a6a85",

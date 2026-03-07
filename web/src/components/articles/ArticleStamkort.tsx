@@ -28,6 +28,10 @@ export interface ArticleData {
   language: string | null;
   issn_electronic: string | null;
   issn_print: string | null;
+  impact_factor:    number | null;
+  journal_h_index:  number | null;
+  citation_count:   number | null;
+  evidence_score:   number | null;
   enriched_at: string | null;
   ai_decision: string | null;
   short_resume: string | null;
@@ -124,7 +128,7 @@ function CardBody({ children }: { children: React.ReactNode }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function ArticleStamkort({ article, authorIdByPosition }: { article: ArticleData; authorIdByPosition?: Map<number, string> }) {
+export default function ArticleStamkort({ article, authorIdByPosition, authorScoreByPosition }: { article: ArticleData; authorIdByPosition?: Map<number, string>; authorScoreByPosition?: Map<number, number> }) {
   const authors   = cast<Author>(article.authors);
   const meshTerms = cast<MeshTerm>(article.mesh_terms);
   const grants    = cast<Grant>(article.grants);
@@ -183,6 +187,54 @@ export default function ArticleStamkort({ article, authorIdByPosition }: { artic
     fr("Imported", importedDisplay),
   ].filter((r): r is FactRow => r !== null);
 
+  function EvidenceScore({ value }: { value: number }) {
+    const pct   = Math.min(100, Math.max(0, value));
+    const color = pct >= 70 ? "#15803d" : pct >= 40 ? "#d97706" : "#E83B2A";
+    const bg    = pct >= 70 ? "#f0fdf4" : pct >= 40 ? "#fffbeb" : "#fef2f2";
+    const label = pct >= 70 ? "Strong" : pct >= 40 ? "Moderate" : "Limited";
+    return (
+      <div style={{
+        display: "flex", alignItems: "center", gap: "16px",
+        background: bg, borderRadius: "8px", padding: "12px 16px",
+        marginBottom: "20px", border: `1px solid ${color}22`,
+      }}>
+        <div style={{ textAlign: "center", minWidth: "56px" }}>
+          <div style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1, color }}>{pct}</div>
+          <div style={{ fontSize: "10px", color: "#888", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: "2px" }}>/ 100</div>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" }}>
+            <span style={{ fontSize: "12px", fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              {label} evidence
+            </span>
+          </div>
+          <div style={{ height: "6px", borderRadius: "3px", background: "#e5e7eb", overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: "3px" }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function ifBadge(value: number): React.ReactNode {
+    const isGold   = value >= 5;
+    const isSilver = value >= 3;
+    const bg     = isGold ? "#fef3c7" : isSilver ? "#f1f5f9" : "#f9fafb";
+    const color  = isGold ? "#92400e" : isSilver ? "#475569" : "#6b7280";
+    const border = isGold ? "#fde68a" : isSilver ? "#cbd5e1" : "#e5e7eb";
+    const label  = isGold ? "Gold" : isSilver ? "Silver" : "Low";
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+        <span style={{ fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px", background: bg, color, border: `1px solid ${border}` }}>
+          {label}
+        </span>
+        <span>{value.toFixed(3)}</span>
+      </span>
+    );
+  }
+
+  const citationsUrl = `https://europepmc.org/search?query=cites:MED:${article.pubmed_id}`;
+
   const factRows2: FactRow[] = [
     article.publication_types?.length
       ? fr("Publication type", article.publication_types[0])
@@ -199,6 +251,14 @@ export default function ArticleStamkort({ article, authorIdByPosition }: { artic
     (article.issn_electronic ?? article.issn_print)
       ? fr("ISSN", article.issn_electronic ?? article.issn_print)
       : null,
+    fr("Impact Factor", article.impact_factor != null ? ifBadge(article.impact_factor) : "—"),
+    fr("H-index", article.journal_h_index != null ? article.journal_h_index : "—"),
+    fr("Citations", (
+      <a href={citationsUrl} target="_blank" rel="noopener noreferrer"
+        style={{ color: "#1a6eb5", textDecoration: "none" }}>
+        {article.citation_count ?? "—"}{article.citation_count != null ? " ↗" : ""}
+      </a>
+    )),
   ].filter((r): r is FactRow => r !== null);
 
   const abstractSections = abstract
@@ -221,6 +281,9 @@ export default function ArticleStamkort({ article, authorIdByPosition }: { artic
       <Card id="facts">
         <CardHeader label="Facts" />
         <CardBody>
+          {article.evidence_score != null && (
+            <EvidenceScore value={article.evidence_score} />
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, fontSize: "14px" }}>
             <div>
               {factRows.map(([label, value]) => (
@@ -350,6 +413,7 @@ export default function ArticleStamkort({ article, authorIdByPosition }: { artic
               ...a,
               affiliation: a.affiliation ? decodeHtml(a.affiliation) : a.affiliation,
               id: authorIdByPosition?.get(i + 1) ?? undefined,
+              author_score: authorScoreByPosition?.get(i + 1) ?? undefined,
             }))} />
           </CardBody>
         </Card>

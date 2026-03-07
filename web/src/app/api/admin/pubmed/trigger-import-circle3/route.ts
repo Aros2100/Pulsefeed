@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { runImportCircle3 } from "@/lib/pubmed/importer-circle3";
+import { runCitationFetch } from "@/lib/pubmed/fetch-citations";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const maxDuration = 300;
@@ -42,6 +43,10 @@ export async function POST() {
 
   after(async () => {
     await runImportCircle3(newLog.id, "manual");
+  });
+
+  after(async () => {
+    await runCitationFetch(200);
   });
 
   return NextResponse.json({ ok: true });

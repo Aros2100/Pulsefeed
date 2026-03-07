@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Header from "@/components/Header";
+import ScoreBadge from "@/components/ScoreBadge";
 
 const PAGE_SIZE = 50;
 
@@ -12,6 +13,7 @@ interface Author {
   display_name: string;
   affiliations: string[] | null;
   article_count: number | null;
+  author_score: number | null;
 }
 
 export default function AuthorsPage() {
@@ -35,7 +37,8 @@ export default function AuthorsPage() {
 
       let req = supabase
         .from("authors")
-        .select("id, display_name, affiliations, article_count", { count: "exact" })
+        .select("id, display_name, affiliations, article_count, author_score", { count: "exact" })
+        .order("author_score", { ascending: false, nullsFirst: false })
         .order("article_count", { ascending: false, nullsFirst: false })
         .range(from, to);
 
@@ -130,7 +133,8 @@ export default function AuthorsPage() {
                   </div>
                 )}
               </div>
-              <div style={{ marginLeft: "16px", flexShrink: 0 }}>
+              <div style={{ marginLeft: "16px", flexShrink: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                {author.author_score != null && <ScoreBadge score={author.author_score} />}
                 <span style={{
                   fontSize: "12px", fontWeight: 600,
                   color: "#fff", background: "#5a6a85",

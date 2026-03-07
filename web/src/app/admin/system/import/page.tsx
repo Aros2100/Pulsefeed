@@ -2,7 +2,6 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 import ImportDashboardActions from "./ImportDashboardActions";
-import SystemNav from "../SystemNav";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -143,7 +142,6 @@ export default async function ImportDashboardPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
-      <SystemNav />
       <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
         {/* Breadcrumb */}
@@ -269,8 +267,9 @@ export default async function ImportDashboardPage() {
           </div>
 
           {/* Linking action */}
-          <div style={{ borderTop: "1px solid #f1f3f7", padding: "16px 28px" }}>
+          <div style={{ borderTop: "1px solid #f1f3f7", padding: "16px 28px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
             <ImportDashboardActions specialtySlugs={specialtySlugs} subset="linking" />
+            <ImportDashboardActions specialtySlugs={specialtySlugs} subset="author-score" />
           </div>
         </div>
 
@@ -308,7 +307,27 @@ export default async function ImportDashboardPage() {
         </div>
 
         {/* ═══════════════════════════════ */}
-        {/* SEKTION 4: QUALITY CHECKS      */}
+        {/* SEKTION 4: CITATIONS           */}
+        {/* ═══════════════════════════════ */}
+        <SectionHeading title="Citations" />
+        <div style={{ ...card, marginBottom: "40px" }}>
+          <div style={{ padding: "24px 28px" }}>
+            <ImportDashboardActions specialtySlugs={specialtySlugs} subset="citations" />
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════ */}
+        {/* SEKTION 5: IMPACT FACTOR       */}
+        {/* ═══════════════════════════════ */}
+        <SectionHeading title="Impact Factor" />
+        <div style={{ ...card, marginBottom: "40px" }}>
+          <div style={{ padding: "24px 28px" }}>
+            <ImportDashboardActions specialtySlugs={specialtySlugs} subset="impact-factor" />
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════ */}
+        {/* SEKTION 6: QUALITY CHECKS      */}
         {/* ═══════════════════════════════ */}
         <SectionHeading title="Quality checks" />
         <div style={card}>

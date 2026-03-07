@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest, after } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { runImportCircle2 } from "@/lib/pubmed/importer-circle2";
+import { runCitationFetch } from "@/lib/pubmed/fetch-citations";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // Allow up to 5 minutes — import kan tage tid ved mange PMIDs
@@ -70,6 +71,10 @@ export async function POST(request: NextRequest) {
   // som fejlagtigt blev dræbt af Vercel inden importen nåede at færdiggøre.
   after(async () => {
     await runImportCircle2(specialty, newLog.id, "manual");
+  });
+
+  after(async () => {
+    await runCitationFetch(200);
   });
 
   return NextResponse.json({ ok: true });

@@ -58,7 +58,28 @@ interface ArticleRow {
     journal_abbr: string | null;
     published_date: string | null;
     news_value: number | null;
+    evidence_score: number | null;
   };
+}
+
+function AuthorScoreBadge({ score }: { score: number }) {
+  const bg    = score >= 35 ? "#f0fdf4" : score >= 15 ? "#fffbeb" : "#fef2f2";
+  const color = score >= 35 ? "#15803d" : score >= 15 ? "#d97706" : "#b91c1c";
+  return (
+    <span style={{ fontSize: "12px", fontWeight: 700, borderRadius: "6px", padding: "2px 8px", background: bg, color }}>
+      {score}
+    </span>
+  );
+}
+
+function EvidenceScoreBadge({ score }: { score: number }) {
+  const bg    = score >= 35 ? "#f0fdf4" : score >= 15 ? "#fffbeb" : "#fef2f2";
+  const color = score >= 35 ? "#15803d" : score >= 15 ? "#d97706" : "#b91c1c";
+  return (
+    <span style={{ fontSize: "11px", fontWeight: 700, borderRadius: "5px", padding: "1px 7px", background: bg, color, flexShrink: 0 }}>
+      {score}
+    </span>
+  );
 }
 
 export default async function AdminAuthorDetailPage({
@@ -71,7 +92,7 @@ export default async function AdminAuthorDetailPage({
 
   const { data: author } = await admin
     .from("authors")
-    .select("id, display_name, article_count, orcid, match_confidence, department, hospital, city, country, affiliations")
+    .select("id, display_name, article_count, orcid, match_confidence, department, hospital, city, country, affiliations, author_score")
     .eq("id", id)
     .single();
 
@@ -79,7 +100,7 @@ export default async function AdminAuthorDetailPage({
 
   const { data: articleRows } = await admin
     .from("article_authors")
-    .select("position, articles(id, title, journal_abbr, published_date, news_value)")
+    .select("position, articles(id, title, journal_abbr, published_date, news_value, evidence_score)")
     .eq("author_id", id)
     .order("position", { ascending: true })
     .limit(100);
@@ -88,7 +109,10 @@ export default async function AdminAuthorDetailPage({
     .map((r) => r.articles)
     .sort((a, b) => (b.published_date ?? "").localeCompare(a.published_date ?? ""));
 
-  const count = author.article_count ?? articles.length;
+  const count       = author.article_count ?? articles.length;
+  const authorScore = (count >= 3 && (author as { author_score?: number | null }).author_score != null)
+    ? Number((author as { author_score: number }).author_score)
+    : null;
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -108,9 +132,12 @@ export default async function AdminAuthorDetailPage({
             <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>
               {author.display_name}
             </h1>
-            <div style={{ fontSize: "13px", color: "#888" }}>
+            <div style={{ fontSize: "13px", color: "#888", marginBottom: authorScore != null ? "10px" : 0 }}>
               {count} article{count !== 1 ? "s" : ""} indexed
             </div>
+            {authorScore != null && (
+              <AuthorScoreBadge score={authorScore} />
+            )}
           </CardBody>
         </Card>
 
@@ -177,21 +204,26 @@ export default async function AdminAuthorDetailPage({
                   key={article.id}
                   href={`/admin/articles/${article.id}`}
                   style={{
-                    display: "block",
+                    display: "flex", alignItems: "center", gap: "12px",
                     padding: "14px 24px",
                     borderTop: i === 0 ? undefined : "1px solid #f0f0f0",
                     textDecoration: "none",
                     color: "inherit",
                   }}
                 >
-                  {meta && (
-                    <div style={{ fontSize: "11px", color: "#888", marginBottom: "4px" }}>
-                      {meta}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {meta && (
+                      <div style={{ fontSize: "11px", color: "#888", marginBottom: "4px" }}>
+                        {meta}
+                      </div>
+                    )}
+                    <div style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a", lineHeight: 1.4 }}>
+                      {article.title}
                     </div>
-                  )}
-                  <div style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a", lineHeight: 1.4 }}>
-                    {article.title}
                   </div>
+                  {article.evidence_score != null && (
+                    <EvidenceScoreBadge score={article.evidence_score} />
+                  )}
                 </Link>
               );
             })

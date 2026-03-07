@@ -1,0 +1,2 @@
+ALTER TABLE articles ADD COLUMN IF NOT EXISTS impact_factor NUMERIC(6,3);
+ALTER TABLE articles ADD COLUMN IF NOT EXISTS impact_factor_fetched_at TIMESTAMPTZ;

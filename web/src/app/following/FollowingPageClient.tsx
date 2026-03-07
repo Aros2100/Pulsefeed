@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import UnfollowButton from "@/components/UnfollowButton";
+import ScoreBadge from "@/components/ScoreBadge";
 
 interface Author {
   id:            string;
@@ -12,6 +13,7 @@ interface Author {
   city:          string | null;
   country:       string | null;
   article_count: number | null;
+  author_score:  number | null;
 }
 
 export default function FollowingPageClient({ initialAuthors }: { initialAuthors: Author[] }) {
@@ -52,7 +54,8 @@ export default function FollowingPageClient({ initialAuthors }: { initialAuthors
               </Link>
               {meta && <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>{meta}</div>}
             </div>
-            <div style={{ marginLeft: "16px", flexShrink: 0 }}>
+            <div style={{ marginLeft: "16px", flexShrink: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+              {author.author_score != null && <ScoreBadge score={author.author_score} />}
               <UnfollowButton authorId={author.id} onUnfollow={() => remove(author.id)} />
             </div>
           </div>

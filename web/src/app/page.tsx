@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 import Header from "@/components/Header";
+import ScoreBadge from "@/components/ScoreBadge";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -92,6 +93,7 @@ export default async function DashboardPage() {
     journal_abbr: string | null;
     published_date: string | null;
     news_value: number | null;
+    evidence_score: number | null;
   };
   type AuthorArticleRow = {
     position: number;
@@ -102,7 +104,7 @@ export default async function DashboardPage() {
   if (profile?.author_id) {
     const { data: pubData } = await supabase
       .from("article_authors")
-      .select("position, articles(id, title, journal_abbr, published_date, news_value)")
+      .select("position, articles(id, title, journal_abbr, published_date, news_value, evidence_score)")
       .eq("author_id", profile.author_id)
       .order("position", { ascending: true })
       .limit(10);
@@ -282,7 +284,8 @@ export default async function DashboardPage() {
                         {[row.articles.journal_abbr, row.articles.published_date?.slice(0, 7)].filter(Boolean).join(" · ")}
                       </div>
                     </div>
-                    <div style={{ marginLeft: "16px", flexShrink: 0 }}>
+                    <div style={{ marginLeft: "16px", flexShrink: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                      {row.articles.evidence_score != null && <ScoreBadge score={row.articles.evidence_score} />}
                       <StarRating value={row.articles.news_value} />
                     </div>
                   </div>
