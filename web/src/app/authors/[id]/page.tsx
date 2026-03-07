@@ -97,7 +97,7 @@ export default async function AuthorDetailPage({
     .order("position", { ascending: true })
     .limit(100);
 
-  const articles = ((articleRows ?? []) as ArticleRow[])
+  const articles = ((articleRows ?? []) as unknown as ArticleRow[])
     .map((r) => r.articles)
     .sort((a, b) => (b.published_date ?? "").localeCompare(a.published_date ?? ""));
 

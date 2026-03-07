@@ -110,7 +110,7 @@ export default async function DashboardPage() {
       .limit(10);
 
     if (pubData) {
-      myPublications = (pubData as AuthorArticleRow[]).sort((a, b) => {
+      myPublications = (pubData as unknown as AuthorArticleRow[]).sort((a, b) => {
         const da = a.articles.published_date ?? "";
         const db = b.articles.published_date ?? "";
         return db.localeCompare(da);
