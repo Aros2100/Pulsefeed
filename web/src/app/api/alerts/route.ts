@@ -5,7 +5,7 @@ export async function GET() {
   const admin = createAdminClient();
 
   const { data, error } = await admin
-    .from("system_alerts")
+    .from("system_alerts" as never)
     .select("id, title, message, type, expires_at")
     .eq("active", true)
     .or("expires_at.is.null,expires_at.gt." + new Date().toISOString())
