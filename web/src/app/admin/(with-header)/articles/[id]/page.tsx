@@ -282,7 +282,7 @@ export default async function AdminArticleLogPage({
   const authorScoreByPosition = new Map(
     (authorLinksResult.data ?? [])
       .filter((r) => (r as { authors?: { author_score?: number | null } | null }).authors?.author_score != null)
-      .map((r) => [r.position as number, (r as { authors: { author_score: number } }).authors.author_score])
+      .map((r) => [r.position as number, (r as unknown as { authors: { author_score: number } }).authors.author_score])
   );
 
   const events = (eventsResult.data ?? []) as {
