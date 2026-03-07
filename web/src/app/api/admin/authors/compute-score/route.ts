@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 async function runComputeAuthorScores() {
   const admin = createAdminClient();
-  const { error } = await admin.rpc("compute_author_scores");
+  const { error } = await admin.rpc("compute_author_scores" as never);
   if (error) {
     console.error("[author-score] Failed:", error.message);
   } else {
