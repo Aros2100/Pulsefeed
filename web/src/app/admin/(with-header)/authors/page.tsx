@@ -55,7 +55,7 @@ export default function AdminAuthorsPage() {
       }
 
       const { data, count } = await req;
-      setAuthors((data as Author[]) ?? []);
+      setAuthors((data as unknown as Author[]) ?? []);
       setTotal(count ?? null);
       setLoading(false);
     }, delay);
