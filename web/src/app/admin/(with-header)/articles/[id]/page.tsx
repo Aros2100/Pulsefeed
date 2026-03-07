@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
-import ArticleStamkort from "@/components/articles/ArticleStamkort";
+import ArticleStamkort, { type ArticleData } from "@/components/articles/ArticleStamkort";
 import AdminArticleTabs from "./AdminArticleTabs";
 import ArticleEditableFields from "./ArticleEditableFields";
 
@@ -296,7 +296,7 @@ export default async function AdminArticleLogPage({
 
   const pubmedTab = (
     <div style={{ padding: "4px 0 80px" }}>
-      <ArticleStamkort article={article} authorIdByPosition={authorIdByPosition} authorScoreByPosition={authorScoreByPosition} />
+      <ArticleStamkort article={article as unknown as ArticleData} authorIdByPosition={authorIdByPosition} authorScoreByPosition={authorScoreByPosition} />
     </div>
   );
 
