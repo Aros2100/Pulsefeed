@@ -52,6 +52,19 @@ function FactRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+interface AuthorRow {
+  id: string;
+  display_name: string | null;
+  article_count: number | null;
+  orcid: string | null;
+  match_confidence: number | null;
+  department: string | null;
+  hospital: string | null;
+  city: string | null;
+  country: string | null;
+  author_score: number | null;
+}
+
 interface ArticleRow {
   position: number | null;
   articles: {
@@ -82,6 +95,7 @@ export default async function AuthorDetailPage({
     .single();
 
   if (!author) notFound();
+  const typedAuthor = author as unknown as AuthorRow;
 
   const { data: followRow } = await supabase
     .from("author_follows")
@@ -101,9 +115,9 @@ export default async function AuthorDetailPage({
     .map((r) => r.articles)
     .sort((a, b) => (b.published_date ?? "").localeCompare(a.published_date ?? ""));
 
-  const count       = author.article_count ?? articles.length;
-  const authorScore = (count >= 3 && (author as { author_score?: number | null }).author_score != null)
-    ? Number((author as { author_score: number }).author_score)
+  const count       = typedAuthor.article_count ?? articles.length;
+  const authorScore = (count >= 3 && typedAuthor.author_score != null)
+    ? Number(typedAuthor.author_score)
     : null;
 
   return (
@@ -126,7 +140,7 @@ export default async function AuthorDetailPage({
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
               <div>
                 <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>
-                  {author.display_name}
+                  {typedAuthor.display_name}
                 </h1>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "#888" }}>
                   {count} article{count !== 1 ? "s" : ""} indexed
@@ -142,31 +156,31 @@ export default async function AuthorDetailPage({
         <Card>
           <CardHeader label="Profile" />
           <CardBody>
-            <FactRow label="Name" value={author.display_name} />
-            {author.department && <FactRow label="Department" value={author.department} />}
-            {author.hospital  && <FactRow label="Hospital"   value={author.hospital} />}
-            {author.city      && <FactRow label="City"       value={author.city} />}
-            {author.country   && <FactRow label="Country"    value={author.country} />}
-            {author.orcid && (
+            <FactRow label="Name" value={typedAuthor.display_name} />
+            {typedAuthor.department && <FactRow label="Department" value={typedAuthor.department} />}
+            {typedAuthor.hospital  && <FactRow label="Hospital"   value={typedAuthor.hospital} />}
+            {typedAuthor.city      && <FactRow label="City"       value={typedAuthor.city} />}
+            {typedAuthor.country   && <FactRow label="Country"    value={typedAuthor.country} />}
+            {typedAuthor.orcid && (
               <FactRow
                 label="ORCID"
                 value={
                   <a
-                    href={`https://orcid.org/${author.orcid}`}
+                    href={`https://orcid.org/${typedAuthor.orcid}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: "#1a6eb5", textDecoration: "none" }}
                   >
-                    {author.orcid} ↗
+                    {typedAuthor.orcid} ↗
                   </a>
                 }
               />
             )}
-            {author.match_confidence !== null && author.match_confidence !== undefined && (
+            {typedAuthor.match_confidence !== null && typedAuthor.match_confidence !== undefined && (
               <FactRow
                 label="Match"
                 value={
-                  author.match_confidence >= 1.0
+                  typedAuthor.match_confidence >= 1.0
                     ? <span style={{ color: "#2d7a2d", fontWeight: 600 }}>Verified</span>
                     : <span style={{ color: "#888" }}>Auto-matched</span>
                 }
