@@ -85,7 +85,7 @@ export async function runCitationFetch(limit = 500): Promise<{ updated: number; 
           article_id: row.id,
           event_type: "citation_count_updated",
           payload:    { citation_count: count },
-        });
+        } as never);
       if (evErr) console.warn(`[fetch-citations] Event insert failed for article ${row.id}:`, evErr.message);
     }
   }

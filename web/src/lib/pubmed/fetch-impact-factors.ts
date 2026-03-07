@@ -111,7 +111,7 @@ export async function runImpactFactorFetch(limit = 500): Promise<{ updated: numb
           article_id: articleId,
           event_type: "impact_factor_updated",
           payload:    { impact_factor: factor, journal_h_index: hIndex },
-        })));
+        })) as never);
       if (evErr) console.warn(`[fetch-if] Event insert failed for ISSN ${issn}:`, evErr.message);
     }
   }
