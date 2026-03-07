@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("system_alerts" as never)
-    .insert({ ...result.data, expires_at: result.data.expires_at ?? null })
+    .insert({ ...result.data, expires_at: result.data.expires_at ?? null } as never)
     .select("id, title, message, type, active, expires_at, created_at")
     .single();
 

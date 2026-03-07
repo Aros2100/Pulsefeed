@@ -29,7 +29,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("system_alerts" as never)
-    .update(result.data)
+    .update(result.data as never)
     .eq("id", id)
     .select("id, title, message, type, active, expires_at, created_at")
     .single();
