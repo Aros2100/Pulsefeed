@@ -30,7 +30,9 @@ const COLORS: Record<string, { dot: string; border: string; bg: string; label: s
   status_changed: { dot: "#f97316", border: "#fed7aa", bg: "#fff7ed",  label: "Status ændret" },
   verified:       { dot: "#10b981", border: "#a7f3d0", bg: "#f0fdf4",  label: "Verificeret" },
   author_linked:  { dot: "#3b82f6", border: "#bfdbfe", bg: "#eff6ff",  label: "Forfattere" },
-  quality_check:  { dot: "#6b7280", border: "#d1d5db", bg: "#f9fafb",  label: "Quality Check" },
+  quality_check:          { dot: "#6b7280", border: "#d1d5db", bg: "#f9fafb",  label: "Quality Check" },
+  impact_factor_updated:  { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff",  label: "Impact Factor opdateret" },
+  citation_count_updated: { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff",  label: "Citations opdateret" },
 };
 
 const FALLBACK_COLOR = { dot: "#6b7280", border: "#d1d5db", bg: "#f9fafb", label: "Event" };
@@ -216,6 +218,23 @@ function QualityCheckCard({ p }: { p: P }) {
   );
 }
 
+function ImpactFactorUpdatedCard({ p }: { p: P }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      <KV label="Impact Factor" value={p.impact_factor != null ? (p.impact_factor as number).toFixed(3) : "—"} />
+      <KV label="H-index"       value={p.journal_h_index != null ? String(p.journal_h_index) : "—"} />
+    </div>
+  );
+}
+
+function CitationCountUpdatedCard({ p }: { p: P }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      <KV label="Citationer" value={p.citation_count != null ? String(p.citation_count) : "—"} />
+    </div>
+  );
+}
+
 function EventCard({ eventType, payload }: { eventType: string; payload: P }) {
   switch (eventType) {
     case "imported":       return <ImportedCard      p={payload} />;
@@ -225,7 +244,9 @@ function EventCard({ eventType, payload }: { eventType: string; payload: P }) {
     case "status_changed": return <StatusChangedCard p={payload} />;
     case "verified":       return <VerifiedCard      p={payload} />;
     case "author_linked":  return <AuthorLinkedCard  p={payload} />;
-    case "quality_check":  return <QualityCheckCard  p={payload} />;
+    case "quality_check":          return <QualityCheckCard          p={payload} />;
+    case "impact_factor_updated":  return <ImpactFactorUpdatedCard   p={payload} />;
+    case "citation_count_updated": return <CitationCountUpdatedCard  p={payload} />;
     default:
       return (
         <pre style={{ fontSize: "11px", color: "#6b7280", margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
@@ -284,6 +305,7 @@ export default async function AdminArticleLogPage({
     { title: "Indlæsning af forfattere", types: ["author_linked"], alwaysShow: true },
     { title: "Speciale scoring",         types: ["enriched"] },
     { title: "Validering",               types: ["lab_decision"] },
+    { title: "Bibliometri",              types: ["impact_factor_updated", "citation_count_updated"] },
   ];
 
   const grouped = SECTIONS.map((s) => ({

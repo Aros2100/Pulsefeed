@@ -79,6 +79,14 @@ export async function runCitationFetch(limit = 500): Promise<{ updated: number; 
       failed++;
     } else {
       updated++;
+      const { error: evErr } = await admin
+        .from("article_events" as never)
+        .insert({
+          article_id: row.id,
+          event_type: "citation_count_updated",
+          payload:    { citation_count: count },
+        });
+      if (evErr) console.warn(`[fetch-citations] Event insert failed for article ${row.id}:`, evErr.message);
     }
   }
 
