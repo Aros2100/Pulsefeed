@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
     .from("articles")
     .select("id, title, abstract, specialty_tags")
     .eq("status", "pending")
+    .contains("specialty_tags", [specialty])
     .order("circle", { ascending: false, nullsFirst: false });
 
   const v = activePrompt.version;
@@ -98,7 +99,6 @@ export async function POST(request: NextRequest) {
         .or(`specialty_scored_at.is.null,model_version.is.null,model_version.neq.${v}`)
         .limit(BATCH_LIMIT)
     : await baseQuery
-        .is("specialty_scored_at", null)
         .is("specialty_confidence", null)
         .limit(BATCH_LIMIT);
 
