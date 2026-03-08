@@ -1,21 +1,10 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
-import ImportDashboardActions from "./ImportDashboardActions";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type StatRow = { circle: number | null; status: string | null; antal: number };
-
-interface QualityCheck {
-  id: string;
-  import_log_id: string | null;
-  check_type: string;
-  passed: boolean;
-  total_checks: number;
-  failed_checks: number;
-  created_at: string;
-}
 
 interface LinkingSnap {
   started_at: string;
@@ -24,6 +13,14 @@ interface LinkingSnap {
   new_authors: number | null;
   duplicates: number | null;
   rejected: number | null;
+}
+
+interface ImportLog {
+  id: string;
+  started_at: string;
+  completed_at: string | null;
+  status: string;
+  articles_imported: number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -36,27 +33,66 @@ function fmt(iso: string | null) {
   });
 }
 
-function n(v: number) { return v.toLocaleString("da-DK"); }
+function num(v: number) { return v.toLocaleString("da-DK"); }
+function dash(v: number | null | undefined) { return v != null && v > 0 ? num(v) : "—"; }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-const card: React.CSSProperties = {
+const sectionCard: React.CSSProperties = {
   background: "#fff",
   borderRadius: "10px",
   boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
   overflow: "hidden",
+  marginBottom: "32px",
 };
 
-const cardHeader = (accent = false): React.CSSProperties => ({
+const sectionHeader: React.CSSProperties = {
   background: "#EEF2F7",
   borderBottom: "1px solid #dde3ed",
   padding: "10px 20px",
-  fontSize: "11px",
-  fontWeight: 700,
-  letterSpacing: "0.07em",
-  textTransform: "uppercase",
-  color: accent ? "#E83B2A" : "#5a6a85",
-});
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+};
+
+const headerLabel: React.CSSProperties = {
+  fontSize: "11px", letterSpacing: "0.08em",
+  textTransform: "uppercase", fontWeight: 700, color: "#5a6a85",
+};
+
+const thStyle: React.CSSProperties = {
+  padding: "10px 16px", textAlign: "left", fontSize: "11px", fontWeight: 700,
+  textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85",
+  borderBottom: "1px solid #eef0f4", background: "#f8f9fb",
+};
+
+const tdStyle: React.CSSProperties = {
+  padding: "12px 16px", fontSize: "13px", color: "#1a1a1a",
+  borderBottom: "1px solid #f1f3f7", fontVariantNumeric: "tabular-nums",
+};
+
+const kpiLabel: React.CSSProperties = {
+  fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
+  letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "4px",
+};
+
+const BADGES = {
+  1: { label: "C1", bg: "#dbeafe", text: "#1d4ed8" },
+  2: { label: "C2", bg: "#f3e8ff", text: "#7c3aed" },
+  3: { label: "C3", bg: "#fff7ed", text: "#c2410c" },
+} as const;
+
+function CircleBadge({ circle }: { circle: 1 | 2 | 3 }) {
+  const b = BADGES[circle];
+  return (
+    <span style={{
+      fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px",
+      background: b.bg, color: b.text, marginRight: "6px",
+    }}>
+      {b.label}
+    </span>
+  );
+}
 
 function SectionHeading({ title }: { title: string }) {
   return (
@@ -70,19 +106,34 @@ function SectionHeading({ title }: { title: string }) {
   );
 }
 
+function ProgressBar({ value, total, color }: { value: number; total: number; color: string }) {
+  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+  return (
+    <div style={{ background: "#eef0f4", borderRadius: "6px", height: "8px", overflow: "hidden", width: "100%" }}>
+      <div style={{ background: color, height: "100%", borderRadius: "6px", width: `${pct}%`, transition: "width 0.3s" }} />
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function ImportDashboardPage() {
   const admin = createAdminClient();
   const activeSpecialties = SPECIALTIES.filter((s) => s.active);
 
-  // All fetches in one parallel batch
   const [
     rpcResults,
     authorsResult,
-    qualityChecksResult,
+    unlinkedResult,
     latestLinkingResult,
+    citationStatusRes,
+    impactStatusRes,
+    latestC1LogResult,
+    latestC2LogResult,
+    latestC3LogResult,
+    meshTaggedResult,
   ] = await Promise.all([
+    // Article stats per specialty
     Promise.all(
       activeSpecialties.map((s) =>
         admin
@@ -90,56 +141,106 @@ export default async function ImportDashboardPage() {
           .then((r) => (r.data as unknown as StatRow[]) ?? [])
       )
     ),
+    // Total authors
     admin.from("authors").select("*", { count: "exact", head: true }),
-    (admin as unknown as Record<string, (t: string) => {
-      select: (c: string) => { order: (f: string, o: object) => { limit: (n: number) => Promise<{ data: unknown[] | null }> } }
-    }>).from("import_quality_checks")
-      .select("id, import_log_id, check_type, passed, total_checks, failed_checks, created_at")
-      .order("created_at", { ascending: false })
-      .limit(3),
+    // Unlinked articles
+    admin.rpc("count_unlinked_articles" as never),
+    // Latest linking run
     admin
       .from("author_linking_logs")
       .select("started_at, completed_at, status, new_authors, duplicates, rejected")
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // Citation status
+    Promise.all([
+      admin.from("articles").select("id", { count: "exact", head: true }).not("citation_count" as never, "is", null),
+      admin.from("articles").select("id", { count: "exact", head: true }).is("citation_count" as never, null),
+    ]),
+    // Impact factor status
+    Promise.all([
+      admin.from("articles").select("id", { count: "exact", head: true }).not("impact_factor", "is", null),
+      admin.from("articles").select("id", { count: "exact", head: true }).is("impact_factor", null),
+    ]),
+    // Latest completed import log per circle — resolve filter IDs first
+    admin.from("pubmed_filters").select("id").eq("specialty", "neurosurgery").eq("circle", 1)
+      .then(async (fRes) => {
+        const ids = (fRes.data ?? []).map((f) => f.id);
+        if (ids.length === 0) return { data: null };
+        return admin.from("import_logs").select("started_at, articles_imported")
+          .eq("status", "completed").in("filter_id", ids)
+          .order("started_at", { ascending: false }).limit(1).maybeSingle();
+      }),
+    admin.from("pubmed_filters").select("id").eq("specialty", "neurosurgery").eq("circle", 2)
+      .then(async (fRes) => {
+        const ids = (fRes.data ?? []).map((f) => f.id);
+        if (ids.length === 0) return { data: null };
+        return admin.from("import_logs").select("started_at, articles_imported")
+          .eq("status", "completed").in("filter_id", ids)
+          .order("started_at", { ascending: false }).limit(1).maybeSingle();
+      }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (admin.from("import_logs") as any)
+      .select("started_at, articles_imported")
+      .eq("status", "completed")
+      .eq("circle", 3)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle() as Promise<{ data: ImportLog | null }>,
+    // MeSH-tagged articles count
+    admin.from("articles").select("id", { count: "exact", head: true }).not("mesh_terms", "is", null),
   ]);
 
-  // ── Compute specialty stats ────────────────────────────────────────────────
-  const specialtyStats = activeSpecialties.map((spec, i) => {
-    const rows = rpcResults[i];
-    function get(c: number, s: string) {
-      return Number(rows.find((r) => r.circle === c && r.status === s)?.antal ?? 0);
-    }
-    const c1Approved = get(1, "approved");
-    const c2Approved = get(2, "approved");
-    const c2Pending  = get(2, "pending");
-    const c2Rejected = get(2, "rejected") + get(3, "rejected");
-    const total      = rows.reduce((sum, r) => sum + Number(r.antal), 0);
-    return { spec, c1Approved, c2Approved, c2Pending, c2Rejected, total };
-  });
+  // ── Aggregate article stats ──
+  const allRows = rpcResults.flat();
+  function getCircleStat(c: number, s: string) {
+    return allRows.filter((r) => r.circle === c && r.status === s).reduce((sum, r) => sum + Number(r.antal), 0);
+  }
 
-  const agg = {
-    total:      specialtyStats.reduce((sum, s) => sum + s.total, 0),
-    c1:         specialtyStats.reduce((sum, s) => sum + s.c1Approved, 0),
-    c2Approved: specialtyStats.reduce((sum, s) => sum + s.c2Approved, 0),
-    c2Pending:  specialtyStats.reduce((sum, s) => sum + s.c2Pending, 0),
-    c2Rejected: specialtyStats.reduce((sum, s) => sum + s.c2Rejected, 0),
-  };
+  const totalArticles = allRows.reduce((sum, r) => sum + Number(r.antal), 0);
 
-  const totalAuthors   = authorsResult.count ?? 0;
-  const latestLinking  = latestLinkingResult.data as LinkingSnap | null;
-  const qualityChecks  = ((qualityChecksResult as { data: unknown[] | null }).data ?? []) as QualityCheck[];
-  const specialtySlugs = activeSpecialties.map((s) => s.slug);
+  const c1Approved = getCircleStat(1, "approved");
+  const c2Approved = getCircleStat(2, "approved");
+  const c2Pending = getCircleStat(2, "pending");
+  const c2Rejected = getCircleStat(2, "rejected");
+  const c3Pending = getCircleStat(3, "pending");
 
-  const statBuckets = [
-    { label: "C1 Approved", value: agg.c1,         bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
-    { label: "C2 Approved", value: agg.c2Approved, bg: "#f0fdf4", border: "#bbf7d0", color: "#15803d" },
-    { label: "C2 Afventer", value: agg.c2Pending,  bg: "#fffbeb", border: "#fde68a", color: "#d97706" },
-    { label: "C2 Afvist",   value: agg.c2Rejected, bg: "#fef2f2", border: "#fecaca", color: "#b91c1c" },
+  // Latest import per circle
+  const latestC1 = latestC1LogResult.data as ImportLog | null;
+  const latestC2 = latestC2LogResult.data as ImportLog | null;
+  const latestC3 = (latestC3LogResult as { data: ImportLog | null }).data;
+
+  // Author stats
+  const totalAuthors = authorsResult.count ?? 0;
+  const unlinkedArticles = (unlinkedResult.data as unknown as number) ?? 0;
+  const latestLinking = latestLinkingResult.data as LinkingSnap | null;
+
+  // Enrichment stats
+  const citWith = citationStatusRes[0].count ?? 0;
+  const citWithout = citationStatusRes[1].count ?? 0;
+  const citTotal = citWith + citWithout;
+
+  const ifWith = impactStatusRes[0].count ?? 0;
+  const ifWithout = impactStatusRes[1].count ?? 0;
+  const ifTotal = ifWith + ifWithout;
+
+  const meshTagged = meshTaggedResult.count ?? 0;
+
+  // Circle table data
+  const circleRows: {
+    circle: 1 | 2 | 3;
+    name: string;
+    approved: number | null;
+    pending: number | null;
+    rejected: number | null;
+    latestDate: string | null;
+  }[] = [
+    { circle: 1, name: "Trusted Journals", approved: c1Approved, pending: null, rejected: null, latestDate: latestC1?.started_at ?? null },
+    { circle: 2, name: "Extended Sources", approved: c2Approved, pending: c2Pending, rejected: c2Rejected, latestDate: latestC2?.started_at ?? null },
+    { circle: 3, name: "Danish Sources", approved: null, pending: c3Pending, rejected: null, latestDate: latestC3?.started_at ?? null },
   ];
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ──
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
       <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "40px 24px 80px" }}>
@@ -159,245 +260,136 @@ export default async function ImportDashboardPage() {
           }}>
             System · Import
           </div>
-          <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Import Dashboard</h1>
+          <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Import oversigt</h1>
         </div>
 
-        {/* ═══════════════════════════════ */}
-        {/* SEKTION 1: ARTIKLER            */}
-        {/* ═══════════════════════════════ */}
+        {/* ═══ SEKTION 1: ARTIKLER ═══ */}
         <SectionHeading title="Artikler" />
-        <div style={{ ...card, marginBottom: "40px" }}>
-          <div style={{ padding: "24px 28px" }}>
+        <div style={sectionCard}>
+          <div style={sectionHeader}>
+            <span style={headerLabel}>Import-kilder</span>
+          </div>
 
-            {/* Stats row */}
-            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "flex-end", marginBottom: "20px" }}>
-              {/* Total */}
-              <div style={{ marginRight: "8px" }}>
-                <div style={{
-                  fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
-                  letterSpacing: "0.07em", color: "#5a6a85", marginBottom: "4px",
-                }}>
-                  Total
-                </div>
-                <div style={{ fontSize: "40px", fontWeight: 800, lineHeight: 1, color: "#E83B2A" }}>
-                  {n(agg.total)}
-                </div>
-              </div>
-
-              {/* Separator */}
-              <div style={{ width: "1px", background: "#e5e7eb", alignSelf: "stretch", margin: "0 8px" }} />
-
-              {/* Buckets */}
-              {statBuckets.map(({ label, value, bg, border, color }) => (
-                <div key={label} style={{
-                  background: bg, border: `1px solid ${border}`,
-                  borderRadius: "8px", padding: "10px 14px", textAlign: "center",
-                }}>
-                  <div style={{
-                    fontSize: "10px", fontWeight: 700, textTransform: "uppercase",
-                    letterSpacing: "0.05em", color, marginBottom: "4px",
-                  }}>
-                    {label}
-                  </div>
-                  <div style={{ fontSize: "22px", fontWeight: 800, color }}>{n(value)}</div>
-                </div>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                {["Import-kilde", "Approved", "Pending", "Rejected", "Seneste import", ""].map((h) => (
+                  <th key={h} style={thStyle}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {circleRows.map((row) => (
+                <tr key={row.circle}>
+                  <td style={tdStyle}>
+                    <CircleBadge circle={row.circle} />
+                    <span style={{ fontWeight: 600 }}>{row.name}</span>
+                  </td>
+                  <td style={{ ...tdStyle, color: row.approved ? "#15803d" : "#888", fontWeight: row.approved ? 600 : 400 }}>
+                    {dash(row.approved)}
+                  </td>
+                  <td style={{ ...tdStyle, color: row.pending ? "#d97706" : "#888", fontWeight: row.pending ? 600 : 400 }}>
+                    {dash(row.pending)}
+                  </td>
+                  <td style={{ ...tdStyle, color: row.rejected ? "#b91c1c" : "#888", fontWeight: row.rejected ? 600 : 400 }}>
+                    {dash(row.rejected)}
+                  </td>
+                  <td style={{ ...tdStyle, color: "#5a6a85", whiteSpace: "nowrap" }}>
+                    {fmt(row.latestDate)}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: "right" }}>
+                    <Link
+                      href={`/admin/system/import/c${row.circle}`}
+                      style={{ fontSize: "13px", fontWeight: 600, color: "#E83B2A", textDecoration: "none" }}
+                    >
+                      Administrér →
+                    </Link>
+                  </td>
+                </tr>
               ))}
-            </div>
+            </tbody>
+          </table>
 
-            {/* Action buttons */}
-            <div style={{ borderTop: "1px solid #f1f3f7", paddingTop: "16px" }}>
-              <ImportDashboardActions specialtySlugs={specialtySlugs} subset="articles" />
+          {/* KPIs under table */}
+          <div style={{ padding: "16px 20px", borderTop: "1px solid #eef0f4", display: "flex", gap: "32px", flexWrap: "wrap" }}>
+            <div>
+              <div style={kpiLabel}>Total artikler</div>
+              <div style={{ fontSize: "24px", fontWeight: 800, color: "#E83B2A" }}>{num(totalArticles)}</div>
             </div>
-
+            <div>
+              <div style={kpiLabel}>Auto-tagged (MeSH)</div>
+              <div style={{ fontSize: "24px", fontWeight: 800, color: "#1a1a1a" }}>{num(meshTagged)}</div>
+            </div>
           </div>
         </div>
 
-        {/* ═══════════════════════════════ */}
-        {/* SEKTION 2: FORFATTERE          */}
-        {/* ═══════════════════════════════ */}
+        {/* ═══ SEKTION 2: FORFATTERE ═══ */}
         <SectionHeading title="Forfattere" />
-
-        <div style={{ ...card, marginBottom: "40px" }}>
-          <div style={{ padding: "28px 32px", display: "flex", alignItems: "center", gap: "40px", flexWrap: "wrap" }}>
-            {/* Total */}
-            <div style={{ flexShrink: 0 }}>
-              <div style={{
-                fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em",
-                textTransform: "uppercase", color: "#5a6a85", marginBottom: "8px",
-              }}>
-                Forfattere i DB
-              </div>
-              <div style={{ fontSize: "52px", fontWeight: 800, lineHeight: 1, color: "#E83B2A" }}>
-                {n(totalAuthors)}
-              </div>
-              {latestLinking && (
-                <div style={{ fontSize: "12px", color: "#888", marginTop: "8px" }}>
-                  Seneste linking: {fmt(latestLinking.started_at)}
-                </div>
-              )}
-            </div>
-
-            {/* Stats from latest completed linking run */}
-            <div style={{ display: "flex", gap: "28px", flexWrap: "wrap" }}>
-              {[
-                { label: "Nye",       value: latestLinking?.new_authors, color: "#15803d", icon: "✅" },
-                { label: "Dubletter", value: latestLinking?.duplicates,  color: "#1d4ed8", icon: "🔄" },
-                { label: "Afvist",    value: latestLinking?.rejected,    color: "#d97706", icon: "❌" },
-              ].map(({ label, value, color, icon }) => (
-                <div key={label}>
-                  <div style={{ fontSize: "12px", color: "#5a6a85", marginBottom: "4px" }}>
-                    {label} {icon}
-                  </div>
-                  <div style={{ fontSize: "32px", fontWeight: 700, fontVariantNumeric: "tabular-nums", color }}>
-                    {value != null ? n(value) : "—"}
-                  </div>
-                  <div style={{ fontSize: "11px", color: "#bbb", marginTop: "2px" }}>seneste kørsel</div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ marginLeft: "auto" }}>
-              <Link
-                href="/admin/system/author-linking"
-                style={{ fontSize: "13px", fontWeight: 600, color: "#E83B2A", textDecoration: "none" }}
-              >
-                Detaljer →
-              </Link>
-            </div>
-          </div>
-
-          {/* Linking action */}
-          <div style={{ borderTop: "1px solid #f1f3f7", padding: "16px 28px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            <ImportDashboardActions specialtySlugs={specialtySlugs} subset="linking" />
-            <ImportDashboardActions specialtySlugs={specialtySlugs} subset="author-score" />
-          </div>
-        </div>
-
-        {/* ═══════════════════════════════ */}
-        {/* SEKTION 3: KONFIGURATION       */}
-        {/* ═══════════════════════════════ */}
-        <SectionHeading title="Konfiguration" />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginBottom: "40px" }}>
-          {[
-            {
-              title: "C1 Trusted Journals",
-              desc: "Betroede neurokirurgiske tidsskrifter — auto-approved",
-              href: "/admin/system/import/c1",
-              badge: { bg: "#dbeafe", text: "#1d4ed8" },
-            },
-            {
-              title: "C2 Extended Sources",
-              desc: "Affiliations-baseret søgning — kræver validering",
-              href: "/admin/system/import/c2",
-              badge: { bg: "#f3e8ff", text: "#7c3aed" },
-            },
-            {
-              title: "C3 Danish Sources",
-              desc: "Danske neurokirurgiske afdelinger — kræver validering",
-              href: "/admin/system/import/c3",
-              badge: { bg: "#fff7ed", text: "#c2410c" },
-            },
-          ].map(({ title, desc, href, badge }) => (
+        <div style={sectionCard}>
+          <div style={sectionHeader}>
+            <span style={headerLabel}>Forfatter-linking</span>
             <Link
-              key={title}
-              href={href}
-              style={{ ...card, textDecoration: "none", color: "inherit", display: "block" }}
+              href="/admin/system/author-linking"
+              style={{ fontSize: "13px", fontWeight: 600, color: "#E83B2A", textDecoration: "none" }}
             >
-              <div style={{ ...cardHeader(), display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{
-                  fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "1px 6px",
-                  background: badge.bg, color: badge.text,
-                }}>
-                  {title.slice(0, 2)}
-                </span>
-                <span>{title.slice(3)}</span>
-              </div>
-              <div style={{ padding: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
-                <div style={{ fontSize: "13px", color: "#5a6a85", lineHeight: 1.5 }}>{desc}</div>
-                <div style={{ fontSize: "13px", fontWeight: 600, color: "#E83B2A", flexShrink: 0 }}>Administrér →</div>
-              </div>
+              Administrér →
             </Link>
-          ))}
-        </div>
-
-        {/* ═══════════════════════════════ */}
-        {/* SEKTION 4: CITATIONS           */}
-        {/* ═══════════════════════════════ */}
-        <SectionHeading title="Citations" />
-        <div style={{ ...card, marginBottom: "40px" }}>
-          <div style={{ padding: "24px 28px" }}>
-            <ImportDashboardActions specialtySlugs={specialtySlugs} subset="citations" />
           </div>
-        </div>
-
-        {/* ═══════════════════════════════ */}
-        {/* SEKTION 5: IMPACT FACTOR       */}
-        {/* ═══════════════════════════════ */}
-        <SectionHeading title="Impact Factor" />
-        <div style={{ ...card, marginBottom: "40px" }}>
-          <div style={{ padding: "24px 28px" }}>
-            <ImportDashboardActions specialtySlugs={specialtySlugs} subset="impact-factor" />
-          </div>
-        </div>
-
-        {/* ═══════════════════════════════ */}
-        {/* SEKTION 6: QUALITY CHECKS      */}
-        {/* ═══════════════════════════════ */}
-        <SectionHeading title="Quality checks" />
-        <div style={card}>
-          <div style={cardHeader()}>Seneste 3 kørsler</div>
-          {qualityChecks.length === 0 ? (
-            <div style={{ padding: "32px", textAlign: "center", fontSize: "13px", color: "#888" }}>
-              Ingen quality checks fundet
-            </div>
-          ) : (
-            qualityChecks.map((qc, i) => (
-              <div key={qc.id} style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "14px 20px",
-                borderTop: i === 0 ? undefined : "1px solid #f1f3f7",
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                  <span style={{
-                    display: "inline-block", padding: "2px 8px", borderRadius: "999px",
-                    fontSize: "11px", fontWeight: 600,
-                    background: qc.passed ? "#f0fdf4" : "#fef2f2",
-                    color:      qc.passed ? "#15803d" : "#b91c1c",
-                    border:    `1px solid ${qc.passed ? "#bbf7d0" : "#fecaca"}`,
-                  }}>
-                    {qc.passed ? "✓ Passed" : "✗ Failed"}
-                  </span>
-                  <span style={{
-                    display: "inline-block", padding: "2px 8px", borderRadius: "999px",
-                    fontSize: "11px", fontWeight: 600,
-                    background: qc.check_type === "article" ? "#eff6ff" : "#f5f3ff",
-                    color:      qc.check_type === "article" ? "#1d4ed8" : "#6d28d9",
-                    border:    `1px solid ${qc.check_type === "article" ? "#bfdbfe" : "#ddd6fe"}`,
-                  }}>
-                    {qc.check_type}
-                  </span>
-                  <span style={{ fontSize: "12px", color: qc.passed ? "#888" : "#b91c1c" }}>
-                    {qc.passed
-                      ? `${qc.total_checks} checks passed`
-                      : `${qc.failed_checks} / ${qc.total_checks} checks fejlede`
-                    }
-                  </span>
+          <div style={{ padding: "20px 24px", display: "flex", gap: "40px", flexWrap: "wrap", alignItems: "flex-end" }}>
+            {[
+              { label: "Forfattere i DB", value: totalAuthors, color: "#E83B2A", large: true },
+              { label: "Artikler uden forfattere", value: unlinkedArticles, color: "#d97706", large: false },
+              { label: "Nye (seneste kørsel)", value: latestLinking?.new_authors ?? null, color: "#15803d", large: false },
+              { label: "Dubletter", value: latestLinking?.duplicates ?? null, color: "#1d4ed8", large: false },
+              { label: "Afviste", value: latestLinking?.rejected ?? null, color: "#d97706", large: false },
+            ].map(({ label, value, color, large }) => (
+              <div key={label}>
+                <div style={kpiLabel}>{label}</div>
+                <div style={{
+                  fontSize: large ? "28px" : "20px", fontWeight: 800,
+                  fontVariantNumeric: "tabular-nums", color,
+                }}>
+                  {value != null ? num(value) : "—"}
                 </div>
-                <span style={{ fontSize: "12px", color: "#9ca3af", whiteSpace: "nowrap", flexShrink: 0 }}>
-                  {fmt(qc.created_at)}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ═══ SEKTION 3: BERIGELSE ═══ */}
+        <SectionHeading title="Berigelse" />
+        <div style={sectionCard}>
+          <div style={sectionHeader}>
+            <span style={headerLabel}>Citations & Impact Factor</span>
+          </div>
+          <div style={{ padding: "20px 24px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
+            {/* Citations */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a" }}>Citations</span>
+                <span style={{ fontSize: "12px", color: "#5a6a85" }}>
+                  {num(citWith)} / {num(citTotal)} artikler
                 </span>
               </div>
-            ))
-          )}
-        </div>
+              <ProgressBar value={citWith} total={citTotal} color="#1d4ed8" />
+              <div style={{ fontSize: "12px", color: "#888", marginTop: "6px" }}>
+                {citWithout > 0 ? `${num(citWithout)} mangler` : "Alle hentet"}
+              </div>
+            </div>
 
-        {/* ═══════════════════════════════ */}
-        {/* SEKTION 7: VEDLIGEHOLD         */}
-        {/* ═══════════════════════════════ */}
-        <SectionHeading title="Vedligehold" />
-        <div style={{ ...card, marginBottom: "40px" }}>
-          <div style={{ padding: "24px 28px" }}>
-            <ImportDashboardActions specialtySlugs={specialtySlugs} subset="cleanup" />
+            {/* Impact Factor */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a" }}>Impact Factor</span>
+                <span style={{ fontSize: "12px", color: "#5a6a85" }}>
+                  {num(ifWith)} / {num(ifTotal)} artikler
+                </span>
+              </div>
+              <ProgressBar value={ifWith} total={ifTotal} color="#7c3aed" />
+              <div style={{ fontSize: "12px", color: "#888", marginTop: "6px" }}>
+                {ifWithout > 0 ? `${num(ifWithout)} mangler` : "Alle hentet"}
+              </div>
+            </div>
           </div>
         </div>
 
