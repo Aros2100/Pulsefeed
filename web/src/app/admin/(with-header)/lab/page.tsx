@@ -68,21 +68,44 @@ export default async function LabPage() {
 
   const activeVersionName = (versionsResult.data?.[0]?.version as string | null) ?? null;
 
-  const activeVersionCountResult = await (activeVersionName
-    ? admin
-        .from("lab_decisions")
-        .select("*", { count: "exact", head: true })
-        .eq("specialty", specialty)
-        .eq("module", "specialty_tag")
-        .eq("model_version", activeVersionName)
-    : Promise.resolve({ count: 0 as number | null, error: null }));
+  const noVersion = Promise.resolve({ count: 0 as number | null, error: null });
 
-  const queueCount         = queueResult.count ?? 0;
-  const totalDecisions     = totalResult.count ?? 0;
-  const approvedCount      = approvedResult.count ?? 0;
-  const approvalRate       = totalDecisions > 0 ? Math.round((approvedCount / totalDecisions) * 100) : null;
-  const lastDecisionAt     = lastResult.data?.[0]?.decided_at ?? null;
-  const activeVersionCount = activeVersionCountResult.count ?? 0;
+  const [activeVersionCountResult, fpResult, fnResult] = await Promise.all([
+    activeVersionName
+      ? admin
+          .from("lab_decisions")
+          .select("*", { count: "exact", head: true })
+          .eq("specialty", specialty)
+          .eq("module", "specialty_tag")
+          .eq("model_version", activeVersionName)
+      : noVersion,
+    activeVersionName
+      ? admin
+          .from("lab_decisions")
+          .select("*", { count: "exact", head: true })
+          .eq("specialty", specialty)
+          .eq("module", "specialty_tag")
+          .eq("model_version", activeVersionName)
+          .eq("ai_decision", "approved")
+          .eq("decision", "rejected")
+      : noVersion,
+    activeVersionName
+      ? admin
+          .from("lab_decisions")
+          .select("*", { count: "exact", head: true })
+          .eq("specialty", specialty)
+          .eq("module", "specialty_tag")
+          .eq("model_version", activeVersionName)
+          .eq("ai_decision", "rejected")
+          .eq("decision", "approved")
+      : noVersion,
+  ]);
+
+  const queueCount          = queueResult.count ?? 0;
+  const totalDecisions      = totalResult.count ?? 0;
+  const lastDecisionAt      = lastResult.data?.[0]?.decided_at ?? null;
+  const activeVersionCount  = activeVersionCountResult.count ?? 0;
+  const disagreementsCount  = (fpResult.count ?? 0) + (fnResult.count ?? 0);
 
   const futureModules = [
     { title: "Citation Quality Check", description: "Flag artikler med mistænkelige citatmønstre" },
@@ -151,16 +174,23 @@ export default async function LabPage() {
             }}>
               Specialty Tag Validation
             </span>
-            <span style={{
-              fontSize: "11px",
-              background: "#E83B2A",
-              color: "#fff",
-              borderRadius: "4px",
-              padding: "2px 8px",
-              fontWeight: 600,
-            }}>
-              Aktiv
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              {activeVersionName && (
+                <span style={{ fontSize: "11px", color: "#5a6a85", fontWeight: 600 }}>
+                  {activeVersionName}
+                </span>
+              )}
+              <span style={{
+                fontSize: "11px",
+                background: "#E83B2A",
+                color: "#fff",
+                borderRadius: "4px",
+                padding: "2px 8px",
+                fontWeight: 600,
+              }}>
+                Aktiv
+              </span>
+            </div>
           </div>
 
           <div style={{ padding: "24px" }}>
@@ -194,11 +224,16 @@ export default async function LabPage() {
               </div>
               <div>
                 <div style={{ fontSize: "11px", color: "#888", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
-                  Godkendelsesrate
+                  Uenigheder
                 </div>
-                <div style={{ fontSize: "24px", fontWeight: 700 }}>
-                  {approvalRate != null ? `${approvalRate}%` : "—"}
+                <div style={{ fontSize: "24px", fontWeight: 700, color: disagreementsCount > 0 ? "#d97706" : "#1a1a1a" }}>
+                  {disagreementsCount}
                 </div>
+                {activeVersionCount > 0 && (
+                  <div style={{ fontSize: "11px", color: "#aaa", marginTop: "2px" }}>
+                    {Math.round((disagreementsCount / activeVersionCount) * 100)}% af {activeVersionName}
+                  </div>
+                )}
               </div>
               <div>
                 <div style={{ fontSize: "11px", color: "#888", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
