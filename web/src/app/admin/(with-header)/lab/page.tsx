@@ -34,7 +34,7 @@ export default async function LabPage() {
 
   const admin = createAdminClient();
 
-  const [queueResult, totalResult, approvedResult, lastResult] = await Promise.all([
+  const [queueResult, totalResult, approvedResult, lastResult, versionsResult] = await Promise.all([
     admin
       .from("articles")
       .select("id", { count: "exact", head: true })
@@ -57,13 +57,32 @@ export default async function LabPage() {
       .eq("module", "specialty_tag")
       .order("decided_at", { ascending: false })
       .limit(1),
+    admin
+      .from("model_versions")
+      .select("version")
+      .eq("specialty", specialty)
+      .eq("module", "specialty_tag")
+      .eq("active", true)
+      .limit(1),
   ]);
 
-  const queueCount     = queueResult.count ?? 0;
-  const totalDecisions = totalResult.count ?? 0;
-  const approvedCount  = approvedResult.count ?? 0;
-  const approvalRate   = totalDecisions > 0 ? Math.round((approvedCount / totalDecisions) * 100) : null;
-  const lastDecisionAt = lastResult.data?.[0]?.decided_at ?? null;
+  const activeVersionName = (versionsResult.data?.[0]?.version as string | null) ?? null;
+
+  const activeVersionCountResult = await (activeVersionName
+    ? admin
+        .from("lab_decisions")
+        .select("*", { count: "exact", head: true })
+        .eq("specialty", specialty)
+        .eq("module", "specialty_tag")
+        .eq("model_version", activeVersionName)
+    : Promise.resolve({ count: 0 as number | null, error: null }));
+
+  const queueCount         = queueResult.count ?? 0;
+  const totalDecisions     = totalResult.count ?? 0;
+  const approvedCount      = approvedResult.count ?? 0;
+  const approvalRate       = totalDecisions > 0 ? Math.round((approvedCount / totalDecisions) * 100) : null;
+  const lastDecisionAt     = lastResult.data?.[0]?.decided_at ?? null;
+  const activeVersionCount = activeVersionCountResult.count ?? 0;
 
   const futureModules = [
     { title: "Citation Quality Check", description: "Flag artikler med mistænkelige citatmønstre" },
@@ -168,7 +187,10 @@ export default async function LabPage() {
                 <div style={{ fontSize: "11px", color: "#888", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
                   Bearbejdet i alt
                 </div>
-                <div style={{ fontSize: "24px", fontWeight: 700 }}>{totalDecisions}</div>
+                <div style={{ fontSize: "24px", fontWeight: 700 }}>{activeVersionCount}</div>
+                {activeVersionCount !== totalDecisions && (
+                  <div style={{ fontSize: "11px", color: "#aaa", marginTop: "2px" }}>{totalDecisions} i alt</div>
+                )}
               </div>
               <div>
                 <div style={{ fontSize: "11px", color: "#888", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
