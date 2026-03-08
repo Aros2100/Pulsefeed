@@ -71,7 +71,7 @@ export default async function DashboardPage() {
   const [decisionsRes, queueRes, sessionsRes, versionsRes] = await Promise.all([
     admin
       .from("lab_decisions")
-      .select("ai_decision, decision, ai_confidence, decided_at, session_id, model_version")
+      .select("ai_decision, decision, ai_confidence, decided_at, session_id, model_version", { count: "exact" })
       .eq("specialty", specialty)
       .eq("module", "specialty_tag")
       .not("ai_decision", "is", null)
@@ -248,7 +248,7 @@ export default async function DashboardPage() {
         )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "12px", marginBottom: "16px" }}>
           {[
-            { label: "Valideret i alt",   value: total,          sub: null },
+            { label: "Valideret i alt",   value: decisionsRes.count ?? 0, sub: null },
             { label: "AI-nøjagtighed",    value: accuracy != null ? `${accuracy}%` : "—", sub: null, highlight: accuracy },
             { label: "False positives",   value: falsePositives, sub: "AI godkendt → afvist" },
             { label: "False negatives",   value: falseNegatives, sub: "AI afvist → godkendt" },
