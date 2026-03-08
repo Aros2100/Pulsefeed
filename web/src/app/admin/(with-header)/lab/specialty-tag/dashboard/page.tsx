@@ -59,24 +59,31 @@ export default async function DashboardPage() {
 
   const admin = createAdminClient();
 
-  const [versionsRes, decisionsRes] = await Promise.all([
-    admin
-      .from("model_versions")
-      .select("version, activated_at, active")
-      .eq("specialty", specialty)
-      .eq("module", "specialty_tag")
-      .order("activated_at", { ascending: false }),
-    admin
+  const versionsRes = await admin
+    .from("model_versions")
+    .select("version, activated_at, active")
+    .eq("specialty", specialty)
+    .eq("module", "specialty_tag")
+    .order("activated_at", { ascending: false });
+
+  const rawVersions = versionsRes.data ?? [];
+
+  // Paginate all lab_decisions — PostgREST caps rows per request (default 1000)
+  type Decision = { model_version: string | null; ai_decision: string; decision: string; ai_confidence: number | null; disagreement_reason: string | null };
+  const decisions: Decision[] = [];
+  for (let from = 0; ; ) {
+    const { data } = await admin
       .from("lab_decisions")
       .select("model_version, ai_decision, decision, ai_confidence, disagreement_reason")
       .eq("specialty", specialty)
       .eq("module", "specialty_tag")
       .not("ai_decision", "is", null)
-      .limit(10000),
-  ]);
-
-  const rawVersions = versionsRes.data ?? [];
-  const decisions = decisionsRes.data ?? [];
+      .range(from, from + 999);
+    if (!data || data.length === 0) break;
+    decisions.push(...(data as Decision[]));
+    if (data.length < 1000) break;
+    from += 1000;
+  }
 
   // Group decisions by model_version
   const groups: Record<string, typeof decisions> = {};

@@ -45,7 +45,7 @@ export default async function LabPage() {
   const admin = createAdminClient();
 
   // --- Batch 1: base queries ---
-  const [queueResult, totalResult, lastResult, versionsResult, allVersionsResult, allDecisionsResult] = await Promise.all([
+  const [queueResult, totalResult, lastResult, versionsResult, allVersionsResult] = await Promise.all([
     admin
       .from("articles")
       .select("id", { count: "exact", head: true })
@@ -76,15 +76,24 @@ export default async function LabPage() {
       .eq("specialty", specialty)
       .eq("module", "specialty_tag")
       .order("activated_at", { ascending: false }),
-    // All decisions (for per-version accuracy in PromptDrawer)
-    admin
+  ]);
+
+  // Paginate all lab_decisions — PostgREST caps rows per request (default 1000)
+  type LabDecision = { model_version: string | null; ai_decision: string; decision: string };
+  const allDecisions: LabDecision[] = [];
+  for (let from = 0; ; ) {
+    const { data } = await admin
       .from("lab_decisions")
       .select("model_version, ai_decision, decision")
       .eq("specialty", specialty)
       .eq("module", "specialty_tag")
       .not("ai_decision", "is", null)
-      .limit(10000),
-  ]);
+      .range(from, from + 999);
+    if (!data || data.length === 0) break;
+    allDecisions.push(...(data as LabDecision[]));
+    if (data.length < 1000) break;
+    from += 1000;
+  }
 
   const activeVersionName = (versionsResult.data?.[0]?.version as string | null) ?? null;
   const activatedAt = (versionsResult.data?.[0]?.activated_at as string | null) ?? null;
@@ -147,7 +156,7 @@ export default async function LabPage() {
 
   // --- Build ModelVersion[] for PromptDrawer ---
   const versionAccMap: Record<string, { total: number; correct: number }> = {};
-  for (const d of (allDecisionsResult.data ?? [])) {
+  for (const d of allDecisions) {
     const mv = d.model_version as string | null;
     if (!mv) continue;
     if (!versionAccMap[mv]) versionAccMap[mv] = { total: 0, correct: 0 };
