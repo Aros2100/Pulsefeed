@@ -198,7 +198,7 @@ function normalizeOrcid(orcid: string): string {
 }
 
 function normalizeNameStr(name: string): string {
-  return name.toLowerCase().replace(/[^a-z\s]/g, "").trim();
+  return name.toLowerCase().replace(/[^a-z\u00c0-\u024f\s]/g, "").trim();
 }
 
 function computeMatchConfidence(
@@ -332,7 +332,7 @@ async function resolveAuthorId(
       .from("authors")
       .select("id, display_name, affiliations")
       .ilike("display_name", `%${author.lastName}%`)
-      .limit(20);
+      .limit(50);
 
     let bestId: string | null = null;
     let bestScore = 0;
@@ -347,7 +347,7 @@ async function resolveAuthorId(
       }
     }
 
-    if (bestScore > 0.85 && bestId) return { id: bestId, outcome: "duplicate" };
+    if (bestScore >= 0.85 && bestId) return { id: bestId, outcome: "duplicate" };
   }
 
   // 3. No match — create new author
