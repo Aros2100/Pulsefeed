@@ -377,6 +377,16 @@ export default async function ImportDashboardPage() {
           )}
         </div>
 
+        {/* ═══════════════════════════════ */}
+        {/* SEKTION 7: VEDLIGEHOLD         */}
+        {/* ═══════════════════════════════ */}
+        <SectionHeading title="Vedligehold" />
+        <div style={{ ...card, marginBottom: "40px" }}>
+          <div style={{ padding: "24px 28px" }}>
+            <ImportDashboardActions specialtySlugs={specialtySlugs} subset="cleanup" />
+          </div>
+        </div>
+
       </div>
     </div>
   );

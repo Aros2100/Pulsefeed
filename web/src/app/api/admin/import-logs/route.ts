@@ -20,22 +20,29 @@ export async function GET(request: NextRequest) {
     .order("started_at", { ascending: false })
     .limit(limit);
 
-  // Filter by circle column when provided (e.g. circle=3 for C3 imports)
-  if (circle !== null && !isNaN(circle)) {
-    logsQuery = logsQuery.eq("circle" as never, circle);
+  // Filter by circle column for C3 (which sets import_logs.circle = 3).
+  // C1/C2 logs don't have circle set — filter by specialty + pubmed_filters instead.
+  if (circle === 3) {
+    logsQuery = logsQuery.eq("circle" as never, 3);
   } else if (specialty) {
-    // Get filter IDs belonging to this specialty, then include logs that either
-    // reference one of those filters OR have no specific filter (null = all filters run).
     const { data: filters } = await admin
       .from("pubmed_filters")
       .select("id")
       .eq("specialty", specialty);
 
-    const filterIds = (filters ?? []).map((f) => f.id);
+    let filterIds = (filters ?? []).map((f) => f.id);
+
+    // If circle param is provided (1 or 2), narrow to filters of that circle
+    if (circle === 1 || circle === 2) {
+      const circleFilterIds = new Set(
+        ((await admin.from("pubmed_filters").select("id").eq("specialty", specialty).eq("circle", circle)).data ?? []).map((f) => f.id)
+      );
+      filterIds = filterIds.filter((id) => circleFilterIds.has(id));
+    }
 
     logsQuery =
       filterIds.length > 0
-        ? logsQuery.or(`filter_id.is.null,filter_id.in.(${filterIds.join(",")})`)
+        ? logsQuery.or(`filter_id.in.(${filterIds.join(",")})`)
         : logsQuery.is("filter_id", null);
   }
 

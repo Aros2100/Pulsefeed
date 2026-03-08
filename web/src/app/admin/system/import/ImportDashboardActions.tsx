@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 interface Props {
   specialtySlugs: string[];
-  subset: "articles" | "linking" | "citations" | "impact-factor" | "author-score";
+  subset: "articles" | "linking" | "citations" | "impact-factor" | "author-score" | "cleanup";
 }
 
 type ActionState = "idle" | "loading" | "done" | "error";
@@ -86,6 +86,8 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
   const [c3State,        setC3State]        = useState<ActionState>("idle");
   const [linkState,      setLinkState]      = useState<ActionState>("idle");
   const [authorScState,  setAuthorScState]  = useState<ActionState>("idle");
+  const [cleanupState,   setCleanupState]   = useState<ActionState>("idle");
+  const [cleanupMsg,     setCleanupMsg]     = useState<string | null>(null);
 
   // ── Citations state ──────────────────────────────────────────────────────────
   const [citState,  setCitState]  = useState<ActionState>("idle");
@@ -244,6 +246,74 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
       ifLastWithCount.current = current?.withIF ?? null;
       startIFPolling();
     } catch { setIfState("error"); }
+  }
+
+  async function triggerCleanup() {
+    setCleanupState("loading");
+    setCleanupMsg(null);
+    try {
+      const res  = await fetch("/api/admin/cleanup-stuck-jobs", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setCleanupState("error");
+        setCleanupMsg(data.error ?? "Noget gik galt");
+        return;
+      }
+      const total = (data.import_logs_fixed ?? 0) + (data.author_linking_logs_fixed ?? 0);
+      if (total === 0) {
+        setCleanupMsg("Ingen hængte jobs fundet");
+      } else {
+        const parts: string[] = [];
+        if (data.import_logs_fixed > 0)        parts.push(`${data.import_logs_fixed} import`);
+        if (data.author_linking_logs_fixed > 0) parts.push(`${data.author_linking_logs_fixed} author linking`);
+        setCleanupMsg(`Ryddede op i ${parts.join(" + ")} job${total > 1 ? "s" : ""}`);
+      }
+      setCleanupState("done");
+    } catch {
+      setCleanupState("error");
+      setCleanupMsg("Netværksfejl — prøv igen");
+    }
+  }
+
+  // ── Cleanup subset UI ──────────────────────────────────────────────────────
+
+  if (subset === "cleanup") {
+    const bg    = cleanupState === "done"    ? "#f0fdf4"
+                : cleanupState === "error"   ? "#fef2f2"
+                : cleanupState === "loading" ? "#f1f3f7"
+                :                              "#E83B2A";
+    const color = cleanupState === "done"    ? "#15803d"
+                : cleanupState === "error"   ? "#b91c1c"
+                : cleanupState === "loading" ? "#9ca3af"
+                :                              "#fff";
+    const label = cleanupState === "loading" ? "Rydder op…"
+                : cleanupState === "done"    ? "Færdig ✓"
+                : cleanupState === "error"   ? "Fejl — prøv igen"
+                :                              "Ryd op i hængte jobs";
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+        <button
+          onClick={() => { void triggerCleanup(); }}
+          disabled={cleanupState === "loading"}
+          style={{
+            padding: "8px 16px", borderRadius: "7px", border: "none",
+            fontFamily: "inherit", fontSize: "13px", fontWeight: 600,
+            cursor: cleanupState === "loading" ? "not-allowed" : "pointer",
+            background: bg, color,
+            transition: "background 0.15s, color 0.15s",
+          }}
+        >
+          {label}
+        </button>
+        {cleanupMsg && (
+          <span style={{
+            fontSize: "12px", color: cleanupState === "error" ? "#b91c1c" : "#15803d",
+          }}>
+            {cleanupMsg}
+          </span>
+        )}
+      </div>
+    );
   }
 
   // ── Citations subset UI ──────────────────────────────────────────────────────

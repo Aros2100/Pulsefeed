@@ -8,7 +8,8 @@ export type ArticleEventType =
   | "status_changed"
   | "verified"
   | "author_linked"
-  | "quality_check";
+  | "quality_check"
+  | "auto_tagged";
 
 export async function logArticleEvent(
   articleId: string,

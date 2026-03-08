@@ -780,15 +780,20 @@ export async function runImport(
       filterFetched = pmids.length;
       if (!pmids.length) continue;
 
-      // 4. Deduplicate
+      // 4. Deduplicate — chunk .in() to stay under PostgREST URL limit
       let newPmids = pmids;
       if (!force) {
-        const { data: existing, error: dedupErr } = await admin
-          .from("articles")
-          .select("pubmed_id")
-          .in("pubmed_id", pmids);
-        if (dedupErr) throw new Error(`Dedup query failed: ${dedupErr.message}`);
-        const existingSet = new Set(existing?.map((r) => r.pubmed_id) ?? []);
+        const DEDUP_CHUNK = 500;
+        const existingSet = new Set<string>();
+        for (let d = 0; d < pmids.length; d += DEDUP_CHUNK) {
+          const chunk = pmids.slice(d, d + DEDUP_CHUNK);
+          const { data: existing, error: dedupErr } = await admin
+            .from("articles")
+            .select("pubmed_id")
+            .in("pubmed_id", chunk);
+          if (dedupErr) throw new Error(`Dedup query failed: ${dedupErr.message}`);
+          for (const r of existing ?? []) existingSet.add(r.pubmed_id);
+        }
         newPmids = pmids.filter((id) => !existingSet.has(id));
         filterSkipped = pmids.length - newPmids.length;
       }
