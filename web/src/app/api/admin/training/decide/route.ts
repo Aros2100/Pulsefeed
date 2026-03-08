@@ -8,6 +8,7 @@ import { logArticleEvent } from "@/lib/article-events";
 const TAG_REMAP: Record<string, string> = {
   "Neuroscience":        "neuroscience",
   "Basic neuro research": "basic_neuro_research",
+  "Neurology":           "neurology",
   "Oncology":            "oncology",
   "Anesthesiology":      "anesthesiology",
   "ENT":                 "ent",
