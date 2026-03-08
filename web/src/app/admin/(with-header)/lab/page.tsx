@@ -260,44 +260,27 @@ export default async function LabPage() {
                   : "Start session"}
                 {" →"}
               </Link>
-              <Link
-                href="/admin/lab/specialty-tag/dashboard"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  borderRadius: "8px",
-                  padding: "10px 16px",
-                  background: "transparent",
-                  border: "1px solid #dde3ed",
-                  color: "#5a6a85",
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  textDecoration: "none",
-                }}
-              >
-                Se performance →
-              </Link>
-              <Link
-                href="/admin/lab/specialty-tag/evaluation"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  borderRadius: "8px",
-                  padding: "10px 16px",
-                  background: "transparent",
-                  border: "1px solid #dde3ed",
-                  color: "#5a6a85",
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  textDecoration: "none",
-                }}
-              >
-                Prompt evaluation →
-              </Link>
             </div>
           </div>
+        </div>
+
+        {/* Tools section */}
+        <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#888", textTransform: "uppercase" as const, fontWeight: 700, marginBottom: "12px", marginTop: "28px" }}>
+          Værktøjer
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
+          <Link href="/admin/lab/specialty-tag/dashboard" style={{ textDecoration: "none" }}>
+            <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "20px", cursor: "pointer" }}>
+              <div style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a", marginBottom: "4px" }}>Performance →</div>
+              <div style={{ fontSize: "12px", color: "#888" }}>Nøjagtighed, uenigheder og kalibrering over tid</div>
+            </div>
+          </Link>
+          <Link href="/admin/lab/specialty-tag/evaluation" style={{ textDecoration: "none" }}>
+            <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "20px", cursor: "pointer" }}>
+              <div style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a", marginBottom: "4px" }}>Prompt evaluation →</div>
+              <div style={{ fontSize: "12px", color: "#888" }}>Test og sammenlign prompt-versioner mod kendte beslutninger</div>
+            </div>
+          </Link>
         </div>
 
       </div>
