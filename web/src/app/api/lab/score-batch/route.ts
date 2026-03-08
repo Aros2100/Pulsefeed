@@ -76,17 +76,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
-  // When scoreAll=true (triggered by model activation): fetch all pending articles
-  // that haven't been scored yet OR were scored with a different model version.
-  // When scoreAll=false (manual Lab session): only fetch unscored articles, cap at 50.
+  // scoreAll=true  (triggered by model activation): re-score all pending articles
+  //   that have never been scored OR were scored with a different/null model version.
+  //   Guard: articles already scored with the active version are NEVER re-scored.
+  //
+  // scoreAll=false (TrainingClient pre-score / manual run): only score articles that
+  //   have never been scored (specialty_scored_at IS NULL AND specialty_confidence IS NULL).
   const baseQuery = admin
     .from("articles")
     .select("id, title, abstract, specialty_tags")
     .eq("status", "pending")
     .order("circle", { ascending: false, nullsFirst: false });
 
+  const v = activePrompt.version;
   const { data: articles, error: fetchError } = scoreAll
-    ? await baseQuery.or(`ai_decision.is.null,model_version.neq.${activePrompt.version}`).limit(100)
+    // Never re-score an article that already has specialty_scored_at set with the
+    // current model version. Use specialty_scored_at (not ai_decision) as the
+    // canonical "was this scored" signal. Explicit model_version.is.null clause
+    // is required because SQL NULL != 'v3' evaluates to NULL (not TRUE).
+    ? await baseQuery
+        .or(`specialty_scored_at.is.null,model_version.is.null,model_version.neq.${v}`)
+        .limit(BATCH_LIMIT)
     : await baseQuery
         .is("specialty_scored_at", null)
         .is("specialty_confidence", null)

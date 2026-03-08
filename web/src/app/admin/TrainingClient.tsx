@@ -226,7 +226,7 @@ export default function TrainingClient({ specialty, label }: Props) {
           const response = await fetch("/api/lab/score-batch", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ specialty, scoreAll: true }),
+            body: JSON.stringify({ specialty, scoreAll: false }),
           });
 
           const reader = response.body!.getReader();
