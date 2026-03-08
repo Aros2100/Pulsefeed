@@ -277,30 +277,44 @@ export default async function ImportDashboardPage() {
         {/* SEKTION 3: KONFIGURATION       */}
         {/* ═══════════════════════════════ */}
         <SectionHeading title="Konfiguration" />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px", marginBottom: "40px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginBottom: "40px" }}>
           {[
             {
-              title: "C1 Filtre",
-              desc: "PubMed-filtre for Circle 1 — trusted journals og søgestrenge",
-              href: `/admin/system/layers/neurosurgery?tab=circle1`,
+              title: "C1 Trusted Journals",
+              desc: "Betroede neurokirurgiske tidsskrifter — auto-approved",
+              href: "/admin/system/import/c1",
+              badge: { bg: "#dbeafe", text: "#1d4ed8" },
             },
             {
-              title: "C2 Affiliations",
-              desc: "Affilierings-søgninger for Circle 2 — extended sources",
-              href: `/admin/system/layers/neurosurgery?tab=circle2`,
+              title: "C2 Extended Sources",
+              desc: "Affiliations-baseret søgning — kræver validering",
+              href: "/admin/system/import/c2",
+              badge: { bg: "#f3e8ff", text: "#7c3aed" },
             },
-          ].map(({ title, desc, href }) => (
+            {
+              title: "C3 Danish Sources",
+              desc: "Danske neurokirurgiske afdelinger — kræver validering",
+              href: "/admin/system/import/c3",
+              badge: { bg: "#fff7ed", text: "#c2410c" },
+            },
+          ].map(({ title, desc, href, badge }) => (
             <Link
               key={title}
               href={href}
               style={{ ...card, textDecoration: "none", color: "inherit", display: "block" }}
             >
-              <div style={cardHeader()}>
-                {title}
+              <div style={{ ...cardHeader(), display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{
+                  fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "1px 6px",
+                  background: badge.bg, color: badge.text,
+                }}>
+                  {title.slice(0, 2)}
+                </span>
+                <span>{title.slice(3)}</span>
               </div>
               <div style={{ padding: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
                 <div style={{ fontSize: "13px", color: "#5a6a85", lineHeight: 1.5 }}>{desc}</div>
-                <div style={{ fontSize: "13px", fontWeight: 600, color: "#E83B2A", flexShrink: 0 }}>Konfigurér →</div>
+                <div style={{ fontSize: "13px", fontWeight: 600, color: "#E83B2A", flexShrink: 0 }}>Administrér →</div>
               </div>
             </Link>
           ))}
