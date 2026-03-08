@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SPECIALTIES } from "@/lib/auth/specialties";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-type StatRow = { circle: number | null; status: string | null; antal: number };
 
 interface LinkingSnap {
   started_at: string;
@@ -119,52 +116,42 @@ function ProgressBar({ value, total, color }: { value: number; total: number; co
 
 export default async function ImportDashboardPage() {
   const admin = createAdminClient();
-  const activeSpecialties = SPECIALTIES.filter((s) => s.active);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const a = admin as any;
+
+  // Direct article counts per circle+status (bypasses RPC for accuracy)
+  const countQ = (circle: number, status: string) =>
+    a.from("articles").select("id", { count: "exact", head: true })
+      .eq("circle", circle).eq("status", status) as Promise<{ count: number | null }>;
 
   const [
-    rpcResults,
-    authorsResult,
-    unlinkedResult,
-    latestLinkingResult,
-    citationStatusRes,
-    impactStatusRes,
-    latestC1LogResult,
-    latestC2LogResult,
-    latestC3LogResult,
-    meshTaggedResult,
+    c1ApprovedRes, c2ApprovedRes, c2PendingRes, c2RejectedRes,
+    c3ApprovedRes, c3PendingRes, c3RejectedRes,
+    totalArticlesRes,
+    authorsResult, unlinkedResult, latestLinkingResult,
+    citWithRes, citWithoutRes, ifWithRes, ifWithoutRes,
+    latestC1LogResult, latestC2LogResult, latestC3LogResult,
   ] = await Promise.all([
-    // Article stats per specialty
-    Promise.all(
-      activeSpecialties.map((s) =>
-        admin
-          .rpc("get_specialty_article_stats" as never, { specialty_slug: s.slug } as never)
-          .then((r) => (r.data as unknown as StatRow[]) ?? [])
-      )
-    ),
-    // Total authors
+    // Article counts per circle+status
+    countQ(1, "approved"), countQ(2, "approved"), countQ(2, "pending"), countQ(2, "rejected"),
+    countQ(3, "approved"), countQ(3, "pending"), countQ(3, "rejected"),
+    // Total articles
+    admin.from("articles").select("id", { count: "exact", head: true }),
+    // Authors
     admin.from("authors").select("*", { count: "exact", head: true }),
-    // Unlinked articles
     admin.rpc("count_unlinked_articles" as never),
-    // Latest linking run
-    admin
-      .from("author_linking_logs")
+    admin.from("author_linking_logs")
       .select("started_at, completed_at, status, new_authors, duplicates, rejected")
-      .order("started_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    // Citation status
-    Promise.all([
-      admin.from("articles").select("id", { count: "exact", head: true }).not("citation_count" as never, "is", null),
-      admin.from("articles").select("id", { count: "exact", head: true }).is("citation_count" as never, null),
-    ]),
-    // Impact factor status
-    Promise.all([
-      admin.from("articles").select("id", { count: "exact", head: true }).not("impact_factor", "is", null),
-      admin.from("articles").select("id", { count: "exact", head: true }).is("impact_factor", null),
-    ]),
-    // Latest completed import log per circle — resolve filter IDs first
+      .order("started_at", { ascending: false }).limit(1).maybeSingle(),
+    // Enrichment
+    admin.from("articles").select("id", { count: "exact", head: true }).not("citation_count" as never, "is", null),
+    admin.from("articles").select("id", { count: "exact", head: true }).is("citation_count" as never, null),
+    admin.from("articles").select("id", { count: "exact", head: true }).not("impact_factor", "is", null),
+    admin.from("articles").select("id", { count: "exact", head: true }).is("impact_factor", null),
+    // Latest completed import log per circle
     admin.from("pubmed_filters").select("id").eq("specialty", "neurosurgery").eq("circle", 1)
-      .then(async (fRes) => {
+      .then(async (fRes: { data: { id: string }[] | null }) => {
         const ids = (fRes.data ?? []).map((f) => f.id);
         if (ids.length === 0) return { data: null };
         return admin.from("import_logs").select("started_at, articles_imported")
@@ -172,38 +159,28 @@ export default async function ImportDashboardPage() {
           .order("started_at", { ascending: false }).limit(1).maybeSingle();
       }),
     admin.from("pubmed_filters").select("id").eq("specialty", "neurosurgery").eq("circle", 2)
-      .then(async (fRes) => {
+      .then(async (fRes: { data: { id: string }[] | null }) => {
         const ids = (fRes.data ?? []).map((f) => f.id);
         if (ids.length === 0) return { data: null };
         return admin.from("import_logs").select("started_at, articles_imported")
           .eq("status", "completed").in("filter_id", ids)
           .order("started_at", { ascending: false }).limit(1).maybeSingle();
       }),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (admin.from("import_logs") as any)
-      .select("started_at, articles_imported")
-      .eq("status", "completed")
-      .eq("circle", 3)
-      .order("started_at", { ascending: false })
-      .limit(1)
+    a.from("import_logs").select("started_at, articles_imported")
+      .eq("status", "completed").eq("circle", 3)
+      .order("started_at", { ascending: false }).limit(1)
       .maybeSingle() as Promise<{ data: ImportLog | null }>,
-    // MeSH-tagged articles count
-    admin.from("articles").select("id", { count: "exact", head: true }).not("mesh_terms", "is", null),
   ]);
 
-  // ── Aggregate article stats ──
-  const allRows = rpcResults.flat();
-  function getCircleStat(c: number, s: string) {
-    return allRows.filter((r) => r.circle === c && r.status === s).reduce((sum, r) => sum + Number(r.antal), 0);
-  }
-
-  const totalArticles = allRows.reduce((sum, r) => sum + Number(r.antal), 0);
-
-  const c1Approved = getCircleStat(1, "approved");
-  const c2Approved = getCircleStat(2, "approved");
-  const c2Pending = getCircleStat(2, "pending");
-  const c2Rejected = getCircleStat(2, "rejected");
-  const c3Pending = getCircleStat(3, "pending");
+  // ── Article stats ──
+  const c1Approved = (c1ApprovedRes as { count: number | null }).count ?? 0;
+  const c2Approved = (c2ApprovedRes as { count: number | null }).count ?? 0;
+  const c2Pending  = (c2PendingRes as { count: number | null }).count ?? 0;
+  const c2Rejected = (c2RejectedRes as { count: number | null }).count ?? 0;
+  const c3Approved = (c3ApprovedRes as { count: number | null }).count ?? 0;
+  const c3Pending  = (c3PendingRes as { count: number | null }).count ?? 0;
+  const c3Rejected = (c3RejectedRes as { count: number | null }).count ?? 0;
+  const totalArticles = totalArticlesRes.count ?? 0;
 
   // Latest import per circle
   const latestC1 = latestC1LogResult.data as ImportLog | null;
@@ -216,15 +193,13 @@ export default async function ImportDashboardPage() {
   const latestLinking = latestLinkingResult.data as LinkingSnap | null;
 
   // Enrichment stats
-  const citWith = citationStatusRes[0].count ?? 0;
-  const citWithout = citationStatusRes[1].count ?? 0;
+  const citWith = citWithRes.count ?? 0;
+  const citWithout = citWithoutRes.count ?? 0;
   const citTotal = citWith + citWithout;
 
-  const ifWith = impactStatusRes[0].count ?? 0;
-  const ifWithout = impactStatusRes[1].count ?? 0;
+  const ifWith = ifWithRes.count ?? 0;
+  const ifWithout = ifWithoutRes.count ?? 0;
   const ifTotal = ifWith + ifWithout;
-
-  const meshTagged = meshTaggedResult.count ?? 0;
 
   // Circle table data
   const circleRows: {
@@ -237,7 +212,7 @@ export default async function ImportDashboardPage() {
   }[] = [
     { circle: 1, name: "Trusted Journals", approved: c1Approved, pending: null, rejected: null, latestDate: latestC1?.started_at ?? null },
     { circle: 2, name: "Extended Sources", approved: c2Approved, pending: c2Pending, rejected: c2Rejected, latestDate: latestC2?.started_at ?? null },
-    { circle: 3, name: "Danish Sources", approved: null, pending: c3Pending, rejected: null, latestDate: latestC3?.started_at ?? null },
+    { circle: 3, name: "Danish Sources", approved: c3Approved || null, pending: c3Pending, rejected: c3Rejected || null, latestDate: latestC3?.started_at ?? null },
   ];
 
   // ── Render ──
@@ -310,15 +285,11 @@ export default async function ImportDashboardPage() {
             </tbody>
           </table>
 
-          {/* KPIs under table */}
-          <div style={{ padding: "16px 20px", borderTop: "1px solid #eef0f4", display: "flex", gap: "32px", flexWrap: "wrap" }}>
+          {/* KPI under table */}
+          <div style={{ padding: "16px 20px", borderTop: "1px solid #eef0f4" }}>
             <div>
               <div style={kpiLabel}>Total artikler</div>
               <div style={{ fontSize: "24px", fontWeight: 800, color: "#E83B2A" }}>{num(totalArticles)}</div>
-            </div>
-            <div>
-              <div style={kpiLabel}>Auto-tagged (MeSH)</div>
-              <div style={{ fontSize: "24px", fontWeight: 800, color: "#1a1a1a" }}>{num(meshTagged)}</div>
             </div>
           </div>
         </div>
