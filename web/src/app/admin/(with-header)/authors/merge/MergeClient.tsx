@@ -112,6 +112,7 @@ export default function MergeClient() {
     setDetails([]);
     setMasterId(null);
     setError(null);
+    setMerging(false);
   }, []);
 
   /* ── Merge (step 3) ─── */
