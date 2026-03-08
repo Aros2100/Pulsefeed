@@ -66,6 +66,57 @@ function KV({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+// ── Card helpers (same style as ArticleStamkort) ─────────────────────────────
+
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      background: "#fff",
+      borderRadius: "10px",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
+      marginBottom: "12px",
+      overflow: "hidden",
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function CardHeader({ label, green }: { label: string; green?: boolean }) {
+  return (
+    <div style={{
+      background: green ? "#f0f7ee" : "#EEF2F7",
+      borderBottom: `1px solid ${green ? "#c8e6c0" : "#dde3ed"}`,
+      padding: "10px 24px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+    }}>
+      <div style={{
+        fontSize: "11px", letterSpacing: "0.08em",
+        color: green ? "#3a7d44" : "#5a6a85",
+        textTransform: "uppercase", fontWeight: 700,
+      }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function CardBody({ children }: { children: React.ReactNode }) {
+  return <div style={{ padding: "20px 24px" }}>{children}</div>;
+}
+
+function CardKVRow({ label, value }: { label: string; value: React.ReactNode }) {
+  if (!value && value !== 0) return null;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontSize: "14px" }}>
+      <span style={{ color: "#888" }}>{label}</span>
+      <span style={{ color: "#1a1a1a" }}>{value}</span>
+    </div>
+  );
+}
+
 // ── Event cards ───────────────────────────────────────────────────────────────
 
 type P = Record<string, unknown>;
@@ -256,6 +307,65 @@ function EventCard({ eventType, payload }: { eventType: string; payload: P }) {
   }
 }
 
+// ── Berigelse helpers ─────────────────────────────────────────────────────────
+
+function EvidenceScore({ value }: { value: number }) {
+  const pct   = Math.min(100, Math.max(0, value));
+  const color = pct >= 70 ? "#15803d" : pct >= 40 ? "#d97706" : "#E83B2A";
+  const bg    = pct >= 70 ? "#f0fdf4" : pct >= 40 ? "#fffbeb" : "#fef2f2";
+  const label = pct >= 70 ? "Strong" : pct >= 40 ? "Moderate" : "Limited";
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: "16px",
+      background: bg, borderRadius: "8px", padding: "12px 16px",
+      border: `1px solid ${color}22`,
+    }}>
+      <div style={{ textAlign: "center", minWidth: "56px" }}>
+        <div style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1, color }}>{pct}</div>
+        <div style={{ fontSize: "10px", color: "#888", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: "2px" }}>/ 100</div>
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" }}>
+          <span style={{ fontSize: "12px", fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            {label} evidence
+          </span>
+        </div>
+        <div style={{ height: "6px", borderRadius: "3px", background: "#e5e7eb", overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: "3px" }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ifBadge(value: number): React.ReactNode {
+  const isGold   = value >= 5;
+  const isSilver = value >= 3;
+  const bg     = isGold ? "#fef3c7" : isSilver ? "#f1f5f9" : "#f9fafb";
+  const color  = isGold ? "#92400e" : isSilver ? "#475569" : "#6b7280";
+  const border = isGold ? "#fde68a" : isSilver ? "#cbd5e1" : "#e5e7eb";
+  const label  = isGold ? "Gold" : isSilver ? "Silver" : "Low";
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+      <span style={{ fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px", background: bg, color, border: `1px solid ${border}` }}>
+        {label}
+      </span>
+      <span>{value.toFixed(3)}</span>
+    </span>
+  );
+}
+
+function stars(value: number | null): React.ReactNode {
+  if (!value) return null;
+  const v = Math.round(Math.max(1, Math.min(5, value)));
+  return (
+    <>
+      {"★".repeat(v)}
+      <span style={{ color: "#ddd" }}>{"★".repeat(5 - v)}</span>
+    </>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function AdminArticleLogPage({
@@ -275,6 +385,12 @@ export default async function AdminArticleLogPage({
   const article = articleResult.data;
   if (!article) notFound();
 
+  // Cast for typed access
+  const a = article as unknown as ArticleData;
+
+  // Raw article for fields not on ArticleData
+  const raw = article as Record<string, unknown>;
+
   // Map position → author_id and author_score for linking author names + scores
   const authorIdByPosition = new Map(
     (authorLinksResult.data ?? []).map((r) => [r.position as number, r.author_id as string])
@@ -292,13 +408,200 @@ export default async function AdminArticleLogPage({
     created_at: string;
   }[];
 
-  // ── Tab content ───────────────────────────────────────────────────────────────
+  // ── PubMed tab ──────────────────────────────────────────────────────────────
 
   const pubmedTab = (
     <div style={{ padding: "4px 0 80px" }}>
-      <ArticleStamkort article={article as unknown as ArticleData} authorIdByPosition={authorIdByPosition} authorScoreByPosition={authorScoreByPosition} />
+      <ArticleStamkort article={a} authorIdByPosition={authorIdByPosition} authorScoreByPosition={authorScoreByPosition} />
     </div>
   );
+
+  // ── Berigelse tab ───────────────────────────────────────────────────────────
+
+  const isEnriched = !!a.enriched_at;
+  const pico = a.pico as { population?: string; intervention?: string; comparison?: string; outcome?: string } | null;
+  const citationsUrl = `https://europepmc.org/search?query=cites:MED:${a.pubmed_id}`;
+
+  const berigelseTab = (
+    <div style={{ padding: "4px 0 80px" }}>
+      {/* Evidence Score */}
+      {a.evidence_score != null && (
+        <Card>
+          <CardHeader label="Evidence Score" />
+          <CardBody>
+            <EvidenceScore value={a.evidence_score} />
+          </CardBody>
+        </Card>
+      )}
+
+      {/* Bibliometri */}
+      <Card>
+        <CardHeader label="Bibliometri" />
+        <CardBody>
+          <CardKVRow label="Impact Factor" value={a.impact_factor != null ? ifBadge(a.impact_factor) : "—"} />
+          <CardKVRow label="Journal H-index" value={a.journal_h_index != null ? String(a.journal_h_index) : "—"} />
+          <CardKVRow label="Citation Count" value={
+            <a href={citationsUrl} target="_blank" rel="noopener noreferrer"
+              style={{ color: "#1a6eb5", textDecoration: "none" }}>
+              {a.citation_count ?? "—"}{a.citation_count != null ? " ↗" : ""}
+            </a>
+          } />
+        </CardBody>
+      </Card>
+
+      {/* AI Summary */}
+      {isEnriched && a.short_resume && (
+        <Card>
+          <CardHeader label="AI Summary" green />
+          <CardBody>
+            <div style={{ fontSize: "15px", lineHeight: 1.75, color: "#1a1a1a" }}>
+              {a.short_resume}
+            </div>
+            <div style={{ display: "flex", gap: "32px", marginTop: "20px", paddingTop: "16px", borderTop: "1px solid #e8f0e8" }}>
+              <div>
+                <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>News Value</div>
+                <div style={{ fontSize: "18px", letterSpacing: "2px", color: "#f4a100" }}>
+                  {stars(a.news_value)}
+                </div>
+              </div>
+              {a.clinical_relevance && (
+                <div>
+                  <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>Clinical Relevance</div>
+                  <span style={{
+                    display: "inline-block", fontSize: "12px",
+                    background: a.clinical_relevance.toLowerCase().includes("practice") ? "#fff3e0" : "#e8f4e8",
+                    color:      a.clinical_relevance.toLowerCase().includes("practice") ? "#e65100"  : "#2d7a2d",
+                    padding: "4px 12px", borderRadius: "20px", fontWeight: 600,
+                  }}>
+                    {a.clinical_relevance}
+                  </span>
+                </div>
+              )}
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* PICO */}
+      {isEnriched && pico && (pico.population || pico.intervention || pico.comparison || pico.outcome) && (
+        <Card>
+          <CardHeader label="PICO" green />
+          <CardBody>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              {([
+                { label: "Population",   value: pico.population },
+                { label: "Intervention", value: pico.intervention },
+                { label: "Comparison",   value: pico.comparison },
+                { label: "Outcome",      value: pico.outcome },
+              ] as { label: string; value: string | undefined }[])
+                .filter((p) => p.value)
+                .map((p) => (
+                  <div key={p.label} style={{ background: "#f9fafb", borderRadius: "8px", padding: "14px", border: "1px solid #eef2f7" }}>
+                    <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px", fontWeight: 600 }}>
+                      {p.label}
+                    </div>
+                    <div style={{ fontSize: "14px", lineHeight: 1.5, color: "#2a2a2a" }}>{p.value}</div>
+                  </div>
+                ))
+              }
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* Specialty scoring */}
+      <Card>
+        <CardHeader label="Specialty scoring" />
+        <CardBody>
+          <CardKVRow label="AI beslutning" value={
+            a.ai_decision
+              ? <Badge color={a.ai_decision === "approved" ? "green" : "red"}>{a.ai_decision}</Badge>
+              : "—"
+          } />
+          <CardKVRow label="Confidence" value={
+            (raw.specialty_confidence as number | null) != null
+              ? `${(raw.specialty_confidence as number).toFixed(1)}%`
+              : "—"
+          } />
+          <CardKVRow label="Model" value={(raw.model_version as string | null) ?? "—"} />
+          <CardKVRow label="Scored at" value={
+            (raw.specialty_scored_at as string | null)
+              ? fmt(raw.specialty_scored_at as string)
+              : "—"
+          } />
+        </CardBody>
+      </Card>
+    </div>
+  );
+
+  // ── System tab ──────────────────────────────────────────────────────────────
+
+  const importedDisplay = (() => {
+    const d = new Date(a.imported_at);
+    const date = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+    return `${date} at ${time}`;
+  })();
+
+  const pubmedUrl = `https://pubmed.ncbi.nlm.nih.gov/${a.pubmed_id}/`;
+  const pmcId = raw.pmc_id as string | null;
+
+  const systemTab = (
+    <div style={{ padding: "4px 0 80px" }}>
+      {/* Import */}
+      <Card>
+        <CardHeader label="Import" />
+        <CardBody>
+          <CardKVRow label="Circle" value={
+            (raw.circle as number | null) != null
+              ? <Badge color="blue">{`Circle ${raw.circle}`}</Badge>
+              : "—"
+          } />
+          <CardKVRow label="Imported at" value={importedDisplay} />
+          <CardKVRow label="Source ID" value={(raw.source_id as string | null) ?? "—"} />
+        </CardBody>
+      </Card>
+
+      {/* Editable fields */}
+      <Card>
+        <CardHeader label="Redigering" />
+        <CardBody>
+          <ArticleEditableFields
+            articleId={id}
+            initialTags={(a.specialty_tags as string[] | null) ?? []}
+            initialStatus={(raw.status as string | null) ?? "pending"}
+            initialVerified={(raw.verified as boolean | null) ?? false}
+          />
+        </CardBody>
+      </Card>
+
+      {/* IDs */}
+      <Card>
+        <CardHeader label="IDs" />
+        <CardBody>
+          <CardKVRow label="Article UUID" value={
+            <span style={{ fontFamily: "monospace", fontSize: "12px" }}>{a.id}</span>
+          } />
+          <CardKVRow label="PubMed ID" value={
+            <a href={pubmedUrl} target="_blank" rel="noopener noreferrer"
+              style={{ color: "#1a6eb5", textDecoration: "none" }}>
+              PMID {a.pubmed_id} ↗
+            </a>
+          } />
+          {pmcId && (
+            <CardKVRow label="PMC ID" value={
+              <a href={`https://www.ncbi.nlm.nih.gov/pmc/articles/${pmcId}/`} target="_blank" rel="noopener noreferrer"
+                style={{ color: "#1a6eb5", textDecoration: "none" }}>
+                {pmcId} ↗
+              </a>
+            } />
+          )}
+        </CardBody>
+      </Card>
+    </div>
+  );
+
+  // ── Historik tab ────────────────────────────────────────────────────────────
 
   const SECTIONS: { title: string; types: string[]; alwaysShow?: boolean }[] = [
     { title: "Indlæsning af artikel",    types: ["imported"],      alwaysShow: true },
@@ -385,24 +688,23 @@ export default async function AdminArticleLogPage({
           <Link href="/admin/articles" style={{ color: "#5a6a85", textDecoration: "none" }}>← Artikler</Link>
         </div>
 
-        {/* Article header */}
+        {/* Article header — title only */}
         <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "24px", marginBottom: "24px" }}>
-          <h1 style={{ fontSize: "16px", fontWeight: 700, lineHeight: 1.4, margin: "0 0 16px" }}>
-            {article.title as string}
+          <h1 style={{ fontSize: "16px", fontWeight: 700, lineHeight: 1.4, margin: 0 }}>
+            {a.title}
           </h1>
-          <ArticleEditableFields
-            articleId={id}
-            initialTags={(article.specialty_tags as string[] | null) ?? []}
-            initialStatus={(article.status as string | null) ?? "pending"}
-            initialVerified={(article.verified as boolean | null) ?? false}
-          />
         </div>
 
       </div>
 
       {/* Tabs */}
       <div style={{ maxWidth: "860px", margin: "0 auto", padding: "0 24px" }}>
-        <AdminArticleTabs pubmed={pubmedTab} historik={historikTab} />
+        <AdminArticleTabs
+          pubmed={pubmedTab}
+          berigelse={berigelseTab}
+          system={systemTab}
+          historik={historikTab}
+        />
       </div>
     </div>
   );

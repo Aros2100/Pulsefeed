@@ -12,6 +12,11 @@ const TAG_REMAP: Record<string, string> = {
   "Oncology":            "oncology",
   "Anesthesiology":      "anesthesiology",
   "ENT":                 "ent",
+  "Radiology":           "radiology",
+  "Ophthalmology":       "ophthalmology",
+  "Psychiatry":          "psychiatry",
+  "Nuclear Medicine":    "nuclear_medicine",
+  "Health Care Management": "health_care_management",
 };
 
 const schema = z.object({

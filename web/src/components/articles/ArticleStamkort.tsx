@@ -1,4 +1,3 @@
-import { SPECIALTIES } from "@/lib/auth/specialties";
 import CollapseAuthors from "./CollapseAuthors";
 import CopyButton from "./CopyButton";
 
@@ -44,8 +43,6 @@ export interface ArticleData {
 interface Author   { lastName?: string; foreName?: string; affiliation?: string | null; orcid?: string | null }
 interface MeshTerm { descriptor?: string; major?: boolean; qualifiers?: string[] }
 interface Grant    { grantId?: string | null; agency?: string | null }
-interface PicoData { population?: string; intervention?: string; comparison?: string; outcome?: string }
-
 function cast<T>(v: unknown): T[] {
   return Array.isArray(v) ? (v as T[]) : [];
 }
@@ -61,21 +58,6 @@ function decodeHtml(text: string): string {
     .replace(/&apos;/g, "'")
     .replace(/&#x([0-9a-fA-F]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
     .replace(/&#(\d+);/g,            (_, dec) => String.fromCodePoint(parseInt(dec, 10)));
-}
-
-function stars(value: number | null): React.ReactNode {
-  if (!value) return null;
-  const v = Math.round(Math.max(1, Math.min(5, value)));
-  return (
-    <>
-      {"★".repeat(v)}
-      <span style={{ color: "#ddd" }}>{"★".repeat(5 - v)}</span>
-    </>
-  );
-}
-
-function specialtyLabel(slug: string): string {
-  return SPECIALTIES.find((s) => s.slug === slug)?.label ?? slug;
 }
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -132,27 +114,14 @@ export default function ArticleStamkort({ article, authorIdByPosition, authorSco
   const authors   = cast<Author>(article.authors);
   const meshTerms = cast<MeshTerm>(article.mesh_terms);
   const grants    = cast<Grant>(article.grants);
-  const pico      = article.pico as PicoData | null;
   const abstract  = article.abstract ? decodeHtml(article.abstract) : null;
-  const isEnriched = !!article.enriched_at;
 
   const pubmedUrl = `https://pubmed.ncbi.nlm.nih.gov/${article.pubmed_id}/`;
   const doiUrl    = article.doi ? `https://doi.org/${article.doi}` : null;
 
-  const topSpecialty = article.specialty_tags[0]
-    ? specialtyLabel(article.specialty_tags[0])
-    : null;
-
   const publishedDisplay = article.published_date
     ? new Date(article.published_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
     : article.published_year ? String(article.published_year) : null;
-
-  const importedDisplay = (() => {
-    const d = new Date(article.imported_at);
-    const date = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-    const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-    return `${date} at ${time}`;
-  })();
 
   const firstAuthorCitation = authors.length > 0
     ? `${authors[0].lastName ?? ""}${authors.length > 1 ? " et al." : ""}`
@@ -184,56 +153,7 @@ export default function ArticleStamkort({ article, authorIdByPosition, authorSco
     authors.length
       ? fr("Authors", `${[authors[0].foreName, authors[0].lastName].filter(Boolean).join(" ")}${authors.length > 1 ? " et al." : ""}${authors[0].affiliation ? ` · ${authors[0].affiliation}` : ""}`)
       : null,
-    fr("Imported", importedDisplay),
   ].filter((r): r is FactRow => r !== null);
-
-  function EvidenceScore({ value }: { value: number }) {
-    const pct   = Math.min(100, Math.max(0, value));
-    const color = pct >= 70 ? "#15803d" : pct >= 40 ? "#d97706" : "#E83B2A";
-    const bg    = pct >= 70 ? "#f0fdf4" : pct >= 40 ? "#fffbeb" : "#fef2f2";
-    const label = pct >= 70 ? "Strong" : pct >= 40 ? "Moderate" : "Limited";
-    return (
-      <div style={{
-        display: "flex", alignItems: "center", gap: "16px",
-        background: bg, borderRadius: "8px", padding: "12px 16px",
-        marginBottom: "20px", border: `1px solid ${color}22`,
-      }}>
-        <div style={{ textAlign: "center", minWidth: "56px" }}>
-          <div style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1, color }}>{pct}</div>
-          <div style={{ fontSize: "10px", color: "#888", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: "2px" }}>/ 100</div>
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" }}>
-            <span style={{ fontSize: "12px", fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              {label} evidence
-            </span>
-          </div>
-          <div style={{ height: "6px", borderRadius: "3px", background: "#e5e7eb", overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: "3px" }} />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  function ifBadge(value: number): React.ReactNode {
-    const isGold   = value >= 5;
-    const isSilver = value >= 3;
-    const bg     = isGold ? "#fef3c7" : isSilver ? "#f1f5f9" : "#f9fafb";
-    const color  = isGold ? "#92400e" : isSilver ? "#475569" : "#6b7280";
-    const border = isGold ? "#fde68a" : isSilver ? "#cbd5e1" : "#e5e7eb";
-    const label  = isGold ? "Gold" : isSilver ? "Silver" : "Low";
-    return (
-      <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-        <span style={{ fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px", background: bg, color, border: `1px solid ${border}` }}>
-          {label}
-        </span>
-        <span>{value.toFixed(3)}</span>
-      </span>
-    );
-  }
-
-  const citationsUrl = `https://europepmc.org/search?query=cites:MED:${article.pubmed_id}`;
 
   const factRows2: FactRow[] = [
     article.publication_types?.length
@@ -248,17 +168,17 @@ export default function ArticleStamkort({ article, authorIdByPosition, authorSco
         PMID {article.pubmed_id} ↗
       </a>
     )),
+    doiUrl
+      ? fr("DOI", (
+          <a href={doiUrl} target="_blank" rel="noopener noreferrer"
+            style={{ color: "#1a6eb5", textDecoration: "none" }}>
+            {article.doi} ↗
+          </a>
+        ))
+      : null,
     (article.issn_electronic ?? article.issn_print)
       ? fr("ISSN", article.issn_electronic ?? article.issn_print)
       : null,
-    fr("Impact Factor", article.impact_factor != null ? ifBadge(article.impact_factor) : "—"),
-    fr("H-index", article.journal_h_index != null ? article.journal_h_index : "—"),
-    fr("Citations", (
-      <a href={citationsUrl} target="_blank" rel="noopener noreferrer"
-        style={{ color: "#1a6eb5", textDecoration: "none" }}>
-        {article.citation_count ?? "—"}{article.citation_count != null ? " ↗" : ""}
-      </a>
-    )),
   ].filter((r): r is FactRow => r !== null);
 
   const abstractSections = abstract
@@ -281,9 +201,6 @@ export default function ArticleStamkort({ article, authorIdByPosition, authorSco
       <Card id="facts">
         <CardHeader label="Facts" />
         <CardBody>
-          {article.evidence_score != null && (
-            <EvidenceScore value={article.evidence_score} />
-          )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, fontSize: "14px" }}>
             <div>
               {factRows.map(([label, value]) => (
@@ -340,66 +257,6 @@ export default function ArticleStamkort({ article, authorIdByPosition, authorSco
                 </div>
               ))
             }
-          </CardBody>
-        </Card>
-      )}
-
-      {/* AI Summary */}
-      {isEnriched && article.short_resume && (
-        <Card id="ai-summary">
-          <CardHeader label="AI Summary" green />
-          <CardBody>
-            <div style={{ fontSize: "15px", lineHeight: 1.75, color: "#1a1a1a" }}>
-              {article.short_resume}
-            </div>
-            <div style={{ display: "flex", gap: "32px", marginTop: "20px", paddingTop: "16px", borderTop: "1px solid #e8f0e8" }}>
-              <div>
-                <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>News Value</div>
-                <div style={{ fontSize: "18px", letterSpacing: "2px", color: "#f4a100" }}>
-                  {stars(article.news_value)}
-                </div>
-              </div>
-              {article.clinical_relevance && (
-                <div>
-                  <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>Clinical Relevance</div>
-                  <span style={{
-                    display: "inline-block", fontSize: "12px",
-                    background: article.clinical_relevance.toLowerCase().includes("practice") ? "#fff3e0" : "#e8f4e8",
-                    color:      article.clinical_relevance.toLowerCase().includes("practice") ? "#e65100"  : "#2d7a2d",
-                    padding: "4px 12px", borderRadius: "20px", fontWeight: 600,
-                  }}>
-                    {article.clinical_relevance}
-                  </span>
-                </div>
-              )}
-            </div>
-          </CardBody>
-        </Card>
-      )}
-
-      {/* PICO */}
-      {isEnriched && pico && (pico.population || pico.intervention || pico.comparison || pico.outcome) && (
-        <Card id="pico">
-          <CardHeader label="PICO" green />
-          <CardBody>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-              {([
-                { label: "Population",   value: pico.population },
-                { label: "Intervention", value: pico.intervention },
-                { label: "Comparison",   value: pico.comparison },
-                { label: "Outcome",      value: pico.outcome },
-              ] as { label: string; value: string | undefined }[])
-                .filter((p) => p.value)
-                .map((p) => (
-                  <div key={p.label} style={{ background: "#f9fafb", borderRadius: "8px", padding: "14px", border: "1px solid #eef2f7" }}>
-                    <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px", fontWeight: 600 }}>
-                      {p.label}
-                    </div>
-                    <div style={{ fontSize: "14px", lineHeight: 1.5, color: "#2a2a2a" }}>{p.value}</div>
-                  </div>
-                ))
-              }
-            </div>
           </CardBody>
         </Card>
       )}

@@ -781,6 +781,11 @@ export default function TrainingClient({ specialty, label }: Props) {
                         "Oncology",
                         "Anesthesiology",
                         "ENT",
+                        "Radiology",
+                        "Ophthalmology",
+                        "Psychiatry",
+                        "Nuclear Medicine",
+                        "Health Care Management",
                         "Ikke klinisk relevant",
                         "Other",
                       ]
