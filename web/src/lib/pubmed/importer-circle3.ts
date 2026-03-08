@@ -193,7 +193,7 @@ export async function runImportCircle3(
           if (upsertErr) {
             errors.push(`Upsert batch error: ${upsertErr.message}`);
           } else {
-            totalImported += batch.length;
+            totalImported += (upsertedRows ?? []).length;
             totalAuthorSlots += batch.reduce((sum, a) => {
               const authors = (a.authors as unknown as unknown[]) ?? [];
               return sum + authors.length;
