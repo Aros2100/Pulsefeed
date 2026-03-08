@@ -298,15 +298,8 @@ export default function TrainingClient({ specialty, label }: Props) {
     }
 
     function populateArticles(list: TrainingArticle[]) {
-      const sorted = [...list].sort((a, b) => {
-        if (a.specialty_confidence == null && b.specialty_confidence == null) return 0;
-        if (a.specialty_confidence == null) return 1;
-        if (b.specialty_confidence == null) return -1;
-        return a.specialty_confidence - b.specialty_confidence;
-      });
-
       const initialAI: Record<string, AIData> = {};
-      for (const a of sorted) {
+      for (const a of list) {
         if (a.specialty_confidence != null) {
           initialAI[a.id] = {
             verdict: scoreToVerdict(a.specialty_confidence),
@@ -319,9 +312,9 @@ export default function TrainingClient({ specialty, label }: Props) {
       }
 
       setAiData(initialAI);
-      setArticles(sorted);
-      setTotalCount(sorted.length);
-      setSelectedId(sorted[0]?.id ?? null);
+      setArticles(list);
+      setTotalCount(list.length);
+      setSelectedId(list[0]?.id ?? null);
     }
 
     void loadArticles();
