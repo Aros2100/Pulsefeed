@@ -107,12 +107,6 @@ export default async function LabPage() {
   const activeVersionCount  = activeVersionCountResult.count ?? 0;
   const disagreementsCount  = (fpResult.count ?? 0) + (fnResult.count ?? 0);
 
-  const futureModules = [
-    { title: "Citation Quality Check", description: "Flag artikler med mistænkelige citatmønstre" },
-    { title: "Duplicate Detection", description: "Mærk næsten-duplikater til sletning" },
-    { title: "Abstract Grading", description: "Bedøm abstract-kvalitet til nyhedsbrev" },
-  ];
-
   return (
     <div style={{
       fontFamily: "var(--font-inter), Inter, sans-serif",
@@ -304,44 +298,6 @@ export default async function LabPage() {
               </Link>
             </div>
           </div>
-        </div>
-
-        {/* Future modules */}
-        <div style={{
-          fontSize: "11px",
-          letterSpacing: "0.08em",
-          color: "#888",
-          textTransform: "uppercase" as const,
-          fontWeight: 700,
-          marginBottom: "12px",
-          marginTop: "28px",
-        }}>
-          Kommende moduler
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
-          {futureModules.map((m) => (
-            <div key={m.title} style={{
-              background: "#fff",
-              borderRadius: "10px",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
-              padding: "20px",
-              opacity: 0.5,
-            }}>
-              <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>{m.title}</div>
-              <div style={{ fontSize: "12px", color: "#888", marginBottom: "16px" }}>{m.description}</div>
-              <span style={{
-                fontSize: "11px",
-                background: "#f5f7fa",
-                border: "1px solid #dde3ed",
-                borderRadius: "4px",
-                padding: "3px 8px",
-                color: "#888",
-                fontWeight: 600,
-              }}>
-                Kommer snart
-              </span>
-            </div>
-          ))}
         </div>
 
       </div>
