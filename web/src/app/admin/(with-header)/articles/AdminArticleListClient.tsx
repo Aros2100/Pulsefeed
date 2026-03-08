@@ -13,19 +13,18 @@ interface ArticleRow {
   status: string | null;
   circle: number | null;
   specialty_tags: string[];
-  verified: boolean | null;
   abstract: string | null;
   evidence_score: number | null;
 }
 
-type SortField = "title" | "journal_abbr" | "published_date" | "imported_at" | "circle" | "status" | "verified" | "evidence_score";
+type SortField = "title" | "journal_abbr" | "published_date" | "imported_at" | "circle" | "status" | "evidence_score";
 
 interface Filters {
   search: string;
   circle: string;
   status: string;
   specialty: string;
-  verified: string;
+  approval_method: string;
   has_abstract: string;
   date_from: string;
   date_to: string;
@@ -83,7 +82,7 @@ function SelectFilter({ value, onChange, options, placeholder }: {
 export default function AdminArticleListClient() {
   const [filters, setFilters] = useState<Filters>({
     search: "", circle: "", status: "", specialty: "",
-    verified: "", has_abstract: "", date_from: "", date_to: "",
+    approval_method: "", has_abstract: "", date_from: "", date_to: "",
     sort_by: "imported_at", sort_dir: "desc", page: 1,
   });
   const [rows, setRows] = useState<ArticleRow[]>([]);
@@ -112,7 +111,7 @@ export default function AdminArticleListClient() {
     if (f.circle)      params.set("circle", f.circle);
     if (f.status)      params.set("status", f.status);
     if (f.specialty)   params.set("specialty", f.specialty);
-    if (f.verified)    params.set("verified", f.verified);
+    if (f.approval_method) params.set("approval_method", f.approval_method);
     if (f.has_abstract) params.set("has_abstract", f.has_abstract);
     if (f.date_from)   params.set("date_from", f.date_from);
     if (f.date_to)     params.set("date_to", f.date_to);
@@ -232,12 +231,14 @@ export default function AdminArticleListClient() {
         {/* Row 2: extra filters */}
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
           <SelectFilter
-            value={filters.verified}
-            onChange={(v) => setFilter("verified", v)}
-            placeholder="Verificeret: Alle"
+            value={filters.approval_method}
+            onChange={(v) => setFilter("approval_method", v)}
+            placeholder="Approval: Alle"
             options={[
-              { value: "true",  label: "Verificeret" },
-              { value: "false", label: "Ikke verificeret" },
+              { value: "journal",       label: "Journal" },
+              { value: "mesh_auto_tag", label: "MeSH-terms" },
+              { value: "human",         label: "Editor" },
+              { value: "null",          label: "Pending" },
             ]}
           />
           <SelectFilter
@@ -265,11 +266,11 @@ export default function AdminArticleListClient() {
               style={{ padding: "5px 8px", fontSize: "12px", border: "1px solid #dde3ed", borderRadius: "6px", outline: "none" }}
             />
           </div>
-          {(filters.circle || filters.status || filters.specialty || filters.verified || filters.has_abstract || filters.date_from || filters.date_to || filters.search) && (
+          {(filters.circle || filters.status || filters.specialty || filters.approval_method || filters.has_abstract || filters.date_from || filters.date_to || filters.search) && (
             <button
               onClick={() => {
                 setSearchInput("");
-                setFilters({ search: "", circle: "", status: "", specialty: "", verified: "", has_abstract: "", date_from: "", date_to: "", sort_by: "imported_at", sort_dir: "desc", page: 1 });
+                setFilters({ search: "", circle: "", status: "", specialty: "", approval_method: "", has_abstract: "", date_from: "", date_to: "", sort_by: "imported_at", sort_dir: "desc", page: 1 });
               }}
               style={{ fontSize: "12px", color: "#E83B2A", background: "none", border: "none", cursor: "pointer", padding: "5px 0", textDecoration: "underline" }}
             >

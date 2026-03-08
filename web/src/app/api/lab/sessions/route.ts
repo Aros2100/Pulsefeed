@@ -142,12 +142,12 @@ export async function POST(request: NextRequest) {
   const [approvedResult, rejectedResult, ...remapResults] = await Promise.all([
     approvedIds.length > 0
       ? admin.from("articles")
-          .update({ verified: true, status: "approved", specialty_tags: [specialty] })
+          .update({ approval_method: "human", status: "approved", specialty_tags: [specialty] })
           .in("id", approvedIds)
       : Promise.resolve({ error: null }),
     rejectedRegularIds.length > 0
       ? admin.from("articles")
-          .update({ verified: false, status: "rejected" })
+          .update({ status: "rejected" })
           .in("id", rejectedRegularIds)
       : Promise.resolve({ error: null }),
     // Per-article updates for remap rejections — bruger RPC der bypasser
@@ -159,7 +159,6 @@ export async function POST(request: NextRequest) {
       return admin.rpc("replace_article_specialty_tags", {
         p_article_id: v.article_id,
         p_tags:       newTags,
-        p_verified:   false,
         p_status:     "rejected",
       });
     }),
@@ -181,19 +180,13 @@ export async function POST(request: NextRequest) {
   }
 
   void Promise.all([
-    ...approvedIds.flatMap((id) => {
+    ...approvedIds.map((id) => {
       const old = oldMap.get(id);
-      return [
-        logArticleEvent(id, "status_changed", { from: old?.status ?? null, to: "approved",  changed_by: auth.userId }),
-        logArticleEvent(id, "verified",        { from: old?.verified ?? null, to: true,      changed_by: auth.userId }),
-      ];
+      return logArticleEvent(id, "status_changed", { from: old?.status ?? null, to: "approved", changed_by: auth.userId });
     }),
-    ...rejectedIds.flatMap((id) => {
+    ...rejectedIds.map((id) => {
       const old = oldMap.get(id);
-      return [
-        logArticleEvent(id, "status_changed", { from: old?.status ?? null, to: "rejected", changed_by: auth.userId }),
-        logArticleEvent(id, "verified",        { from: old?.verified ?? null, to: false,    changed_by: auth.userId }),
-      ];
+      return logArticleEvent(id, "status_changed", { from: old?.status ?? null, to: "rejected", changed_by: auth.userId });
     }),
   ]);
 

@@ -185,7 +185,7 @@ export async function runImportCircle3(
             issn_print:        a.issnPrint,
             specialty_tags:    ["neurosurgery"],
             circle:            3,
-            verified:          false,
+            approval_method:   null,
             status:            "pending",
             country:           "Denmark",
           }));

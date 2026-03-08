@@ -31,6 +31,7 @@ const COLORS: Record<string, { dot: string; border: string; bg: string; label: s
   verified:       { dot: "#10b981", border: "#a7f3d0", bg: "#f0fdf4",  label: "Verificeret" },
   author_linked:  { dot: "#3b82f6", border: "#bfdbfe", bg: "#eff6ff",  label: "Forfattere" },
   quality_check:          { dot: "#6b7280", border: "#d1d5db", bg: "#f9fafb",  label: "Quality Check" },
+  auto_tagged:            { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff",  label: "Auto-Tagged" },
   impact_factor_updated:  { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff",  label: "Impact Factor opdateret" },
   citation_count_updated: { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff",  label: "Citations opdateret" },
 };
@@ -286,6 +287,33 @@ function CitationCountUpdatedCard({ p }: { p: P }) {
   );
 }
 
+function AutoTaggedCard({ p }: { p: P }) {
+  const score     = p.mesh_score as number | null;
+  const threshold = p.threshold as number | null;
+  const source    = p.source as string | null;
+  const terms     = (p.matched_terms ?? []) as { term: string; approve_rate: number; total_decisions: number }[];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      {score != null && <KV label="Mesh Score" value={<><strong>{score}</strong>{threshold != null && <span style={{ color: "#888" }}> / {threshold}</span>}</>} />}
+      {source && <KV label="Kilde" value={<Badge color="blue">{source}</Badge>} />}
+      {terms.length > 0 && (
+        <div style={{ marginTop: "4px" }}>
+          <div style={{ fontSize: "11px", color: "#5a6a85", marginBottom: "4px", fontWeight: 600 }}>Matchede MeSH terms</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+            {terms.map((t) => (
+              <div key={t.term} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px" }}>
+                <span style={{ color: "#1a1a1a" }}>{t.term}</span>
+                <span style={{ color: "#888" }}>{t.approve_rate}% · {t.total_decisions} beslutninger</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EventCard({ eventType, payload }: { eventType: string; payload: P }) {
   switch (eventType) {
     case "imported":       return <ImportedCard      p={payload} />;
@@ -296,6 +324,7 @@ function EventCard({ eventType, payload }: { eventType: string; payload: P }) {
     case "verified":       return <VerifiedCard      p={payload} />;
     case "author_linked":  return <AuthorLinkedCard  p={payload} />;
     case "quality_check":          return <QualityCheckCard          p={payload} />;
+    case "auto_tagged":            return <AutoTaggedCard            p={payload} />;
     case "impact_factor_updated":  return <ImpactFactorUpdatedCard   p={payload} />;
     case "citation_count_updated": return <CitationCountUpdatedCard  p={payload} />;
     default:
@@ -558,6 +587,13 @@ export default async function AdminArticleLogPage({
               : "—"
           } />
           <CardKVRow label="Imported at" value={importedDisplay} />
+          <CardKVRow label="Specialty Tag Approval" value={(() => {
+            const m = raw.approval_method as string | null;
+            if (m === "human")        return <Badge color="green">Approved by Editor</Badge>;
+            if (m === "mesh_auto_tag") return <span style={{ display: "inline-block", padding: "1px 7px", borderRadius: "999px", fontSize: "11px", fontWeight: 600, background: "#ecfeff", color: "#0891b2", border: "1px solid #a5f3fc" }}>Auto-approved by MeSH-terms</span>;
+            if (m === "journal")      return <Badge color="blue">Auto-approved by Journal</Badge>;
+            return <span style={{ color: "#9ca3af" }}>Pending</span>;
+          })()} />
           <CardKVRow label="Source ID" value={(raw.source_id as string | null) ?? "—"} />
         </CardBody>
       </Card>
@@ -570,7 +606,6 @@ export default async function AdminArticleLogPage({
             articleId={id}
             initialTags={(a.specialty_tags as string[] | null) ?? []}
             initialStatus={(raw.status as string | null) ?? "pending"}
-            initialVerified={(raw.verified as boolean | null) ?? false}
           />
         </CardBody>
       </Card>
@@ -607,6 +642,7 @@ export default async function AdminArticleLogPage({
     { title: "Indlæsning af artikel",    types: ["imported"],      alwaysShow: true },
     { title: "Indlæsning af forfattere", types: ["author_linked"], alwaysShow: true },
     { title: "Speciale scoring",         types: ["enriched"] },
+    { title: "Auto-Tagging",            types: ["auto_tagged"] },
     { title: "Validering",               types: ["lab_decision"] },
     { title: "Bibliometri",              types: ["impact_factor_updated", "citation_count_updated"] },
   ];

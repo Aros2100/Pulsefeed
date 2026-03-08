@@ -87,15 +87,12 @@ export async function POST(request: NextRequest) {
     if (editor_verdict === "relevant") {
       const { error: updateError } = await admin
         .from("articles")
-        .update({ specialty_tags: [specialty], verified: true, status: "approved" })
+        .update({ specialty_tags: [specialty], approval_method: "human", status: "approved" })
         .eq("id", article_id);
       if (updateError) {
         return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
       }
-      void Promise.all([
-        logArticleEvent(article_id, "status_changed", { from: oldArticle?.status ?? null, to: "approved", changed_by: auth.userId }),
-        logArticleEvent(article_id, "verified",        { from: oldArticle?.verified ?? null, to: true,      changed_by: auth.userId }),
-      ]);
+      void logArticleEvent(article_id, "status_changed", { from: oldArticle?.status ?? null, to: "approved", changed_by: auth.userId });
     } else {
       const remapTag = disagreement_reason ? TAG_REMAP[disagreement_reason] : undefined;
       const oldTags  = (oldArticle?.specialty_tags ?? []) as string[];
@@ -107,7 +104,6 @@ export async function POST(request: NextRequest) {
         const { error: updateError } = await (admin as any).rpc("replace_article_specialty_tags", {
           p_article_id: article_id,
           p_tags:       newTags,
-          p_verified:   false,
           p_status:     "rejected",
         });
         if (updateError) {
@@ -116,16 +112,13 @@ export async function POST(request: NextRequest) {
       } else {
         const { error: updateError } = await admin
           .from("articles")
-          .update({ verified: false, status: "rejected" })
+          .update({ status: "rejected" })
           .eq("id", article_id);
         if (updateError) {
           return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
         }
       }
-      void Promise.all([
-        logArticleEvent(article_id, "status_changed", { from: oldArticle?.status ?? null, to: "rejected", changed_by: auth.userId }),
-        logArticleEvent(article_id, "verified",        { from: oldArticle?.verified ?? null, to: false,    changed_by: auth.userId }),
-      ]);
+      void logArticleEvent(article_id, "status_changed", { from: oldArticle?.status ?? null, to: "rejected", changed_by: auth.userId });
     }
   }
   // unsure: no article update

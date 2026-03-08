@@ -4,9 +4,21 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logArticleEvent } from "@/lib/article-events";
 import { z } from "zod";
 
+const matchedTermSchema = z.object({
+  term: z.string(),
+  approve_rate: z.number(),
+  total_decisions: z.number(),
+});
+
+const articleScoreSchema = z.object({
+  mesh_score: z.number(),
+  matched_terms: z.array(matchedTermSchema),
+});
+
 const schema = z.object({
   articleIds: z.array(z.string().uuid()).min(1).max(500),
   specialty: z.string(),
+  articleScores: z.record(z.string().uuid(), articleScoreSchema).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -27,13 +39,14 @@ export async function POST(request: NextRequest) {
   let approved = 0;
 
   // Batch update in chunks of 50
-  const { articleIds, specialty } = parsed.data;
+  const { articleIds, specialty, articleScores } = parsed.data;
   for (let i = 0; i < articleIds.length; i += 50) {
     const chunk = articleIds.slice(i, i + 50);
     const { error } = await admin
       .from("articles")
       .update({
         status: "approved",
+        approval_method: "mesh_auto_tag",
         auto_tagged_at: now,
       } as never)
       .in("id", chunk)
@@ -41,10 +54,14 @@ export async function POST(request: NextRequest) {
 
     if (!error) {
       for (const id of chunk) {
+        const score = articleScores?.[id];
         await logArticleEvent(id, "auto_tagged", {
+          source: "mesh_auto_tagging",
           specialty,
-          batch_approved: true,
+          threshold: 95,
           approved_by: auth.userId,
+          mesh_score: score?.mesh_score ?? null,
+          matched_terms: score?.matched_terms ?? [],
         });
       }
       approved += chunk.length;

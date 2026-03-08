@@ -188,7 +188,7 @@ export async function runImportCircle2(
           issn_print:        a.issnPrint,
           specialty_tags:    [specialty],
           circle:            2,
-          verified:          false,
+          approval_method:   null,
           status:            "pending",
           source_id:         source.id,
         }));

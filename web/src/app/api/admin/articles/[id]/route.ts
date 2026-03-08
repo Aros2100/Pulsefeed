@@ -7,8 +7,7 @@ import { logArticleEvent } from "@/lib/article-events";
 const schema = z.object({
   specialty_tags: z.array(z.string()).optional(),
   status:         z.enum(["pending", "approved", "rejected"]).optional(),
-  verified:       z.boolean().optional(),
-}).refine((d) => d.specialty_tags !== undefined || d.status !== undefined || d.verified !== undefined, {
+}).refine((d) => d.specialty_tags !== undefined || d.status !== undefined, {
   message: "At least one field must be provided",
 });
 
@@ -30,7 +29,7 @@ export async function PUT(
     return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
   }
 
-  const { specialty_tags, status, verified } = result.data;
+  const { specialty_tags, status } = result.data;
   const admin = createAdminClient();
 
   // Fetch current article values for logging and for RPC args
@@ -64,30 +63,17 @@ export async function PUT(
     });
   }
 
-  // Update status and/or verified
-  const updates: Record<string, unknown> = {};
-  if (status !== undefined)   updates.status   = status;
-  if (verified !== undefined) updates.verified = verified;
-
-  if (Object.keys(updates).length > 0) {
-    const { error } = await admin.from("articles").update(updates).eq("id", articleId);
+  // Update status
+  if (status !== undefined) {
+    const { error } = await admin.from("articles").update({ status }).eq("id", articleId);
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
-    if (status !== undefined) {
-      void logArticleEvent(articleId, "status_changed", {
-        from:       article.status ?? null,
-        to:         status,
-        changed_by: auth.userId,
-      });
-    }
-    if (verified !== undefined) {
-      void logArticleEvent(articleId, "verified", {
-        from:       article.verified ?? null,
-        to:         verified,
-        changed_by: auth.userId,
-      });
-    }
+    void logArticleEvent(articleId, "status_changed", {
+      from:       article.status ?? null,
+      to:         status,
+      changed_by: auth.userId,
+    });
   }
 
   return NextResponse.json({ ok: true });

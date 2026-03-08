@@ -22,23 +22,20 @@ interface Props {
   articleId:       string;
   initialTags:     string[];
   initialStatus:   string;
-  initialVerified: boolean;
 }
 
 export default function ArticleEditableFields({
   articleId,
   initialTags,
   initialStatus,
-  initialVerified,
 }: Props) {
   const [tags,     setTags]     = useState<string[]>(initialTags);
   const [status,   setStatus]   = useState(initialStatus);
-  const [verified, setVerified] = useState(initialVerified);
   const [input,    setInput]    = useState("");
   const [saving,   setSaving]   = useState<string | null>(null);
   const [error,    setError]    = useState<string | null>(null);
 
-  async function save(patch: { specialty_tags?: string[]; status?: string; verified?: boolean }, key: string) {
+  async function save(patch: { specialty_tags?: string[]; status?: string }, key: string) {
     setSaving(key);
     setError(null);
     try {
@@ -74,12 +71,6 @@ export default function ArticleEditableFields({
   function handleStatusChange(newStatus: string) {
     setStatus(newStatus);
     void save({ status: newStatus }, "status");
-  }
-
-  function handleVerifiedToggle() {
-    const next = !verified;
-    setVerified(next);
-    void save({ verified: next }, "verified");
   }
 
   const statusBg    = status === "approved" ? "#f0fdf4" : status === "rejected" ? "#fef2f2" : "#fffbeb";
@@ -129,33 +120,19 @@ export default function ArticleEditableFields({
         </div>
       </div>
 
-      {/* Status + Verified */}
-      <div style={{ display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{ fontSize: "11px", fontWeight: 600, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em" }}>Status</span>
-          <select
-            value={status}
-            onChange={(e) => handleStatusChange(e.target.value)}
-            style={{ fontSize: "12px", fontWeight: 600, padding: "4px 8px", borderRadius: "6px", border: `1px solid ${statusBorder}`, background: statusBg, color: statusColor, cursor: "pointer", outline: "none" }}
-          >
-            <option value="pending">pending</option>
-            <option value="approved">approved</option>
-            <option value="rejected">rejected</option>
-          </select>
-          {saving === "status" && <span style={{ fontSize: "11px", color: "#9ca3af" }}>gemmer…</span>}
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{ fontSize: "11px", fontWeight: 600, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em" }}>Verificeret</span>
-          <button
-            onClick={handleVerifiedToggle}
-            style={{ fontSize: "12px", fontWeight: 600, padding: "4px 12px", borderRadius: "6px", border: "none", cursor: "pointer", background: verified ? "#f0fdf4" : "#fef2f2", color: verified ? "#15803d" : "#b91c1c" }}
-          >
-            {verified ? "Ja" : "Nej"}
-          </button>
-          {saving === "verified" && <span style={{ fontSize: "11px", color: "#9ca3af" }}>gemmer…</span>}
-        </div>
+      {/* Status */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <span style={{ fontSize: "11px", fontWeight: 600, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em" }}>Status</span>
+        <select
+          value={status}
+          onChange={(e) => handleStatusChange(e.target.value)}
+          style={{ fontSize: "12px", fontWeight: 600, padding: "4px 8px", borderRadius: "6px", border: `1px solid ${statusBorder}`, background: statusBg, color: statusColor, cursor: "pointer", outline: "none" }}
+        >
+          <option value="pending">pending</option>
+          <option value="approved">approved</option>
+          <option value="rejected">rejected</option>
+        </select>
+        {saving === "status" && <span style={{ fontSize: "11px", color: "#9ca3af" }}>gemmer…</span>}
       </div>
 
       {error && (

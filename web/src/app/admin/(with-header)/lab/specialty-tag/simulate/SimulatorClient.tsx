@@ -374,7 +374,7 @@ export default function SimulatorClient({
             Simuler forbedret prompt
           </h1>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
-            Baseret på analyse af {specialty} · {baseVersion} · {disagreements.length} uenigheder + {agreementArticles.length} regressionstest
+            Simulerer new prompt mod {specialty} · {disagreements.length} uenigheder + {agreementArticles.length} regressionstest
           </p>
         </div>
 

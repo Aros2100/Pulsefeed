@@ -65,16 +65,17 @@ export default async function SimulatePage({ searchParams }: Props) {
       .select("decision, ai_decision, ai_confidence, disagreement_reason, article_id, articles(title, journal_title)")
       .eq("specialty", run.specialty)
       .eq("module", run.module)
+      .eq("model_version", activeModelVersion)
       .not("ai_decision", "is", null)
       .order("decided_at", { ascending: false }),
 
-    // Agreement sample: recent decisions with active model version where AI == human
+    // Regression sample: agreements from earlier versions — test that the new prompt doesn't break what older versions got right
     admin
       .from("lab_decisions")
       .select("decision, ai_decision, ai_confidence, article_id, articles(title, journal_title)")
       .eq("specialty", run.specialty)
       .eq("module", run.module)
-      .eq("model_version", activeModelVersion)
+      .neq("model_version", activeModelVersion)
       .not("ai_decision", "is", null)
       .order("decided_at", { ascending: false })
       .limit(300),

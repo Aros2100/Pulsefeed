@@ -16,8 +16,9 @@ export async function GET(request: Request) {
   const circle  = searchParams.get("circle");
   const status  = searchParams.get("status");
   const specialty = searchParams.get("specialty");
-  const verified  = searchParams.get("verified");
-  const hasAbstract = searchParams.get("has_abstract");
+  const verified        = searchParams.get("verified");
+  const approvalMethod  = searchParams.get("approval_method");
+  const hasAbstract     = searchParams.get("has_abstract");
   const dateFrom = searchParams.get("date_from");
   const dateTo   = searchParams.get("date_to");
   const search   = searchParams.get("search")?.trim() ?? "";
@@ -37,6 +38,8 @@ export async function GET(request: Request) {
   if (specialty) query = query.contains("specialty_tags", [specialty]);
   if (verified === "true")  query = query.eq("verified", true);
   if (verified === "false") query = query.eq("verified", false);
+  if (approvalMethod === "null")  query = query.is("approval_method" as never, null as never);
+  else if (approvalMethod)        query = query.eq("approval_method" as never, approvalMethod as never);
   if (hasAbstract === "true")  query = query.not("abstract", "is", null);
   if (hasAbstract === "false") query = query.is("abstract", null);
   if (dateFrom) query = query.gte("published_date", dateFrom);

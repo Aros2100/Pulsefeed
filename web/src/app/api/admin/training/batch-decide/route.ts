@@ -46,12 +46,12 @@ export async function POST(request: NextRequest) {
   const [relevantResult, rejectedResult] = await Promise.all([
     relevantIds.length > 0
       ? admin.from("articles")
-          .update({ verified: true, status: "approved", specialty_tags: [specialty] })
+          .update({ approval_method: "human", status: "approved", specialty_tags: [specialty] })
           .in("id", relevantIds)
       : Promise.resolve({ error: null }),
     rejectedIds.length > 0
       ? admin.from("articles")
-          .update({ verified: false, status: "rejected" })
+          .update({ status: "rejected" })
           .in("id", rejectedIds)
       : Promise.resolve({ error: null }),
   ]);
@@ -64,19 +64,13 @@ export async function POST(request: NextRequest) {
   }
 
   void Promise.all([
-    ...relevantIds.flatMap((id) => {
+    ...relevantIds.map((id) => {
       const old = oldMap.get(id);
-      return [
-        logArticleEvent(id, "status_changed", { from: old?.status ?? null, to: "approved", changed_by: auth.userId }),
-        logArticleEvent(id, "verified",        { from: old?.verified ?? null, to: true,     changed_by: auth.userId }),
-      ];
+      return logArticleEvent(id, "status_changed", { from: old?.status ?? null, to: "approved", changed_by: auth.userId });
     }),
-    ...rejectedIds.flatMap((id) => {
+    ...rejectedIds.map((id) => {
       const old = oldMap.get(id);
-      return [
-        logArticleEvent(id, "status_changed", { from: old?.status ?? null, to: "rejected", changed_by: auth.userId }),
-        logArticleEvent(id, "verified",        { from: old?.verified ?? null, to: false,    changed_by: auth.userId }),
-      ];
+      return logArticleEvent(id, "status_changed", { from: old?.status ?? null, to: "rejected", changed_by: auth.userId });
     }),
   ]);
 

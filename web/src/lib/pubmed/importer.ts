@@ -834,7 +834,7 @@ export async function runImport(
             issn_print:        a.issnPrint,
             specialty_tags:    [specialty],
             circle:            1,
-            verified:          true,
+            approval_method:   "journal",
             status:            "approved",
           }));
 

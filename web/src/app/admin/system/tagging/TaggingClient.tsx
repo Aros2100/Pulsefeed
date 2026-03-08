@@ -210,10 +210,27 @@ export default function TaggingClient({
     if (selected.size === 0) return;
     setBusyApprove(true);
     try {
+      // Build per-article score data for event payload
+      const ruleMap = new Map(rules.map((r) => [r.term, r]));
+      const articleScores: Record<string, {
+        mesh_score: number;
+        matched_terms: { term: string; approve_rate: number; total_decisions: number }[];
+      }> = {};
+      for (const a of readyArticles) {
+        if (!selected.has(a.id)) continue;
+        articleScores[a.id] = {
+          mesh_score: a.mesh_score,
+          matched_terms: a.matched_terms.map((t) => {
+            const r = ruleMap.get(t);
+            return { term: t, approve_rate: r?.approve_rate ?? 0, total_decisions: r?.total_decisions ?? 0 };
+          }),
+        };
+      }
+
       const res = await fetch("/api/admin/tagging/batch-approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ articleIds: [...selected], specialty }),
+        body: JSON.stringify({ articleIds: [...selected], specialty, articleScores }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
