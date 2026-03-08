@@ -20,6 +20,8 @@ interface SectionCardProps {
   actionLabel: string;
   actionHref: string;
   actionColor?: string;
+  /** Optional extra element rendered next to the action button (e.g. a client component) */
+  secondaryAction?: React.ReactNode;
 }
 
 export function SectionCard({
@@ -29,6 +31,7 @@ export function SectionCard({
   actionLabel,
   actionHref,
   actionColor = "#E83B2A",
+  secondaryAction,
 }: SectionCardProps) {
   return (
     <div
@@ -128,24 +131,27 @@ export function SectionCard({
           ))}
         </div>
 
-        {/* Action button */}
-        <Link
-          href={actionHref}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-            borderRadius: "8px",
-            padding: "10px 20px",
-            background: actionColor,
-            color: "#fff",
-            fontSize: "13px",
-            fontWeight: 600,
-            textDecoration: "none",
-          }}
-        >
-          {actionLabel}
-        </Link>
+        {/* Actions */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <Link
+            href={actionHref}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              borderRadius: "8px",
+              padding: "10px 20px",
+              background: actionColor,
+              color: "#fff",
+              fontSize: "13px",
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            {actionLabel}
+          </Link>
+          {secondaryAction}
+        </div>
       </div>
     </div>
   );

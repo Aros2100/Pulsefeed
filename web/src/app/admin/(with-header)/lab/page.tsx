@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 import { SectionCard } from "./SectionCard";
+import PromptDrawer, { type ModelVersion } from "@/components/lab/PromptDrawer";
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "Aldrig";
@@ -44,7 +45,7 @@ export default async function LabPage() {
   const admin = createAdminClient();
 
   // --- Batch 1: base queries ---
-  const [queueResult, totalResult, lastResult, versionsResult] = await Promise.all([
+  const [queueResult, totalResult, lastResult, versionsResult, allVersionsResult, allDecisionsResult] = await Promise.all([
     admin
       .from("articles")
       .select("id", { count: "exact", head: true })
@@ -68,6 +69,21 @@ export default async function LabPage() {
       .eq("module", "specialty_tag")
       .eq("active", true)
       .limit(1),
+    // All versions (for PromptDrawer)
+    admin
+      .from("model_versions")
+      .select("id, version, prompt_text, notes, activated_at, active, generated_by")
+      .eq("specialty", specialty)
+      .eq("module", "specialty_tag")
+      .order("activated_at", { ascending: false }),
+    // All decisions (for per-version accuracy in PromptDrawer)
+    admin
+      .from("lab_decisions")
+      .select("model_version, ai_decision, decision")
+      .eq("specialty", specialty)
+      .eq("module", "specialty_tag")
+      .not("ai_decision", "is", null)
+      .limit(10000),
   ]);
 
   const activeVersionName = (versionsResult.data?.[0]?.version as string | null) ?? null;
@@ -128,6 +144,32 @@ export default async function LabPage() {
   const agreementRate       = decisionsWithAi > 0
     ? Math.round((agreementCount / decisionsWithAi) * 100)
     : null;
+
+  // --- Build ModelVersion[] for PromptDrawer ---
+  const versionAccMap: Record<string, { total: number; correct: number }> = {};
+  for (const d of (allDecisionsResult.data ?? [])) {
+    const mv = d.model_version as string | null;
+    if (!mv) continue;
+    if (!versionAccMap[mv]) versionAccMap[mv] = { total: 0, correct: 0 };
+    versionAccMap[mv].total++;
+    if (d.ai_decision === d.decision) versionAccMap[mv].correct++;
+  }
+  const rawMV = allVersionsResult.data ?? [];
+  const promptVersions: ModelVersion[] = rawMV.map((v, i) => {
+    const stats = versionAccMap[v.version as string] ?? { total: 0, correct: 0 };
+    return {
+      id:             v.id as string,
+      version:        v.version as string,
+      prompt:         (v.prompt_text as string) ?? "",
+      notes:          v.notes as string | null,
+      activated_at:   v.activated_at as string,
+      deactivated_at: i === 0 ? null : rawMV[i - 1].activated_at as string,
+      active:         v.active as boolean,
+      accuracy:       stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : null,
+      validatedCount: stats.total,
+      generated_by:   (v.generated_by as string | null) ?? "manual",
+    };
+  });
 
   return (
     <div style={{
@@ -282,6 +324,15 @@ export default async function LabPage() {
             ]}
             actionLabel="Start evaluering →"
             actionHref="/admin/lab/specialty-tag/evaluation"
+            secondaryAction={
+              <PromptDrawer
+                versions={promptVersions}
+                specialty={specialty}
+                module="specialty_tag"
+                totalDisagreements={disagreementsCount}
+                buttonLabel="Prompt versioner"
+              />
+            }
           />
 
         </div>

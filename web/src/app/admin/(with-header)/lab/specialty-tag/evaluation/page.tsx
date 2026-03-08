@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 import VersionSelector from "./VersionSelector";
-import PromptSection, { type ModelVersion } from "../dashboard/PromptSection";
+import PromptDrawer, { type ModelVersion } from "@/components/lab/PromptDrawer";
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
@@ -264,9 +264,17 @@ export default async function EvaluationPage({ searchParams }: Props) {
           <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
             Prompt Evaluation · Specialty Tag
           </div>
-          <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
-            AI/Human Disagreements · {specialtyLabel}
-          </h1>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
+              AI/Human Disagreements · {specialtyLabel}
+            </h1>
+            <PromptDrawer
+              versions={promptVersions}
+              specialty={specialty}
+              module="specialty_tag"
+              totalDisagreements={totalDisagree}
+            />
+          </div>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
             Cases where AI and human decisions differed — use these to refine the prompt
           </p>
@@ -355,16 +363,6 @@ export default async function EvaluationPage({ searchParams }: Props) {
               <ArticleRow key={`${row.article_id}-${row.decided_at}`} row={row} article={row.article_id ? articleMap[row.article_id] : undefined} />
             ))
           )}
-        </div>
-
-        {/* Prompt Evolution */}
-        <div style={{ marginTop: "28px" }}>
-          <PromptSection
-            versions={promptVersions}
-            specialty={specialty}
-            module="specialty_tag"
-            totalDisagreements={totalDisagree}
-          />
         </div>
 
       </div>
