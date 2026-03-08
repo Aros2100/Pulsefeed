@@ -136,7 +136,7 @@ export default async function LabPage() {
             The Lab
           </div>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
-            The Lab · {specialtyLabel}
+            Specialty Tag Validation
           </h1>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
             Mærk artikler og træn AI-modellerne til dit speciale
@@ -157,17 +157,8 @@ export default async function LabPage() {
             padding: "10px 24px",
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
+            justifyContent: "flex-end",
           }}>
-            <span style={{
-              fontSize: "11px",
-              letterSpacing: "0.08em",
-              color: "#E83B2A",
-              textTransform: "uppercase" as const,
-              fontWeight: 700,
-            }}>
-              Specialty Tag Validation
-            </span>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               {activeVersionName && (
                 <span style={{ fontSize: "11px", color: "#5a6a85", fontWeight: 600 }}>
