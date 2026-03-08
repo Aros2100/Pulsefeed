@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       storedDecision === "approved" ? "relevant" :
       storedDecision === "rejected" ? "not_relevant" :
       score != null ? scoreToVerdict(score) : "unsure";
-    return NextResponse.json({ ok: true, verdict, confidence: score });
+    return NextResponse.json({ ok: true, verdict, confidence: score, ai_decision: storedDecision });
   }
 
   const content = [

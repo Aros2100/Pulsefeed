@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
+import { SectionCard } from "./SectionCard";
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "Aldrig";
@@ -11,6 +12,15 @@ function fmtDate(iso: string | null): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+  });
+}
+
+function fmtShortDate(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("da-DK", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 }
 
@@ -30,11 +40,11 @@ export default async function LabPage() {
   ) ?? SPECIALTIES.find((s) => s.active);
 
   const specialty = activeSpec?.slug ?? "neurosurgery";
-  const specialtyLabel = activeSpec?.label ?? "Neurosurgery";
 
   const admin = createAdminClient();
 
-  const [queueResult, totalResult, approvedResult, lastResult, versionsResult] = await Promise.all([
+  // --- Batch 1: base queries ---
+  const [queueResult, totalResult, lastResult, versionsResult] = await Promise.all([
     admin
       .from("articles")
       .select("id", { count: "exact", head: true })
@@ -46,12 +56,6 @@ export default async function LabPage() {
       .eq("module", "specialty_tag"),
     admin
       .from("lab_decisions")
-      .select("*", { count: "exact", head: true })
-      .eq("specialty", specialty)
-      .eq("module", "specialty_tag")
-      .eq("decision", "approved"),
-    admin
-      .from("lab_decisions")
       .select("decided_at")
       .eq("specialty", specialty)
       .eq("module", "specialty_tag")
@@ -59,7 +63,7 @@ export default async function LabPage() {
       .limit(1),
     admin
       .from("model_versions")
-      .select("version")
+      .select("version, activated_at")
       .eq("specialty", specialty)
       .eq("module", "specialty_tag")
       .eq("active", true)
@@ -67,10 +71,12 @@ export default async function LabPage() {
   ]);
 
   const activeVersionName = (versionsResult.data?.[0]?.version as string | null) ?? null;
+  const activatedAt = (versionsResult.data?.[0]?.activated_at as string | null) ?? null;
 
   const noVersion = Promise.resolve({ count: 0 as number | null, error: null });
 
-  const [activeVersionCountResult, fpResult, fnResult] = await Promise.all([
+  // --- Batch 2: version-dependent queries ---
+  const [activeVersionCountResult, fpResult, fnResult, decisionsWithAiResult] = await Promise.all([
     activeVersionName
       ? admin
           .from("lab_decisions")
@@ -99,13 +105,29 @@ export default async function LabPage() {
           .eq("ai_decision", "rejected")
           .eq("decision", "approved")
       : noVersion,
+    activeVersionName
+      ? admin
+          .from("lab_decisions")
+          .select("*", { count: "exact", head: true })
+          .eq("specialty", specialty)
+          .eq("module", "specialty_tag")
+          .eq("model_version", activeVersionName)
+          .not("ai_decision", "is", null)
+      : noVersion,
   ]);
 
   const queueCount          = queueResult.count ?? 0;
   const totalDecisions      = totalResult.count ?? 0;
   const lastDecisionAt      = lastResult.data?.[0]?.decided_at ?? null;
   const activeVersionCount  = activeVersionCountResult.count ?? 0;
-  const disagreementsCount  = (fpResult.count ?? 0) + (fnResult.count ?? 0);
+  const fpCount             = fpResult.count ?? 0;
+  const fnCount             = fnResult.count ?? 0;
+  const disagreementsCount  = fpCount + fnCount;
+  const decisionsWithAi     = decisionsWithAiResult.count ?? 0;
+  const agreementCount      = decisionsWithAi - disagreementsCount;
+  const agreementRate       = decisionsWithAi > 0
+    ? Math.round((agreementCount / decisionsWithAi) * 100)
+    : null;
 
   return (
     <div style={{
@@ -143,137 +165,126 @@ export default async function LabPage() {
           </p>
         </div>
 
-        {/* Active module card */}
-        <div style={{
-          background: "#fff",
-          borderRadius: "10px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
-          overflow: "hidden",
-          marginBottom: "16px",
-        }}>
-          <div style={{
-            background: "#EEF2F7",
-            borderBottom: "1px solid #dde3ed",
-            padding: "10px 24px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-end",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              {activeVersionName && (
-                <span style={{ fontSize: "11px", color: "#5a6a85", fontWeight: 600 }}>
-                  {activeVersionName}
-                </span>
-              )}
-              <span style={{
-                fontSize: "11px",
-                background: "#E83B2A",
-                color: "#fff",
-                borderRadius: "4px",
-                padding: "2px 8px",
-                fontWeight: 600,
-              }}>
-                Aktiv
-              </span>
-            </div>
-          </div>
+        {/* Three section cards */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
 
-          <div style={{ padding: "24px" }}>
-            {/* KPI grid */}
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: "24px",
-              marginBottom: "24px",
-            }}>
-              <div>
-                <div style={{ fontSize: "11px", color: "#888", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
-                  Artikler i kø
-                </div>
-                <div style={{
-                  fontSize: "24px",
-                  fontWeight: 700,
-                  color: queueCount > 0 ? "#E83B2A" : "#1a1a1a",
-                }}>
-                  {queueCount}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: "11px", color: "#888", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
-                  Bearbejdet, {activeVersionName ?? "—"}
-                </div>
-                <div style={{ fontSize: "24px", fontWeight: 700 }}>{activeVersionCount}</div>
-                {activeVersionCount !== totalDecisions && (
-                  <div style={{ fontSize: "11px", color: "#aaa", marginTop: "2px" }}>{totalDecisions} i alt</div>
-                )}
-              </div>
-              <div>
-                <div style={{ fontSize: "11px", color: "#888", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
-                  Uenigheder
-                </div>
-                <div style={{ fontSize: "24px", fontWeight: 700, color: disagreementsCount > 0 ? "#d97706" : "#1a1a1a" }}>
-                  {activeVersionCount > 0
-                    ? `${Math.round((disagreementsCount / activeVersionCount) * 100)}%`
-                    : "—"}
-                </div>
-                <div style={{ fontSize: "11px", color: "#aaa", marginTop: "2px" }}>
-                  {disagreementsCount} af {activeVersionCount}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: "11px", color: "#888", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
-                  Sidst bearbejdet
-                </div>
-                <div style={{ fontSize: "13px", fontWeight: 600, color: "#5a6a85", paddingTop: "6px" }}>
-                  {fmtDate(lastDecisionAt)}
-                </div>
-              </div>
-            </div>
+          {/* Card 1: Validering */}
+          <SectionCard
+            headerLabel="Validering"
+            badges={[
+              ...(activeVersionName
+                ? [{ label: activeVersionName, color: "#dde3ed", textColor: "#5a6a85" }]
+                : []),
+              { label: "Aktiv", color: "#E83B2A" },
+            ]}
+            kpis={[
+              {
+                label: "Artikler i kø",
+                value: String(queueCount),
+                valueColor: queueCount > 0 ? "#E83B2A" : undefined,
+              },
+              {
+                label: `Bearbejdet, ${activeVersionName ?? "—"}`,
+                value: String(activeVersionCount),
+                sub: activeVersionCount !== totalDecisions
+                  ? `${totalDecisions} i alt`
+                  : undefined,
+              },
+              {
+                label: "Uenigheder",
+                value: activeVersionCount > 0
+                  ? `${Math.round((disagreementsCount / activeVersionCount) * 100)}%`
+                  : "—",
+                valueColor: disagreementsCount > 0 ? "#d97706" : undefined,
+                sub: `${disagreementsCount} af ${activeVersionCount}`,
+              },
+              {
+                label: "Sidst bearbejdet",
+                value: fmtDate(lastDecisionAt),
+                valueColor: "#5a6a85",
+              },
+            ]}
+            actionLabel={
+              queueCount > 0
+                ? `Start session · ${queueCount} artikler klar →`
+                : "Start session →"
+            }
+            actionHref={`/admin/system/layers/${specialty}/training`}
+            actionColor={queueCount > 0 ? "#E83B2A" : "#1a1a1a"}
+          />
 
-            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <Link
-                href={`/admin/system/layers/${specialty}/training`}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  borderRadius: "8px",
-                  padding: "10px 20px",
-                  background: queueCount > 0 ? "#E83B2A" : "#1a1a1a",
-                  color: "#fff",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  textDecoration: "none",
-                }}
-              >
-                {queueCount > 0
-                  ? `Start session · ${queueCount} artikler klar`
-                  : "Start session"}
-                {" →"}
-              </Link>
-            </div>
-          </div>
+          {/* Card 2: Performance */}
+          <SectionCard
+            headerLabel="Performance"
+            badges={
+              agreementRate !== null
+                ? [{ label: `${agreementRate}% agreement`, color: "#15803d" }]
+                : []
+            }
+            kpis={[
+              {
+                label: "Nøjagtighed",
+                value: agreementRate !== null ? `${agreementRate}%` : "—",
+                valueColor: agreementRate !== null ? "#15803d" : undefined,
+              },
+              {
+                label: "Falsk positive",
+                value: String(fpCount),
+                sub: "AI siger ja, editor nej",
+              },
+              {
+                label: "Falsk negative",
+                value: String(fnCount),
+                sub: "AI siger nej, editor ja",
+              },
+              {
+                label: "Beslutninger",
+                value: String(decisionsWithAi),
+                sub: activeVersionName ? `${activeVersionName}-periode` : undefined,
+              },
+            ]}
+            actionLabel="Se detaljer →"
+            actionHref="/admin/lab/specialty-tag/dashboard"
+          />
+
+          {/* Card 3: Prompt Evaluation */}
+          <SectionCard
+            headerLabel="Prompt Evaluation"
+            badges={[
+              ...(activeVersionName
+                ? [{ label: activeVersionName, color: "#dde3ed", textColor: "#5a6a85" }]
+                : []),
+              { label: "Aktiv", color: "#2563eb" },
+            ]}
+            kpis={[
+              {
+                label: "Aktiv version",
+                value: activeVersionName ?? "—",
+              },
+              {
+                label: "Uenigheder",
+                value: String(disagreementsCount),
+                valueColor: disagreementsCount > 0 ? "#d97706" : undefined,
+                sub: "til analyse",
+              },
+              {
+                label: "Implementeret",
+                value: fmtShortDate(activatedAt),
+              },
+              {
+                label: "Agreement rate",
+                value: agreementRate !== null ? `${agreementRate}%` : "—",
+                valueColor: agreementRate !== null ? "#15803d" : undefined,
+                sub: decisionsWithAi > 0
+                  ? `${agreementCount} af ${decisionsWithAi}`
+                  : undefined,
+              },
+            ]}
+            actionLabel="Start evaluering →"
+            actionHref="/admin/lab/specialty-tag/evaluation"
+          />
+
         </div>
-
-        {/* Tools section */}
-        <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#888", textTransform: "uppercase" as const, fontWeight: 700, marginBottom: "12px", marginTop: "28px" }}>
-          Værktøjer
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
-          <Link href="/admin/lab/specialty-tag/dashboard" style={{ textDecoration: "none" }}>
-            <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "20px", cursor: "pointer" }}>
-              <div style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a", marginBottom: "4px" }}>Performance →</div>
-              <div style={{ fontSize: "12px", color: "#888" }}>Nøjagtighed, uenigheder og kalibrering over tid</div>
-            </div>
-          </Link>
-          <Link href="/admin/lab/specialty-tag/evaluation" style={{ textDecoration: "none" }}>
-            <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "20px", cursor: "pointer" }}>
-              <div style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a", marginBottom: "4px" }}>Prompt evaluation →</div>
-              <div style={{ fontSize: "12px", color: "#888" }}>Test og sammenlign prompt-versioner mod kendte beslutninger</div>
-            </div>
-          </Link>
-        </div>
-
       </div>
     </div>
   );

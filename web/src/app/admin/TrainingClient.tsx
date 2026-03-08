@@ -24,6 +24,7 @@ interface TrainingArticle {
 interface AIData {
   verdict: EditorVerdict | null;
   confidence: number | null;
+  aiDecision: string | null;
   loading: boolean;
 }
 
@@ -126,9 +127,16 @@ function AITopbarBadge({ ai }: { ai: AIData | undefined }) {
     );
   }
 
-  const bg     = score >= 70 ? "#f0fdf4" : score >= 40 ? "#fefce8" : "#fef2f2";
-  const color  = score >= 70 ? "#15803d" : score >= 40 ? "#d97706" : "#dc2626";
-  const border = score >= 70 ? "#bbf7d0" : score >= 40 ? "#fde68a" : "#fecaca";
+  let bg: string, color: string, border: string;
+  if (ai.aiDecision === "approved") {
+    bg = "#f0fdf4"; color = "#15803d"; border = "#bbf7d0";
+  } else if (ai.aiDecision === "rejected") {
+    bg = "#fef2f2"; color = "#dc2626"; border = "#fecaca";
+  } else {
+    bg     = score >= 70 ? "#f0fdf4" : score >= 40 ? "#fefce8" : "#fef2f2";
+    color  = score >= 70 ? "#15803d" : score >= 40 ? "#d97706" : "#dc2626";
+    border = score >= 70 ? "#bbf7d0" : score >= 40 ? "#fde68a" : "#fecaca";
+  }
   return (
     <span style={{ fontSize: "12px", fontWeight: 700, background: bg, color, border: `1px solid ${border}`, borderRadius: "999px", padding: "3px 12px", whiteSpace: "nowrap" }}>
       AI: {score}% confident
@@ -303,6 +311,7 @@ export default function TrainingClient({ specialty, label }: Props) {
           initialAI[a.id] = {
             verdict: scoreToVerdict(a.specialty_confidence),
             confidence: a.specialty_confidence,
+            aiDecision: a.ai_decision,
             loading: false,
           };
           fetchedAI.current.add(a.id);
@@ -328,17 +337,18 @@ export default function TrainingClient({ specialty, label }: Props) {
 
     setAiData((prev) => ({
       ...prev,
-      [selectedId]: { verdict: null, confidence: null, loading: true },
+      [selectedId]: { verdict: null, confidence: null, aiDecision: null, loading: true },
     }));
 
     void fetch(`/api/admin/training/ai-verdict?articleId=${selectedId}&specialty=${specialty}`)
       .then((r) => r.json())
-      .then((d: { ok: boolean; verdict?: string; confidence?: number }) => {
+      .then((d: { ok: boolean; verdict?: string; confidence?: number; ai_decision?: string }) => {
         setAiData((prev) => ({
           ...prev,
           [selectedId]: {
             verdict: d.ok ? ((d.verdict === "relevant" || d.verdict === "not_relevant") ? d.verdict : null) : null,
             confidence: d.ok ? (d.confidence ?? null) : null,
+            aiDecision: d.ok ? (d.ai_decision ?? null) : null,
             loading: false,
           },
         }));
@@ -354,7 +364,7 @@ export default function TrainingClient({ specialty, label }: Props) {
       .catch(() => {
         setAiData((prev) => ({
           ...prev,
-          [selectedId]: { verdict: null, confidence: null, loading: false },
+          [selectedId]: { verdict: null, confidence: null, aiDecision: null, loading: false },
         }));
       });
   }, [selectedId, specialty]); // eslint-disable-line react-hooks/exhaustive-deps
