@@ -165,11 +165,13 @@ after(): runCitationFetch(200)   ← automatisk efter C1/C2/C3 import
 - Cross-source deduplicering via `seenPmids`-set
 - `last_run_at` opdateres per source efter hver kørsel
 - `status = "pending"`, `verified = false`
+- `totalImported` tæller `(upsertedRows ?? []).length` — ikke `batch.length`
 
 ### Circle 3 (`importer-circle3.ts`)
 - Bygger kombineret query: `("hospitalNavn"[AD] AND neurosurg*[AD]) OR ...`
 - Lokal affiliationscheck efter EFetch — begge betingelser på SAMME forfatters affiliation
 - `status = "pending"`, `verified = false`, `country = "Denmark"`, `specialty_tags = ["neurosurgery"]`
+- `totalImported` tæller `(upsertedRows ?? []).length` — ikke `batch.length`
 
 ### Author linking (`author-linker.ts`)
 - `resolveAuthorId` returnerer `{ id, outcome }` — outcome: `"new" | "duplicate" | "rejected"`
@@ -215,8 +217,11 @@ Polling-mønster: snapshot count → poll hvert 3s → stop efter 3 stabile poll
 | `web/src/app/api/lab/model-versions/` | Gem og aktiver ny model-version |
 
 ### score-batch (`/api/lab/score-batch`)
-- `scoreAll: boolean` — når `true`: scorer ALLE pending artikler med forældet `model_version`, ingen 50-grænse
+- `scoreAll: boolean` — når `true`: scorer ALLE pending artikler med forældet `model_version`; `false`: kun artikler med `specialty_confidence IS NULL`
+- Begge queries filtreres på `.contains("specialty_tags", [specialty])` — scorer kun artikler tagget med den valgte specialty
+- `scoreAll=true`-query bruger `.or("specialty_scored_at.is.null,model_version.is.null,model_version.neq.{v}")` — explicit `model_version.is.null` kræves da SQL `NULL != 'v3'` evaluerer til NULL (ikke TRUE)
 - Bruges automatisk efter aktivering af ny model-version (kaldt fra SimulatorClient)
+- **AbortController**: `TrainingClient.tsx`-useEffect opretter en AbortController og returnerer `() => abort.abort()` som cleanup — forhindrer React StrictMode double-invocation i at starte to samtidige score-batch-kald
 
 ### Simulation (`simulate/SimulatorClient.tsx`)
 - **To sektioner**: Fejlrettelse (uenigheder) + Regressionstest (enigheder fra aktiv model)
@@ -246,7 +251,7 @@ Polling-mønster: snapshot count → poll hvert 3s → stop efter 3 stabile poll
 | `/admin/system/alerts` | Opret/rediger/slet system-alerts |
 | `/admin/system/layers/[specialty]` | C1 filter + C2/C3 affiliation management |
 | `/admin/system/author-linking` | Forfatter-linking dashboard |
-| `/admin/lab` | AI-træning, scoring, model-versioner |
+| `/admin/lab` | Specialty Tag Validation — KPI'er (bearbejdet/version, uenigheder%), "Værktøjer"-sektion med Performance + Prompt evaluation |
 | `/admin/articles` | Artikel-liste med filter + evidence_score badge |
 | `/admin/articles/[id]` | Artikel-stamkort: historik + redigerbare tags/status/verified |
 | `/admin/authors` | Forfatter-liste sorteret på author_score DESC NULLS LAST |
@@ -276,6 +281,10 @@ Polling-mønster: snapshot count → poll hvert 3s → stop efter 3 stabile poll
 | `verified` | from, to, changed_by |
 | `author_linked` | authors_linked, new, duplicates, rejected |
 | `quality_check` | passed, message |
+| `impact_factor_updated` | impact_factor, journal_h_index |
+| `citation_count_updated` | citation_count |
+
+Events vises i admin-stamkort under fanen "Historik" — `impact_factor_updated` og `citation_count_updated` vises i sektionen **Bibliometri**.
 
 ## Miljøvariabler (web/.env.local)
 
