@@ -188,7 +188,6 @@ export default function TrainingClient({ specialty, label }: Props) {
   const [aiData, setAiData]                   = useState<Record<string, AIData>>({});
 
   const [scoring, setScoring]                 = useState(false);
-  const [scoringCount, setScoringCount]       = useState(0);
   const [scoringProgress, setScoringProgress] = useState<{ scored: number; total: number } | null>(null);
   const [saving, setSaving]                   = useState(false);
   const [toast, setToast]                     = useState<string | null>(null);
@@ -218,7 +217,6 @@ export default function TrainingClient({ specialty, label }: Props) {
       // Pre-score any unscored articles before showing the UI
       if (unscored.length > 0) {
         setScoring(true);
-        setScoringCount(unscored.length);
         setScoringProgress(null);
         setLoading(false);
 
@@ -553,8 +551,8 @@ export default function TrainingClient({ specialty, label }: Props) {
         <div style={{ fontSize: "16px", fontWeight: 600, color: "#1a1a1a" }}>Scorer artikler med AI…</div>
         <div style={{ fontSize: "13px", color: "#888" }}>
           {scoringProgress
-            ? `Scoring ${scoringProgress.scored} / ${scoringProgress.total}…`
-            : `${scoringCount} artikel${scoringCount !== 1 ? "er" : ""} afventer scoring`}
+            ? `${scoringProgress.scored} / ${scoringProgress.total} artikler scoret…`
+            : `Forbereder scoring…`}
         </div>
       </div>
     );
