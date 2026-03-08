@@ -200,7 +200,7 @@ export default async function LabPage() {
               </div>
               <div>
                 <div style={{ fontSize: "11px", color: "#888", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
-                  Bearbejdet i alt
+                  Bearbejdet, {activeVersionName ?? "—"}
                 </div>
                 <div style={{ fontSize: "24px", fontWeight: 700 }}>{activeVersionCount}</div>
                 {activeVersionCount !== totalDecisions && (
