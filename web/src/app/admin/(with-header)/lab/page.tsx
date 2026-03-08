@@ -34,25 +34,36 @@ export default async function LabPage() {
 
   const admin = createAdminClient();
 
-  const [queueResult, decisionsResult] = await Promise.all([
+  const [queueResult, totalResult, approvedResult, lastResult] = await Promise.all([
     admin
       .from("articles")
       .select("id", { count: "exact", head: true })
       .eq("status", "pending"),
     admin
       .from("lab_decisions")
-      .select("decision, decided_at")
+      .select("*", { count: "exact", head: true })
+      .eq("specialty", specialty)
+      .eq("module", "specialty_tag"),
+    admin
+      .from("lab_decisions")
+      .select("*", { count: "exact", head: true })
       .eq("specialty", specialty)
       .eq("module", "specialty_tag")
-      .order("decided_at", { ascending: false }),
+      .eq("decision", "approved"),
+    admin
+      .from("lab_decisions")
+      .select("decided_at")
+      .eq("specialty", specialty)
+      .eq("module", "specialty_tag")
+      .order("decided_at", { ascending: false })
+      .limit(1),
   ]);
 
-  const decisions = decisionsResult.data ?? [];
-  const queueCount = queueResult.count ?? 0;
-  const totalDecisions = decisions.length;
-  const approvedCount = decisions.filter((d) => d.decision === "approved").length;
-  const approvalRate = totalDecisions > 0 ? Math.round((approvedCount / totalDecisions) * 100) : null;
-  const lastDecisionAt = decisions.length > 0 ? decisions[0].decided_at : null;
+  const queueCount     = queueResult.count ?? 0;
+  const totalDecisions = totalResult.count ?? 0;
+  const approvedCount  = approvedResult.count ?? 0;
+  const approvalRate   = totalDecisions > 0 ? Math.round((approvedCount / totalDecisions) * 100) : null;
+  const lastDecisionAt = lastResult.data?.[0]?.decided_at ?? null;
 
   const futureModules = [
     { title: "Citation Quality Check", description: "Flag artikler med mistænkelige citatmønstre" },
