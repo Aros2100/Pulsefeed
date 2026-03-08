@@ -203,11 +203,20 @@ export default function TrainingClient({ specialty, label }: Props) {
   // ── Load articles (with pre-scoring if needed) ────────────────────────────
 
   useEffect(() => {
+    const abort = new AbortController();
+
     async function loadArticles() {
       setLoading(true);
 
-      const d = await fetch(`/api/admin/training/articles?specialty=${specialty}`)
-        .then((r) => r.json()) as { ok: boolean; articles?: TrainingArticle[] };
+      let d: { ok: boolean; articles?: TrainingArticle[] };
+      try {
+        d = await fetch(`/api/admin/training/articles?specialty=${specialty}`, { signal: abort.signal })
+          .then((r) => r.json()) as { ok: boolean; articles?: TrainingArticle[] };
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+        setLoading(false);
+        return;
+      }
 
       if (!d.ok) { setLoading(false); return; }
 
@@ -225,6 +234,7 @@ export default function TrainingClient({ specialty, label }: Props) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ specialty, scoreAll: false }),
+            signal: abort.signal,
           });
 
           const reader = response.body!.getReader();
@@ -246,14 +256,24 @@ export default function TrainingClient({ specialty, label }: Props) {
               } catch { /* ignore malformed events */ }
             }
           }
-        } catch { /* network error — proceed to reload anyway */ }
+        } catch (e) {
+          if ((e as Error).name === "AbortError") return; // component unmounted — stop silently
+          /* other network error — proceed to reload anyway */
+        }
 
+        if (abort.signal.aborted) return;
         setScoring(false);
         setScoringProgress(null);
 
         // Reload with fresh scores
-        const d2 = await fetch(`/api/admin/training/articles?specialty=${specialty}`)
-          .then((r) => r.json()) as { ok: boolean; articles?: TrainingArticle[] };
+        let d2: { ok: boolean; articles?: TrainingArticle[] };
+        try {
+          d2 = await fetch(`/api/admin/training/articles?specialty=${specialty}`, { signal: abort.signal })
+            .then((r) => r.json()) as { ok: boolean; articles?: TrainingArticle[] };
+        } catch (e) {
+          if ((e as Error).name === "AbortError") return;
+          return;
+        }
         populateArticles(d2.articles ?? []);
       } else {
         setLoading(false);
@@ -288,6 +308,7 @@ export default function TrainingClient({ specialty, label }: Props) {
     }
 
     void loadArticles();
+    return () => abort.abort();
   }, [specialty]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Pre-fetch AI verdict when selected article changes ────────────────────
