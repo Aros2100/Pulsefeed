@@ -5,6 +5,12 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { trackedCall } from "@/lib/ai/tracked-client";
 
+const regressionCommentSchema = z.object({
+  article_id: z.string().uuid(),
+  title: z.string().optional(),
+  comment: z.string().min(1),
+});
+
 const schema = z.object({
   current_prompt: z.string().min(10),
   feedback:       z.string().min(1),
@@ -15,6 +21,7 @@ const schema = z.object({
     { message: "Invalid specialty" }
   ),
   run_id: z.string().uuid().nullable().optional(),
+  regression_comments: z.array(regressionCommentSchema).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -30,9 +37,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: parsed.error.issues[0].message }, { status: 400 });
   }
 
-  const { current_prompt, feedback, fp_patterns, fn_patterns, specialty, run_id } = parsed.data;
+  const { current_prompt, feedback, fp_patterns, fn_patterns, specialty, run_id, regression_comments } = parsed.data;
 
-  const userMessage = `You are refining an AI scoring prompt for neurosurgery article relevance.
+  const regressionSection = regression_comments && regression_comments.length > 0
+    ? `\n\nThe domain expert also reviewed regression cases (articles where the new prompt disagrees with earlier correct decisions) and provided these comments:\n<regression_comments>\n${regression_comments.map((c, i) => `${i + 1}. ${c.title ? `"${c.title}" — ` : ""}${c.comment}`).join("\n")}\n</regression_comments>\n\nUse these regression comments to avoid introducing new errors while fixing the prompt.`
+    : "";
+
+  const userMessage = `You are refining an AI scoring prompt for ${specialty} article relevance.
 
 The current candidate prompt is:
 <current_prompt>
@@ -43,10 +54,10 @@ This prompt was generated based on these error patterns:
 False positive patterns (AI too lenient): ${fp_patterns.join("; ")}
 False negative patterns (AI too strict): ${fn_patterns.join("; ")}
 
-The domain expert (a neurosurgeon) has reviewed the prompt and provided this feedback:
+The domain expert has reviewed the prompt and provided this feedback:
 <feedback>
 ${feedback}
-</feedback>
+</feedback>${regressionSection}
 
 Rewrite the prompt incorporating the expert's feedback while maintaining the corrections for the error patterns above. Keep {{title}} and {{abstract}} as placeholders. Keep the JSON response format instruction at the end.
 

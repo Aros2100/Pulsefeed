@@ -114,7 +114,7 @@ function DecisionBadge({ decision, confidence }: { decision: string; confidence?
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function SimulatorClient({
-  runId: _runId,
+  runId,
   specialty,
   module,
   baseVersion,
@@ -141,6 +141,11 @@ export default function SimulatorClient({
   const [saving,       setSaving]       = useState(false);
   const [savedVersion, setSavedVersion] = useState<string | null>(null);
   const [saveError,    setSaveError]    = useState<string | null>(null);
+
+  // ── Regression comment state ─────────────────────────────────────────────
+  const [regComments, setRegComments] = useState<Map<string, string>>(new Map());
+  const [refining,    setRefining]    = useState(false);
+  const [refineError, setRefineError] = useState<string | null>(null);
 
   // ── Rescore state ─────────────────────────────────────────────────────────
   const [rescoring,       setRescoring]       = useState(false);
@@ -281,6 +286,58 @@ export default function SimulatorClient({
       // non-critical
     } finally {
       setRescoring(false);
+    }
+  }
+
+  function setComment(articleId: string, value: string) {
+    setRegComments((prev) => {
+      const next = new Map(prev);
+      if (value) next.set(articleId, value);
+      else next.delete(articleId);
+      return next;
+    });
+  }
+
+  async function handleRefineWithComments() {
+    if (refining) return;
+    setRefining(true);
+    setRefineError(null);
+    try {
+      const regressionComments = [...regComments.entries()]
+        .map(([article_id, comment]) => {
+          const article = agreementArticles.find((a) => a.article_id === article_id);
+          return { article_id, title: article?.title, comment };
+        });
+
+      const res = await fetch("/api/lab/refine-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          current_prompt: promptText,
+          feedback: `Regression feedback from simulation: ${regComments.size} kommentarer vedlagt.`,
+          fp_patterns: [],
+          fn_patterns: [],
+          specialty,
+          run_id: runId,
+          regression_comments: regressionComments,
+        }),
+      });
+      const data = await res.json() as { ok: boolean; refined_prompt?: string; error?: string };
+      if (!data.ok) {
+        setRefineError(data.error ?? "Fejl ved raffinering");
+        return;
+      }
+      // Load the refined prompt into the editor for re-simulation
+      setPromptText(data.refined_prompt ?? promptText);
+      setSimResults(null);
+      setRegResults(null);
+      setSimDone(false);
+      setSimProgress(null);
+      setRegComments(new Map());
+    } catch {
+      setRefineError("Netværksfejl — prøv igen");
+    } finally {
+      setRefining(false);
     }
   }
 
@@ -633,6 +690,7 @@ export default function SimulatorClient({
                       <th style={{ ...thStyle, minWidth: "160px" }}>Gammel AI</th>
                       <th style={{ ...thStyle, minWidth: "160px" }}>Ny AI</th>
                       <th style={{ ...thStyle, minWidth: "120px", textAlign: "center" }}>Regression?</th>
+                      <th style={{ ...thStyle, minWidth: "200px" }}>Kommentar</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -691,12 +749,56 @@ export default function SimulatorClient({
                               <span style={{ color: "#aaa" }}>—</span>
                             )}
                           </td>
+                          <td style={tdStyle}>
+                            <textarea
+                              value={regComments.get(d.article_id) ?? ""}
+                              onChange={(e) => setComment(d.article_id, e.target.value)}
+                              placeholder={isRegression ? "Fx: Korrekt afvist — ren neurologi" : "Valgfri kommentar"}
+                              rows={2}
+                              style={{
+                                width: "100%", boxSizing: "border-box",
+                                fontSize: "11px", lineHeight: 1.5,
+                                padding: "5px 8px", borderRadius: "6px",
+                                border: `1px solid ${regComments.has(d.article_id) ? "#0891b2" : "#e0e4ed"}`,
+                                background: regComments.has(d.article_id) ? "#ecfeff" : "#fff",
+                                resize: "vertical", outline: "none",
+                                fontFamily: "var(--font-inter), Inter, sans-serif",
+                              }}
+                            />
+                          </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
+
+              {/* Refine button */}
+              {regComments.size > 0 && (
+                <div style={{ padding: "16px 24px", borderTop: "1px solid #e8ecf1" }}>
+                  {refineError && (
+                    <div style={{ fontSize: "12px", color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "6px", padding: "8px 12px", marginBottom: "10px" }}>
+                      {refineError}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleRefineWithComments}
+                    disabled={refining}
+                    style={{
+                      fontSize: "13px", fontWeight: 700,
+                      background: refining ? "#f0f2f5" : "#0891b2",
+                      color: refining ? "#aaa" : "#fff",
+                      border: "none", borderRadius: "7px", padding: "9px 18px",
+                      cursor: refining ? "not-allowed" : "pointer",
+                      display: "inline-flex", alignItems: "center", gap: "6px",
+                    }}
+                  >
+                    {refining && <Spinner size={13} />}
+                    {refining ? "Forfiner prompt…" : `Gem kommentarer og kør ny optimering → (${regComments.size})`}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
