@@ -27,6 +27,12 @@ function toArray<T>(v: T | T[] | undefined | null): T[] {
   return Array.isArray(v) ? v : [v];
 }
 
+function decodeXmlEntities(str: string): string {
+  return str
+    .replace(/&#x([0-9a-fA-F]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)));
+}
+
 function getText(v: unknown): string {
   if (typeof v === "string") return v;
   if (typeof v === "number") return String(v);
@@ -535,7 +541,7 @@ export async function fetchArticleDetails(
       if (!pubmedId) continue;
 
       // Title
-      const title = getText(art?.ArticleTitle);
+      const title = decodeXmlEntities(getText(art?.ArticleTitle));
 
       // Abstract (may have multiple structured parts)
       const abstractParts = toArray(
@@ -543,15 +549,17 @@ export async function fetchArticleDetails(
       );
       const abstract =
         abstractParts.length > 0
-          ? abstractParts
-              .map((part) => {
-                const p = part as Record<string, unknown>;
-                const label = p["@_Label"] as string | undefined;
-                const text = getText(part);
-                return label ? `${label}: ${text}` : text;
-              })
-              .filter(Boolean)
-              .join("\n\n")
+          ? decodeXmlEntities(
+              abstractParts
+                .map((part) => {
+                  const p = part as Record<string, unknown>;
+                  const label = p["@_Label"] as string | undefined;
+                  const text = getText(part);
+                  return label ? `${label}: ${text}` : text;
+                })
+                .filter(Boolean)
+                .join("\n\n")
+            )
           : null;
 
       // Language
