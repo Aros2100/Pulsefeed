@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     // Fetch old values before updating so we can record the transition
     const { data: oldArticle } = await admin
       .from("articles")
-      .select("status, verified, specialty_tags")
+      .select("status, specialty_tags")
       .eq("id", article_id)
       .maybeSingle();
 

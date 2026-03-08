@@ -17,7 +17,8 @@ export default async function SearchPage({
     supabase.from("users").select("specialty_slugs").eq("id", user.id).single(),
     supabase
       .from("articles")
-      .select("id, title, journal_abbr, published_date, authors, publication_types, news_value, clinical_relevance, enriched_at, imported_at, specialty_tags, verified")
+      .select("id, title, journal_abbr, published_date, authors, publication_types, news_value, clinical_relevance, enriched_at, imported_at, specialty_tags")
+      .eq("status", "approved")
       .order("imported_at", { ascending: false })
       .limit(500),
   ]);

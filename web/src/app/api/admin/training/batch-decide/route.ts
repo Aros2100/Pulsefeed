@@ -36,12 +36,12 @@ export async function POST(request: NextRequest) {
   const relevantIds = verdicts.filter((v) => v.verdict === "relevant").map((v) => v.article_id);
   const rejectedIds = verdicts.filter((v) => v.verdict === "not_relevant").map((v) => v.article_id);
 
-  // Fetch old status/verified before updating so we can record the transition
+  // Fetch old status before updating so we can record the transition
   const allChangedIds = [...relevantIds, ...rejectedIds];
   const { data: oldArticles } = allChangedIds.length > 0
-    ? await admin.from("articles").select("id, status, verified").in("id", allChangedIds)
+    ? await admin.from("articles").select("id, status").in("id", allChangedIds)
     : { data: [] };
-  const oldMap = new Map((oldArticles ?? []).map((a) => [a.id as string, a as { id: string; status: string | null; verified: boolean | null }]));
+  const oldMap = new Map((oldArticles ?? []).map((a) => [a.id as string, a as { id: string; status: string | null }]));
 
   const [relevantResult, rejectedResult] = await Promise.all([
     relevantIds.length > 0

@@ -35,7 +35,7 @@ export async function PUT(
   // Fetch current article values for logging and for RPC args
   const { data: article } = await admin
     .from("articles")
-    .select("status, verified, specialty_tags")
+    .select("status, specialty_tags")
     .eq("id", articleId)
     .maybeSingle();
 
@@ -49,7 +49,6 @@ export async function PUT(
     const { error } = await (admin as any).rpc("replace_article_specialty_tags", {
       p_article_id: articleId,
       p_tags:       specialty_tags,
-      p_verified:   article.verified ?? false,
       p_status:     article.status ?? "pending",
     });
     if (error) {

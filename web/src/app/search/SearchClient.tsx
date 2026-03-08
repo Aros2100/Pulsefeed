@@ -16,7 +16,6 @@ interface Article {
   enriched_at: string | null;
   imported_at: string;
   specialty_tags: string[] | null;
-  verified: boolean | null;
 }
 
 interface Props {
@@ -91,9 +90,8 @@ export default function SearchClient({ articles, specialtyTags, initialQuery, in
 
   // Filter articles client-side
   const filtered = articles.filter((article) => {
-    // Specialty filter: only verified articles with matching tag
+    // Specialty filter: only approved articles with matching tag
     if (!allActive) {
-      if (!article.verified) return false;
       const tags = article.specialty_tags ?? [];
       if (!tags.some((t) => activeSpecialties.includes(t))) return false;
     }

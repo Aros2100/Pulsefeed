@@ -132,12 +132,12 @@ export async function POST(request: NextRequest) {
 
   // 3. Apply article updates in parallel
 
-  // Fetch old status/verified before updating so we can record the transition
+  // Fetch old status before updating so we can record the transition
   const allChangedIds = [...approvedIds, ...rejectedIds];
   const { data: oldArticles } = allChangedIds.length > 0
-    ? await admin.from("articles").select("id, status, verified, specialty_tags").in("id", allChangedIds)
+    ? await admin.from("articles").select("id, status, specialty_tags").in("id", allChangedIds)
     : { data: [] };
-  const oldMap = new Map((oldArticles ?? []).map((a) => [a.id as string, a as { id: string; status: string | null; verified: boolean | null; specialty_tags: string[] | null }]));
+  const oldMap = new Map((oldArticles ?? []).map((a) => [a.id as string, a as { id: string; status: string | null; specialty_tags: string[] | null }]));
 
   const [approvedResult, rejectedResult, ...remapResults] = await Promise.all([
     approvedIds.length > 0
