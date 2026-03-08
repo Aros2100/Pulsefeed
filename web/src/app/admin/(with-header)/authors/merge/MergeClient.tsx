@@ -243,7 +243,16 @@ export default function MergeClient() {
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a1a1a" }}>
-                        {author.display_name}
+                        <a
+                          href={`/admin/authors/${author.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: "inherit", textDecoration: "none" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
+                        >
+                          {author.display_name}
+                        </a>
                         {isMaster && (
                           <span style={{
                             fontSize: "11px", fontWeight: 700, color: "#15803d",
@@ -255,7 +264,15 @@ export default function MergeClient() {
                       </div>
                       {author.orcid && (
                         <div style={{ fontSize: "12px", color: "#5a6a85", marginTop: "2px" }}>
-                          ORCID: {author.orcid}
+                          ORCID:{" "}
+                          <a
+                            href={`https://orcid.org/${author.orcid}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: "#1a6dca", textDecoration: "none" }}
+                          >
+                            {author.orcid}
+                          </a>
                         </div>
                       )}
                     </div>
