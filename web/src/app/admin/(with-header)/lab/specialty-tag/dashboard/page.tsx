@@ -76,7 +76,7 @@ export default async function DashboardPage() {
       .eq("module", "specialty_tag")
       .not("ai_decision", "is", null)
       .order("decided_at", { ascending: true })
-      .limit(5000),
+      .limit(10000),
     admin
       .from("articles")
       .select("id", { count: "exact", head: true })
