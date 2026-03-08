@@ -115,12 +115,18 @@ export async function runImportCircle3(
     totalFetched = pmids.length;
 
     if (pmids.length > 0) {
-      // 4. Deduplicate
-      const { data: existing } = await admin
-        .from("articles")
-        .select("pubmed_id")
-        .in("pubmed_id", pmids);
-      const existingSet = new Set(existing?.map((r) => r.pubmed_id) ?? []);
+      // 4. Deduplicate — chunk the IN query (Supabase default 1000-row limit + URL length)
+      const DEDUP_CHUNK = 500;
+      const existingPmidsList: string[] = [];
+      for (let i = 0; i < pmids.length; i += DEDUP_CHUNK) {
+        const { data } = await admin
+          .from("articles")
+          .select("pubmed_id")
+          .in("pubmed_id", pmids.slice(i, i + DEDUP_CHUNK))
+          .limit(DEDUP_CHUNK);
+        existingPmidsList.push(...(data?.map((r) => r.pubmed_id) ?? []));
+      }
+      const existingSet = new Set(existingPmidsList);
       const newPmids = pmids.filter((id) => !existingSet.has(id));
       totalSkipped = pmids.length - newPmids.length;
 
@@ -193,7 +199,11 @@ export async function runImportCircle3(
           if (upsertErr) {
             errors.push(`Upsert batch error: ${upsertErr.message}`);
           } else {
-            totalImported += (upsertedRows ?? []).length;
+            const inserted = (upsertedRows ?? []).length;
+            // Belt-and-suspenders: any batch rows not returned were DB-level duplicates
+            // that escaped the pre-fetch dedup (e.g. race condition or chunking gap)
+            totalSkipped   += batch.length - inserted;
+            totalImported  += inserted;
             totalAuthorSlots += batch.reduce((sum, a) => {
               const authors = (a.authors as unknown as unknown[]) ?? [];
               return sum + authors.length;
