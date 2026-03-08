@@ -71,7 +71,7 @@ export default async function DashboardPage() {
   const [decisionsRes, queueRes, sessionsRes, versionsRes] = await Promise.all([
     admin
       .from("lab_decisions")
-      .select("ai_decision, decision, ai_confidence, decided_at, session_id, model_version", { count: "exact" })
+      .select("ai_decision, decision, ai_confidence, decided_at, session_id, model_version")
       .eq("specialty", specialty)
       .eq("module", "specialty_tag")
       .not("ai_decision", "is", null)
@@ -106,6 +106,28 @@ export default async function DashboardPage() {
 
   // ── Overall KPIs (scoped to active model version) ───────────────────────────
   const activeVersionName = ((versionsRes.data ?? []).find((v) => v.active)?.version as string | null) ?? null;
+
+  // Fetch exact decision counts from DB — not from in-memory rows (which are capped by db-max-rows)
+  const [activeVersionCountRes, totalCountRes] = await Promise.all([
+    activeVersionName
+      ? admin
+          .from("lab_decisions")
+          .select("*", { count: "exact", head: true })
+          .eq("specialty", specialty)
+          .eq("module", "specialty_tag")
+          .not("ai_decision", "is", null)
+          .eq("model_version", activeVersionName)
+      : Promise.resolve({ count: 0 as number | null, error: null }),
+    admin
+      .from("lab_decisions")
+      .select("*", { count: "exact", head: true })
+      .eq("specialty", specialty)
+      .eq("module", "specialty_tag")
+      .not("ai_decision", "is", null),
+  ]);
+  const activeVersionCount  = activeVersionCountRes.count  ?? 0;
+  const totalDecisionsCount = totalCountRes.count ?? 0;
+
   const kpiDecisions   = activeVersionName
     ? decisions.filter((d) => (d.model_version as string | null) === activeVersionName)
     : decisions;
@@ -248,15 +270,16 @@ export default async function DashboardPage() {
         )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "12px", marginBottom: "16px" }}>
           {[
-            { label: "Valideret i alt",   value: decisionsRes.count ?? 0, sub: null },
-            { label: "AI-nøjagtighed",    value: accuracy != null ? `${accuracy}%` : "—", sub: null, highlight: accuracy },
-            { label: "False positives",   value: falsePositives, sub: "AI godkendt → afvist" },
-            { label: "False negatives",   value: falseNegatives, sub: "AI afvist → godkendt" },
-            { label: "Artikler i kø",     value: queueCount,     sub: null },
-          ].map(({ label, value, sub, highlight }) => (
+            { label: "Valideret i alt",   value: activeVersionCount, valueSub: activeVersionCount !== totalDecisionsCount ? `${totalDecisionsCount} i alt` : null, sub: null },
+            { label: "AI-nøjagtighed",    value: accuracy != null ? `${accuracy}%` : "—", valueSub: null, sub: null, highlight: accuracy },
+            { label: "False positives",   value: falsePositives, valueSub: null, sub: "AI godkendt → afvist" },
+            { label: "False negatives",   value: falseNegatives, valueSub: null, sub: "AI afvist → godkendt" },
+            { label: "Artikler i kø",     value: queueCount,     valueSub: null, sub: null },
+          ].map(({ label, value, valueSub, sub, highlight }) => (
             <div key={label} style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "16px 18px" }}>
               <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>{label}</div>
               <div style={{ fontSize: "22px", fontWeight: 700, color: highlight != null ? accuracyColor(highlight) : "#1a1a1a" }}>{value}</div>
+              {valueSub && <div style={{ fontSize: "11px", color: "#aaa", marginTop: "2px" }}>{valueSub}</div>}
               {sub && <div style={{ fontSize: "11px", color: "#aaa", marginTop: "4px" }}>{sub}</div>}
             </div>
           ))}
