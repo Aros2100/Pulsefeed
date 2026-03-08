@@ -2,123 +2,123 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 
-interface Author {
-  id: string;
-  display_name: string;
-  affiliations: string[] | null;
-  article_count: number | null;
-  author_score: number | null;
-  orcid: string | null;
-}
+/* ── Types ─────────────────────────────────────────────── */
 
 interface DuplicateGroup {
   display_name: string;
   count: number;
-  authors: Author[];
+  authors: { id: string; display_name: string; article_count: number | null }[];
 }
 
-function AuthorScoreBadge({ score }: { score: number }) {
-  const bg = score >= 35 ? "#f0fdf4" : score >= 15 ? "#fffbeb" : "#fef2f2";
-  const color = score >= 35 ? "#15803d" : score >= 15 ? "#d97706" : "#b91c1c";
+interface Article {
+  id: string;
+  title: string;
+  journal_abbr: string | null;
+  published_date: string | null;
+}
+
+interface AuthorDetail {
+  id: string;
+  display_name: string;
+  affiliations: string[] | null;
+  article_count: number | null;
+  orcid: string | null;
+  articles: Article[];
+}
+
+/* ── Shared components ─────────────────────────────────── */
+
+function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <span style={{ fontSize: "12px", fontWeight: 700, borderRadius: "6px", padding: "2px 8px", background: bg, color }}>
-      {score}
-    </span>
+    <div style={{
+      background: "#fff", borderRadius: "10px",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
+      overflow: "hidden", ...style,
+    }}>
+      {children}
+    </div>
   );
 }
 
+function CardHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
+      <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ── Main component ────────────────────────────────────── */
+
 export default function MergeClient() {
-  const router = useRouter();
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
 
-  const [query, setQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Author[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-
-  const [selected, setSelected] = useState<Map<string, Author>>(new Map());
+  // Step 2 state
+  const [activeGroup, setActiveGroup] = useState<DuplicateGroup | null>(null);
+  const [details, setDetails] = useState<AuthorDetail[]>([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);
   const [masterId, setMasterId] = useState<string | null>(null);
 
+  // Step 3 state
   const [merging, setMerging] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch duplicate groups
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/admin/authors/duplicates");
-        const json = await res.json();
-        if (json.ok) setGroups(json.groups);
-      } finally {
-        setLoadingGroups(false);
-      }
-    })();
+  /* ── Fetch duplicate groups (step 1) ─── */
+  const fetchGroups = useCallback(async () => {
+    setLoadingGroups(true);
+    try {
+      const res = await fetch("/api/admin/authors/duplicates");
+      const json = await res.json();
+      if (json.ok) setGroups(json.groups);
+    } finally {
+      setLoadingGroups(false);
+    }
   }, []);
 
-  // Search authors
-  useEffect(() => {
-    if (query.trim().length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      setSearchLoading(true);
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("authors")
-        .select("id, display_name, affiliations, article_count, author_score, orcid")
-        .ilike("display_name", `%${query.trim()}%`)
-        .order("article_count", { ascending: false, nullsFirst: false })
-        .limit(30);
-      setSearchResults((data as unknown as Author[]) ?? []);
-      setSearchLoading(false);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [query]);
+  useEffect(() => { fetchGroups(); }, [fetchGroups]);
 
-  const toggleSelect = useCallback((author: Author) => {
-    setSelected((prev) => {
-      const next = new Map(prev);
-      if (next.has(author.id)) {
-        next.delete(author.id);
-      } else {
-        next.set(author.id, author);
-      }
-      return next;
-    });
-  }, []);
-
-  const selectGroup = useCallback((group: DuplicateGroup) => {
-    const next = new Map<string, Author>();
-    for (const a of group.authors) {
-      next.set(a.id, a);
-    }
-    setSelected(next);
+  /* ── Select group → fetch details (step 2) ─── */
+  const openGroup = useCallback(async (group: DuplicateGroup) => {
+    setActiveGroup(group);
+    setDetails([]);
     setMasterId(null);
-    setQuery(group.display_name);
+    setError(null);
+    setLoadingDetails(true);
+
+    const ids = group.authors.map((a) => a.id).join(",");
+    try {
+      const res = await fetch(`/api/admin/authors/details?ids=${ids}`);
+      const json = await res.json();
+      if (json.ok) {
+        const sorted = (json.authors as AuthorDetail[]).sort(
+          (a, b) => (b.article_count ?? 0) - (a.article_count ?? 0)
+        );
+        setDetails(sorted);
+        // Auto-select the one with most articles as master
+        if (sorted.length > 0) setMasterId(sorted[0].id);
+      }
+    } finally {
+      setLoadingDetails(false);
+    }
   }, []);
 
-  // Auto-select master: the one with most articles
-  useEffect(() => {
-    if (selected.size < 2) {
-      setMasterId(null);
-      return;
-    }
-    if (masterId && selected.has(masterId)) return;
-    const best = Array.from(selected.values()).sort(
-      (a, b) => (b.article_count ?? 0) - (a.article_count ?? 0)
-    )[0];
-    setMasterId(best.id);
-  }, [selected, masterId]);
+  /* ── Back to list ─── */
+  const backToList = useCallback(() => {
+    setActiveGroup(null);
+    setDetails([]);
+    setMasterId(null);
+    setError(null);
+  }, []);
 
-  const selectedAuthors = Array.from(selected.values());
-  const duplicateIds = selectedAuthors.filter((a) => a.id !== masterId).map((a) => a.id);
-  const master = masterId ? selected.get(masterId) : null;
-  const totalArticles = duplicateIds.reduce((sum, id) => {
-    const a = selected.get(id);
+  /* ── Merge (step 3) ─── */
+  const duplicateIds = details.filter((a) => a.id !== masterId).map((a) => a.id);
+  const master = details.find((a) => a.id === masterId) ?? null;
+  const totalArticlesMoved = duplicateIds.reduce((sum, id) => {
+    const a = details.find((d) => d.id === id);
     return sum + (a?.article_count ?? 0);
   }, 0);
 
@@ -138,243 +138,217 @@ export default function MergeClient() {
         setMerging(false);
         return;
       }
-      router.push(`/admin/authors/${masterId}`);
+      // Success → remove this group from the list and go back to step 1
+      setGroups((prev) => prev.filter((g) => g !== activeGroup));
+      backToList();
     } catch {
       setError("Network error");
       setMerging(false);
     }
   };
 
-  // Determine display list: search results + any selected not in search results
-  const displayAuthors: Author[] = [];
-  const seen = new Set<string>();
-
-  // Show selected first
-  for (const a of selectedAuthors) {
-    displayAuthors.push(a);
-    seen.add(a.id);
-  }
-  // Then search results not already shown
-  for (const a of searchResults) {
-    if (!seen.has(a.id)) {
-      displayAuthors.push(a);
-      seen.add(a.id);
-    }
-  }
-
+  /* ── Render ─── */
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
         <div style={{ marginBottom: "8px" }}>
-          <Link href="/admin/authors" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
-            ← Forfattere
-          </Link>
+          {activeGroup ? (
+            <button
+              onClick={backToList}
+              style={{ fontSize: "13px", color: "#5a6a85", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+            >
+              ← Tilbage til listen
+            </button>
+          ) : (
+            <Link href="/admin/authors" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+              ← Forfattere
+            </Link>
+          )}
         </div>
 
         <div style={{ marginBottom: "28px" }}>
-          <div style={{ fontSize: "26px", fontWeight: 700 }}>Merge forfattere</div>
+          <div style={{ fontSize: "26px", fontWeight: 700 }}>
+            {activeGroup ? activeGroup.display_name : "Merge forfattere"}
+          </div>
           <div style={{ fontSize: "14px", color: "#888", marginTop: "4px" }}>
-            Vælg 2+ forfattere og flet dem til én profil
+            {activeGroup
+              ? `${activeGroup.count} profiler med dette navn — vælg master`
+              : "Duplikat-grupper med identisk navn"}
           </div>
         </div>
 
-        {/* Auto-detect duplicates */}
-        <div style={{
-          background: "#fff", borderRadius: "10px", marginBottom: "24px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
-          overflow: "hidden",
-        }}>
-          <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
-            <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
-              {loadingGroups ? "Finder duplikater…" : `${groups.length} grupper med identisk navn`}
-            </div>
-          </div>
+        {/* ═══ STEP 1: Group list ═══ */}
+        {!activeGroup && (
+          <Card>
+            <CardHeader>
+              {loadingGroups ? "Finder duplikater…" : `${groups.length} grupper`}
+            </CardHeader>
 
-          {!loadingGroups && groups.length === 0 && (
-            <div style={{ padding: "16px 24px", fontSize: "14px", color: "#888" }}>
-              Ingen duplikater fundet.
-            </div>
-          )}
-
-          {groups.slice(0, 30).map((group, i) => (
-            <button
-              key={group.display_name}
-              onClick={() => selectGroup(group)}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                width: "100%", padding: "12px 24px", background: "transparent",
-                border: "none", borderTop: i === 0 ? undefined : "1px solid #f0f0f0",
-                cursor: "pointer", textAlign: "left", fontSize: "14px", color: "#1a1a1a",
-              }}
-            >
-              <span style={{ fontWeight: 600 }}>{group.display_name}</span>
-              <span style={{
-                fontSize: "12px", fontWeight: 600, color: "#fff", background: "#b91c1c",
-                borderRadius: "10px", padding: "2px 10px",
-              }}>
-                {group.count} stk
-              </span>
-            </button>
-          ))}
-        </div>
-
-        {/* Search */}
-        <div style={{ marginBottom: "20px" }}>
-          <input
-            type="text"
-            placeholder="Søg forfatter…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            style={{
-              width: "100%", boxSizing: "border-box",
-              border: "1px solid #d1d5db", borderRadius: "8px",
-              padding: "10px 14px", fontSize: "14px", color: "#1a1a1a",
-              outline: "none", background: "#fff",
-            }}
-          />
-        </div>
-
-        {/* Author list */}
-        {(displayAuthors.length > 0 || searchLoading) && (
-          <div style={{
-            background: "#fff", borderRadius: "10px", marginBottom: "24px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
-            overflow: "hidden",
-          }}>
-            <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
-              <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
-                {searchLoading ? "Søger…" : `${displayAuthors.length} forfattere · ${selected.size} valgt`}
+            {!loadingGroups && groups.length === 0 && (
+              <div style={{ padding: "24px", fontSize: "14px", color: "#888" }}>
+                Ingen duplikater fundet.
               </div>
-            </div>
+            )}
 
-            {displayAuthors.map((author, i) => {
-              const isSelected = selected.has(author.id);
+            {groups.map((group, i) => (
+              <button
+                key={group.display_name}
+                onClick={() => openGroup(group)}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  width: "100%", padding: "14px 24px", background: "transparent",
+                  border: "none", borderTop: i === 0 ? undefined : "1px solid #f0f0f0",
+                  cursor: "pointer", textAlign: "left", fontSize: "14px", color: "#1a1a1a",
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>{group.display_name}</span>
+                <span style={{
+                  fontSize: "12px", fontWeight: 600, color: "#fff", background: "#b91c1c",
+                  borderRadius: "10px", padding: "2px 10px",
+                }}>
+                  {group.count} stk
+                </span>
+              </button>
+            ))}
+          </Card>
+        )}
+
+        {/* ═══ STEP 2 + 3: Author cards + merge confirm ═══ */}
+        {activeGroup && (
+          <>
+            {loadingDetails && (
+              <div style={{ padding: "24px", fontSize: "14px", color: "#888" }}>
+                Henter forfatterdata…
+              </div>
+            )}
+
+            {!loadingDetails && details.map((author) => {
               const isMaster = author.id === masterId;
               return (
-                <div
-                  key={author.id}
-                  onClick={() => toggleSelect(author)}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "12px 24px", cursor: "pointer",
-                    borderTop: i === 0 ? undefined : "1px solid #f0f0f0",
-                    background: isMaster ? "#f0fdf4" : isSelected ? "#f8fafc" : "transparent",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }}>
+                <Card key={author.id} style={{ marginBottom: "16px", border: isMaster ? "2px solid #15803d" : "2px solid transparent" }}>
+                  {/* Author header with radio */}
+                  <div style={{
+                    padding: "16px 24px", display: "flex", alignItems: "center", gap: "12px",
+                    background: isMaster ? "#f0fdf4" : undefined,
+                    borderBottom: "1px solid #f0f0f0",
+                  }}>
                     <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleSelect(author)}
-                      style={{ flexShrink: 0, accentColor: "#15803d" }}
+                      type="radio"
+                      name="master"
+                      checked={isMaster}
+                      onChange={() => setMasterId(author.id)}
+                      style={{ accentColor: "#15803d", width: "16px", height: "16px", flexShrink: 0 }}
                     />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a1a1a" }}>
                         {author.display_name}
-                        {author.orcid && (
-                          <span style={{ fontSize: "11px", color: "#5a6a85", marginLeft: "6px", fontWeight: 400 }}>
-                            ORCID
-                          </span>
-                        )}
                         {isMaster && (
                           <span style={{
                             fontSize: "11px", fontWeight: 700, color: "#15803d",
-                            marginLeft: "8px", background: "#dcfce7", borderRadius: "4px", padding: "1px 6px",
+                            marginLeft: "8px", background: "#dcfce7", borderRadius: "4px", padding: "2px 8px",
                           }}>
                             MASTER
                           </span>
                         )}
                       </div>
-                      {author.affiliations && author.affiliations.length > 0 && (
-                        <div style={{
-                          fontSize: "12px", color: "#888", marginTop: "2px",
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          maxWidth: "550px",
-                        }}>
-                          {author.affiliations[0]}
+                      {author.orcid && (
+                        <div style={{ fontSize: "12px", color: "#5a6a85", marginTop: "2px" }}>
+                          ORCID: {author.orcid}
                         </div>
                       )}
                     </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                      <span style={{
+                        fontSize: "12px", fontWeight: 600, color: "#fff", background: "#5a6a85",
+                        borderRadius: "10px", padding: "2px 10px",
+                      }}>
+                        {author.article_count ?? 0} artikler
+                      </span>
+                    </div>
                   </div>
-                  <div style={{ marginLeft: "16px", flexShrink: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-                    {author.author_score != null && (
-                      <AuthorScoreBadge score={author.author_score} />
-                    )}
-                    <span style={{
-                      fontSize: "12px", fontWeight: 600, color: "#fff", background: "#5a6a85",
-                      borderRadius: "10px", padding: "2px 8px",
-                    }}>
-                      {author.article_count ?? 0}
-                    </span>
-                  </div>
-                </div>
+
+                  {/* Affiliations */}
+                  {author.affiliations && author.affiliations.length > 0 && (
+                    <div style={{ padding: "12px 24px", borderBottom: "1px solid #f0f0f0" }}>
+                      <div style={{ fontSize: "11px", fontWeight: 700, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>
+                        Affilieringer
+                      </div>
+                      {author.affiliations.map((aff, j) => (
+                        <div key={j} style={{ fontSize: "13px", color: "#444", lineHeight: 1.5 }}>
+                          {aff}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Articles */}
+                  {author.articles.length > 0 && (
+                    <div style={{ padding: "12px 24px" }}>
+                      <div style={{ fontSize: "11px", fontWeight: 700, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>
+                        Artikler ({author.articles.length})
+                      </div>
+                      {author.articles.map((art) => (
+                        <div key={art.id} style={{ marginBottom: "8px" }}>
+                          <a
+                            href={`/admin/articles/${art.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: "13px", color: "#1a6dca", textDecoration: "none", fontWeight: 500, lineHeight: 1.4, display: "block" }}
+                          >
+                            {art.title}
+                          </a>
+                          <div style={{ fontSize: "12px", color: "#888", marginTop: "1px" }}>
+                            {[art.journal_abbr, art.published_date].filter(Boolean).join(" · ")}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {author.articles.length === 0 && (
+                    <div style={{ padding: "12px 24px", fontSize: "13px", color: "#aaa" }}>
+                      Ingen artikler linket.
+                    </div>
+                  )}
+                </Card>
               );
             })}
-          </div>
-        )}
 
-        {/* Merge panel */}
-        {selected.size >= 2 && (
-          <div style={{
-            background: "#fff", borderRadius: "10px", padding: "24px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
-            position: "sticky", bottom: "24px",
-          }}>
-            <div style={{ fontSize: "15px", fontWeight: 700, marginBottom: "12px" }}>
-              Merge-panel
-            </div>
+            {/* ═══ STEP 3: Merge confirmation ═══ */}
+            {!loadingDetails && details.length >= 2 && masterId && (
+              <Card style={{ marginTop: "8px" }}>
+                <div style={{ padding: "20px 24px" }}>
+                  <div style={{
+                    fontSize: "14px", color: "#1a1a1a", background: "#EEF2F7",
+                    borderRadius: "8px", padding: "14px 18px", marginBottom: "16px", lineHeight: 1.6,
+                  }}>
+                    <strong>Master:</strong> {master?.display_name} ({master?.article_count ?? 0} artikler).
+                    {" "}Merger {duplicateIds.length} duplikat{duplicateIds.length > 1 ? "er" : ""}.
+                    {" "}{totalArticlesMoved} artikel{totalArticlesMoved !== 1 ? "er" : ""} flyttes.
+                  </div>
 
-            <div style={{ fontSize: "13px", color: "#5a6a85", marginBottom: "12px" }}>
-              Vælg master (primær profil):
-            </div>
+                  {error && (
+                    <div style={{ fontSize: "13px", color: "#b91c1c", marginBottom: "12px" }}>
+                      {error}
+                    </div>
+                  )}
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "16px" }}>
-              {selectedAuthors.map((a) => (
-                <label key={a.id} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "14px" }}>
-                  <input
-                    type="radio"
-                    name="master"
-                    checked={masterId === a.id}
-                    onChange={() => setMasterId(a.id)}
-                    style={{ accentColor: "#15803d" }}
-                  />
-                  <span style={{ fontWeight: masterId === a.id ? 700 : 400 }}>
-                    {a.display_name}
-                  </span>
-                  <span style={{ fontSize: "12px", color: "#888" }}>
-                    ({a.article_count ?? 0} artikler)
-                  </span>
-                </label>
-              ))}
-            </div>
-
-            <div style={{
-              fontSize: "13px", color: "#1a1a1a", background: "#EEF2F7",
-              borderRadius: "6px", padding: "10px 14px", marginBottom: "16px",
-            }}>
-              Merger {duplicateIds.length} forfatter{duplicateIds.length > 1 ? "e" : ""} → <strong>{master?.display_name}</strong>.
-              {" "}{totalArticles} artikel{totalArticles !== 1 ? "er" : ""} flyttes.
-            </div>
-
-            {error && (
-              <div style={{ fontSize: "13px", color: "#b91c1c", marginBottom: "12px" }}>
-                {error}
-              </div>
+                  <button
+                    onClick={handleMerge}
+                    disabled={merging}
+                    style={{
+                      padding: "10px 28px", fontSize: "14px", fontWeight: 700,
+                      background: merging ? "#9ca3af" : "#b91c1c", color: "#fff",
+                      border: "none", borderRadius: "8px", cursor: merging ? "default" : "pointer",
+                    }}
+                  >
+                    {merging ? "Merger…" : `Bekræft merge (${details.length} → 1)`}
+                  </button>
+                </div>
+              </Card>
             )}
-
-            <button
-              onClick={handleMerge}
-              disabled={merging}
-              style={{
-                padding: "10px 24px", fontSize: "14px", fontWeight: 700,
-                background: merging ? "#9ca3af" : "#b91c1c", color: "#fff",
-                border: "none", borderRadius: "8px", cursor: merging ? "default" : "pointer",
-              }}
-            >
-              {merging ? "Merger…" : `Bekræft merge (${selected.size} → 1)`}
-            </button>
-          </div>
+          </>
         )}
 
       </div>
