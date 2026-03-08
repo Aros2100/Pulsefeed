@@ -227,13 +227,13 @@ export default async function LabPage() {
                   Uenigheder
                 </div>
                 <div style={{ fontSize: "24px", fontWeight: 700, color: disagreementsCount > 0 ? "#d97706" : "#1a1a1a" }}>
-                  {disagreementsCount}
+                  {activeVersionCount > 0
+                    ? `${Math.round((disagreementsCount / activeVersionCount) * 100)}%`
+                    : "—"}
                 </div>
-                {activeVersionCount > 0 && (
-                  <div style={{ fontSize: "11px", color: "#aaa", marginTop: "2px" }}>
-                    {Math.round((disagreementsCount / activeVersionCount) * 100)}% af {activeVersionName}
-                  </div>
-                )}
+                <div style={{ fontSize: "11px", color: "#aaa", marginTop: "2px" }}>
+                  {disagreementsCount} af {activeVersionCount}
+                </div>
               </div>
               <div>
                 <div style={{ fontSize: "11px", color: "#888", marginBottom: "4px", textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
