@@ -74,11 +74,23 @@ export default function AdminAuthorsPage() {
           </Link>
         </div>
 
-        <div style={{ marginBottom: "28px" }}>
-          <div style={{ fontSize: "26px", fontWeight: 700 }}>Authors</div>
-          <div style={{ fontSize: "14px", color: "#888", marginTop: "4px" }}>
-            {total !== null ? `${total.toLocaleString("da-DK")} forfattere i databasen` : "Browse researchers indexed in the database"}
+        <div style={{ marginBottom: "28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: "26px", fontWeight: 700 }}>Authors</div>
+            <div style={{ fontSize: "14px", color: "#888", marginTop: "4px" }}>
+              {total !== null ? `${total.toLocaleString("da-DK")} forfattere i databasen` : "Browse researchers indexed in the database"}
+            </div>
           </div>
+          <Link
+            href="/admin/authors/merge"
+            style={{
+              fontSize: "13px", fontWeight: 600, padding: "8px 16px",
+              background: "#b91c1c", color: "#fff", borderRadius: "8px",
+              textDecoration: "none", whiteSpace: "nowrap", marginTop: "4px",
+            }}
+          >
+            Merge duplikater
+          </Link>
         </div>
 
         <div style={{ marginBottom: "20px" }}>
