@@ -17,6 +17,7 @@ interface TrainingArticle {
   pubmed_id: string;
   authors: unknown;
   specialty_confidence: number | null;
+  ai_decision: string | null;
   circle: number | null;
 }
 
@@ -67,7 +68,7 @@ function applyConfFilter(articles: TrainingArticle[], filter: ConfidenceFilter):
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function ConfidenceBadge({ score }: { score: number | null }) {
+function ConfidenceBadge({ score, aiDecision }: { score: number | null; aiDecision?: string | null }) {
   if (score == null) {
     return (
       <span style={{ fontSize: "10px", fontWeight: 700, background: "#f1f5f9", color: "#94a3b8", border: "1px solid #e2e8f0", borderRadius: "4px", padding: "1px 6px", flexShrink: 0 }}>
@@ -75,9 +76,16 @@ function ConfidenceBadge({ score }: { score: number | null }) {
       </span>
     );
   }
-  const bg     = score >= 70 ? "#f0fdf4" : score >= 40 ? "#fefce8" : "#fef2f2";
-  const color  = score >= 70 ? "#15803d" : score >= 40 ? "#d97706" : "#dc2626";
-  const border = score >= 70 ? "#bbf7d0" : score >= 40 ? "#fde68a" : "#fecaca";
+  let bg: string, color: string, border: string;
+  if (aiDecision === "approved") {
+    bg = "#f0fdf4"; color = "#15803d"; border = "#bbf7d0";
+  } else if (aiDecision === "rejected") {
+    bg = "#fef2f2"; color = "#dc2626"; border = "#fecaca";
+  } else {
+    bg     = score >= 70 ? "#f0fdf4" : score >= 40 ? "#fefce8" : "#fef2f2";
+    color  = score >= 70 ? "#15803d" : score >= 40 ? "#d97706" : "#dc2626";
+    border = score >= 70 ? "#bbf7d0" : score >= 40 ? "#fde68a" : "#fecaca";
+  }
   return (
     <span style={{ fontSize: "10px", fontWeight: 700, background: bg, color, border: `1px solid ${border}`, borderRadius: "4px", padding: "1px 6px", flexShrink: 0 }}>
       {score}%
@@ -661,7 +669,7 @@ export default function TrainingClient({ specialty, label }: Props) {
                         {verdict === "relevant"     && <span style={{ fontSize: "10px", fontWeight: 700, color: "#15803d" }}>✓</span>}
                         {verdict === "not_relevant" && <span style={{ fontSize: "10px", fontWeight: 700, color: "#b91c1c" }}>✗</span>}
                         <CircleBadge circle={article.circle} />
-                        <ConfidenceBadge score={article.specialty_confidence} />
+                        <ConfidenceBadge score={article.specialty_confidence} aiDecision={article.ai_decision} />
                       </div>
                     </div>
                     <div style={{ fontSize: "13px", fontWeight: 600, lineHeight: 1.4, color: "#1a1a1a", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
