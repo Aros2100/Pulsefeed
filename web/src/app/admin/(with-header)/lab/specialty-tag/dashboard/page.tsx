@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
+import BenchmarkTable from "./BenchmarkTable";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -18,8 +19,8 @@ function fmtDate(iso: string | null): string {
 
 function accColor(v: number | null): string {
   if (v == null) return "#888";
-  if (v >= 85) return "#15803d";
-  if (v >= 70) return "#d97706";
+  if (v >= 85) return "#16a34a";
+  if (v >= 70) return "#ea580c";
   return "#dc2626";
 }
 
@@ -94,7 +95,7 @@ export default async function DashboardPage() {
   ];
 
   // Build per-version stats (raw order = activated_at DESC)
-  const versions: VersionStats[] = rawVersions.map((v, i) => {
+  const allVersions: VersionStats[] = rawVersions.map((v, i) => {
     const ds = groups[v.version as string] ?? [];
     const total = ds.length;
     const correct = ds.filter((d) => d.ai_decision === d.decision).length;
@@ -138,21 +139,35 @@ export default async function DashboardPage() {
     };
   });
 
-  // Sort: active first, then keep activated_at DESC order
-  versions.sort((a, b) => {
+  // Chart: chronological, only versions with data
+  const chartVersions = allVersions
+    .filter((v) => v.decisions > 0)
+    .sort((a, b) => new Date(a.activatedAt).getTime() - new Date(b.activatedAt).getTime());
+
+  // Table: active first, then activated_at DESC — include all
+  const tableVersions = [...allVersions].sort((a, b) => {
     if (a.active && !b.active) return -1;
     if (!a.active && b.active) return 1;
     return 0;
   });
 
-  // Chart: chronological order (oldest → newest)
-  const chartVersions = [...versions].sort(
-    (a, b) => new Date(a.activatedAt).getTime() - new Date(b.activatedAt).getTime()
-  );
+  // Serialize for client component
+  const tableRows = tableVersions.map((v) => ({
+    version: v.version,
+    active: v.active,
+    decisions: v.decisions,
+    agreements: v.agreements,
+    fp: v.fp,
+    fn: v.fn,
+    accuracy: v.accuracy,
+    period: `${fmtDate(v.activatedAt)} → ${v.active ? "nu" : fmtDate(v.deactivatedAt)}`,
+    confBuckets: v.confBuckets,
+    topReasons: v.topReasons,
+  }));
 
   // ── Styles ────────────────────────────────────────────────────────────────
 
-  const barHeight = 180;
+  const barHeight = 200;
 
   const card: React.CSSProperties = {
     background: "#fff",
@@ -172,8 +187,6 @@ export default async function DashboardPage() {
     textTransform: "uppercase",
     fontWeight: 700,
   };
-
-  const gridCols = "120px 100px 100px 55px 55px 100px 1fr";
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -201,82 +214,144 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        {/* 1 ── Bar chart */}
+        {/* 1 ── Vertical bar chart */}
         <div style={card}>
           <div style={cardHeader}>Nøjagtighed pr. version</div>
-          <div style={{ padding: "24px" }}>
+          <div style={{ padding: "24px 24px 20px" }}>
             {chartVersions.length === 0 ? (
               <div style={{ height: barHeight, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa", fontSize: "13px" }}>
-                Ingen versioner endnu
+                Ingen versioner med data
               </div>
             ) : (
               <>
-                <div style={{ display: "flex", alignItems: "flex-end", gap: "12px", justifyContent: "center" }}>
-                  {chartVersions.map((v) => {
-                    const correctRate = v.accuracy ?? 0;
-                    const fpr = v.fpRate ?? 0;
-                    const fnr = v.fnRate ?? 0;
-                    const isEmpty = v.decisions === 0;
+                {/* Y-axis labels + bars */}
+                <div style={{ display: "flex", gap: "0" }}>
+                  {/* Y-axis */}
+                  <div style={{
+                    display: "flex", flexDirection: "column", justifyContent: "space-between",
+                    height: `${barHeight}px`, paddingRight: "10px", flexShrink: 0,
+                  }}>
+                    {[100, 80, 60, 40, 20, 0].map((tick) => (
+                      <div key={tick} style={{ fontSize: "10px", color: "#aaa", textAlign: "right", width: "28px", lineHeight: "1" }}>
+                        {tick}%
+                      </div>
+                    ))}
+                  </div>
 
-                    return (
-                      <div key={v.version} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", flex: 1, maxWidth: "100px" }}>
-                        <div
-                          style={{
+                  {/* Bars area */}
+                  <div style={{
+                    flex: 1, display: "flex", alignItems: "flex-end",
+                    gap: "16px", justifyContent: "center",
+                    height: `${barHeight}px`,
+                    borderLeft: "1px solid #e8ecf1",
+                    borderBottom: "1px solid #e8ecf1",
+                    position: "relative",
+                    paddingBottom: "1px",
+                  }}>
+                    {/* Grid lines */}
+                    {[20, 40, 60, 80].map((tick) => (
+                      <div key={tick} style={{
+                        position: "absolute",
+                        bottom: `${tick}%`,
+                        left: 0, right: 0,
+                        borderTop: "1px dashed #f0f2f5",
+                      }} />
+                    ))}
+
+                    {/* Bars */}
+                    {chartVersions.map((v) => {
+                      const acc = v.accuracy ?? 0;
+                      const h = Math.max((acc / 100) * barHeight, 4);
+
+                      return (
+                        <div key={v.version} style={{
+                          display: "flex", flexDirection: "column", alignItems: "center",
+                          flex: 1, maxWidth: "80px", position: "relative", zIndex: 1,
+                        }}>
+                          {/* Accuracy label above bar */}
+                          <div style={{
+                            fontSize: "14px", fontWeight: 800,
+                            color: accColor(v.accuracy),
+                            marginBottom: "6px",
+                          }}>
+                            {v.accuracy != null ? `${v.accuracy}%` : "—"}
+                          </div>
+
+                          {/* Bar */}
+                          <div style={{
                             width: "100%",
-                            height: `${barHeight}px`,
-                            background: "#f0f2f5",
-                            borderRadius: "6px",
-                            overflow: "hidden",
+                            height: `${h}px`,
+                            borderRadius: "6px 6px 2px 2px",
+                            background: v.active
+                              ? "linear-gradient(180deg, #16a34a 0%, #15803d 100%)"
+                              : "#EEF2F7",
+                            border: v.active
+                              ? "2px solid #16a34a"
+                              : "1px solid #dde3ed",
+                            position: "relative",
                             display: "flex",
                             flexDirection: "column",
-                            border: v.active ? "2px solid #15803d" : "1px solid #e2e8f0",
-                          }}
-                        >
-                          {!isEmpty && (
-                            <>
-                              <div
-                                style={{ flex: `${correctRate} 0 0`, background: v.active ? "#86efac" : "#bbf7d0" }}
-                                title={`Korrekt: ${correctRate}%`}
-                              />
-                              {fnr > 0 && (
-                                <div
-                                  style={{ flex: `${fnr} 0 0`, background: "#fde68a", minHeight: "2px" }}
-                                  title={`FN: ${fnr}% (${v.fn})`}
-                                />
-                              )}
-                              {fpr > 0 && (
-                                <div
-                                  style={{ flex: `${fpr} 0 0`, background: "#fecaca", minHeight: "2px" }}
-                                  title={`FP: ${fpr}% (${v.fp})`}
-                                />
-                              )}
-                            </>
-                          )}
+                            justifyContent: "flex-end",
+                            alignItems: "center",
+                            padding: "0 4px 6px",
+                            overflow: "hidden",
+                          }}>
+                            {/* FP/FN labels inside bar (only if bar is tall enough) */}
+                            {h >= 50 && (v.fpRate ?? 0) + (v.fnRate ?? 0) > 0 && (
+                              <div style={{
+                                fontSize: "9px", fontWeight: 700,
+                                color: v.active ? "rgba(255,255,255,0.85)" : "#888",
+                                textAlign: "center", lineHeight: 1.6,
+                              }}>
+                                {(v.fpRate ?? 0) > 0 && <div>FP {v.fpRate}%</div>}
+                                {(v.fnRate ?? 0) > 0 && <div>FN {v.fnRate}%</div>}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div style={{ fontSize: "12px", fontWeight: 700, color: v.active ? "#15803d" : "#5a6a85" }}>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* X-axis labels (below bars) */}
+                <div style={{ display: "flex", gap: "0", marginTop: "8px" }}>
+                  <div style={{ width: "38px", flexShrink: 0 }} /> {/* spacer for y-axis */}
+                  <div style={{ flex: 1, display: "flex", gap: "16px", justifyContent: "center" }}>
+                    {chartVersions.map((v) => (
+                      <div key={v.version} style={{
+                        flex: 1, maxWidth: "80px", textAlign: "center",
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: "3px",
+                      }}>
+                        <div style={{
+                          fontSize: "12px", fontWeight: 700,
+                          color: v.active ? "#16a34a" : "#5a6a85",
+                        }}>
                           {v.version}
                         </div>
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: accColor(v.accuracy) }}>
-                          {v.accuracy != null ? `${v.accuracy}%` : "—"}
-                        </div>
+                        {v.active && (
+                          <span style={{
+                            fontSize: "9px", fontWeight: 700,
+                            background: "#16a34a", color: "#fff",
+                            borderRadius: "3px", padding: "1px 5px",
+                          }}>
+                            Aktiv
+                          </span>
+                        )}
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
 
                 {/* Legend */}
-                <div style={{ display: "flex", gap: "16px", justifyContent: "center", marginTop: "16px", fontSize: "11px", color: "#888" }}>
-                  <span>
-                    <span style={{ display: "inline-block", width: "10px", height: "10px", background: "#bbf7d0", borderRadius: "2px", marginRight: "4px", verticalAlign: "middle" }} />
-                    Korrekt
+                <div style={{ display: "flex", gap: "20px", justifyContent: "center", marginTop: "16px", fontSize: "11px", color: "#5a6a85" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                    <span style={{ display: "inline-block", width: "12px", height: "12px", background: "linear-gradient(180deg, #16a34a, #15803d)", borderRadius: "3px" }} />
+                    Aktiv version
                   </span>
-                  <span>
-                    <span style={{ display: "inline-block", width: "10px", height: "10px", background: "#fde68a", borderRadius: "2px", marginRight: "4px", verticalAlign: "middle" }} />
-                    Falsk negativ
-                  </span>
-                  <span>
-                    <span style={{ display: "inline-block", width: "10px", height: "10px", background: "#fecaca", borderRadius: "2px", marginRight: "4px", verticalAlign: "middle" }} />
-                    Falsk positiv
+                  <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                    <span style={{ display: "inline-block", width: "12px", height: "12px", background: "#EEF2F7", border: "1px solid #dde3ed", borderRadius: "3px" }} />
+                    Inaktiv
                   </span>
                 </div>
               </>
@@ -287,113 +362,10 @@ export default async function DashboardPage() {
         {/* 2 ── Version comparison table */}
         <div style={card}>
           <div style={cardHeader}>Versions-sammenligning</div>
-          {versions.length === 0 ? (
+          {tableRows.length === 0 ? (
             <div style={{ padding: "24px", fontSize: "13px", color: "#aaa" }}>Ingen versioner endnu.</div>
           ) : (
-            <div>
-              {/* Column headers */}
-              <div style={{
-                display: "grid", gridTemplateColumns: gridCols,
-                padding: "10px 24px", borderBottom: "1px solid #f0f2f5",
-                fontSize: "11px", color: "#888", fontWeight: 600,
-                textTransform: "uppercase", letterSpacing: "0.05em",
-              }}>
-                <div>Version</div>
-                <div>Beslutninger</div>
-                <div>Agreement</div>
-                <div>FP</div>
-                <div>FN</div>
-                <div>Nøjagtighed</div>
-                <div>Periode</div>
-              </div>
-
-              {/* Rows */}
-              {versions.map((v) => (
-                <details key={v.version} style={{ borderBottom: "1px solid #f5f5f5" }}>
-                  <summary style={{
-                    display: "grid", gridTemplateColumns: gridCols,
-                    padding: "14px 24px", cursor: "pointer",
-                    listStyle: "none", fontSize: "13px", alignItems: "center",
-                  }}>
-                    <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
-                      {v.version}
-                      {v.active && (
-                        <span style={{ fontSize: "10px", fontWeight: 700, background: "#15803d", color: "#fff", borderRadius: "3px", padding: "1px 5px" }}>
-                          Aktiv
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ color: "#5a6a85" }}>{v.decisions}</div>
-                    <div>{v.agreements}</div>
-                    <div style={{ color: v.fp > 0 ? "#dc2626" : "#aaa" }}>{v.fp}</div>
-                    <div style={{ color: v.fn > 0 ? "#d97706" : "#aaa" }}>{v.fn}</div>
-                    <div style={{ fontWeight: 700, color: accColor(v.accuracy) }}>
-                      {v.accuracy != null ? `${v.accuracy}%` : "—"}
-                    </div>
-                    <div style={{ fontSize: "12px", color: "#888" }}>
-                      {fmtDate(v.activatedAt)} → {v.active ? "nu" : fmtDate(v.deactivatedAt)}
-                    </div>
-                  </summary>
-
-                  {/* Expanded details */}
-                  <div style={{ padding: "0 24px 20px 24px" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
-
-                      {/* Confidence distribution */}
-                      <div>
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px" }}>
-                          Confidence-fordeling
-                        </div>
-                        {v.confBuckets.every((b) => b.count === 0) ? (
-                          <div style={{ fontSize: "12px", color: "#aaa" }}>Ingen data</div>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                            {v.confBuckets.map((b) => {
-                              const maxCount = Math.max(...v.confBuckets.map((x) => x.count), 1);
-                              const w = Math.round((b.count / maxCount) * 100);
-                              return (
-                                <div key={b.label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                  <div style={{ fontSize: "11px", color: "#888", width: "60px", textAlign: "right", flexShrink: 0 }}>
-                                    {b.label}
-                                  </div>
-                                  <div style={{ flex: 1, height: "14px", background: "#f0f2f5", borderRadius: "3px", overflow: "hidden" }}>
-                                    <div style={{ height: "100%", width: `${w}%`, background: "#93c5fd", borderRadius: "3px", transition: "width 0.2s" }} />
-                                  </div>
-                                  <div style={{ fontSize: "11px", color: "#5a6a85", width: "30px", flexShrink: 0 }}>
-                                    {b.count}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Top rejection reasons */}
-                      <div>
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px" }}>
-                          Hyppigste afvisningsårsager
-                        </div>
-                        {v.topReasons.length === 0 ? (
-                          <div style={{ fontSize: "12px", color: "#aaa" }}>Ingen uenigheder med årsag</div>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                            {v.topReasons.map((r, i) => (
-                              <div key={i} style={{ fontSize: "12px", color: "#1a1a1a", display: "flex", gap: "6px" }}>
-                                <span style={{ color: "#aaa" }}>•</span>
-                                <span style={{ flex: 1 }}>{r.reason}</span>
-                                <span style={{ color: "#aaa", flexShrink: 0 }}>({r.count})</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                    </div>
-                  </div>
-                </details>
-              ))}
-            </div>
+            <BenchmarkTable versions={tableRows} />
           )}
         </div>
 
