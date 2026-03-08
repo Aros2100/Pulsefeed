@@ -2,37 +2,11 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
-import AccuracyChart from "./AccuracyChart";
-import PromptSection, { type ModelVersion } from "./PromptSection";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function isoWeekKey(date: Date): string {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const day = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
-}
-
-function last12WeekKeys(): string[] {
-  const keys: string[] = [];
-  const now = new Date();
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i * 7);
-    keys.push(isoWeekKey(d));
-  }
-  return keys;
-}
-
-function shortWeekLabel(key: string): string {
-  return key.split("-")[1] ?? key;
-}
-
-function pct(correct: number, total: number): number | null {
-  return total > 0 ? Math.round((correct / total) * 100) : null;
+function pct(n: number, d: number): number | null {
+  return d > 0 ? Math.round((n / d) * 100) : null;
 }
 
 function fmtDate(iso: string | null): string {
@@ -42,14 +16,32 @@ function fmtDate(iso: string | null): string {
   });
 }
 
-function accuracyColor(v: number | null): string {
+function accColor(v: number | null): string {
   if (v == null) return "#888";
-  if (v >= 80) return "#15803d";
-  if (v >= 60) return "#d97706";
+  if (v >= 85) return "#15803d";
+  if (v >= 70) return "#d97706";
   return "#dc2626";
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface VersionStats {
+  version: string;
+  active: boolean;
+  activatedAt: string;
+  deactivatedAt: string | null;
+  decisions: number;
+  agreements: number;
+  fp: number;
+  fn: number;
+  accuracy: number | null;
+  fpRate: number | null;
+  fnRate: number | null;
+  confBuckets: { label: string; count: number }[];
+  topReasons: { reason: string; count: number }[];
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -62,168 +54,106 @@ export default async function DashboardPage() {
   const activeSpec =
     SPECIALTIES.find((s) => s.active && userSpecialties.includes(s.slug)) ??
     SPECIALTIES.find((s) => s.active);
-  const specialty      = activeSpec?.slug  ?? "neurosurgery";
-  const specialtyLabel = activeSpec?.label ?? "Neurosurgery";
+  const specialty = activeSpec?.slug ?? "neurosurgery";
 
   const admin = createAdminClient();
 
-  // Fetch everything in parallel
-  const [decisionsRes, queueRes, sessionsRes, versionsRes] = await Promise.all([
-    admin
-      .from("lab_decisions")
-      .select("ai_decision, decision, ai_confidence, decided_at, session_id, model_version")
-      .eq("specialty", specialty)
-      .eq("module", "specialty_tag")
-      .not("ai_decision", "is", null)
-      .order("decided_at", { ascending: true })
-      .limit(10000),
-    admin
-      .from("articles")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending")
-      .contains("specialty_tags", [specialty]),
-    admin
-      .from("lab_sessions")
-      .select("id, completed_at, articles_reviewed")
-      .eq("specialty", specialty)
-      .eq("module", "specialty_tag")
-      .order("completed_at", { ascending: false })
-      .limit(10),
+  const [versionsRes, decisionsRes] = await Promise.all([
     admin
       .from("model_versions")
-      .select("id, version, prompt_text, notes, activated_at, active, generated_by")
+      .select("version, activated_at, active")
       .eq("specialty", specialty)
       .eq("module", "specialty_tag")
       .order("activated_at", { ascending: false }),
-  ]);
-
-  if (decisionsRes.error) console.error("[dashboard] lab_decisions query failed:", decisionsRes.error.message);
-  if (versionsRes.error)  console.error("[dashboard] model_versions query failed:", versionsRes.error.message);
-
-  const decisions = decisionsRes.data ?? [];
-  const queueCount = queueRes.count ?? 0;
-  const sessions   = sessionsRes.data ?? [];
-
-  // ── Overall KPIs (scoped to active model version) ───────────────────────────
-  const activeVersionName = ((versionsRes.data ?? []).find((v) => v.active)?.version as string | null) ?? null;
-
-  // Fetch exact decision counts from DB — not from in-memory rows (which are capped by db-max-rows)
-  const [activeVersionCountRes, totalCountRes] = await Promise.all([
-    activeVersionName
-      ? admin
-          .from("lab_decisions")
-          .select("*", { count: "exact", head: true })
-          .eq("specialty", specialty)
-          .eq("module", "specialty_tag")
-          .not("ai_decision", "is", null)
-          .eq("model_version", activeVersionName)
-      : Promise.resolve({ count: 0 as number | null, error: null }),
     admin
       .from("lab_decisions")
-      .select("*", { count: "exact", head: true })
+      .select("model_version, ai_decision, decision, ai_confidence, disagreement_reason")
       .eq("specialty", specialty)
       .eq("module", "specialty_tag")
-      .not("ai_decision", "is", null),
+      .not("ai_decision", "is", null)
+      .limit(10000),
   ]);
-  const activeVersionCount  = activeVersionCountRes.count  ?? 0;
-  const totalDecisionsCount = totalCountRes.count ?? 0;
 
-  const kpiDecisions   = activeVersionName
-    ? decisions.filter((d) => (d.model_version as string | null) === activeVersionName)
-    : decisions;
+  const rawVersions = versionsRes.data ?? [];
+  const decisions = decisionsRes.data ?? [];
 
-  const total          = kpiDecisions.length;
-  const correct        = kpiDecisions.filter((d) => d.ai_decision === d.decision).length;
-  const accuracy       = pct(correct, total);
-  const falsePositives = kpiDecisions.filter((d) => d.ai_decision === "approved" && d.decision === "rejected").length;
-  const falseNegatives = kpiDecisions.filter((d) => d.ai_decision === "rejected" && d.decision === "approved").length;
-
-  // ── Weekly chart (last 12 weeks) ────────────────────────────────────────────
-  const weekMap: Record<string, { total: number; correct: number }> = {};
-  for (const d of decisions) {
-    const key = isoWeekKey(new Date(d.decided_at as string));
-    if (!weekMap[key]) weekMap[key] = { total: 0, correct: 0 };
-    weekMap[key].total++;
-    if (d.ai_decision === d.decision) weekMap[key].correct++;
-  }
-  const weeklyData = last12WeekKeys().map((key) => ({
-    label:    shortWeekLabel(key),
-    accuracy: weekMap[key] ? pct(weekMap[key].correct, weekMap[key].total) : null,
-    total:    weekMap[key]?.total ?? 0,
-  }));
-
-  // ── Confidence calibration ───────────────────────────────────────────────────
-  const bands = [
-    { label: "90–100%", min: 90, max: 100 },
-    { label: "70–89%",  min: 70, max: 89  },
-    { label: "50–69%",  min: 50, max: 69  },
-    { label: "<50%",    min: 0,  max: 49  },
-  ];
-  const calibration = bands.map(({ label, min, max }) => {
-    const inBand  = decisions.filter((d) => {
-      const c = d.ai_confidence as number | null;
-      return c != null && c >= min && c <= max;
-    });
-    const ok = inBand.filter((d) => d.ai_decision === d.decision).length;
-    return { label, validated: inBand.length, correct: ok, accuracy: pct(ok, inBand.length) };
-  });
-
-  // ── Recent sessions ─────────────────────────────────────────────────────────
-  const sessionIds = sessions.map((s) => s.id as string);
-  let sessionDecisions: { session_id: string; ai_decision: string; decision: string }[] = [];
-  if (sessionIds.length > 0) {
-    const { data } = await admin
-      .from("lab_decisions")
-      .select("session_id, ai_decision, decision")
-      .in("session_id", sessionIds)
-      .not("ai_decision", "is", null);
-    sessionDecisions = (data ?? []) as typeof sessionDecisions;
-  }
-
-  const sessionAccuracy = (id: string): number | null => {
-    const ds = sessionDecisions.filter((d) => d.session_id === id);
-    if (ds.length === 0) return null;
-    return pct(ds.filter((d) => d.ai_decision === d.decision).length, ds.length);
-  };
-
-  const recentSessions = sessions.map((s, i) => {
-    const acc      = sessionAccuracy(s.id as string);
-    const prevAcc  = i < sessions.length - 1 ? sessionAccuracy(sessions[i + 1].id as string) : null;
-    const trend    = acc == null || prevAcc == null ? "—"
-                   : acc > prevAcc ? "↑" : acc < prevAcc ? "↓" : "→";
-    const trendClr = trend === "↑" ? "#15803d" : trend === "↓" ? "#dc2626" : "#888";
-    return { ...s, acc, trend, trendClr };
-  });
-
-  // ── Per-version accuracy (grouped by model_version on lab_decisions) ─────────
-  const versionAccMap: Record<string, { total: number; correct: number }> = {};
+  // Group decisions by model_version
+  const groups: Record<string, typeof decisions> = {};
   for (const d of decisions) {
     const mv = d.model_version as string | null;
     if (!mv) continue;
-    if (!versionAccMap[mv]) versionAccMap[mv] = { total: 0, correct: 0 };
-    versionAccMap[mv].total++;
-    if (d.ai_decision === d.decision) versionAccMap[mv].correct++;
+    (groups[mv] ??= []).push(d);
   }
 
-  // Versions are ordered DESC; versions[i].deactivated_at = versions[i-1].activated_at
-  const rawVersions = versionsRes.data ?? [];
-  const versions: ModelVersion[] = rawVersions.map((v, i) => {
-    const stats = versionAccMap[v.version as string] ?? { total: 0, correct: 0 };
+  const bucketDefs = [
+    { label: "90–100%", min: 90, max: 100 },
+    { label: "80–89%",  min: 80, max: 89 },
+    { label: "70–79%",  min: 70, max: 79 },
+    { label: "60–69%",  min: 60, max: 69 },
+    { label: "<60%",    min: 0,  max: 59 },
+  ];
+
+  // Build per-version stats (raw order = activated_at DESC)
+  const versions: VersionStats[] = rawVersions.map((v, i) => {
+    const ds = groups[v.version as string] ?? [];
+    const total = ds.length;
+    const correct = ds.filter((d) => d.ai_decision === d.decision).length;
+    const fp = ds.filter((d) => d.ai_decision === "approved" && d.decision === "rejected").length;
+    const fn = ds.filter((d) => d.ai_decision === "rejected" && d.decision === "approved").length;
+
+    const confidences = ds
+      .map((d) => d.ai_confidence as number | null)
+      .filter((c): c is number => c != null);
+
+    const confBuckets = bucketDefs.map((b) => ({
+      label: b.label,
+      count: confidences.filter((c) => c >= b.min && c <= b.max).length,
+    }));
+
+    const reasonMap: Record<string, number> = {};
+    for (const d of ds) {
+      if (d.decision !== d.ai_decision && d.disagreement_reason) {
+        const r = d.disagreement_reason as string;
+        reasonMap[r] = (reasonMap[r] ?? 0) + 1;
+      }
+    }
+    const topReasons = Object.entries(reasonMap)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([reason, count]) => ({ reason, count }));
+
     return {
-      id:             v.id as string,
-      version:        v.version as string,
-      prompt:         v.prompt_text as string,
-      notes:          v.notes as string | null,
-      activated_at:   v.activated_at as string,
-      deactivated_at: i === 0 ? null : (rawVersions[i - 1].activated_at as string),
-      active:         v.active as boolean,
-      accuracy:       pct(stats.correct, stats.total),
-      validatedCount: stats.total,
-      generated_by:   (v.generated_by as string | null) ?? "manual",
+      version:       v.version as string,
+      active:        v.active as boolean,
+      activatedAt:   v.activated_at as string,
+      deactivatedAt: (v.active as boolean) ? null : (i === 0 ? null : rawVersions[i - 1].activated_at as string),
+      decisions:     total,
+      agreements:    correct,
+      fp, fn,
+      accuracy: pct(correct, total),
+      fpRate:   pct(fp, total),
+      fnRate:   pct(fn, total),
+      confBuckets,
+      topReasons,
     };
   });
 
-  // ── Shared card style ────────────────────────────────────────────────────────
+  // Sort: active first, then keep activated_at DESC order
+  versions.sort((a, b) => {
+    if (a.active && !b.active) return -1;
+    if (!a.active && b.active) return 1;
+    return 0;
+  });
+
+  // Chart: chronological order (oldest → newest)
+  const chartVersions = [...versions].sort(
+    (a, b) => new Date(a.activatedAt).getTime() - new Date(b.activatedAt).getTime()
+  );
+
+  // ── Styles ────────────────────────────────────────────────────────────────
+
+  const barHeight = 180;
+
   const card: React.CSSProperties = {
     background: "#fff",
     borderRadius: "10px",
@@ -231,149 +161,241 @@ export default async function DashboardPage() {
     overflow: "hidden",
     marginBottom: "16px",
   };
+
   const cardHeader: React.CSSProperties = {
     background: "#EEF2F7",
     borderBottom: "1px solid #dde3ed",
     padding: "10px 24px",
     fontSize: "11px",
     letterSpacing: "0.08em",
-    color: "#E83B2A",
+    color: "#5a6a85",
     textTransform: "uppercase",
     fontWeight: 700,
   };
 
+  const gridCols = "120px 100px 100px 55px 55px 100px 1fr";
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
-      <div style={{ maxWidth: "900px", margin: "0 auto", padding: "40px 24px 80px" }}>
+      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 80px" }}>
+
+        {/* Back */}
+        <div style={{ marginBottom: "8px" }}>
+          <Link href="/admin/lab" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+            ← The Lab
+          </Link>
+        </div>
 
         {/* Heading */}
         <div style={{ marginBottom: "32px" }}>
-          <Link href="/admin/lab" style={{ fontSize: "12px", color: "#888", textDecoration: "none" }}>
-            ← The Lab
-          </Link>
           <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700, marginTop: "16px", marginBottom: "6px" }}>
             Performance
           </div>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
-            Specialty Tag Validation · {specialtyLabel}
+            Model benchmark
           </h1>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
-            Hvor godt rammer AI&apos;en sammenlignet med din vurdering?
+            Nøjagtighed og fejlanalyse pr. model-version
           </p>
         </div>
 
-        {/* 1 ── Overall KPI cards (scoped to active version) */}
-        {activeVersionName && (
-          <div style={{ fontSize: "11px", color: "#888", marginBottom: "6px" }}>
-            Nøjagtighed for <span style={{ fontWeight: 700, color: "#5a6a85" }}>{activeVersionName}</span> (aktiv)
+        {/* 1 ── Bar chart */}
+        <div style={card}>
+          <div style={cardHeader}>Nøjagtighed pr. version</div>
+          <div style={{ padding: "24px" }}>
+            {chartVersions.length === 0 ? (
+              <div style={{ height: barHeight, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa", fontSize: "13px" }}>
+                Ingen versioner endnu
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: "12px", justifyContent: "center" }}>
+                  {chartVersions.map((v) => {
+                    const correctRate = v.accuracy ?? 0;
+                    const fpr = v.fpRate ?? 0;
+                    const fnr = v.fnRate ?? 0;
+                    const isEmpty = v.decisions === 0;
+
+                    return (
+                      <div key={v.version} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", flex: 1, maxWidth: "100px" }}>
+                        <div
+                          style={{
+                            width: "100%",
+                            height: `${barHeight}px`,
+                            background: "#f0f2f5",
+                            borderRadius: "6px",
+                            overflow: "hidden",
+                            display: "flex",
+                            flexDirection: "column",
+                            border: v.active ? "2px solid #15803d" : "1px solid #e2e8f0",
+                          }}
+                        >
+                          {!isEmpty && (
+                            <>
+                              <div
+                                style={{ flex: `${correctRate} 0 0`, background: v.active ? "#86efac" : "#bbf7d0" }}
+                                title={`Korrekt: ${correctRate}%`}
+                              />
+                              {fnr > 0 && (
+                                <div
+                                  style={{ flex: `${fnr} 0 0`, background: "#fde68a", minHeight: "2px" }}
+                                  title={`FN: ${fnr}% (${v.fn})`}
+                                />
+                              )}
+                              {fpr > 0 && (
+                                <div
+                                  style={{ flex: `${fpr} 0 0`, background: "#fecaca", minHeight: "2px" }}
+                                  title={`FP: ${fpr}% (${v.fp})`}
+                                />
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "12px", fontWeight: 700, color: v.active ? "#15803d" : "#5a6a85" }}>
+                          {v.version}
+                        </div>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: accColor(v.accuracy) }}>
+                          {v.accuracy != null ? `${v.accuracy}%` : "—"}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Legend */}
+                <div style={{ display: "flex", gap: "16px", justifyContent: "center", marginTop: "16px", fontSize: "11px", color: "#888" }}>
+                  <span>
+                    <span style={{ display: "inline-block", width: "10px", height: "10px", background: "#bbf7d0", borderRadius: "2px", marginRight: "4px", verticalAlign: "middle" }} />
+                    Korrekt
+                  </span>
+                  <span>
+                    <span style={{ display: "inline-block", width: "10px", height: "10px", background: "#fde68a", borderRadius: "2px", marginRight: "4px", verticalAlign: "middle" }} />
+                    Falsk negativ
+                  </span>
+                  <span>
+                    <span style={{ display: "inline-block", width: "10px", height: "10px", background: "#fecaca", borderRadius: "2px", marginRight: "4px", verticalAlign: "middle" }} />
+                    Falsk positiv
+                  </span>
+                </div>
+              </>
+            )}
           </div>
-        )}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "12px", marginBottom: "16px" }}>
-          {[
-            { label: "Valideret i alt",   value: activeVersionCount, valueSub: activeVersionCount !== totalDecisionsCount ? `${totalDecisionsCount} i alt` : null, sub: null },
-            { label: "AI-nøjagtighed",    value: accuracy != null ? `${accuracy}%` : "—", valueSub: null, sub: null, highlight: accuracy },
-            { label: "False positives",   value: falsePositives, valueSub: null, sub: "AI godkendt → afvist" },
-            { label: "False negatives",   value: falseNegatives, valueSub: null, sub: "AI afvist → godkendt" },
-            { label: "Artikler i kø",     value: queueCount,     valueSub: null, sub: null },
-          ].map(({ label, value, valueSub, sub, highlight }) => (
-            <div key={label} style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "16px 18px" }}>
-              <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>{label}</div>
-              <div style={{ fontSize: "22px", fontWeight: 700, color: highlight != null ? accuracyColor(highlight) : "#1a1a1a" }}>{value}</div>
-              {valueSub && <div style={{ fontSize: "11px", color: "#aaa", marginTop: "2px" }}>{valueSub}</div>}
-              {sub && <div style={{ fontSize: "11px", color: "#aaa", marginTop: "4px" }}>{sub}</div>}
-            </div>
-          ))}
         </div>
 
-        {/* 2 ── Weekly accuracy chart */}
+        {/* 2 ── Version comparison table */}
         <div style={card}>
-          <div style={cardHeader}>Ugentlig nøjagtighed · seneste 12 uger</div>
-          <div style={{ padding: "20px 24px" }}>
-            <AccuracyChart data={weeklyData} />
-            <div style={{ fontSize: "11px", color: "#aaa", marginTop: "8px" }}>
-              Stiplet linje = 80% målsætning
-            </div>
-          </div>
-        </div>
-
-        {/* 3 ── Confidence calibration table */}
-        <div style={card}>
-          <div style={cardHeader}>Confidence kalibrering</div>
-          <div style={{ padding: "0" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid #f0f2f5" }}>
-                  {["Confidence", "Valideret", "AI korrekt", "Nøjagtighed"].map((h) => (
-                    <th key={h} style={{ padding: "10px 24px", textAlign: "left", fontSize: "11px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {calibration.map((row) => (
-                  <tr key={row.label} style={{ borderBottom: "1px solid #f9f9f9" }}>
-                    <td style={{ padding: "12px 24px", fontWeight: 600 }}>{row.label}</td>
-                    <td style={{ padding: "12px 24px", color: "#5a6a85" }}>{row.validated}</td>
-                    <td style={{ padding: "12px 24px", color: "#5a6a85" }}>{row.correct}</td>
-                    <td style={{ padding: "12px 24px" }}>
-                      {row.accuracy != null ? (
-                        <span style={{ fontWeight: 700, color: accuracyColor(row.accuracy) }}>
-                          {row.accuracy}%
-                        </span>
-                      ) : (
-                        <span style={{ color: "#aaa" }}>—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* 4 ── Recent sessions */}
-        <div style={card}>
-          <div style={cardHeader}>Seneste sessioner</div>
-          {recentSessions.length === 0 ? (
-            <div style={{ padding: "24px", fontSize: "13px", color: "#aaa" }}>Ingen sessioner endnu.</div>
+          <div style={cardHeader}>Versions-sammenligning</div>
+          {versions.length === 0 ? (
+            <div style={{ padding: "24px", fontSize: "13px", color: "#aaa" }}>Ingen versioner endnu.</div>
           ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid #f0f2f5" }}>
-                  {["Dato", "Artikler", "Nøjagtighed", "Trend"].map((h) => (
-                    <th key={h} style={{ padding: "10px 24px", textAlign: "left", fontSize: "11px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {recentSessions.map((s) => (
-                  <tr key={s.id as string} style={{ borderBottom: "1px solid #f9f9f9" }}>
-                    <td style={{ padding: "12px 24px", color: "#5a6a85" }}>{fmtDate(s.completed_at as string | null)}</td>
-                    <td style={{ padding: "12px 24px" }}>{s.articles_reviewed as number}</td>
-                    <td style={{ padding: "12px 24px" }}>
-                      {s.acc != null ? (
-                        <span style={{ fontWeight: 700, color: accuracyColor(s.acc) }}>{s.acc}%</span>
-                      ) : (
-                        <span style={{ color: "#aaa" }}>—</span>
+            <div>
+              {/* Column headers */}
+              <div style={{
+                display: "grid", gridTemplateColumns: gridCols,
+                padding: "10px 24px", borderBottom: "1px solid #f0f2f5",
+                fontSize: "11px", color: "#888", fontWeight: 600,
+                textTransform: "uppercase", letterSpacing: "0.05em",
+              }}>
+                <div>Version</div>
+                <div>Beslutninger</div>
+                <div>Agreement</div>
+                <div>FP</div>
+                <div>FN</div>
+                <div>Nøjagtighed</div>
+                <div>Periode</div>
+              </div>
+
+              {/* Rows */}
+              {versions.map((v) => (
+                <details key={v.version} style={{ borderBottom: "1px solid #f5f5f5" }}>
+                  <summary style={{
+                    display: "grid", gridTemplateColumns: gridCols,
+                    padding: "14px 24px", cursor: "pointer",
+                    listStyle: "none", fontSize: "13px", alignItems: "center",
+                  }}>
+                    <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
+                      {v.version}
+                      {v.active && (
+                        <span style={{ fontSize: "10px", fontWeight: 700, background: "#15803d", color: "#fff", borderRadius: "3px", padding: "1px 5px" }}>
+                          Aktiv
+                        </span>
                       )}
-                    </td>
-                    <td style={{ padding: "12px 24px", fontWeight: 700, color: s.trendClr, fontSize: "16px" }}>
-                      {s.trend}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                    <div style={{ color: "#5a6a85" }}>{v.decisions}</div>
+                    <div>{v.agreements}</div>
+                    <div style={{ color: v.fp > 0 ? "#dc2626" : "#aaa" }}>{v.fp}</div>
+                    <div style={{ color: v.fn > 0 ? "#d97706" : "#aaa" }}>{v.fn}</div>
+                    <div style={{ fontWeight: 700, color: accColor(v.accuracy) }}>
+                      {v.accuracy != null ? `${v.accuracy}%` : "—"}
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#888" }}>
+                      {fmtDate(v.activatedAt)} → {v.active ? "nu" : fmtDate(v.deactivatedAt)}
+                    </div>
+                  </summary>
+
+                  {/* Expanded details */}
+                  <div style={{ padding: "0 24px 20px 24px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+
+                      {/* Confidence distribution */}
+                      <div>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px" }}>
+                          Confidence-fordeling
+                        </div>
+                        {v.confBuckets.every((b) => b.count === 0) ? (
+                          <div style={{ fontSize: "12px", color: "#aaa" }}>Ingen data</div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                            {v.confBuckets.map((b) => {
+                              const maxCount = Math.max(...v.confBuckets.map((x) => x.count), 1);
+                              const w = Math.round((b.count / maxCount) * 100);
+                              return (
+                                <div key={b.label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                  <div style={{ fontSize: "11px", color: "#888", width: "60px", textAlign: "right", flexShrink: 0 }}>
+                                    {b.label}
+                                  </div>
+                                  <div style={{ flex: 1, height: "14px", background: "#f0f2f5", borderRadius: "3px", overflow: "hidden" }}>
+                                    <div style={{ height: "100%", width: `${w}%`, background: "#93c5fd", borderRadius: "3px", transition: "width 0.2s" }} />
+                                  </div>
+                                  <div style={{ fontSize: "11px", color: "#5a6a85", width: "30px", flexShrink: 0 }}>
+                                    {b.count}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Top rejection reasons */}
+                      <div>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px" }}>
+                          Hyppigste afvisningsårsager
+                        </div>
+                        {v.topReasons.length === 0 ? (
+                          <div style={{ fontSize: "12px", color: "#aaa" }}>Ingen uenigheder med årsag</div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            {v.topReasons.map((r, i) => (
+                              <div key={i} style={{ fontSize: "12px", color: "#1a1a1a", display: "flex", gap: "6px" }}>
+                                <span style={{ color: "#aaa" }}>•</span>
+                                <span style={{ flex: 1 }}>{r.reason}</span>
+                                <span style={{ color: "#aaa", flexShrink: 0 }}>({r.count})</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+                  </div>
+                </details>
+              ))}
+            </div>
           )}
         </div>
-
-        {/* 5 ── Prompt version history */}
-        <PromptSection
-          versions={versions}
-          specialty={specialty}
-          module="specialty_tag"
-          totalDisagreements={falsePositives + falseNegatives}
-        />
-
 
       </div>
     </div>

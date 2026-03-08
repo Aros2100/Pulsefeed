@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 import VersionSelector from "./VersionSelector";
+import PromptSection, { type ModelVersion } from "../dashboard/PromptSection";
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
@@ -139,7 +140,7 @@ export default async function EvaluationPage({ searchParams }: Props) {
   // Fetch model versions for selector
   const { data: modelVersionsData } = await admin
     .from("model_versions")
-    .select("version, active")
+    .select("id, version, prompt_text, notes, activated_at, active, generated_by")
     .eq("specialty", specialty)
     .eq("module", "specialty_tag")
     .order("activated_at", { ascending: false });
@@ -168,13 +169,49 @@ export default async function EvaluationPage({ searchParams }: Props) {
   const articleIds = [...new Set(disagreements.map((d) => d.article_id).filter((id): id is string => id !== null))];
   let articleMap: Record<string, ArticleDetail> = {};
 
-  if (articleIds.length > 0) {
-    const { data: articles } = await admin
-      .from("articles")
-      .select("id, title, journal_abbr, abstract, specialty_confidence")
-      .in("id", articleIds);
-    articleMap = Object.fromEntries((articles ?? []).map((a) => [a.id, a]));
+  // Fetch article details + all decisions for per-version accuracy in parallel
+  const [articlesForMap, allAccRes] = await Promise.all([
+    articleIds.length > 0
+      ? admin.from("articles")
+          .select("id, title, journal_abbr, abstract, specialty_confidence")
+          .in("id", articleIds)
+      : Promise.resolve({ data: null }),
+    admin.from("lab_decisions")
+      .select("model_version, ai_decision, decision")
+      .eq("specialty", specialty).eq("module", "specialty_tag")
+      .not("ai_decision", "is", null)
+      .limit(10000),
+  ]);
+  articleMap = Object.fromEntries(
+    (articlesForMap.data ?? []).map((a: Record<string, unknown>) => [a.id, a])
+  );
+
+  // Per-version accuracy for PromptSection
+  const versionAccMap: Record<string, { total: number; correct: number }> = {};
+  for (const d of (allAccRes.data ?? [])) {
+    const mv = d.model_version as string | null;
+    if (!mv) continue;
+    if (!versionAccMap[mv]) versionAccMap[mv] = { total: 0, correct: 0 };
+    versionAccMap[mv].total++;
+    if (d.ai_decision === d.decision) versionAccMap[mv].correct++;
   }
+
+  const rawMV = modelVersionsData ?? [];
+  const promptVersions: ModelVersion[] = rawMV.map((v, i) => {
+    const stats = versionAccMap[v.version as string] ?? { total: 0, correct: 0 };
+    return {
+      id:             v.id as string,
+      version:        v.version as string,
+      prompt:         (v.prompt_text as string) ?? "",
+      notes:          v.notes as string | null,
+      activated_at:   v.activated_at as string,
+      deactivated_at: i === 0 ? null : rawMV[i - 1].activated_at as string,
+      active:         v.active as boolean,
+      accuracy:       stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : null,
+      validatedCount: stats.total,
+      generated_by:   (v.generated_by as string | null) ?? "manual",
+    };
+  });
 
   // False positives: AI approved, human rejected
   const falsePositivesRaw = allDecisions.filter((d) => d.decision === "rejected" && d.ai_decision === "approved");
@@ -318,6 +355,16 @@ export default async function EvaluationPage({ searchParams }: Props) {
               <ArticleRow key={`${row.article_id}-${row.decided_at}`} row={row} article={row.article_id ? articleMap[row.article_id] : undefined} />
             ))
           )}
+        </div>
+
+        {/* Prompt Evolution */}
+        <div style={{ marginTop: "28px" }}>
+          <PromptSection
+            versions={promptVersions}
+            specialty={specialty}
+            module="specialty_tag"
+            totalDisagreements={totalDisagree}
+          />
         </div>
 
       </div>
