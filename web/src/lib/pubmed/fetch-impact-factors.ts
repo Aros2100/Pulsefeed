@@ -1,6 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const DELAY_MS = 200;
+const DELAY_MS = 500;
+const RETRY_DELAY_MS = 5_000;
+const MAX_RETRIES = 3;
+const OPENALEX_MAILTO = "digest@pulsefeed.dk";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -28,28 +31,44 @@ interface JournalStats {
  * Fetch journal stats for a given ISSN via OpenAlex.
  * Uses summary_stats.2yr_mean_citedness (JIF proxy) and summary_stats.h_index — both free.
  * Returns nulls when the journal is not found or the request fails.
+ * Retries up to 3 times on HTTP 429 with 5s backoff.
  */
 export async function fetchJournalStats(issn: string): Promise<JournalStats> {
-  const url = `https://api.openalex.org/sources?filter=issn:${issn}`;
-  try {
-    const res = await fetch(url, {
-      headers: { "Accept": "application/json" },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!res.ok) {
-      console.warn(`[fetch-if] HTTP ${res.status} for ISSN ${issn}`);
+  const url = `https://api.openalex.org/sources?filter=issn:${issn}&mailto=${OPENALEX_MAILTO}`;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          "Accept": "application/json",
+          "User-Agent": `pulsefeed/1.0 (mailto:${OPENALEX_MAILTO})`,
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (res.status === 429) {
+        if (attempt < MAX_RETRIES) {
+          console.warn(`[fetch-if] 429 for ISSN ${issn}, retry ${attempt + 1}/${MAX_RETRIES} in ${RETRY_DELAY_MS / 1000}s`);
+          await sleep(RETRY_DELAY_MS);
+          continue;
+        }
+        console.warn(`[fetch-if] 429 for ISSN ${issn}, max retries exceeded — skipping`);
+        return { factor: null, hIndex: null };
+      }
+      if (!res.ok) {
+        console.warn(`[fetch-if] HTTP ${res.status} for ISSN ${issn}`);
+        return { factor: null, hIndex: null };
+      }
+      const data   = (await res.json()) as OpenAlexResponse;
+      const stats  = data.results?.[0]?.summary_stats;
+      return {
+        factor: stats?.["2yr_mean_citedness"] ?? null,
+        hIndex: stats?.h_index ?? null,
+      };
+    } catch (err) {
+      console.warn(`[fetch-if] Failed for ISSN ${issn}:`, err);
       return { factor: null, hIndex: null };
     }
-    const data   = (await res.json()) as OpenAlexResponse;
-    const stats  = data.results?.[0]?.summary_stats;
-    return {
-      factor: stats?.["2yr_mean_citedness"] ?? null,
-      hIndex: stats?.h_index ?? null,
-    };
-  } catch (err) {
-    console.warn(`[fetch-if] Failed for ISSN ${issn}:`, err);
-    return { factor: null, hIndex: null };
   }
+  return { factor: null, hIndex: null };
 }
 
 /**
