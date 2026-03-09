@@ -288,6 +288,8 @@ export default function TaggingClient({
   const [busyRestoreId, setBusyRestoreId] = useState<string | null>(null);
   const [busySave, setBusySave] = useState(false);
   const [busyArticleId, setBusyArticleId] = useState<string | null>(null);
+  const [busyBatchApprove, setBusyBatchApprove] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
   /* ── Rule groups ─────────────────────────────────────────────── */
@@ -319,6 +321,48 @@ export default function TaggingClient({
   function showToast(msg: string, ok: boolean) {
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 4000);
+  }
+
+  /* ── Article selection (ready tab) ───────────────────────────── */
+
+  function toggleArticle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (selected.size === readyArticles.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(readyArticles.map((a) => a.article_id)));
+    }
+  }
+
+  async function handleBatchApprove() {
+    if (selected.size === 0) return;
+    setBusyBatchApprove(true);
+    try {
+      const res = await fetch("/api/admin/tagging/batch-approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ articleIds: [...selected], specialty }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        showToast(data.error ?? "Fejl ved godkendelse", false);
+        return;
+      }
+      showToast(`${data.approved} artikler godkendt`, true);
+      setSelected(new Set());
+      setTimeout(() => router.refresh(), 1000);
+    } catch {
+      showToast("Netværksfejl", false);
+    } finally {
+      setBusyBatchApprove(false);
+    }
   }
 
   /* ── Article decision ──────────────────────────────────────── */
@@ -479,7 +523,18 @@ export default function TaggingClient({
 
   /* ── Render article table ──────────────────────────────────── */
 
-  function renderArticleTable(articles: MatchedArticle[], emptyMsg: string) {
+  function renderArticleTable(
+    articles: MatchedArticle[],
+    emptyMsg: string,
+    opts?: {
+      showCheckbox?: boolean;
+      checkedIds?: Set<string>;
+      onToggle?: (id: string) => void;
+    }
+  ) {
+    const hasCheckbox = opts?.showCheckbox ?? false;
+    const colCount = hasCheckbox ? 6 : 5;
+
     return (
       <div style={{
         background: "#fff",
@@ -490,6 +545,7 @@ export default function TaggingClient({
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
           <thead>
             <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e5e7eb" }}>
+              {hasCheckbox && <th style={{ ...thStyle, width: "40px" }}></th>}
               <th style={thStyle}>Titel</th>
               <th style={{ ...thStyle, width: "100px" }}>Tidsskrift</th>
               <th style={{ ...thStyle, width: "100px" }}>Publiceret</th>
@@ -500,13 +556,23 @@ export default function TaggingClient({
           <tbody>
             {articles.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>
+                <td colSpan={colCount} style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>
                   {emptyMsg}
                 </td>
               </tr>
             )}
             {articles.map((article) => (
               <tr key={article.article_id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                {hasCheckbox && (
+                  <td style={{ ...tdStyle, textAlign: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={opts?.checkedIds?.has(article.article_id) ?? false}
+                      onChange={() => opts?.onToggle?.(article.article_id)}
+                      style={{ accentColor: "#059669" }}
+                    />
+                  </td>
+                )}
                 <td style={tdStyle}>
                   <a
                     href={`/admin/articles/${article.article_id}`}
@@ -668,7 +734,49 @@ export default function TaggingClient({
       </div>
 
       {/* ═══ Tab 1: Klar til auto-approve — ARTIKLER med aktiv single match ═══ */}
-      {tab === "ready" && renderArticleTable(readyArticles, "Ingen pending artikler matcher aktive single terms")}
+      {tab === "ready" && (
+        <div>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+            marginBottom: "12px",
+          }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "#475569", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={readyArticles.length > 0 && selected.size === readyArticles.length}
+                onChange={toggleAll}
+                style={{ accentColor: "#059669" }}
+              />
+              V&aelig;lg alle
+            </label>
+            {selected.size > 0 && (
+              <button
+                onClick={() => void handleBatchApprove()}
+                disabled={busyBatchApprove}
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  padding: "7px 18px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: busyBatchApprove ? "#a7f3d0" : "#059669",
+                  color: "#fff",
+                  cursor: busyBatchApprove ? "not-allowed" : "pointer",
+                }}
+              >
+                {busyBatchApprove ? "Godkender…" : `Godkend ${selected.size} artikel${selected.size > 1 ? "er" : ""}`}
+              </button>
+            )}
+          </div>
+          {renderArticleTable(readyArticles, "Ingen pending artikler matcher aktive single terms", {
+            showCheckbox: true,
+            checkedIds: selected,
+            onToggle: toggleArticle,
+          })}
+        </div>
+      )}
 
       {/* ═══ Tab 2: Grænsetilfælde — ARTIKLER med draft match (ikke aktiv) ═══ */}
       {tab === "borderline" && (
