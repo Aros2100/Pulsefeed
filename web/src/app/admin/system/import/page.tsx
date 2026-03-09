@@ -215,6 +215,10 @@ export default async function ImportDashboardPage() {
     { circle: 3, name: "Danish Sources", approved: c3Approved || null, pending: c3Pending, rejected: c3Rejected || null, latestDate: latestC3?.started_at ?? null },
   ];
 
+  const totalApproved = c1Approved + c2Approved + c3Approved;
+  const totalPending = c2Pending + c3Pending;
+  const totalRejected = c2Rejected + c3Rejected;
+
   // ── Render ──
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -282,6 +286,15 @@ export default async function ImportDashboardPage() {
                   </td>
                 </tr>
               ))}
+              {/* Total row */}
+              <tr style={{ borderTop: "2px solid #e5e7eb" }}>
+                <td style={{ ...tdStyle, fontWeight: 700 }}>Total</td>
+                <td style={{ ...tdStyle, fontWeight: 700, color: "#15803d" }}>{num(totalApproved)}</td>
+                <td style={{ ...tdStyle, fontWeight: 700, color: totalPending > 0 ? "#d97706" : "#888" }}>{totalPending > 0 ? num(totalPending) : "—"}</td>
+                <td style={{ ...tdStyle, fontWeight: 700, color: totalRejected > 0 ? "#b91c1c" : "#888" }}>{totalRejected > 0 ? num(totalRejected) : "—"}</td>
+                <td style={tdStyle}></td>
+                <td style={tdStyle}></td>
+              </tr>
             </tbody>
           </table>
 

@@ -2,8 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-type StatRow = { circle: number | null; status: string | null; antal: number };
-
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
@@ -14,17 +12,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Invalid circle (1-3)" }, { status: 400 });
   }
 
-  const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
 
-  const { data } = await admin.rpc(
-    "get_specialty_article_stats" as never,
-    { specialty_slug: "neurosurgery" } as never,
-  );
-  const rows = ((data as unknown as StatRow[]) ?? []).filter((r) => r.circle === circle);
+  const countQ = (status: string) =>
+    admin.from("articles").select("id", { count: "exact", head: true })
+      .eq("circle", circle).eq("status", status) as Promise<{ count: number | null }>;
 
-  const total = rows.reduce((sum, r) => sum + Number(r.antal), 0);
-  const pending = Number(rows.find((r) => r.status === "pending")?.antal ?? 0);
-  const approved = Number(rows.find((r) => r.status === "approved")?.antal ?? 0);
+  const [approvedRes, pendingRes, rejectedRes] = await Promise.all([
+    countQ("approved"),
+    countQ("pending"),
+    countQ("rejected"),
+  ]);
+
+  const approved = (approvedRes as { count: number | null }).count ?? 0;
+  const pending = (pendingRes as { count: number | null }).count ?? 0;
+  const rejected = (rejectedRes as { count: number | null }).count ?? 0;
+  const total = approved + pending + rejected;
 
   return NextResponse.json({ ok: true, total, pending, approved });
 }

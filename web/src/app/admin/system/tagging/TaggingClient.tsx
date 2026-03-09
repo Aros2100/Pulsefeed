@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { ScoredArticle } from "@/lib/tagging/auto-tagger";
+import TaggingKpiCards from "./TaggingKpiCards";
+import type { TaggingKpis } from "./TaggingKpiCards";
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -20,18 +21,18 @@ interface TaggingRule {
   activated_at: string | null;
 }
 
-interface KPIs {
-  totalPending: number;
-  readyCount: number;
-  borderlineCount: number;
-  noMatchCount: number;
+interface MatchedArticle {
+  article_id: string;
+  title: string;
+  journal_abbr: string | null;
+  published_date: string | null;
+  matched_terms: string[];
 }
 
 type Tab = "ready" | "borderline" | "engine" | "active" | "rejected";
 
 /* ── Constants ────────────────────────────────────────────────── */
 
-const ACTION_ACCENT = "#E83B2A";
 const INFO_ACCENT = "#64748b";
 const CYAN = "#0891b2";
 const SHADOW = "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)";
@@ -51,52 +52,7 @@ const tdStyle: React.CSSProperties = {
   color: "#475569",
 };
 
-const tabAccent: Record<Tab, string> = {
-  ready: ACTION_ACCENT,
-  borderline: ACTION_ACCENT,
-  engine: INFO_ACCENT,
-  active: INFO_ACCENT,
-  rejected: INFO_ACCENT,
-};
-
 /* ── Small components ─────────────────────────────────────────── */
-
-function KpiCard({ label, value, accent }: { label: string; value: number; accent?: string }) {
-  return (
-    <div style={{
-      background: "#fff",
-      borderRadius: "10px",
-      boxShadow: SHADOW,
-      padding: "20px 28px",
-      minWidth: "150px",
-      textAlign: "center",
-    }}>
-      <div style={{ fontSize: "28px", fontWeight: 700, color: accent ?? "#1a1a1a" }}>
-        {value}
-      </div>
-      <div style={{ fontSize: "12px", color: "#888", marginTop: "4px" }}>{label}</div>
-    </div>
-  );
-}
-
-function ScoreBadge({ score, variant }: { score: number; variant: "green" | "orange" }) {
-  const bg = variant === "green" ? "#ecfdf5" : "#fffbeb";
-  const fg = variant === "green" ? "#059669" : "#d97706";
-  const border = variant === "green" ? "#a7f3d0" : "#fde68a";
-  return (
-    <span style={{
-      fontSize: "12px",
-      fontWeight: 700,
-      padding: "2px 8px",
-      borderRadius: "6px",
-      background: bg,
-      color: fg,
-      border: `1px solid ${border}`,
-    }}>
-      {score.toFixed(1)}
-    </span>
-  );
-}
 
 function MeshTag({ term }: { term: string }) {
   return (
@@ -155,103 +111,6 @@ function Toast({ toast }: { toast: { msg: string; ok: boolean } }) {
       boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
     }}>
       {toast.msg}
-    </div>
-  );
-}
-
-/* ── Article table sub-component ──────────────────────────────── */
-
-function ArticleTable({
-  articles,
-  selected,
-  onToggle,
-  showCheckbox,
-  scoreVariant,
-}: {
-  articles: ScoredArticle[];
-  selected?: Set<string>;
-  onToggle?: (id: string) => void;
-  showCheckbox?: boolean;
-  scoreVariant: "green" | "orange";
-}) {
-  return (
-    <div style={{
-      background: "#fff",
-      borderRadius: "10px",
-      boxShadow: SHADOW,
-      overflow: "hidden",
-    }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-        <thead>
-          <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e5e7eb" }}>
-            {showCheckbox && <th style={{ ...thStyle, width: "40px" }}></th>}
-            <th style={thStyle}>Titel</th>
-            <th style={{ ...thStyle, width: "100px" }}>Journal</th>
-            <th style={{ ...thStyle, width: "100px" }}>Publiceret</th>
-            <th style={{ ...thStyle, width: "70px" }}>Score</th>
-            <th style={thStyle}>MeSH matches</th>
-          </tr>
-        </thead>
-        <tbody>
-          {articles.length === 0 && (
-            <tr>
-              <td
-                colSpan={showCheckbox ? 6 : 5}
-                style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}
-              >
-                Ingen artikler i denne kategori
-              </td>
-            </tr>
-          )}
-          {articles.map((a) => (
-            <tr key={a.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-              {showCheckbox && (
-                <td style={{ ...tdStyle, textAlign: "center" }}>
-                  <input
-                    type="checkbox"
-                    checked={selected?.has(a.id) ?? false}
-                    onChange={() => onToggle?.(a.id)}
-                    style={{ accentColor: ACTION_ACCENT }}
-                  />
-                </td>
-              )}
-              <td style={tdStyle}>
-                <a
-                  href={`/admin/articles/${a.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    fontWeight: 500,
-                    color: "#1a1a1a",
-                    textDecoration: "none",
-                    borderBottom: "1px solid transparent",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderBottomColor = CYAN)}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderBottomColor = "transparent")}
-                >
-                  {a.title}
-                </a>
-              </td>
-              <td style={{ ...tdStyle, fontSize: "12px", color: "#64748b" }}>
-                {a.journal_abbr ?? "—"}
-              </td>
-              <td style={{ ...tdStyle, fontSize: "12px", color: "#64748b" }}>
-                {a.published_date ?? "—"}
-              </td>
-              <td style={tdStyle}>
-                <ScoreBadge score={a.mesh_score} variant={scoreVariant} />
-              </td>
-              <td style={tdStyle}>
-                <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-                  {a.matched_terms.map((t) => (
-                    <MeshTag key={t} term={t} />
-                  ))}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
@@ -416,20 +275,19 @@ export default function TaggingClient({
   specialty,
 }: {
   rules: TaggingRule[];
-  readyArticles: ScoredArticle[];
-  borderlineArticles: ScoredArticle[];
-  kpis: KPIs;
+  readyArticles: MatchedArticle[];
+  borderlineArticles: MatchedArticle[];
+  kpis: TaggingKpis;
   specialty: string;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("ready");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [busyApprove, setBusyApprove] = useState(false);
   const [busyRecalc, setBusyRecalc] = useState(false);
   const [busyDisableId, setBusyDisableId] = useState<string | null>(null);
   const [busyRejectId, setBusyRejectId] = useState<string | null>(null);
   const [busyRestoreId, setBusyRestoreId] = useState<string | null>(null);
   const [busySave, setBusySave] = useState(false);
+  const [busyArticleId, setBusyArticleId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
   /* ── Rule groups ─────────────────────────────────────────────── */
@@ -440,7 +298,7 @@ export default function TaggingClient({
   const activeRules = rules.filter((r) => r.status === "active");
   const rejectedRules = rules.filter((r) => r.status === "disabled");
 
-  /* ── Engine tab: checkbox state — auto-check qualifying terms ── */
+  /* ── Engine tab: checkbox state ─────────────────────────────── */
 
   const [checkedTerms, setCheckedTerms] = useState<Set<string>>(new Set());
 
@@ -463,61 +321,31 @@ export default function TaggingClient({
     setTimeout(() => setToast(null), 4000);
   }
 
-  /* ── Article selection (Tab 1) ──────────────────────────────── */
+  /* ── Article decision ──────────────────────────────────────── */
 
-  function toggleArticle(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleAll() {
-    if (selected.size === readyArticles.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(readyArticles.map((a) => a.id)));
-    }
-  }
-
-  async function handleBatchApprove() {
-    if (selected.size === 0) return;
-    setBusyApprove(true);
+  async function handleArticleDecision(
+    articleId: string,
+    decision: "approved" | "rejected",
+    matchedTerms: string[]
+  ) {
+    setBusyArticleId(articleId);
     try {
-      const ruleMap = new Map(rules.map((r) => [r.term, r]));
-      const articleScores: Record<string, {
-        mesh_score: number;
-        matched_terms: { term: string; approve_rate: number; total_decisions: number }[];
-      }> = {};
-      for (const a of readyArticles) {
-        if (!selected.has(a.id)) continue;
-        articleScores[a.id] = {
-          mesh_score: a.mesh_score,
-          matched_terms: a.matched_terms.map((t) => {
-            const r = ruleMap.get(t);
-            return { term: t, approve_rate: r?.approve_rate ?? 0, total_decisions: r?.total_decisions ?? 0 };
-          }),
-        };
-      }
-
-      const res = await fetch("/api/admin/tagging/batch-approve", {
+      const res = await fetch("/api/admin/tagging/article-decision", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ articleIds: [...selected], specialty, articleScores }),
+        body: JSON.stringify({ articleId, decision, specialty, matchedTerms }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        showToast(data.error ?? "Fejl ved godkendelse", false);
+        showToast(data.error ?? "Fejl", false);
         return;
       }
-      showToast(`${data.approved} artikler godkendt`, true);
-      setSelected(new Set());
-      setTimeout(() => router.refresh(), 1000);
+      showToast(decision === "approved" ? "Artikel godkendt" : "Artikel afvist", true);
+      setTimeout(() => router.refresh(), 800);
     } catch {
       showToast("Netværksfejl", false);
     } finally {
-      setBusyApprove(false);
+      setBusyArticleId(null);
     }
   }
 
@@ -638,13 +466,118 @@ export default function TaggingClient({
 
   /* ── Tabs config ────────────────────────────────────────────── */
 
-  const tabs: { key: Tab; label: string; count: number }[] = [
+  const articleTabs: { key: Tab; label: string; count: number }[] = [
     { key: "ready", label: "Klar til auto-approve", count: readyArticles.length },
     { key: "borderline", label: "Grænsetilfælde", count: borderlineArticles.length },
+  ];
+
+  const termTabs: { key: Tab; label: string; count: number }[] = [
     { key: "engine", label: "Under motorhjelmen", count: trackingRules.length },
     { key: "active", label: "Aktive terms", count: activeRules.length },
     { key: "rejected", label: "Afviste terms", count: rejectedRules.length },
   ];
+
+  /* ── Render article table ──────────────────────────────────── */
+
+  function renderArticleTable(articles: MatchedArticle[], emptyMsg: string) {
+    return (
+      <div style={{
+        background: "#fff",
+        borderRadius: "10px",
+        boxShadow: SHADOW,
+        overflow: "hidden",
+      }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+          <thead>
+            <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e5e7eb" }}>
+              <th style={thStyle}>Titel</th>
+              <th style={{ ...thStyle, width: "100px" }}>Tidsskrift</th>
+              <th style={{ ...thStyle, width: "100px" }}>Publiceret</th>
+              <th style={thStyle}>MeSH matches</th>
+              <th style={{ ...thStyle, width: "150px" }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {articles.length === 0 && (
+              <tr>
+                <td colSpan={5} style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>
+                  {emptyMsg}
+                </td>
+              </tr>
+            )}
+            {articles.map((article) => (
+              <tr key={article.article_id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                <td style={tdStyle}>
+                  <a
+                    href={`/admin/articles/${article.article_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      fontWeight: 500,
+                      color: "#1a1a1a",
+                      textDecoration: "none",
+                      borderBottom: "1px solid transparent",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.borderBottomColor = CYAN)}
+                    onMouseLeave={(e) => (e.currentTarget.style.borderBottomColor = "transparent")}
+                  >
+                    {article.title}
+                  </a>
+                </td>
+                <td style={{ ...tdStyle, fontSize: "12px", color: "#64748b" }}>
+                  {article.journal_abbr ?? "—"}
+                </td>
+                <td style={{ ...tdStyle, fontSize: "12px", color: "#64748b" }}>
+                  {article.published_date ?? "—"}
+                </td>
+                <td style={tdStyle}>
+                  <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                    {article.matched_terms.map((t) => (
+                      <MeshTag key={t} term={t} />
+                    ))}
+                  </div>
+                </td>
+                <td style={{ ...tdStyle, display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+                  <button
+                    onClick={() => void handleArticleDecision(article.article_id, "approved", article.matched_terms)}
+                    disabled={busyArticleId === article.article_id}
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      padding: "4px 12px",
+                      borderRadius: "6px",
+                      border: "none",
+                      background: busyArticleId === article.article_id ? "#a7f3d0" : "#059669",
+                      color: "#fff",
+                      cursor: busyArticleId === article.article_id ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    Godkend
+                  </button>
+                  <button
+                    onClick={() => void handleArticleDecision(article.article_id, "rejected", article.matched_terms)}
+                    disabled={busyArticleId === article.article_id}
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      padding: "4px 12px",
+                      borderRadius: "6px",
+                      border: "1px solid #e2e8f0",
+                      background: "#fff",
+                      color: busyArticleId === article.article_id ? "#94a3b8" : "#64748b",
+                      cursor: busyArticleId === article.article_id ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    Afvis
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
 
   /* ── Render ─────────────────────────────────────────────────── */
 
@@ -653,22 +586,12 @@ export default function TaggingClient({
       fontFamily: "var(--font-inter), Inter, sans-serif",
       maxWidth: "1200px",
       margin: "0 auto",
-      padding: "40px 24px",
+      padding: "0 24px 40px",
     }}>
       {toast && <Toast toast={toast} />}
 
-      {/* Header */}
-      <h1 style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a", margin: "0 0 28px" }}>
-        Auto-Tagging
-      </h1>
-
       {/* KPI cards */}
-      <div style={{ display: "flex", gap: "16px", marginBottom: "28px", flexWrap: "wrap" }}>
-        <KpiCard label="Total pending" value={kpis.totalPending} />
-        <KpiCard label="Score &ge; 95" value={kpis.readyCount} accent="#059669" />
-        <KpiCard label="Score 70–94" value={kpis.borderlineCount} accent="#d97706" />
-        <KpiCard label="Ingen MeSH match" value={kpis.noMatchCount} />
-      </div>
+      <TaggingKpiCards kpis={kpis} />
 
       {/* Tabs */}
       <div style={{
@@ -685,7 +608,7 @@ export default function TaggingClient({
           borderRadius: "6px 6px 0 0",
           padding: "2px 2px 0",
         }}>
-          {tabs.filter((t) => t.key === "ready" || t.key === "borderline").map((t) => {
+          {articleTabs.map((t) => {
             const isActive = tab === t.key;
             return (
               <button
@@ -719,7 +642,7 @@ export default function TaggingClient({
           borderRadius: "6px 6px 0 0",
           padding: "2px 2px 0",
         }}>
-          {tabs.filter((t) => t.key === "engine" || t.key === "active" || t.key === "rejected").map((t) => {
+          {termTabs.map((t) => {
             const isActive = tab === t.key;
             return (
               <button
@@ -744,55 +667,10 @@ export default function TaggingClient({
         </div>
       </div>
 
-      {/* ═══ Tab 1: Klar til auto-approve — ARTIKLER med score >= 95 ═══ */}
-      {tab === "ready" && (
-        <div>
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "16px",
-            marginBottom: "12px",
-          }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "#475569", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={readyArticles.length > 0 && selected.size === readyArticles.length}
-                onChange={toggleAll}
-                style={{ accentColor: ACTION_ACCENT }}
-              />
-              V&aelig;lg alle
-            </label>
-            {selected.size > 0 && (
-              <button
-                onClick={() => void handleBatchApprove()}
-                disabled={busyApprove}
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  padding: "7px 18px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: busyApprove ? "#fca5a5" : ACTION_ACCENT,
-                  color: "#fff",
-                  cursor: busyApprove ? "not-allowed" : "pointer",
-                }}
-              >
-                {busyApprove ? "Godkender…" : `Godkend ${selected.size} artikel${selected.size > 1 ? "er" : ""}`}
-              </button>
-            )}
-          </div>
+      {/* ═══ Tab 1: Klar til auto-approve — ARTIKLER med aktiv single match ═══ */}
+      {tab === "ready" && renderArticleTable(readyArticles, "Ingen pending artikler matcher aktive single terms")}
 
-          <ArticleTable
-            articles={readyArticles}
-            selected={selected}
-            onToggle={toggleArticle}
-            showCheckbox
-            scoreVariant="green"
-          />
-        </div>
-      )}
-
-      {/* ═══ Tab 2: Grænsetilfælde — ARTIKLER med score 70–94 ═══ */}
+      {/* ═══ Tab 2: Grænsetilfælde — ARTIKLER med draft match (ikke aktiv) ═══ */}
       {tab === "borderline" && (
         <div>
           <div style={{
@@ -804,13 +682,9 @@ export default function TaggingClient({
             color: "#92400e",
             marginBottom: "16px",
           }}>
-            Disse artikler har score 70–94 og kr&aelig;ver manuel vurdering
+            Disse artikler matcher draft-terms men ingen aktive terms — kr&aelig;ver manuel vurdering
           </div>
-
-          <ArticleTable
-            articles={borderlineArticles}
-            scoreVariant="orange"
-          />
+          {renderArticleTable(borderlineArticles, "Ingen grænsetilfælde")}
         </div>
       )}
 
@@ -891,7 +765,7 @@ export default function TaggingClient({
         <RulesTable
           rules={activeRules}
           showAction
-          actionLabel="Deaktiv&eacute;r"
+          actionLabel="Deaktivér"
           actionBusyId={busyDisableId}
           onAction={handleDeactivate}
           emptyMessage="Ingen aktive terms"
@@ -903,7 +777,7 @@ export default function TaggingClient({
         <RulesTable
           rules={rejectedRules}
           showAction
-          actionLabel="Genaktiv&eacute;r"
+          actionLabel="Genaktivér"
           actionBusyId={busyRestoreId}
           onAction={handleRestore}
           emptyMessage="Ingen afviste terms"

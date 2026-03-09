@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
-import { scorePendingArticles } from "@/lib/tagging/auto-tagger";
 import TaggingClient from "./TaggingClient";
+import TaggingNav from "./TaggingNav";
 
 export default async function TaggingPage() {
   const admin = createAdminClient();
@@ -29,28 +29,64 @@ export default async function TaggingPage() {
     activated_at: string | null;
   }[];
 
-  // Score pending articles for KPI counts
-  const scored = await scorePendingArticles(specialty);
+  // Fetch KPIs via RPC
+  const { data: kpiData } = await admin.rpc("get_tagging_kpis" as never, {
+    p_specialty: specialty,
+  } as never);
 
-  // Count total pending
-  const { count: totalPending } = await admin
-    .from("articles")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "pending")
-    .contains("specialty_tags", [specialty]);
+  const kpis = (kpiData as { total_pending: number; no_mesh: number; single_ready: number; combo_ready: number; no_match: number } | null) ?? {
+    total_pending: 0, no_mesh: 0, single_ready: 0, combo_ready: 0, no_match: 0,
+  };
+
+  // Fetch pending articles matching active single terms
+  const { data: readyArticlesRaw } = await admin.rpc("get_single_ready_articles" as never, {
+    p_specialty: specialty,
+  } as never);
+
+  const readyArticles = (readyArticlesRaw ?? []) as {
+    article_id: string;
+    title: string;
+    journal_abbr: string | null;
+    published_date: string | null;
+    matched_terms: string[];
+  }[];
+
+  // Fetch pending articles matching draft terms (but not active)
+  const { data: borderlineArticlesRaw } = await admin.rpc("get_single_borderline_articles" as never, {
+    p_specialty: specialty,
+  } as never);
+
+  const borderlineArticles = (borderlineArticlesRaw ?? []) as {
+    article_id: string;
+    title: string;
+    journal_abbr: string | null;
+    published_date: string | null;
+    matched_terms: string[];
+  }[];
 
   return (
-    <TaggingClient
-      rules={typedRules}
-      readyArticles={scored.ready}
-      borderlineArticles={scored.borderline}
-      kpis={{
-        totalPending: totalPending ?? 0,
-        readyCount: scored.ready.length,
-        borderlineCount: scored.borderline.length,
-        noMatchCount: scored.noMatch,
-      }}
-      specialty={specialty}
-    />
+    <>
+      <div style={{
+        fontFamily: "var(--font-inter), Inter, sans-serif",
+        maxWidth: "1200px",
+        margin: "0 auto",
+        padding: "40px 24px 0",
+      }}>
+        <TaggingNav />
+      </div>
+      <TaggingClient
+        rules={typedRules}
+        readyArticles={readyArticles}
+        borderlineArticles={borderlineArticles}
+        kpis={{
+          totalPending: kpis.total_pending,
+          noMesh: kpis.no_mesh,
+          singleReady: kpis.single_ready,
+          comboReady: kpis.combo_ready,
+          noMatch: kpis.no_match,
+        }}
+        specialty={specialty}
+      />
+    </>
   );
 }

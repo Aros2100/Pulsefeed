@@ -143,13 +143,36 @@ export async function runImportCircle3(
           danishHospitals.map((h) => h.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"),
           "i"
         );
-        const articles = fetched.filter((a) =>
-          (a.authors as Array<{ affiliation?: string | null }>).some((au) => {
+        const articles: typeof fetched = [];
+        const rejected: typeof fetched = [];
+        for (const a of fetched) {
+          const authors = a.authors as Array<{ affiliation?: string | null }>;
+          const match = authors.some((au) => {
             const aff = au.affiliation ?? "";
             return /neurosurg/i.test(aff) && danishPattern.test(aff);
-          })
-        );
-        const filteredOut = fetched.length - articles.length;
+          });
+          if (match) {
+            articles.push(a);
+          } else {
+            rejected.push(a);
+          }
+        }
+
+        // DEBUG: log rejected articles with near-miss affiliations
+        for (const a of rejected) {
+          const authors = a.authors as Array<{ affiliation?: string | null }>;
+          const nearMiss = authors
+            .map((au) => au.affiliation ?? "")
+            .filter((aff) => danishPattern.test(aff) && !/neurosurg/i.test(aff));
+          if (nearMiss.length > 0) {
+            console.log(`[import-circle3] REJECTED pmid=${a.pubmedId} title="${a.title}"`);
+            for (const aff of nearMiss) {
+              console.log(`  near-miss affiliation: ${aff}`);
+            }
+          }
+        }
+
+        const filteredOut = rejected.length;
         if (filteredOut > 0) {
           totalSkipped += filteredOut;
           console.log(`[import-circle3] Filtered ${filteredOut} articles lacking co-located neurosurg+Danish-hospital affiliation`);

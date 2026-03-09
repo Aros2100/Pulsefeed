@@ -85,5 +85,13 @@ BEGIN
       -- Otherwise tracking
       ELSE 'tracking'
     END;
+
+  -- Promote any first-insert terms that already qualify
+  UPDATE public.tagging_rules
+    SET status = 'draft', updated_at = now()
+    WHERE specialty = p_specialty
+      AND status = 'tracking'
+      AND approve_rate = 100
+      AND total_decisions >= min_decisions;
 END;
 $$;
