@@ -165,6 +165,8 @@ export default function CombosClient({
   const [busyAddPair, setBusyAddPair] = useState(false);
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
   const [busyArticleId, setBusyArticleId] = useState<string | null>(null);
+  const [busyBatchApprove, setBusyBatchApprove] = useState(false);
+  const [selectedArticles, setSelectedArticles] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
   const trackingRules = rules.filter((r) => r.status === "tracking" || r.status === "draft");
@@ -180,6 +182,48 @@ export default function CombosClient({
   function showToast(msg: string, ok: boolean) {
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 4000);
+  }
+
+  /* ── Article selection (pending tab) ─────────────────────────── */
+
+  function toggleArticle(id: string) {
+    setSelectedArticles((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllArticles() {
+    if (selectedArticles.size === pendingArticles.length) {
+      setSelectedArticles(new Set());
+    } else {
+      setSelectedArticles(new Set(pendingArticles.map((a) => a.article_id)));
+    }
+  }
+
+  async function handleBatchApprove() {
+    if (selectedArticles.size === 0) return;
+    setBusyBatchApprove(true);
+    try {
+      const res = await fetch("/api/admin/tagging/batch-approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ articleIds: [...selectedArticles], specialty }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        showToast(data.error ?? "Fejl ved godkendelse", false);
+        return;
+      }
+      showToast(`${data.approved} artikler godkendt`, true);
+      setSelectedArticles(new Set());
+      setTimeout(() => router.refresh(), 1000);
+    } catch {
+      showToast("Netv\u00e6rksfejl", false);
+    } finally {
+      setBusyBatchApprove(false);
+    }
   }
 
   /* ── Heatmap data ──────────────────────────────────────────── */
@@ -374,7 +418,7 @@ export default function CombosClient({
   const tabConfig: { key: Tab; label: string; count?: number }[] = [
     { key: "heatmap", label: "Heatmap" },
     { key: "selected", label: "Valgte par", count: trackingRules.length },
-    { key: "pending", label: "Pending artikler", count: pendingArticles.length },
+    { key: "pending", label: "Klar til auto-approve", count: pendingArticles.length },
     { key: "active", label: "Aktive par", count: activeRules.length },
   ];
 
@@ -737,120 +781,130 @@ export default function CombosClient({
         </div>
       )}
 
-      {/* ═══ Tab 3: Pending artikler ═══ */}
+      {/* ═══ Tab 3: Klar til auto-approve ═══ */}
       {tab === "pending" && (
-        <div style={{
-          background: "#fff",
-          borderRadius: "10px",
-          boxShadow: SHADOW,
-          overflow: "hidden",
-        }}>
+        <div>
           {activeRules.length === 0 && (
-            <div style={{ padding: "12px 16px", background: "#fffbeb", borderBottom: "1px solid #fde68a", fontSize: "13px", color: "#92400e" }}>
+            <div style={{ padding: "12px 16px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "8px", fontSize: "13px", color: "#92400e", marginBottom: "16px" }}>
               Ingen aktive combo-par. Aktiv&eacute;r par i &quot;Valgte par&quot; for at se matchende artikler.
             </div>
           )}
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-            <thead>
-              <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e5e7eb" }}>
-                <th style={thStyle}>Titel</th>
-                <th style={{ ...thStyle, width: "100px" }}>Tidsskrift</th>
-                <th style={{ ...thStyle, width: "100px" }}>Publiceret</th>
-                <th style={thStyle}>Combo match</th>
-                <th style={{ ...thStyle, width: "150px" }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendingArticles.length === 0 && (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>
-                    Ingen pending artikler matcher aktive combo-par
-                  </td>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+            marginBottom: "12px",
+          }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "#475569", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={pendingArticles.length > 0 && selectedArticles.size === pendingArticles.length}
+                onChange={toggleAllArticles}
+                style={{ accentColor: "#059669" }}
+              />
+              V&aelig;lg alle
+            </label>
+            {selectedArticles.size > 0 && (
+              <button
+                onClick={() => void handleBatchApprove()}
+                disabled={busyBatchApprove}
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  padding: "7px 18px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: busyBatchApprove ? "#a7f3d0" : "#059669",
+                  color: "#fff",
+                  cursor: busyBatchApprove ? "not-allowed" : "pointer",
+                }}
+              >
+                {busyBatchApprove ? "Godkender\u2026" : `Godkend ${selectedArticles.size} artikel${selectedArticles.size > 1 ? "er" : ""}`}
+              </button>
+            )}
+          </div>
+          <div style={{
+            background: "#fff",
+            borderRadius: "10px",
+            boxShadow: SHADOW,
+            overflow: "hidden",
+          }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+              <thead>
+                <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e5e7eb" }}>
+                  <th style={{ ...thStyle, width: "40px" }}></th>
+                  <th style={thStyle}>Titel</th>
+                  <th style={{ ...thStyle, width: "100px" }}>Tidsskrift</th>
+                  <th style={{ ...thStyle, width: "100px" }}>Publiceret</th>
+                  <th style={thStyle}>Combo match</th>
                 </tr>
-              )}
-              {pendingArticles.map((article) => (
-                <tr key={article.article_id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  <td style={tdStyle}>
-                    <a
-                      href={`/admin/articles/${article.article_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        fontWeight: 500,
-                        color: "#1a1a1a",
-                        textDecoration: "none",
-                        borderBottom: "1px solid transparent",
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.borderBottomColor = CYAN)}
-                      onMouseLeave={(e) => (e.currentTarget.style.borderBottomColor = "transparent")}
-                    >
-                      {article.title}
-                    </a>
-                  </td>
-                  <td style={{ ...tdStyle, fontSize: "12px", color: "#64748b" }}>
-                    {article.journal_abbr ?? "\u2014"}
-                  </td>
-                  <td style={{ ...tdStyle, fontSize: "12px", color: "#64748b" }}>
-                    {article.published_date ?? "\u2014"}
-                  </td>
-                  <td style={tdStyle}>
-                    <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-                      {article.matched_combos.map((c, i) => (
-                        <span
-                          key={i}
-                          style={{
-                            fontSize: "10px",
-                            padding: "2px 6px",
-                            borderRadius: "4px",
-                            background: "#fef2f2",
-                            color: "#991b1b",
-                            border: "1px solid #fecaca",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {c.term_1} + {c.term_2}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td style={{ ...tdStyle, display: "flex", gap: "6px", justifyContent: "flex-end" }}>
-                    <button
-                      onClick={() => void handleArticleDecision(article.article_id, "approved", article.matched_combos)}
-                      disabled={busyArticleId === article.article_id}
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        padding: "4px 12px",
-                        borderRadius: "6px",
-                        border: "none",
-                        background: busyArticleId === article.article_id ? "#a7f3d0" : "#059669",
-                        color: "#fff",
-                        cursor: busyArticleId === article.article_id ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      Godkend
-                    </button>
-                    <button
-                      onClick={() => void handleArticleDecision(article.article_id, "rejected", article.matched_combos)}
-                      disabled={busyArticleId === article.article_id}
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        padding: "4px 12px",
-                        borderRadius: "6px",
-                        border: "1px solid #e2e8f0",
-                        background: "#fff",
-                        color: busyArticleId === article.article_id ? "#94a3b8" : "#64748b",
-                        cursor: busyArticleId === article.article_id ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      Afvis
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {pendingArticles.length === 0 && (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>
+                      Ingen pending artikler matcher aktive combo-par
+                    </td>
+                  </tr>
+                )}
+                {pendingArticles.map((article) => (
+                  <tr key={article.article_id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                    <td style={{ ...tdStyle, textAlign: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedArticles.has(article.article_id)}
+                        onChange={() => toggleArticle(article.article_id)}
+                        style={{ accentColor: "#059669" }}
+                      />
+                    </td>
+                    <td style={tdStyle}>
+                      <a
+                        href={`/admin/articles/${article.article_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          fontWeight: 500,
+                          color: "#1a1a1a",
+                          textDecoration: "none",
+                          borderBottom: "1px solid transparent",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.borderBottomColor = CYAN)}
+                        onMouseLeave={(e) => (e.currentTarget.style.borderBottomColor = "transparent")}
+                      >
+                        {article.title}
+                      </a>
+                    </td>
+                    <td style={{ ...tdStyle, fontSize: "12px", color: "#64748b" }}>
+                      {article.journal_abbr ?? "\u2014"}
+                    </td>
+                    <td style={{ ...tdStyle, fontSize: "12px", color: "#64748b" }}>
+                      {article.published_date ?? "\u2014"}
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                        {article.matched_combos.map((c, i) => (
+                          <span
+                            key={i}
+                            style={{
+                              fontSize: "10px",
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              background: "#fef2f2",
+                              color: "#991b1b",
+                              border: "1px solid #fecaca",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {c.term_1} + {c.term_2}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
