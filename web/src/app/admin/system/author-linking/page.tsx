@@ -10,23 +10,10 @@ interface AuthorLinkingLog {
   status: "running" | "completed" | "failed";
   articles_processed: number;
   authors_linked: number;
+  new_authors: number;
+  duplicates: number;
+  rejected: number;
   errors: string[];
-}
-
-interface ImportOverviewRow {
-  id: string;
-  started_at: string;
-  articles_imported: number;
-  author_slots_imported: number;
-  trigger: string | null;
-  filter_name: string | null;
-  circle: number | null;
-  authors_linked: number | null;
-  linking_status: string | null;
-  unlinked_author_slots: number;
-  new_authors: number | null;
-  duplicates: number | null;
-  rejected: number | null;
 }
 
 interface RejectedRow {
@@ -42,6 +29,7 @@ interface RejectedRow {
 interface StatusResponse {
   ok: boolean;
   latest: AuthorLinkingLog | null;
+  logs: AuthorLinkingLog[];
   unlinkedCount: number;
   unlinkedAuthorSlots: number;
   totalAuthors: number;
@@ -49,11 +37,6 @@ interface StatusResponse {
   totalDuplicates: number;
   totalRejected: number;
   rejectedAuthorsCount: number;
-}
-
-interface ImportOverviewResponse {
-  ok: boolean;
-  rows: ImportOverviewRow[];
 }
 
 function fmt(iso: string | null) {
@@ -108,9 +91,22 @@ const thStyle: React.CSSProperties = {
   borderBottom: "1px solid #e5e7eb",
 };
 
+function fmtDuration(started: string, completed: string | null) {
+  if (!completed) return "—";
+  const ms = new Date(completed).getTime() - new Date(started).getTime();
+  if (ms < 0) return "—";
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  const remSecs = secs % 60;
+  if (mins < 60) return `${mins}m ${remSecs}s`;
+  const hrs = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  return `${hrs}t ${remMins}m`;
+}
+
 export default function AuthorLinkingPage() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
-  const [overview, setOverview] = useState<ImportOverviewRow[] | null>(null);
   const [starting, setStarting] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -120,14 +116,9 @@ export default function AuthorLinkingPage() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [statusRes, overviewRes] = await Promise.all([
-        fetch("/api/admin/author-linking/status"),
-        fetch("/api/admin/author-linking/import-overview"),
-      ]);
-      const statusJson = (await statusRes.json()) as StatusResponse;
-      const overviewJson = (await overviewRes.json()) as ImportOverviewResponse;
-      if (statusJson.ok) setStatus(statusJson);
-      if (overviewJson.ok) setOverview(overviewJson.rows);
+      const res = await fetch("/api/admin/author-linking/status");
+      const json = (await res.json()) as StatusResponse;
+      if (json.ok) setStatus(json);
     } catch (e) {
       console.error("[author-linking] fetchAll error:", e);
     }
@@ -190,16 +181,7 @@ export default function AuthorLinkingPage() {
     setLoadingRejected(false);
   }
 
-  // Compute accumulated for import log
-  const withAccumulated = overview
-    ? [...overview]
-        .sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime())
-        .reduce<(ImportOverviewRow & { accumulated: number })[]>((acc, row, i) => {
-          const prev = acc[i - 1]?.accumulated ?? 0;
-          return [...acc, { ...row, accumulated: prev + row.author_slots_imported }];
-        }, [])
-        .reverse()
-    : null;
+  const logs = status?.logs ?? [];
 
   return (
     <div style={{
@@ -381,57 +363,65 @@ export default function AuthorLinkingPage() {
           })()}
         </div>
 
-        {/* IMPORT LOG */}
+        {/* LINKING LOG */}
         <div style={{
           background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb",
           padding: 24, marginBottom: 20,
         }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#E83B2A", letterSpacing: "0.05em", marginBottom: 16 }}>
-            IMPORT-KØRSLER
+            LINKING-KØRSLER
           </div>
 
-          {withAccumulated == null ? (
+          {status == null ? (
             <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "#9ca3af" }}>Indlæser…</div>
-          ) : withAccumulated.length === 0 ? (
-            <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "#9ca3af" }}>Ingen import-kørsler endnu</div>
+          ) : logs.length === 0 ? (
+            <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "#9ca3af" }}>Ingen kørsler endnu</div>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid #e5e7eb" }}>
-                  {["DATO", "FILTER", "IMPORTERET", "AFVENTER", "AKKUMULERET"].map((h) => (
+                  {["DATO", "ARTIKLER BEHANDLET", "NYE FORFATTERE", "DUBLETTER", "AFVIST", "VARIGHED", "STATUS"].map((h) => (
                     <th key={h} style={thStyle}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {withAccumulated.slice(0, 10).map((row) => (
-                  <tr key={row.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                    <td style={{ padding: "12px", color: "#374151", whiteSpace: "nowrap" }}>{fmt(row.started_at)}</td>
+                {logs.slice(0, 10).map((log) => (
+                  <tr key={log.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                    <td style={{ padding: "12px", color: "#374151", whiteSpace: "nowrap" }}>
+                      {fmt(log.started_at)}
+                    </td>
+                    <td style={{ padding: "12px", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: "#374151" }}>
+                      {log.articles_processed.toLocaleString("da-DK")}
+                    </td>
+                    <td style={{ padding: "12px", fontVariantNumeric: "tabular-nums", color: "#16a34a" }}>
+                      {log.new_authors.toLocaleString("da-DK")}
+                    </td>
+                    <td style={{ padding: "12px", fontVariantNumeric: "tabular-nums", color: "#2563eb" }}>
+                      {log.duplicates.toLocaleString("da-DK")}
+                    </td>
+                    <td style={{ padding: "12px", fontVariantNumeric: "tabular-nums", color: log.rejected > 0 ? "#dc2626" : "#9ca3af" }}>
+                      {log.rejected > 0 ? log.rejected.toLocaleString("da-DK") : "—"}
+                    </td>
+                    <td style={{ padding: "12px", color: "#6b7280", whiteSpace: "nowrap" }}>
+                      {log.status === "running" ? "Kører…" : fmtDuration(log.started_at, log.completed_at)}
+                    </td>
                     <td style={{ padding: "12px" }}>
-                      {row.filter_name ? (
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          {row.circle != null && (
-                            <span style={{
-                              background: "#dbeafe", color: "#1d4ed8", fontSize: 10, fontWeight: 700,
-                              padding: "2px 6px", borderRadius: 4,
-                            }}>
-                              C{row.circle}
-                            </span>
-                          )}
-                          <span style={{ color: "#374151" }}>{row.filter_name}</span>
+                      {log.status === "completed" && (
+                        <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: "#f0fdf4", color: "#16a34a" }}>
+                          Fuldført
                         </span>
-                      ) : (
-                        <span style={{ color: "#9ca3af" }}>—</span>
                       )}
-                    </td>
-                    <td style={{ padding: "12px", color: "#374151", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-                      {row.articles_imported.toLocaleString("da-DK")}
-                    </td>
-                    <td style={{ padding: "12px", color: row.unlinked_author_slots > 0 ? "#ea580c" : "#9ca3af", fontVariantNumeric: "tabular-nums" }}>
-                      {row.unlinked_author_slots > 0 ? row.unlinked_author_slots.toLocaleString("da-DK") : "—"}
-                    </td>
-                    <td style={{ padding: "12px", color: "#111827", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                      {row.accumulated.toLocaleString("da-DK")}
+                      {log.status === "running" && (
+                        <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: "#fef3c7", color: "#d97706" }}>
+                          Kører
+                        </span>
+                      )}
+                      {log.status === "failed" && (
+                        <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: "#fef2f2", color: "#dc2626" }}>
+                          Fejlet
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
