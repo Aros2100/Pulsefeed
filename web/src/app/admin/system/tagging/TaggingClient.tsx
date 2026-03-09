@@ -626,7 +626,7 @@ export default function TaggingClient({
         <div style={{
           display: "flex",
           gap: "2px",
-          background: "#fef2f2",
+          background: "#eff6ff",
           borderRadius: "6px 6px 0 0",
           padding: "2px 2px 0",
         }}>
@@ -642,8 +642,8 @@ export default function TaggingClient({
                   padding: "8px 16px",
                   border: "none",
                   background: "transparent",
-                  color: isActive ? ACTION_ACCENT : "#b91c1c",
-                  borderBottom: isActive ? `2px solid ${ACTION_ACCENT}` : "2px solid transparent",
+                  color: isActive ? "#334155" : INFO_ACCENT,
+                  borderBottom: isActive ? `2px solid ${INFO_ACCENT}` : "2px solid transparent",
                   cursor: "pointer",
                   marginBottom: "-1px",
                 }}
