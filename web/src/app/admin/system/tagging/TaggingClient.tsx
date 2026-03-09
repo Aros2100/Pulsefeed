@@ -530,10 +530,12 @@ export default function TaggingClient({
       showCheckbox?: boolean;
       checkedIds?: Set<string>;
       onToggle?: (id: string) => void;
+      hideActions?: boolean;
     }
   ) {
     const hasCheckbox = opts?.showCheckbox ?? false;
-    const colCount = hasCheckbox ? 6 : 5;
+    const hasActions = !(opts?.hideActions ?? false);
+    const colCount = (hasCheckbox ? 1 : 0) + 4 + (hasActions ? 1 : 0);
 
     return (
       <div style={{
@@ -550,7 +552,7 @@ export default function TaggingClient({
               <th style={{ ...thStyle, width: "100px" }}>Tidsskrift</th>
               <th style={{ ...thStyle, width: "100px" }}>Publiceret</th>
               <th style={thStyle}>MeSH matches</th>
-              <th style={{ ...thStyle, width: "150px" }}></th>
+              {hasActions && <th style={{ ...thStyle, width: "150px" }}></th>}
             </tr>
           </thead>
           <tbody>
@@ -603,40 +605,42 @@ export default function TaggingClient({
                     ))}
                   </div>
                 </td>
-                <td style={{ ...tdStyle, display: "flex", gap: "6px", justifyContent: "flex-end" }}>
-                  <button
-                    onClick={() => void handleArticleDecision(article.article_id, "approved", article.matched_terms)}
-                    disabled={busyArticleId === article.article_id}
-                    style={{
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      padding: "4px 12px",
-                      borderRadius: "6px",
-                      border: "none",
-                      background: busyArticleId === article.article_id ? "#a7f3d0" : "#059669",
-                      color: "#fff",
-                      cursor: busyArticleId === article.article_id ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    Godkend
-                  </button>
-                  <button
-                    onClick={() => void handleArticleDecision(article.article_id, "rejected", article.matched_terms)}
-                    disabled={busyArticleId === article.article_id}
-                    style={{
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      padding: "4px 12px",
-                      borderRadius: "6px",
-                      border: "1px solid #e2e8f0",
-                      background: "#fff",
-                      color: busyArticleId === article.article_id ? "#94a3b8" : "#64748b",
-                      cursor: busyArticleId === article.article_id ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    Afvis
-                  </button>
-                </td>
+                {hasActions && (
+                  <td style={{ ...tdStyle, display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+                    <button
+                      onClick={() => void handleArticleDecision(article.article_id, "approved", article.matched_terms)}
+                      disabled={busyArticleId === article.article_id}
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        padding: "4px 12px",
+                        borderRadius: "6px",
+                        border: "none",
+                        background: busyArticleId === article.article_id ? "#a7f3d0" : "#059669",
+                        color: "#fff",
+                        cursor: busyArticleId === article.article_id ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      Godkend
+                    </button>
+                    <button
+                      onClick={() => void handleArticleDecision(article.article_id, "rejected", article.matched_terms)}
+                      disabled={busyArticleId === article.article_id}
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        padding: "4px 12px",
+                        borderRadius: "6px",
+                        border: "1px solid #e2e8f0",
+                        background: "#fff",
+                        color: busyArticleId === article.article_id ? "#94a3b8" : "#64748b",
+                        cursor: busyArticleId === article.article_id ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      Afvis
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -774,6 +778,7 @@ export default function TaggingClient({
             showCheckbox: true,
             checkedIds: selected,
             onToggle: toggleArticle,
+            hideActions: true,
           })}
         </div>
       )}
