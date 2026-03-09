@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import ImportDashboardActions from "./ImportDashboardActions";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -94,15 +95,6 @@ function SectionHeading({ title }: { title: string }) {
   );
 }
 
-function ProgressBar({ value, total, color }: { value: number; total: number; color: string }) {
-  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
-  return (
-    <div style={{ background: "#eef0f4", borderRadius: "6px", height: "8px", overflow: "hidden", width: "100%" }}>
-      <div style={{ background: color, height: "100%", borderRadius: "6px", width: `${pct}%`, transition: "width 0.3s" }} />
-    </div>
-  );
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function ImportDashboardPage() {
@@ -121,7 +113,6 @@ export default async function ImportDashboardPage() {
     c3ApprovedRes, c3PendingRes, c3RejectedRes,
     totalArticlesRes,
     authorsResult, unlinkedResult, unlinkedSlotsResult, linkingTotalsResult,
-    citWithRes, citWithoutRes, ifWithRes, ifWithoutRes,
     latestC1LogResult, latestC2LogResult, latestC3LogResult,
   ] = await Promise.all([
     // Article counts per circle+status
@@ -136,11 +127,6 @@ export default async function ImportDashboardPage() {
     admin.from("author_linking_logs")
       .select("new_authors, duplicates, rejected")
       .in("status", ["completed", "running"]),
-    // Enrichment
-    admin.from("articles").select("id", { count: "exact", head: true }).not("citation_count" as never, "is", null),
-    admin.from("articles").select("id", { count: "exact", head: true }).is("citation_count" as never, null),
-    admin.from("articles").select("id", { count: "exact", head: true }).not("impact_factor", "is", null),
-    admin.from("articles").select("id", { count: "exact", head: true }).is("impact_factor", null),
     // Latest completed import log per circle
     admin.from("pubmed_filters").select("id").eq("specialty", "neurosurgery").eq("circle", 1)
       .then(async (fRes: { data: { id: string }[] | null }) => {
@@ -187,15 +173,6 @@ export default async function ImportDashboardPage() {
   const totalNewAuthors = linkingTotals.reduce((s, r) => s + (r.new_authors ?? 0), 0);
   const totalDuplicateAuthors = linkingTotals.reduce((s, r) => s + (r.duplicates ?? 0), 0);
   const totalRejectedAuthors = linkingTotals.reduce((s, r) => s + (r.rejected ?? 0), 0);
-
-  // Enrichment stats
-  const citWith = citWithRes.count ?? 0;
-  const citWithout = citWithoutRes.count ?? 0;
-  const citTotal = citWith + citWithout;
-
-  const ifWith = ifWithRes.count ?? 0;
-  const ifWithout = ifWithoutRes.count ?? 0;
-  const ifTotal = ifWith + ifWithout;
 
   // Circle table data
   const circleRows: {
@@ -344,33 +321,8 @@ export default async function ImportDashboardPage() {
             <span style={headerLabel}>Citations & Impact Factor</span>
           </div>
           <div style={{ padding: "20px 24px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
-            {/* Citations */}
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                <span style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a" }}>Citations</span>
-                <span style={{ fontSize: "12px", color: "#5a6a85" }}>
-                  {num(citWith)} / {num(citTotal)} artikler
-                </span>
-              </div>
-              <ProgressBar value={citWith} total={citTotal} color="#1d4ed8" />
-              <div style={{ fontSize: "12px", color: "#888", marginTop: "6px" }}>
-                {citWithout > 0 ? `${num(citWithout)} mangler` : "Alle hentet"}
-              </div>
-            </div>
-
-            {/* Impact Factor */}
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                <span style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a" }}>Impact Factor</span>
-                <span style={{ fontSize: "12px", color: "#5a6a85" }}>
-                  {num(ifWith)} / {num(ifTotal)} artikler
-                </span>
-              </div>
-              <ProgressBar value={ifWith} total={ifTotal} color="#7c3aed" />
-              <div style={{ fontSize: "12px", color: "#888", marginTop: "6px" }}>
-                {ifWithout > 0 ? `${num(ifWithout)} mangler` : "Alle hentet"}
-              </div>
-            </div>
+            <ImportDashboardActions specialtySlugs={[]} subset="citations" />
+            <ImportDashboardActions specialtySlugs={[]} subset="impact-factor" />
           </div>
         </div>
 
