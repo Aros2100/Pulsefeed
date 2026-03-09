@@ -204,19 +204,36 @@ export default function AdminArticleListClient() {
         flexDirection: "column",
         gap: "10px",
       }}>
-        {/* Row 1: search + core filters */}
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+        {/* Row 1: title/journal search */}
+        <div>
           <input
             type="text"
             placeholder="Søg titel eller tidsskrift…"
             value={searchInput}
             onChange={(e) => handleSearchChange(e.target.value)}
             style={{
-              flex: "1 1 200px", padding: "7px 12px",
+              width: "100%", padding: "7px 12px",
               border: "1px solid #dde3ed", borderRadius: "6px",
               fontSize: "13px", outline: "none",
             }}
           />
+        </div>
+        {/* Row 2: MeSH term search */}
+        <div>
+          <input
+            type="text"
+            placeholder="Søg MeSH term…"
+            value={meshInput}
+            onChange={(e) => handleMeshChange(e.target.value)}
+            style={{
+              width: "100%", padding: "7px 12px",
+              border: "1px solid #dde3ed", borderRadius: "6px",
+              fontSize: "13px", outline: "none",
+            }}
+          />
+        </div>
+        {/* Row 3: all dropdown/date filters */}
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
           <SelectFilter
             value={filters.circle}
             onChange={(v) => setFilter("circle", v)}
@@ -242,20 +259,6 @@ export default function AdminArticleListClient() {
             onChange={(v) => setFilter("specialty", v)}
             placeholder="Specialty: Alle"
             options={specialtyTags.map((t) => ({ value: t, label: t }))}
-          />
-        </div>
-        {/* Row 2: extra filters */}
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-          <input
-            type="text"
-            placeholder="MeSH term…"
-            value={meshInput}
-            onChange={(e) => handleMeshChange(e.target.value)}
-            style={{
-              width: "160px", padding: "6px 10px",
-              border: "1px solid #dde3ed", borderRadius: "6px",
-              fontSize: "12px", outline: "none",
-            }}
           />
           <SelectFilter
             value={filters.approval_method}
