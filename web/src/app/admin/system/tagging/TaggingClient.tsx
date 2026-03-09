@@ -29,7 +29,7 @@ interface MatchedArticle {
   matched_terms: string[];
 }
 
-type Tab = "ready" | "borderline" | "engine" | "active" | "rejected";
+type Tab = "ready" | "engine" | "active" | "rejected";
 
 /* ── Constants ────────────────────────────────────────────────── */
 
@@ -270,13 +270,11 @@ function RulesTable({
 export default function TaggingClient({
   rules,
   readyArticles,
-  borderlineArticles,
   kpis,
   specialty,
 }: {
   rules: TaggingRule[];
   readyArticles: MatchedArticle[];
-  borderlineArticles: MatchedArticle[];
   kpis: TaggingKpis;
   specialty: string;
 }) {
@@ -510,7 +508,6 @@ export default function TaggingClient({
 
   const articleTabs: { key: Tab; label: string; count: number }[] = [
     { key: "ready", label: "Klar til auto-approve", count: readyArticles.length },
-    { key: "borderline", label: "Grænsetilfælde", count: borderlineArticles.length },
   ];
 
   const termTabs: { key: Tab; label: string; count: number }[] = [
@@ -781,25 +778,7 @@ export default function TaggingClient({
         </div>
       )}
 
-      {/* ═══ Tab 2: Grænsetilfælde — ARTIKLER med draft match (ikke aktiv) ═══ */}
-      {tab === "borderline" && (
-        <div>
-          <div style={{
-            background: "#fffbeb",
-            border: "1px solid #fde68a",
-            borderRadius: "8px",
-            padding: "10px 16px",
-            fontSize: "13px",
-            color: "#92400e",
-            marginBottom: "16px",
-          }}>
-            Disse artikler matcher draft-terms men ingen aktive terms — kr&aelig;ver manuel vurdering
-          </div>
-          {renderArticleTable(borderlineArticles, "Ingen grænsetilfælde")}
-        </div>
-      )}
-
-      {/* ═══ Tab 3: Under motorhjelmen — MeSH TERMS (tracking) ═══ */}
+      {/* ═══ Tab 2: Under motorhjelmen — MeSH TERMS (tracking) ═══ */}
       {tab === "engine" && (
         <div>
           <div style={{ display: "flex", gap: "10px", marginBottom: "16px" }}>

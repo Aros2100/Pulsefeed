@@ -51,19 +51,6 @@ export default async function TaggingPage() {
     matched_terms: string[];
   }[];
 
-  // Fetch pending articles matching draft terms (but not active)
-  const { data: borderlineArticlesRaw } = await admin.rpc("get_single_borderline_articles" as never, {
-    p_specialty: specialty,
-  } as never);
-
-  const borderlineArticles = (borderlineArticlesRaw ?? []) as {
-    article_id: string;
-    title: string;
-    journal_abbr: string | null;
-    published_date: string | null;
-    matched_terms: string[];
-  }[];
-
   return (
     <>
       <div style={{
@@ -77,7 +64,6 @@ export default async function TaggingPage() {
       <TaggingClient
         rules={typedRules}
         readyArticles={readyArticles}
-        borderlineArticles={borderlineArticles}
         kpis={{
           totalPending: kpis.total_pending,
           noMesh: kpis.no_mesh,
