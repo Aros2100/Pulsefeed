@@ -66,21 +66,33 @@ function fmt(iso: string | null) {
   });
 }
 
-function KpiCard({ label, value, color = "#111827", subtitle }: {
+function KpiCard({ label, value, color = "#111827", subtitle, onClick, active }: {
   label: string;
   value: number | null | undefined;
   color?: string;
   subtitle?: string;
+  onClick?: () => void;
+  active?: boolean;
 }) {
   return (
-    <div style={{
-      background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10,
-      padding: "20px 24px", flex: 1, minWidth: 140,
-    }}>
+    <div
+      onClick={onClick}
+      style={{
+        background: active ? "#fef2f2" : "#fff",
+        border: `1px solid ${active ? "#fecaca" : "#e5e7eb"}`,
+        borderRadius: 10,
+        padding: "20px 24px", flex: 1, minWidth: 140,
+        cursor: onClick ? "pointer" : undefined,
+        transition: "border-color 0.15s, background 0.15s",
+      }}
+    >
       <div style={{ fontSize: 28, fontWeight: 700, color, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>
         {value == null ? "—" : value.toLocaleString("da-DK")}
       </div>
-      <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>{label}</div>
+      <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
+        {label}
+        {onClick && <span style={{ fontSize: 11, marginLeft: 4, color: "#9ca3af" }}>{active ? "▲" : "▼"}</span>}
+      </div>
       {subtitle && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{subtitle}</div>}
     </div>
   );
@@ -269,24 +281,83 @@ export default function AuthorLinkingPage() {
 
           <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
             <KpiCard label="Dubletter" value={status?.totalDuplicates} color="#2563eb" />
-            <KpiCard label="Afvist" value={status?.totalRejected} color="#dc2626" />
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "flex-end", gap: 8, minWidth: 140 }}>
-              {status?.latest && (
+            <KpiCard
+              label="Afvist"
+              value={status?.totalRejected}
+              color="#dc2626"
+              onClick={() => {
+                if (!showRejected) { void handleShowRejected(); }
+                else setShowRejected(false);
+              }}
+              active={showRejected}
+            />
+            {status?.latest && (
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "flex-end", gap: 4, minWidth: 140 }}>
                 <div style={{ fontSize: 13, color: "#6b7280" }}>
-                  {status.latest.articles_processed.toLocaleString("da-DK")} artikler behandlet · {status.latest.authors_linked.toLocaleString("da-DK")} forfattere koblet
+                  {status.latest.articles_processed.toLocaleString("da-DK")} artikler behandlet
+                </div>
+                <div style={{ fontSize: 13, color: "#6b7280" }}>
+                  {status.latest.authors_linked.toLocaleString("da-DK")} forfattere koblet
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Inline rejected list */}
+          {showRejected && (
+            <div style={{
+              marginBottom: 16, padding: 16,
+              background: "#fef2f2", borderRadius: 8, border: "1px solid #fecaca",
+            }}>
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                marginBottom: 12,
+              }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#dc2626", letterSpacing: "0.05em" }}>
+                  AFVISTE FORFATTERE
+                </span>
+                {rejectedRows && rejectedRows.length > 0 && (
+                  <span style={{ fontSize: 11, color: "#9ca3af" }}>
+                    Viser seneste {Math.min(rejectedRows.length, 20)} af {status?.rejectedAuthorsCount ?? rejectedRows.length}
+                  </span>
+                )}
+              </div>
+              {loadingRejected ? (
+                <div style={{ padding: 16, textAlign: "center", fontSize: 13, color: "#9ca3af" }}>Indlæser…</div>
+              ) : !rejectedRows?.length ? (
+                <div style={{ padding: 16, textAlign: "center", fontSize: 13, color: "#9ca3af" }}>Ingen afviste forfattere</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {rejectedRows.slice(0, 20).map((row) => (
+                    <div key={row.id} style={{
+                      display: "flex", alignItems: "center", gap: 12,
+                      padding: "8px 12px", background: "#fff", borderRadius: 6,
+                      fontSize: 13, border: "1px solid #fecaca",
+                    }}>
+                      <span style={{ fontFamily: "monospace", fontSize: 12, color: "#6b7280", flexShrink: 0 }}>
+                        {row.pubmed_id}
+                      </span>
+                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#374151" }}>
+                        {row.articles?.title ?? "—"}
+                      </span>
+                      <span style={{ fontSize: 11, color: "#9ca3af", flexShrink: 0 }}>
+                        pos. {row.position ?? "—"}
+                      </span>
+                      <span style={{
+                        background: "#fef2f2", color: "#dc2626", fontSize: 10, fontWeight: 600,
+                        padding: "2px 6px", borderRadius: 4, flexShrink: 0,
+                      }}>
+                        {row.reason}
+                      </span>
+                      <span style={{ fontSize: 11, color: "#9ca3af", flexShrink: 0 }}>
+                        {fmt(row.created_at)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
-              <button
-                onClick={() => { void handleShowRejected(); }}
-                style={{
-                  padding: "8px 16px", borderRadius: 6, fontSize: 13,
-                  background: "#fff", color: "#374151", border: "1px solid #d1d5db", cursor: "pointer",
-                }}
-              >
-                Se afviste ({status?.rejectedAuthorsCount ?? 0})
-              </button>
             </div>
-          </div>
+          )}
 
           {/* Balance check */}
           {status != null && (status.totalNew + status.totalDuplicates + status.totalRejected) > 0 && (() => {
@@ -333,7 +404,7 @@ export default function AuthorLinkingPage() {
                 </tr>
               </thead>
               <tbody>
-                {withAccumulated.map((row) => (
+                {withAccumulated.slice(0, 10).map((row) => (
                   <tr key={row.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
                     <td style={{ padding: "12px", color: "#374151", whiteSpace: "nowrap" }}>{fmt(row.started_at)}</td>
                     <td style={{ padding: "12px" }}>
@@ -369,73 +440,6 @@ export default function AuthorLinkingPage() {
           )}
         </div>
 
-        {/* REJECTED AUTHORS */}
-        {showRejected && (
-          <div style={{
-            background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb",
-            padding: 24,
-          }}>
-            <div style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              marginBottom: 16,
-            }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#dc2626", letterSpacing: "0.05em" }}>
-                AFVISTE FORFATTERE
-              </div>
-              <button
-                onClick={() => setShowRejected(false)}
-                style={{
-                  padding: "4px 12px", borderRadius: 4, fontSize: 12,
-                  background: "transparent", color: "#6b7280", border: "none", cursor: "pointer",
-                }}
-              >
-                Luk
-              </button>
-            </div>
-
-            {loadingRejected ? (
-              <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "#9ca3af" }}>Indlæser…</div>
-            ) : !rejectedRows?.length ? (
-              <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "#9ca3af" }}>Ingen afviste forfattere</div>
-            ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid #e5e7eb" }}>
-                    {["PMID", "ARTIKEL", "POS.", "ÅRSAG", "DATO"].map((h) => (
-                      <th key={h} style={thStyle}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rejectedRows.map((row) => (
-                    <tr key={row.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                      <td style={{ padding: "12px", color: "#374151", fontFamily: "monospace", fontSize: 12 }}>
-                        {row.pubmed_id}
-                      </td>
-                      <td style={{ padding: "12px", color: "#374151", maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {row.articles?.title ?? "—"}
-                      </td>
-                      <td style={{ padding: "12px", color: "#6b7280", textAlign: "center" }}>
-                        {row.position ?? "—"}
-                      </td>
-                      <td style={{ padding: "12px" }}>
-                        <span style={{
-                          background: "#fef2f2", color: "#dc2626", fontSize: 11, fontWeight: 600,
-                          padding: "2px 8px", borderRadius: 4,
-                        }}>
-                          {row.reason}
-                        </span>
-                      </td>
-                      <td style={{ padding: "12px", color: "#6b7280", whiteSpace: "nowrap" }}>
-                        {fmt(row.created_at)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
 
       </div>
     </div>
