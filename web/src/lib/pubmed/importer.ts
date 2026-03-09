@@ -275,7 +275,13 @@ async function fetchOpenAlexId(
       }
     }
     const url = `${OPENALEX_BASE}/authors?filter=${filter}&mailto=${OPENALEX_MAILTO}&per_page=1`;
-    const res = await fetch(url, { headers: { "User-Agent": `pulsefeed/1.0 (mailto:${OPENALEX_MAILTO})` } });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const res = await fetch(url, {
+      headers: { "User-Agent": `pulsefeed/1.0 (mailto:${OPENALEX_MAILTO})` },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
     if (!res.ok) return null;
     const data = (await res.json()) as { results?: { id?: string }[] };
     const raw = data.results?.[0]?.id ?? null;

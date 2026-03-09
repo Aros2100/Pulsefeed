@@ -21,6 +21,14 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
 
+  // Auto-cleanup: mark jobs stuck as 'running' for >30 min as failed
+  const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  await admin
+    .from("author_linking_logs")
+    .update({ status: "failed", completed_at: new Date().toISOString(), errors: ["Auto-cleanup: job stuck for >30 minutes"] })
+    .eq("status", "running")
+    .lt("started_at", thirtyMinAgo);
+
   // Prevent concurrent runs
   const { data: running } = await admin
     .from("author_linking_logs")
