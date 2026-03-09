@@ -3,15 +3,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface LinkingSnap {
-  started_at: string;
-  completed_at: string | null;
-  status: string;
-  new_authors: number | null;
-  duplicates: number | null;
-  rejected: number | null;
-}
-
 interface ImportLog {
   id: string;
   started_at: string;
@@ -129,7 +120,7 @@ export default async function ImportDashboardPage() {
     c1ApprovedRes, c2ApprovedRes, c2PendingRes, c2RejectedRes,
     c3ApprovedRes, c3PendingRes, c3RejectedRes,
     totalArticlesRes,
-    authorsResult, unlinkedResult, latestLinkingResult,
+    authorsResult, unlinkedResult, unlinkedSlotsResult, linkingTotalsResult,
     citWithRes, citWithoutRes, ifWithRes, ifWithoutRes,
     latestC1LogResult, latestC2LogResult, latestC3LogResult,
   ] = await Promise.all([
@@ -141,9 +132,10 @@ export default async function ImportDashboardPage() {
     // Authors
     admin.from("authors").select("*", { count: "exact", head: true }),
     admin.rpc("count_unlinked_articles" as never),
+    admin.rpc("count_unlinked_author_slots" as never),
     admin.from("author_linking_logs")
-      .select("started_at, completed_at, status, new_authors, duplicates, rejected")
-      .order("started_at", { ascending: false }).limit(1).maybeSingle(),
+      .select("new_authors, duplicates, rejected")
+      .in("status", ["completed", "running"]),
     // Enrichment
     admin.from("articles").select("id", { count: "exact", head: true }).not("citation_count" as never, "is", null),
     admin.from("articles").select("id", { count: "exact", head: true }).is("citation_count" as never, null),
@@ -190,7 +182,11 @@ export default async function ImportDashboardPage() {
   // Author stats
   const totalAuthors = authorsResult.count ?? 0;
   const unlinkedArticles = (unlinkedResult.data as unknown as number) ?? 0;
-  const latestLinking = latestLinkingResult.data as LinkingSnap | null;
+  const unlinkedAuthorSlots = (unlinkedSlotsResult.data as unknown as number) ?? 0;
+  const linkingTotals = (linkingTotalsResult.data ?? []) as { new_authors: number; duplicates: number; rejected: number }[];
+  const totalNewAuthors = linkingTotals.reduce((s, r) => s + (r.new_authors ?? 0), 0);
+  const totalDuplicateAuthors = linkingTotals.reduce((s, r) => s + (r.duplicates ?? 0), 0);
+  const totalRejectedAuthors = linkingTotals.reduce((s, r) => s + (r.rejected ?? 0), 0);
 
   // Enrichment stats
   const citWith = citWithRes.count ?? 0;
@@ -319,22 +315,23 @@ export default async function ImportDashboardPage() {
               Administrér →
             </Link>
           </div>
-          <div style={{ padding: "20px 24px", display: "flex", gap: "40px", flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ padding: "20px 24px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
             {[
-              { label: "Forfattere i DB", value: totalAuthors, color: "#E83B2A", large: true },
-              { label: "Artikler uden forfattere", value: unlinkedArticles, color: "#d97706", large: false },
-              { label: "Nye (seneste kørsel)", value: latestLinking?.new_authors ?? null, color: "#15803d", large: false },
-              { label: "Dubletter", value: latestLinking?.duplicates ?? null, color: "#1d4ed8", large: false },
-              { label: "Afviste", value: latestLinking?.rejected ?? null, color: "#d97706", large: false },
-            ].map(({ label, value, color, large }) => (
-              <div key={label}>
-                <div style={kpiLabel}>{label}</div>
-                <div style={{
-                  fontSize: large ? "28px" : "20px", fontWeight: 800,
-                  fontVariantNumeric: "tabular-nums", color,
-                }}>
-                  {value != null ? num(value) : "—"}
+              { label: "Artikler uden forfattere", value: unlinkedArticles, color: "#ea580c" },
+              { label: "Afventer", value: unlinkedAuthorSlots, color: "#1a1a1a" },
+              { label: "Forfattere i DB", value: totalAuthors, color: "#1a1a1a" },
+              { label: "Nye forfattere", value: totalNewAuthors, color: "#16a34a" },
+              { label: "Dubletter", value: totalDuplicateAuthors, color: "#2563eb" },
+              { label: "Afvist", value: totalRejectedAuthors, color: "#dc2626" },
+            ].map(({ label, value, color }) => (
+              <div key={label} style={{
+                background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10,
+                padding: "16px 20px", flex: 1, minWidth: 130,
+              }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}>
+                  {num(value)}
                 </div>
+                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>{label}</div>
               </div>
             ))}
           </div>
