@@ -433,7 +433,7 @@ export default function TaggingClient({
         showToast(data.error ?? "Fejl ved deaktivering", false);
         return;
       }
-      showToast("Term flyttet tilbage til tracking", true);
+      showToast("Term deaktiveret", true);
       setTimeout(() => router.refresh(), 1000);
     } catch {
       showToast("Netværksfejl", false);
