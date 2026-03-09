@@ -23,12 +23,13 @@ export default async function TaggingPage() {
     approved: number;
     rejected: number;
     approve_rate: number;
+    source_count: number;
     min_decisions: number;
     status: "tracking" | "draft" | "active" | "disabled";
     activated_at: string | null;
   }[];
 
-  // Score pending articles against active rules
+  // Score pending articles for KPI counts
   const scored = await scorePendingArticles(specialty);
 
   // Count total pending
