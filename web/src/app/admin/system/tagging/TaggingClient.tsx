@@ -396,17 +396,15 @@ export default function TaggingClient({
   /* ── Engine tab: save active terms ────────────────────────────── */
 
   async function handleSaveTerms() {
+    if (checkedTerms.size === 0) return;
     setBusySave(true);
     try {
       const activeIds = [...checkedTerms];
-      const disableIds = trackingRules
-        .filter((r) => !checkedTerms.has(r.id) && (r.status === "draft"))
-        .map((r) => r.id);
 
       const res = await fetch("/api/admin/tagging/save-terms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activeIds, disableIds }),
+        body: JSON.stringify({ activeIds, disableIds: [] }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
