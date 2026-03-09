@@ -442,15 +442,7 @@ export default function TaggingClient({
 
   /* ── Engine tab: checkbox state — auto-check qualifying terms ── */
 
-  const [checkedTerms, setCheckedTerms] = useState<Set<string>>(() => {
-    const initial = new Set<string>();
-    for (const r of trackingRules) {
-      if (r.approve_rate === 100 && r.total_decisions >= r.min_decisions) {
-        initial.add(r.id);
-      }
-    }
-    return initial;
-  });
+  const [checkedTerms, setCheckedTerms] = useState<Set<string>>(new Set());
 
   function toggleTerm(id: string) {
     setCheckedTerms((prev) => {

@@ -106,7 +106,7 @@ export async function runImportCircle3(
     // 2. Build combined query
     const terms = sources.map((s) => s.value);
     const query = buildC3Query(terms);
-    const maxResults = Math.max(...sources.map((s) => s.max_results ?? 500));
+    const maxResults = Math.max(...sources.map((s) => s.max_results ?? 2000));
 
     await sleep(RATE_LIMIT_MS);
 
