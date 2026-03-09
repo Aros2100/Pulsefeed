@@ -21,6 +21,7 @@ export async function GET(request: Request) {
   const hasAbstract     = searchParams.get("has_abstract");
   const dateFrom = searchParams.get("date_from");
   const dateTo   = searchParams.get("date_to");
+  const meshTerm = searchParams.get("mesh_term")?.trim() ?? "";
   const search   = searchParams.get("search")?.trim() ?? "";
   const sortBy   = searchParams.get("sort_by") ?? "imported_at";
   const sortAsc  = searchParams.get("sort_dir") === "asc";
@@ -44,6 +45,7 @@ export async function GET(request: Request) {
   if (hasAbstract === "false") query = query.is("abstract", null);
   if (dateFrom) query = query.gte("published_date", dateFrom);
   if (dateTo)   query = query.lte("published_date", dateTo);
+  if (meshTerm) query = query.ilike("mesh_terms_text" as never, `%${meshTerm}%` as never);
   if (search)   query = query.or(`title.ilike.%${search}%,journal_abbr.ilike.%${search}%`);
 
   const { data, error, count } = await query

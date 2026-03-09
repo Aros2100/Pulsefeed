@@ -27,7 +27,7 @@ interface KPIs {
   noMatchCount: number;
 }
 
-type Tab = "ready" | "borderline" | "engine" | "active";
+type Tab = "ready" | "borderline" | "engine" | "active" | "rejected";
 
 /* ── Constants ────────────────────────────────────────────────── */
 
@@ -56,6 +56,7 @@ const tabAccent: Record<Tab, string> = {
   borderline: ACTION_ACCENT,
   engine: INFO_ACCENT,
   active: INFO_ACCENT,
+  rejected: INFO_ACCENT,
 };
 
 /* ── Small components ─────────────────────────────────────────── */
@@ -327,7 +328,21 @@ function RulesTable({
                   </td>
                 )}
                 <td style={tdStyle}>
-                  <span style={{ fontWeight: 500, color: "#1a1a1a" }}>{rule.term}</span>
+                  <a
+                    href={`/admin/articles?mesh_term=${encodeURIComponent(rule.term)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      fontWeight: 500,
+                      color: "#1a1a1a",
+                      textDecoration: "none",
+                      borderBottom: "1px solid transparent",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.borderBottomColor = CYAN)}
+                    onMouseLeave={(e) => (e.currentTarget.style.borderBottomColor = "transparent")}
+                  >
+                    {rule.term}
+                  </a>
                 </td>
                 <td style={tdStyle}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -412,15 +427,18 @@ export default function TaggingClient({
   const [busyApprove, setBusyApprove] = useState(false);
   const [busyRecalc, setBusyRecalc] = useState(false);
   const [busyDisableId, setBusyDisableId] = useState<string | null>(null);
+  const [busyRejectId, setBusyRejectId] = useState<string | null>(null);
+  const [busyRestoreId, setBusyRestoreId] = useState<string | null>(null);
   const [busySave, setBusySave] = useState(false);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
   /* ── Rule groups ─────────────────────────────────────────────── */
 
   const trackingRules = rules.filter(
-    (r) => r.status === "tracking" || r.status === "draft" || r.status === "disabled"
+    (r) => r.status === "tracking" || r.status === "draft"
   );
   const activeRules = rules.filter((r) => r.status === "active");
+  const rejectedRules = rules.filter((r) => r.status === "disabled");
 
   /* ── Engine tab: checkbox state — auto-check qualifying terms ── */
 
@@ -564,6 +582,50 @@ export default function TaggingClient({
     }
   }
 
+  async function handleReject(ruleId: string) {
+    setBusyRejectId(ruleId);
+    try {
+      const res = await fetch("/api/admin/tagging/disable", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ruleId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        showToast(data.error ?? "Fejl ved afvisning", false);
+        return;
+      }
+      showToast("Term afvist", true);
+      setTimeout(() => router.refresh(), 1000);
+    } catch {
+      showToast("Netværksfejl", false);
+    } finally {
+      setBusyRejectId(null);
+    }
+  }
+
+  async function handleRestore(ruleId: string) {
+    setBusyRestoreId(ruleId);
+    try {
+      const res = await fetch("/api/admin/tagging/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ruleId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        showToast(data.error ?? "Fejl ved genaktivering", false);
+        return;
+      }
+      showToast("Term genaktiveret", true);
+      setTimeout(() => router.refresh(), 1000);
+    } catch {
+      showToast("Netværksfejl", false);
+    } finally {
+      setBusyRestoreId(null);
+    }
+  }
+
   async function handleRecalculate() {
     setBusyRecalc(true);
     try {
@@ -589,6 +651,7 @@ export default function TaggingClient({
     { key: "borderline", label: "Grænsetilfælde", count: borderlineArticles.length },
     { key: "engine", label: "Under motorhjelmen", count: trackingRules.length },
     { key: "active", label: "Aktive terms", count: activeRules.length },
+    { key: "rejected", label: "Afviste terms", count: rejectedRules.length },
   ];
 
   /* ── Render ─────────────────────────────────────────────────── */
@@ -664,7 +727,7 @@ export default function TaggingClient({
           borderRadius: "6px 6px 0 0",
           padding: "2px 2px 0",
         }}>
-          {tabs.filter((t) => t.key === "engine" || t.key === "active").map((t) => {
+          {tabs.filter((t) => t.key === "engine" || t.key === "active" || t.key === "rejected").map((t) => {
             const isActive = tab === t.key;
             return (
               <button
@@ -802,6 +865,10 @@ export default function TaggingClient({
             showCheckbox
             checkedIds={checkedTerms}
             onToggleCheck={toggleTerm}
+            showAction
+            actionLabel="Afvis"
+            actionBusyId={busyRejectId}
+            onAction={handleReject}
             emptyMessage="Ingen terms under tracking"
           />
 
@@ -836,6 +903,18 @@ export default function TaggingClient({
           actionBusyId={busyDisableId}
           onAction={handleDeactivate}
           emptyMessage="Ingen aktive terms"
+        />
+      )}
+
+      {/* ═══ Tab 5: Afviste terms — MeSH TERMS (disabled) ═══ */}
+      {tab === "rejected" && (
+        <RulesTable
+          rules={rejectedRules}
+          showAction
+          actionLabel="Genaktiv&eacute;r"
+          actionBusyId={busyRestoreId}
+          onAction={handleRestore}
+          emptyMessage="Ingen afviste terms"
         />
       )}
     </div>

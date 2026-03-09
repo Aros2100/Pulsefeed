@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 interface ArticleRow {
@@ -21,6 +22,7 @@ type SortField = "title" | "journal_abbr" | "published_date" | "imported_at" | "
 
 interface Filters {
   search: string;
+  mesh_term: string;
   circle: string;
   status: string;
   specialty: string;
@@ -80,8 +82,11 @@ function SelectFilter({ value, onChange, options, placeholder }: {
 }
 
 export default function AdminArticleListClient() {
+  const searchParams = useSearchParams();
+  const initialMesh = searchParams.get("mesh_term") ?? "";
+
   const [filters, setFilters] = useState<Filters>({
-    search: "", circle: "", status: "", specialty: "",
+    search: "", mesh_term: initialMesh, circle: "", status: "", specialty: "",
     approval_method: "", has_abstract: "", date_from: "", date_to: "",
     sort_by: "imported_at", sort_dir: "desc", page: 1,
   });
@@ -91,7 +96,9 @@ export default function AdminArticleListClient() {
   const [error, setError] = useState<string | null>(null);
   const [specialtyTags, setSpecialtyTags] = useState<string[]>([]);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const meshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [searchInput, setSearchInput] = useState("");
+  const [meshInput, setMeshInput] = useState(initialMesh);
 
   useEffect(() => {
     void fetch("/api/admin/articles/specialty-tags")
@@ -108,6 +115,7 @@ export default function AdminArticleListClient() {
     params.set("sort_by", f.sort_by);
     params.set("sort_dir", f.sort_dir);
     if (f.search)      params.set("search", f.search);
+    if (f.mesh_term)   params.set("mesh_term", f.mesh_term);
     if (f.circle)      params.set("circle", f.circle);
     if (f.status)      params.set("status", f.status);
     if (f.specialty)   params.set("specialty", f.specialty);
@@ -145,6 +153,14 @@ export default function AdminArticleListClient() {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
       setFilters((prev) => ({ ...prev, search: v, page: 1 }));
+    }, 350);
+  }
+
+  function handleMeshChange(v: string) {
+    setMeshInput(v);
+    if (meshTimer.current) clearTimeout(meshTimer.current);
+    meshTimer.current = setTimeout(() => {
+      setFilters((prev) => ({ ...prev, mesh_term: v, page: 1 }));
     }, 350);
   }
 
@@ -230,6 +246,17 @@ export default function AdminArticleListClient() {
         </div>
         {/* Row 2: extra filters */}
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+          <input
+            type="text"
+            placeholder="MeSH term…"
+            value={meshInput}
+            onChange={(e) => handleMeshChange(e.target.value)}
+            style={{
+              width: "160px", padding: "6px 10px",
+              border: "1px solid #dde3ed", borderRadius: "6px",
+              fontSize: "12px", outline: "none",
+            }}
+          />
           <SelectFilter
             value={filters.approval_method}
             onChange={(v) => setFilter("approval_method", v)}
@@ -266,11 +293,12 @@ export default function AdminArticleListClient() {
               style={{ padding: "5px 8px", fontSize: "12px", border: "1px solid #dde3ed", borderRadius: "6px", outline: "none" }}
             />
           </div>
-          {(filters.circle || filters.status || filters.specialty || filters.approval_method || filters.has_abstract || filters.date_from || filters.date_to || filters.search) && (
+          {(filters.circle || filters.status || filters.specialty || filters.approval_method || filters.has_abstract || filters.date_from || filters.date_to || filters.search || filters.mesh_term) && (
             <button
               onClick={() => {
                 setSearchInput("");
-                setFilters({ search: "", circle: "", status: "", specialty: "", approval_method: "", has_abstract: "", date_from: "", date_to: "", sort_by: "imported_at", sort_dir: "desc", page: 1 });
+                setMeshInput("");
+                setFilters({ search: "", mesh_term: "", circle: "", status: "", specialty: "", approval_method: "", has_abstract: "", date_from: "", date_to: "", sort_by: "imported_at", sort_dir: "desc", page: 1 });
               }}
               style={{ fontSize: "12px", color: "#E83B2A", background: "none", border: "none", cursor: "pointer", padding: "5px 0", textDecoration: "underline" }}
             >
