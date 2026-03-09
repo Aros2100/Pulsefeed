@@ -356,7 +356,7 @@ export default function CombosClient({
         showToast(data.error ?? "Fejl ved sletning", false);
         return;
       }
-      showToast("Par fjernet", true);
+      showToast("Par deaktiveret", true);
       setTimeout(() => router.refresh(), 800);
     } catch {
       showToast("Netv\u00e6rksfejl", false);
@@ -368,7 +368,7 @@ export default function CombosClient({
   async function handleDeactivate(ruleId: string) {
     setBusyActionId(ruleId);
     try {
-      const res = await fetch("/api/admin/tagging/combos/restore", {
+      const res = await fetch("/api/admin/tagging/combos/disable", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ruleId }),

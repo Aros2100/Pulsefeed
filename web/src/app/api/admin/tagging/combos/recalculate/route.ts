@@ -1,4 +1,4 @@
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
@@ -24,7 +24,7 @@ export async function POST() {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
 
-  after(() => runRecalculate());
+  void runRecalculate();
 
   return NextResponse.json({ ok: true });
 }

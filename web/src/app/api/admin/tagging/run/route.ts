@@ -1,4 +1,4 @@
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { runAutoTag } from "@/lib/tagging/auto-tagger";
 import { SPECIALTIES } from "@/lib/auth/specialties";
@@ -18,7 +18,7 @@ export async function POST() {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
 
-  after(() => runAllAutoTag());
+  void runAllAutoTag();
 
   return NextResponse.json({ ok: true });
 }

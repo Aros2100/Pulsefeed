@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient();
   const { error } = await admin
     .from("tagging_rule_combos" as never)
-    .delete()
+    .update({ status: "disabled" } as never)
     .eq("id" as never, parsed.data.ruleId as never);
 
   if (error) {
