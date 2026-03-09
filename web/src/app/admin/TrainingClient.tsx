@@ -237,10 +237,13 @@ export default function TrainingClient({ specialty, label }: Props) {
       if (!d.ok) { setLoading(false); return; }
 
       const list = d.articles ?? [];
-      const unscored = list.filter((a) => a.specialty_confidence == null);
 
-      // Pre-score any unscored articles before showing the UI
-      if (unscored.length > 0) {
+      // If we already have 100 scored articles waiting, show them directly.
+      // Otherwise, call score-batch to fill up to 100, then reload.
+      if (list.length >= 100) {
+        setLoading(false);
+        populateArticles(list);
+      } else {
         setScoring(true);
         setScoringProgress(null);
         setLoading(false);
@@ -273,8 +276,7 @@ export default function TrainingClient({ specialty, label }: Props) {
             }
           }
         } catch (e) {
-          if ((e as Error).name === "AbortError") return; // component unmounted — stop silently
-          /* other network error — proceed to reload anyway */
+          if ((e as Error).name === "AbortError") return;
         }
 
         if (abort.signal.aborted) return;
@@ -291,9 +293,6 @@ export default function TrainingClient({ specialty, label }: Props) {
           return;
         }
         populateArticles(d2.articles ?? []);
-      } else {
-        setLoading(false);
-        populateArticles(list);
       }
     }
 

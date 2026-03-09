@@ -76,12 +76,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
-  // scoreAll=true  (triggered by model activation): re-score all pending articles
-  //   that have never been scored OR were scored with a different/null model version.
-  //   Guard: articles already scored with the active version are NEVER re-scored.
-  //
-  // scoreAll=false (TrainingClient pre-score / manual run): only score articles that
-  //   have never been scored (specialty_scored_at IS NULL AND specialty_confidence IS NULL).
+  // Count how many scored-but-not-validated articles already exist.
+  // Only score enough new articles to fill up to BATCH_LIMIT (100).
+  const { data: alreadyScoredCount } = await admin.rpc(
+    "count_scored_not_validated" as never,
+    { p_specialty: specialty } as never,
+  );
+  const existing = Number(alreadyScoredCount ?? 0);
+  const remaining = Math.max(0, BATCH_LIMIT - existing);
+
+  if (!scoreAll && remaining === 0) {
+    // Already have ≥100 scored articles waiting for validation — nothing to score
+    const stream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, scored: 0, failed: 0, total: 0 })}\n\n`));
+        controller.close();
+      },
+    });
+    return new Response(stream, {
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+    });
+  }
+
   const baseQuery = admin
     .from("articles")
     .select("id, title, abstract, specialty_tags")
@@ -91,16 +108,14 @@ export async function POST(request: NextRequest) {
 
   const v = activePrompt.version;
   const { data: articles, error: fetchError } = scoreAll
-    // Never re-score an article that already has specialty_scored_at set with the
-    // current model version. Use specialty_scored_at (not ai_decision) as the
-    // canonical "was this scored" signal. Explicit model_version.is.null clause
-    // is required because SQL NULL != 'v3' evaluates to NULL (not TRUE).
+    // scoreAll=true (model activation): re-score articles with different/null model version.
     ? await baseQuery
         .or(`specialty_scored_at.is.null,model_version.is.null,model_version.neq.${v}`)
         .limit(BATCH_LIMIT)
+    // scoreAll=false (normal): only unscored articles, fill up to remaining slots.
     : await baseQuery
         .is("specialty_confidence", null)
-        .limit(BATCH_LIMIT);
+        .limit(remaining);
 
   if (fetchError) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });

@@ -17,19 +17,15 @@ export async function GET(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  const { data: articles, error } = await admin
-    .from("articles")
-    .select("id, title, journal_abbr, journal_title, published_date, abstract, pubmed_id, authors, specialty_confidence, ai_decision, circle")
-    .eq("status", "pending")
-    .contains("specialty_tags", [specialty])
-    .order("specialty_confidence", { ascending: true, nullsFirst: false })  // scorede først
-    .order("circle", { ascending: false })                                   // C3 before C2
-    .order("imported_at", { ascending: true })                               // oldest first
-    .limit(100);
+  // Only return articles that ARE scored but have NOT been validated via lab_decisions
+  const { data: articles, error } = await admin.rpc(
+    "get_scored_not_validated_articles" as never,
+    { p_specialty: specialty, p_limit: 100 } as never,
+  );
 
   if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: (error as { message: string }).message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, articles: articles ?? [] });
+  return NextResponse.json({ ok: true, articles: (articles ?? []) as unknown[] });
 }
