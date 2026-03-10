@@ -31,13 +31,13 @@ export async function runLocationParsing(limit = 500): Promise<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = admin as any;
 
-  console.log("[geo/run-parse] Starting parse, targeting unparsed + low-confidence articles");
+  console.log("[geo/run-parse] Starting parse, targeting unparsed articles");
 
   const { data: articles, error } = await db
     .from("articles")
     .select("id, authors")
+    .is("location_parsed_at", null)
     .not("authors", "is", null)
-    .or("location_parsed_at.is.null,location_confidence.eq.low")
     .limit(limit);
 
   if (error) throw new Error(`Failed to fetch articles: ${error.message}`);
@@ -167,4 +167,83 @@ export async function runLocationParsing(limit = 500): Promise<{
   }
 
   return { parsed, highConfidence, lowConfidence, skipped };
+}
+
+/**
+ * One-time re-parse of previously low-confidence articles.
+ * Call after parser improvements to upgrade results. Not meant for loops.
+ */
+export async function reparseLowConfidence(limit = 500): Promise<{
+  parsed: number;
+  highConfidence: number;
+  lowConfidence: number;
+}> {
+  const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = admin as any;
+
+  const { data: articles, error } = await db
+    .from("articles")
+    .select("id, authors")
+    .eq("location_confidence", "low")
+    .not("location_parsed_at", "is", null)
+    .not("authors", "is", null)
+    .limit(limit);
+
+  if (error) throw new Error(`Failed to fetch articles: ${error.message}`);
+
+  const rows = (articles ?? []) as { id: string; authors: unknown }[];
+
+  let parsed = 0;
+  let highConfidence = 0;
+  let lowConfidence = 0;
+
+  const CHUNK_SIZE = 50;
+  const updates: { id: string; fields: Record<string, unknown> }[] = [];
+
+  for (const article of rows) {
+    if (!Array.isArray(article.authors) || article.authors.length === 0) continue;
+
+    const authors = article.authors as AuthorEntry[];
+    const firstParsed = parseAffiliation(getAffiliationString(authors[0]));
+    const lastParsed = authors.length > 1
+      ? parseAffiliation(getAffiliationString(authors[authors.length - 1]))
+      : null;
+
+    let overallConfidence: "high" | "low" | null = null;
+    if (firstParsed && lastParsed) {
+      overallConfidence = firstParsed.confidence === "low" || lastParsed.confidence === "low" ? "low" : "high";
+    } else if (firstParsed || lastParsed) {
+      overallConfidence = ((firstParsed ?? lastParsed) as ParsedAffiliation).confidence;
+    }
+
+    parsed++;
+    if (overallConfidence === "high") highConfidence++;
+    else lowConfidence++;
+
+    updates.push({
+      id: article.id,
+      fields: {
+        first_author_department: firstParsed?.department ?? null,
+        first_author_institution: firstParsed?.institution ?? null,
+        first_author_city: firstParsed?.city ?? null,
+        first_author_country: firstParsed?.country ?? null,
+        last_author_department: lastParsed?.department ?? null,
+        last_author_institution: lastParsed?.institution ?? null,
+        last_author_city: lastParsed?.city ?? null,
+        last_author_country: lastParsed?.country ?? null,
+        location_parsed_at: new Date().toISOString(),
+        location_confidence: overallConfidence,
+      },
+    });
+  }
+
+  for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+    const chunk = updates.slice(i, i + CHUNK_SIZE);
+    await Promise.all(
+      chunk.map((u) => db.from("articles").update(u.fields).eq("id", u.id))
+    );
+  }
+
+  return { parsed, highConfidence, lowConfidence };
 }
