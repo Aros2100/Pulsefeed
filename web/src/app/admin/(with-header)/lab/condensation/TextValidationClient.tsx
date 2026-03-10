@@ -511,23 +511,8 @@ export default function TextValidationClient({ specialty, label }: Props) {
                 borderRadius: "8px",
                 overflow: "hidden",
               }}>
-                {/* Header */}
-                <div style={{
-                  padding: "10px 16px",
-                  borderBottom: `1px solid ${isApproved ? "#bbf7d0" : isRejected ? "#fecaca" : "#f0f0f0"}`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}>
-                  <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#5a6a85" }}>
-                    Tekst
-                  </span>
-                  {isApproved && <span style={{ fontSize: "10px", fontWeight: 700, color: "#15803d" }}>Godkendt</span>}
-                  {isRejected && <span style={{ fontSize: "10px", fontWeight: 700, color: "#dc2626" }}>Afvist</span>}
-                </div>
-
                 {/* Content */}
-                <div style={{ padding: "14px 16px" }}>
+                <div style={{ padding: "16px 16px 14px" }}>
                   {currentArticle.short_headline && (
                     <div style={{ marginBottom: "12px" }}>
                       <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "4px" }}>Headline</div>
@@ -564,12 +549,6 @@ export default function TextValidationClient({ specialty, label }: Props) {
                     <div style={{ fontSize: "13px", color: "#aaa" }}>Ingen tekst genereret</div>
                   )}
 
-                  {/* Model version */}
-                  {currentArticle.condensed_model_version && (
-                    <div style={{ marginTop: "12px", fontSize: "11px", color: "#aaa" }}>
-                      Model: {currentArticle.condensed_model_version}
-                    </div>
-                  )}
                 </div>
 
                 {/* Actions */}
