@@ -36,6 +36,20 @@ export interface ArticleData {
   short_resume: string | null;
   news_value: number | null;
   clinical_relevance: string | null;
+  // Classification (AI-scored)
+  subspecialty_ai: string | null;
+  article_type_ai: string | null;
+  study_design_ai: string | null;
+  classification_reason: string | null;
+  classification_model_version: string | null;
+  classification_scored_at: string | null;
+  // Classification (computed)
+  full_text_available: boolean | null;
+  time_to_read: number | null;
+  geographic_region: string | null;
+  trial_registration: string | null;
+  patient_population: string | null;
+  pmc_id: string | null;
 }
 
 // ── Internal types ────────────────────────────────────────────────────────────

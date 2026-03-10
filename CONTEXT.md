@@ -29,7 +29,14 @@ pulsefeed/
 │   │   │   │   │   ├── authors/          # Forfatter-liste, stamkort, merge
 │   │   │   │   │   │   ├── [id]/         # Forfatter-profil
 │   │   │   │   │   │   └── merge/        # Forfatter-merge UI (MergeClient.tsx)
-│   │   │   │   │   ├── lab/              # AI-træning og scoring
+│   │   │   │   │   ├── lab/              # AI-træning — modul-index + undersider
+│   │   │   │   │   │   ├── page.tsx             # Modul-oversigt (2 kort: specialty-tag + classification)
+│   │   │   │   │   │   ├── SectionCard.tsx      # Delt KPI-kort komponent
+│   │   │   │   │   │   ├── specialty-tag/       # Speciale-validering forside (3 SectionCards)
+│   │   │   │   │   │   └── classification/      # Klassificering
+│   │   │   │   │   │       ├── page.tsx             # Forside med KPI'er (Validering + Performance)
+│   │   │   │   │   │       ├── session/page.tsx     # Scoring-session (ClassificationClient)
+│   │   │   │   │   │       └── ClassificationClient.tsx  # Splitscreen validerings-UI
 │   │   │   │   │   ├── newsletter/
 │   │   │   │   │   └── subscribers/
 │   │   │   │   ├── system/               # Har egen Header i system/layout.tsx
@@ -97,14 +104,14 @@ pulsefeed/
 │   │       ├── AuthorSearch.tsx
 │   │       └── RelativeTime.tsx
 │   └── supabase/
-│       └── migrations/           # 0001–0027 SQL-migrationer
+│       └── migrations/           # 0020–0065 SQL-migrationer
 ```
 
 ## Database — vigtigste tabeller
 
 | Tabel | Formål |
 |-------|--------|
-| `articles` | Artikler fra PubMed — `pubmed_id`, `title`, `abstract`, `authors` (JSONB), `circle`, `specialty_tags`, `status`, `country`, `source_id`, `citation_count`, `impact_factor`, `journal_h_index`, `evidence_score` (generated), `approval_method`, `auto_tagged_at` |
+| `articles` | Artikler fra PubMed — `pubmed_id`, `title`, `abstract`, `authors` (JSONB), `circle`, `specialty_tags`, `status`, `country`, `source_id`, `citation_count`, `impact_factor`, `journal_h_index`, `evidence_score` (generated), `approval_method`, `auto_tagged_at`, `subspecialty_ai`, `article_type_ai`, `study_design_ai`, `classification_reason`, `classification_scored_at`, `classification_model_version` |
 | `authors` | Forfatter-database — `display_name`, `city`, `country`, `specialty`, `affiliations` (TEXT[]), `article_count`, `author_score`, `orcid` |
 | `article_authors` | Many-to-many: artikler ↔ forfattere |
 | `pubmed_filters` | Circle 1 søge-konfiguration (journal-lister, query_string, specialty) |
@@ -115,7 +122,7 @@ pulsefeed/
 | `author_linking_logs` | Log pr. forfatter-linking-kørsel — `new_authors`, `duplicates`, `rejected` |
 | `rejected_authors` | Forfattere der ikke kunne linkes |
 | `system_alerts` | System-beskeder til brugere — `title`, `message`, `type`, `active`, `expires_at` |
-| `lab_decisions` | Trænings-verdicts: `decision`, `ai_decision`, `ai_confidence`, `model_version`, `disagreement_reason` |
+| `lab_decisions` | Trænings-verdicts: `decision`, `ai_decision`, `ai_confidence`, `model_version`, `disagreement_reason`. Moduler: `specialty_tag`, `classification_subspecialty`, `classification_article_type`, `classification_study_design` |
 | `lab_sessions` | Samlet session pr. træningskørsel |
 | `model_versions` | Aktive model-versioner pr. specialty+module — `version`, `active`, `prompt` |
 | `model_optimization_runs` | AI-optimeringsanalyse — `improved_prompt`, `fp_count`, `fn_count`, `refinement_iterations` (JSONB) |
@@ -279,25 +286,60 @@ Delt komponent `CircleImportPage.tsx` med:
 
 ## Lab (AI-træning og model-optimering)
 
+### Navigation
+```
+/admin/lab                          ← Modul-index (2 kort med kø-counts)
+/admin/lab/specialty-tag            ← Speciale-validering forside (3 SectionCards)
+/admin/lab/specialty-tag/dashboard  ← KPI-kort, kalibreringstabel
+/admin/lab/specialty-tag/evaluation ← Uenigheder + VersionSelector
+/admin/lab/specialty-tag/optimize   ← Analyse-workflow (Step 1–2)
+/admin/lab/specialty-tag/simulate   ← Prompt-simulator (Step 3–4)
+/admin/lab/classification           ← Klassificering forside (Validering + Performance)
+/admin/lab/classification/session   ← Scoring-session (splitscreen)
+```
+
 ### Filer
 | Fil | Formål |
 |-----|--------|
-| `web/src/app/admin/lab/specialty-tag/dashboard/` | KPI-kort, kalibreringstabel, PatternAnalysis |
-| `web/src/app/admin/lab/specialty-tag/evaluation/` | Uenigheder + VersionSelector |
-| `web/src/app/admin/lab/specialty-tag/optimize/` | Analyse-workflow (Step 1–2) |
-| `web/src/app/admin/lab/specialty-tag/simulate/` | Prompt-simulator (Step 3–4) |
-| `web/src/app/api/lab/score-batch/` | SSE-scoring af pending artikler |
+| `web/src/app/admin/(with-header)/lab/page.tsx` | Modul-index — viser 2 kort med kø-counts via RPC |
+| `web/src/app/admin/(with-header)/lab/SectionCard.tsx` | Delt KPI-kort komponent |
+| `web/src/app/admin/(with-header)/lab/specialty-tag/page.tsx` | Speciale-validering forside — 3 SectionCards |
+| `web/src/app/admin/(with-header)/lab/classification/page.tsx` | Klassificering forside — Validering + Performance |
+| `web/src/app/admin/(with-header)/lab/classification/session/page.tsx` | Starter ClassificationClient |
+| `web/src/app/admin/(with-header)/lab/classification/ClassificationClient.tsx` | Splitscreen: artikel venstre, 3 parameter-kort højre |
+| `web/src/app/api/lab/score-batch/` | SSE-scoring af specialty_tag (fill-up-to-100 logik) |
+| `web/src/app/api/lab/score-classification/` | SSE-scoring af classification (fill-up-to-100 logik) |
+| `web/src/app/api/lab/classification-sessions/` | Gem klassificerings-session (3 lab_decisions per artikel) |
 | `web/src/app/api/lab/simulate-prompt/` | SSE-scoring mod specifik prompt |
 | `web/src/app/api/lab/analyze-patterns/` | AI-analyse af FP/FN-mønstre |
 | `web/src/app/api/lab/refine-prompt/` | Iterativ prompt-forfining med ekspert-feedback |
 | `web/src/app/api/lab/model-versions/` | Gem og aktiver ny model-version |
 
 ### score-batch (`/api/lab/score-batch`)
+- **Fill-up-to-100**: Tæller eksisterende scorede-ikke-validerede via `count_scored_not_validated` RPC, scorer kun `100 - existing` nye artikler
 - `scoreAll: boolean` — når `true`: scorer ALLE pending artikler med forældet `model_version`; `false`: kun artikler med `specialty_confidence IS NULL`
 - Begge queries filtreres på `.contains("specialty_tags", [specialty])` — scorer kun artikler tagget med den valgte specialty
 - `scoreAll=true`-query bruger `.or("specialty_scored_at.is.null,model_version.is.null,model_version.neq.{v}")` — explicit `model_version.is.null` kræves da SQL `NULL != 'v3'` evaluerer til NULL (ikke TRUE)
 - Bruges automatisk efter aktivering af ny model-version (kaldt fra SimulatorClient)
 - **AbortController**: `TrainingClient.tsx`-useEffect opretter en AbortController og returnerer `() => abort.abort()` som cleanup — forhindrer React StrictMode double-invocation i at starte to samtidige score-batch-kald
+
+### score-classification (`/api/lab/score-classification`)
+- Samme fill-up-to-100 logik via `count_classification_not_validated` RPC
+- Scorer 3 dimensioner: subspecialty, article_type, study_design
+- Skriver til `subspecialty_ai`, `article_type_ai`, `study_design_ai`, `classification_reason`, `classification_scored_at` på articles
+
+### classification-sessions (`/api/lab/classification-sessions`)
+- Opretter 1 `lab_sessions` row (module=classification) + 3 `lab_decisions` per artikel
+- Moduler: `classification_subspecialty`, `classification_article_type`, `classification_study_design`
+- `disagreement_reason = 'corrected'` når reviewer ændrede AI'ens svar
+
+### RPC-funktioner (scoring)
+| RPC | Migration | Formål |
+|-----|-----------|--------|
+| `get_scored_not_validated_articles(p_specialty, p_limit)` | 0038 | Hent scorede-ikke-validerede artikler (specialty_tag) |
+| `count_scored_not_validated(p_specialty)` | 0038 | Tæl dem (til fill-up-to-100) |
+| `get_classification_not_validated_articles(p_specialty, p_limit)` | 0039 | Hent klassificerings-scorede-ikke-validerede |
+| `count_classification_not_validated(p_specialty)` | 0039 | Tæl dem (til fill-up-to-100) |
 
 ### Simulation (`simulate/SimulatorClient.tsx`)
 - **To sektioner**: Fejlrettelse (uenigheder) + Regressionstest (enigheder fra aktiv model)
@@ -331,7 +373,10 @@ Delt komponent `CircleImportPage.tsx` med:
 | `/admin/system/tagging` | MeSH auto-tagging rules management |
 | `/admin/system/layers/[specialty]` | C1 filter + C2/C3 affiliation management |
 | `/admin/system/author-linking` | Forfatter-linking dashboard |
-| `/admin/lab` | Specialty Tag Validation — KPI'er, "Værktøjer"-sektion |
+| `/admin/lab` | Modul-index — 2 kort (Speciale-validering + Klassificering) med kø-counts |
+| `/admin/lab/specialty-tag` | Speciale-validering forside — 3 SectionCards (Validering, Performance, Prompt) |
+| `/admin/lab/classification` | Klassificering forside — Validering + Performance KPI'er |
+| `/admin/lab/classification/session` | Klassificering scoring-session (splitscreen) |
 | `/admin/articles` | Artikel-liste med filter + evidence_score badge |
 | `/admin/articles/[id]` | Artikel-stamkort: historik + redigerbare tags/status |
 | `/admin/authors` | Forfatter-liste sorteret på author_score DESC NULLS LAST |
@@ -397,5 +442,11 @@ NEXT_PUBLIC_SITE_URL
 | `0025` | Tagging rules: tracking status for regler under threshold |
 | `0026` | `recalculate_tagging_rules` udvidet med `p_include_c1` parameter |
 | `0027` | `approval_method` kolonne (journal/mesh_auto_tag/human) + `auto_tagged_at` |
+| `0028–0037` | Model versions, author linking logs, tagging KPIs, specialty article stats |
+| `0038` | `get_scored_not_validated_articles` + `count_scored_not_validated` RPCs (specialty_tag fill-up-to-100) |
+| `0039` | Classification kolonner på articles + `get_classification_not_validated_articles` + `count_classification_not_validated` RPCs |
+| `0040` | Seed: initial classification prompt (v1) for neurosurgery i `model_versions` |
 
-Ældre migrationer (0046–0064) er renummereret/sammenlagt — de nuværende 0001–0027 er den aktive migration-serie.
+Ældre migrationer (0046–0064 i `web/supabase/`) er renummereret/sammenlagt — de nuværende 0001–0065 er den aktive migration-serie.
+
+**NB**: Migrationer 0001–0040 i `supabase/` (root) og 0001–0065 i `web/supabase/` er to separate migration-serier (forskellige Supabase-projekter).

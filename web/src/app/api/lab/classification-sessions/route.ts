@@ -1,0 +1,123 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { z } from "zod";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAdmin } from "@/lib/auth/require-admin";
+import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { logArticleEvent } from "@/lib/article-events";
+
+const verdictFieldSchema = z.object({
+  decision:    z.string(),
+  ai_decision: z.string(),
+  corrected:   z.boolean(),
+});
+
+const schema = z.object({
+  specialty: z.string().refine(
+    (v) => (SPECIALTY_SLUGS as readonly string[]).includes(v),
+    { message: "Invalid specialty" }
+  ),
+  verdicts: z.array(z.object({
+    article_id:   z.string().uuid(),
+    subspecialty:  verdictFieldSchema,
+    article_type:  verdictFieldSchema,
+    study_design:  verdictFieldSchema,
+  })).min(1),
+});
+
+const MODULES = [
+  { key: "subspecialty",  module: "classification_subspecialty" },
+  { key: "article_type",  module: "classification_article_type" },
+  { key: "study_design",  module: "classification_study_design" },
+] as const;
+
+export async function POST(request: NextRequest) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+
+  let body: unknown;
+  try { body = await request.json(); }
+  catch { return NextResponse.json({ ok: false, error: "Invalid request" }, { status: 400 }); }
+
+  const result = schema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
+  }
+
+  const { specialty, verdicts } = result.data;
+  const admin = createAdminClient();
+
+  // Fetch active model version for classification
+  const { data: activeVersion } = await admin
+    .from("model_versions")
+    .select("version")
+    .eq("specialty", specialty)
+    .eq("module", "classification")
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
+  const modelVersion = (activeVersion?.version as string | null) ?? null;
+
+  // 1. Create lab_session row
+  const { data: session, error: sessionError } = await admin
+    .from("lab_sessions")
+    .insert({
+      specialty,
+      module: "classification",
+      user_id: null,
+      completed_at: new Date().toISOString(),
+      articles_reviewed: verdicts.length,
+      articles_approved: 0,
+      articles_rejected: 0,
+    })
+    .select("id")
+    .single();
+
+  if (sessionError) {
+    console.error("[classification-sessions] lab_sessions insert error:", sessionError);
+    return NextResponse.json({ ok: false, error: sessionError.message }, { status: 500 });
+  }
+
+  const sessionId = session.id as string;
+
+  // 2. Insert 3 lab_decisions per verdict (one per classification field)
+  const decisionRows = verdicts.flatMap((v) =>
+    MODULES.map(({ key, module }) => {
+      const field = v[key];
+      return {
+        session_id:          sessionId,
+        article_id:          v.article_id,
+        specialty,
+        module,
+        decision:            field.decision,
+        ai_decision:         field.ai_decision,
+        ai_confidence:       null,
+        disagreement_reason: field.corrected ? "corrected" : null,
+        model_version:       modelVersion,
+      };
+    })
+  );
+
+  const { error: decisionsError } = await admin.from("lab_decisions").insert(decisionRows);
+  if (decisionsError) {
+    console.error("[classification-sessions] lab_decisions insert error:", decisionsError);
+    return NextResponse.json({ ok: false, error: decisionsError.message }, { status: 500 });
+  }
+
+  // Fire-and-forget: log article events
+  void Promise.all(
+    verdicts.map((v) =>
+      logArticleEvent(v.article_id, "lab_decision", {
+        module: "classification",
+        subspecialty:  v.subspecialty.decision,
+        article_type:  v.article_type.decision,
+        study_design:  v.study_design.decision,
+      })
+    )
+  );
+
+  return NextResponse.json({
+    ok: true,
+    sessionId,
+    reviewed: verdicts.length,
+  });
+}

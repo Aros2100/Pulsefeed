@@ -3,8 +3,10 @@ import { linkAuthorsToArticle, decodeHtmlEntities, type Author } from "@/lib/pub
 import { runLinkingChecks } from "@/lib/pubmed/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
 import { notifyFollowedAuthorPublications } from "@/lib/notifications/followedAuthorNotify";
+import pLimit from "p-limit";
 
-const BATCH_SIZE = 20;
+const BATCH_SIZE = 10;
+const LINK_CONCURRENCY = 3;
 
 export async function runAuthorLinking(logId: string, importLogId?: string): Promise<void> {
   const admin = createAdminClient();
@@ -42,67 +44,70 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
       console.log(`[author-linker] RPC returned ${batch.length} articles (data type: ${typeof articles}, isArray: ${Array.isArray(articles)})`);
       if (batch.length === 0) break;
 
-      for (const article of batch) {
-        const rawAuthors = (article.authors ?? []) as Record<string, unknown>[];
-        console.log(`[author-linker] PMID ${article.pubmed_id}: authors field type=${typeof article.authors}, rawAuthors.length=${rawAuthors.length}`);
-        if (rawAuthors.length === 0) {
-          articlesProcessed++;
-          continue;
-        }
+      const limiter = pLimit(LINK_CONCURRENCY);
+      await Promise.all(
+        batch.map((article) => limiter(async () => {
+          const rawAuthors = (article.authors ?? []) as Record<string, unknown>[];
+          console.log(`[author-linker] PMID ${article.pubmed_id}: authors field type=${typeof article.authors}, rawAuthors.length=${rawAuthors.length}`);
+          if (rawAuthors.length === 0) {
+            articlesProcessed++;
+            return;
+          }
 
-        const authors: Author[] = rawAuthors.map((a) => ({
-          lastName:    decodeHtmlEntities(String(a.lastName ?? "")),
-          foreName:    decodeHtmlEntities(String(a.foreName ?? "")),
-          affiliation: a.affiliation != null ? String(a.affiliation) : null,
-          orcid:       a.orcid != null ? String(a.orcid) : null,
-        }));
+          const authors: Author[] = rawAuthors.map((a) => ({
+            lastName:    decodeHtmlEntities(String(a.lastName ?? "")),
+            foreName:    decodeHtmlEntities(String(a.foreName ?? "")),
+            affiliation: a.affiliation != null ? String(a.affiliation) : null,
+            orcid:       a.orcid != null ? String(a.orcid) : null,
+          }));
 
-        const rejectedAuthors = authors.filter(
-          (a) => !a.lastName?.trim() && !a.orcid?.trim()
-        );
+          const rejectedAuthors = authors.filter(
+            (a) => !a.lastName?.trim() && !a.orcid?.trim()
+          );
 
-        console.log(`[author-linker] calling linkAuthorsToArticle for PMID ${article.pubmed_id} (${authors.length} authors)`);
-        await linkAuthorsToArticle(admin, article.id, authors)
-          .then(async (result) => {
-            newAuthors  += result.new;
-            duplicates  += result.duplicates;
-            rejected    += result.rejected;
-            authorsLinked += result.new + result.duplicates;
-            console.log(`[author-linker] linked PMID ${article.pubmed_id} — new=${result.new} dup=${result.duplicates} rejected=${result.rejected}`);
+          console.log(`[author-linker] calling linkAuthorsToArticle for PMID ${article.pubmed_id} (${authors.length} authors)`);
+          await linkAuthorsToArticle(admin, article.id, authors)
+            .then(async (result) => {
+              newAuthors  += result.new;
+              duplicates  += result.duplicates;
+              rejected    += result.rejected;
+              authorsLinked += result.new + result.duplicates;
+              console.log(`[author-linker] linked PMID ${article.pubmed_id} — new=${result.new} dup=${result.duplicates} rejected=${result.rejected}`);
 
-            if (rejectedAuthors.length > 0) {
-              const rejects = rejectedAuthors.map((a, idx) => ({
-                article_id:     article.id,
-                pubmed_id:      article.pubmed_id,
-                position:       rawAuthors.findIndex(
-                  (r) => r.lastName === a.lastName && r.foreName === a.foreName
-                ) + 1 || idx + 1,
-                raw_data:       rawAuthors.find(
-                  (r) => r.lastName === a.lastName && r.foreName === a.foreName
-                ) ?? {},
-                reason:         "no_lastname_no_orcid",
-                linking_log_id: logId,
-              }));
-              await admin.from("rejected_authors" as never).insert(rejects as never);
-            }
+              if (rejectedAuthors.length > 0) {
+                const rejects = rejectedAuthors.map((a, idx) => ({
+                  article_id:     article.id,
+                  pubmed_id:      article.pubmed_id,
+                  position:       rawAuthors.findIndex(
+                    (r) => r.lastName === a.lastName && r.foreName === a.foreName
+                  ) + 1 || idx + 1,
+                  raw_data:       rawAuthors.find(
+                    (r) => r.lastName === a.lastName && r.foreName === a.foreName
+                  ) ?? {},
+                  reason:         "no_lastname_no_orcid",
+                  linking_log_id: logId,
+                }));
+                await admin.from("rejected_authors" as never).insert(rejects as never);
+              }
 
-            linkedArticleIds.push(article.id);
+              linkedArticleIds.push(article.id);
 
-            void logArticleEvent(article.id, "author_linked", {
-              authors_linked: result.new + result.duplicates,
-              new:        result.new,
-              duplicates: result.duplicates,
-              rejected:   result.rejected,
+              void logArticleEvent(article.id, "author_linked", {
+                authors_linked: result.new + result.duplicates,
+                new:        result.new,
+                duplicates: result.duplicates,
+                rejected:   result.rejected,
+              });
+            })
+            .catch((e) => {
+              const msg = `PMID ${article.pubmed_id}: ${e instanceof Error ? e.message : String(e)}`;
+              errors.push(msg);
+              console.error(`[author-linker] error — ${msg}`);
             });
-          })
-          .catch((e) => {
-            const msg = `PMID ${article.pubmed_id}: ${e instanceof Error ? e.message : String(e)}`;
-            errors.push(msg);
-            console.error(`[author-linker] error — ${msg}`);
-          });
 
-        articlesProcessed++;
-      }
+          articlesProcessed++;
+        }))
+      );
 
       // Update progress after each batch
       console.log(`[author-linker] writing progress to DB — logId=${logId} articles_processed=${articlesProcessed} authors_linked=${authorsLinked}`);
@@ -119,6 +124,7 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
       console.log(`[author-linker] batch done — articles=${articlesProcessed} authors=${authorsLinked}`);
 
       if (batch.length < BATCH_SIZE) break;
+      await new Promise((r) => setTimeout(r, 200));
     }
 
     // Notify users who follow any of the newly linked authors (fire-and-forget)

@@ -49,6 +49,12 @@ export type Database = {
           source_id: string | null
           specialty_tags: string[]
           subspecialty: string | null
+          subspecialty_ai: string | null
+          article_type_ai: string | null
+          study_design_ai: string | null
+          classification_reason: string | null
+          classification_scored_at: string | null
+          classification_model_version: string | null
           substances: Json
           title: string
           verified: boolean | null
@@ -88,6 +94,12 @@ export type Database = {
           source_id?: string | null
           specialty_tags?: string[]
           subspecialty?: string | null
+          subspecialty_ai?: string | null
+          article_type_ai?: string | null
+          study_design_ai?: string | null
+          classification_reason?: string | null
+          classification_scored_at?: string | null
+          classification_model_version?: string | null
           substances?: Json
           title: string
           verified?: boolean | null
@@ -127,6 +139,12 @@ export type Database = {
           source_id?: string | null
           specialty_tags?: string[]
           subspecialty?: string | null
+          subspecialty_ai?: string | null
+          article_type_ai?: string | null
+          study_design_ai?: string | null
+          classification_reason?: string | null
+          classification_scored_at?: string | null
+          classification_model_version?: string | null
           substances?: Json
           title?: string
           verified?: boolean | null

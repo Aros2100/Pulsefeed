@@ -560,6 +560,124 @@ export default async function AdminArticleLogPage({
           } />
         </CardBody>
       </Card>
+
+      {/* Klassificering */}
+      {(a.subspecialty_ai || a.article_type_ai || a.study_design_ai ||
+        a.patient_population || a.time_to_read != null || a.full_text_available != null ||
+        a.trial_registration || a.geographic_region) && (() => {
+        const POPULATION_COLORS: Record<string, { bg: string; color: string; border: string }> = {
+          adult:         { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
+          pediatric:     { bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
+          neonatal:      { bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" },
+          mixed:         { bg: "#faf5ff", color: "#7c3aed", border: "#ddd6fe" },
+          not_specified: { bg: "#f9fafb", color: "#374151", border: "#d1d5db" },
+        };
+
+        const LANG_NAMES: Record<string, string> = {
+          eng: "English", fre: "French",  ger: "German",
+          spa: "Spanish", ita: "Italian", por: "Portuguese",
+          chi: "Chinese", jpn: "Japanese", rus: "Russian",
+        };
+
+        type ClsRow = [string, React.ReactNode];
+        const clsFr = (label: string, value: React.ReactNode | null | undefined): ClsRow | null => {
+          if (value === null || value === undefined) return null;
+          return [label, value];
+        };
+
+        const aiRows: ClsRow[] = [
+          clsFr("Subspecialty", a.subspecialty_ai),
+          clsFr("Article Type", a.article_type_ai),
+          clsFr("Study Design", a.study_design_ai),
+          clsFr("Model", a.classification_model_version ? `v${a.classification_model_version}` : null),
+        ].filter((r): r is ClsRow => r !== null);
+
+        const popStyle = a.patient_population
+          ? POPULATION_COLORS[a.patient_population.toLowerCase()] ?? { bg: "#f1f5f9", color: "#475569", border: "#e2e8f0" }
+          : null;
+
+        const pmcFullTextUrl = a.pmc_id
+          ? `https://www.ncbi.nlm.nih.gov/pmc/articles/${a.pmc_id}/`
+          : null;
+
+        const trialUrl = a.trial_registration
+          ? `https://clinicaltrials.gov/study/${a.trial_registration}`
+          : null;
+
+        const metaRows: ClsRow[] = [
+          a.time_to_read != null ? clsFr("Time to Read", `${a.time_to_read} min`) : null,
+          ["Patient Pop.", a.patient_population
+            ? (
+                <span style={{
+                  fontSize: "12px", fontWeight: 600, borderRadius: "4px", padding: "2px 8px",
+                  background: popStyle!.bg, color: popStyle!.color, border: `1px solid ${popStyle!.border}`,
+                }}>
+                  {a.patient_population}
+                </span>
+              )
+            : "—"
+          ] as ClsRow,
+          clsFr("Full Text", a.full_text_available
+            ? pmcFullTextUrl
+              ? <a href={pmcFullTextUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#15803d", fontWeight: 600, textDecoration: "none" }}>Tilgængelig ↗</a>
+              : <span style={{ color: "#15803d", fontWeight: 600 }}>Tilgængelig</span>
+            : a.full_text_available === false
+              ? <span style={{ color: "#888" }}>Kun abstract</span>
+              : null
+          ),
+          clsFr("Region", a.geographic_region),
+          ["Trial Reg.", a.trial_registration
+            ? (
+                <a href={trialUrl!} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
+                  {a.trial_registration} ↗
+                </a>
+              )
+            : "—"
+          ] as ClsRow,
+          a.language
+            ? clsFr("Language", LANG_NAMES[a.language] ?? a.language.toUpperCase())
+            : null,
+        ].filter((r): r is ClsRow => r !== null);
+
+        return (
+          <Card>
+            <CardHeader label="Klassificering" />
+            <CardBody>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, fontSize: "14px" }}>
+                <div>
+                  <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#7c3aed", marginBottom: "8px" }}>
+                    AI-klassificeret
+                  </div>
+                  {aiRows.map(([label, value]) => (
+                    <div key={label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5" }}>
+                      <span style={{ color: "#888" }}>{label}</span>
+                      <span style={{ color: "#1a1a1a" }}>{value}</span>
+                    </div>
+                  ))}
+                  {a.classification_reason && (
+                    <div style={{ marginTop: "8px", fontSize: "12px", color: "#666", fontStyle: "italic", lineHeight: 1.5 }}>
+                      {a.classification_reason}
+                    </div>
+                  )}
+                </div>
+                {metaRows.length > 0 && (
+                  <div style={{ borderLeft: "1px solid #f0f0f0", paddingLeft: "20px" }}>
+                    <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "8px" }}>
+                      Metadata
+                    </div>
+                    {metaRows.map(([label, value]) => (
+                      <div key={label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", alignItems: "center" }}>
+                        <span style={{ color: "#888" }}>{label}</span>
+                        <span style={{ color: "#1a1a1a" }}>{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardBody>
+          </Card>
+        );
+      })()}
     </div>
   );
 

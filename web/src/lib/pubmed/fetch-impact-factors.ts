@@ -77,7 +77,7 @@ export async function fetchJournalStats(issn: string): Promise<JournalStats> {
  * Deduplicates by ISSN — one API call per unique ISSN, then batch-updates
  * all articles sharing that ISSN.
  */
-export async function runImpactFactorFetch(limit = 500): Promise<{ updated: number; failed: number }> {
+export async function runImpactFactorFetch(limit = 2000): Promise<{ updated: number; failed: number }> {
   const admin = createAdminClient();
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -110,28 +110,32 @@ export async function runImpactFactorFetch(limit = 500): Promise<{ updated: numb
 
     const { factor, hIndex } = await fetchJournalStats(issn);
 
-    const { error: updateError } = await admin
+    const { data: updatedRows, error: updateError } = await admin
       .from("articles")
       .update({
         impact_factor:            factor,
         journal_h_index:          hIndex,
         impact_factor_fetched_at: new Date().toISOString(),
       } as never)
-      .in("id", articleIds);
+      .or(`issn_electronic.eq.${issn},issn_print.eq.${issn}`)
+      .select("id");
 
     if (updateError) {
       console.error(`[fetch-if] Batch update failed for ISSN ${issn}:`, updateError.message);
       failed += articleIds.length;
     } else {
-      updated += articleIds.length;
-      const { error: evErr } = await admin
-        .from("article_events" as never)
-        .insert(articleIds.map((articleId) => ({
-          article_id: articleId,
-          event_type: "impact_factor_updated",
-          payload:    { impact_factor: factor, journal_h_index: hIndex },
-        })) as never);
-      if (evErr) console.warn(`[fetch-if] Event insert failed for ISSN ${issn}:`, evErr.message);
+      const affectedIds = (updatedRows ?? []).map((r: { id: string }) => r.id);
+      updated += affectedIds.length;
+      if (affectedIds.length > 0) {
+        const { error: evErr } = await admin
+          .from("article_events" as never)
+          .insert(affectedIds.map((articleId: string) => ({
+            article_id: articleId,
+            event_type: "impact_factor_updated",
+            payload:    { impact_factor: factor, journal_h_index: hIndex },
+          })) as never);
+        if (evErr) console.warn(`[fetch-if] Event insert failed for ISSN ${issn}:`, evErr.message);
+      }
     }
   }
 

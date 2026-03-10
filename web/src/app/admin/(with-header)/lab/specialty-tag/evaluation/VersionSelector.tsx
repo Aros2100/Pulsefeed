@@ -33,8 +33,8 @@ export default function VersionSelector({ versions, selected }: Props) {
         outline: "none",
       }}
     >
-      {versions.map((v) => (
-        <option key={v.version} value={v.version}>
+      {versions.map((v, i) => (
+        <option key={`${v.version}-${i}`} value={v.version}>
           {v.version}{v.active ? " (aktiv)" : ""}
         </option>
       ))}

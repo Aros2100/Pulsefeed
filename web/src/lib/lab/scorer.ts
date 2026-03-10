@@ -1,9 +1,22 @@
 import { trackedCall } from "@/lib/ai/tracked-client";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  SUBSPECIALTY_OPTIONS,
+  ARTICLE_TYPE_OPTIONS,
+  STUDY_DESIGN_OPTIONS,
+} from "@/lib/lab/classification-options";
 
 export interface ScoreResult {
   confidence: number;
   ai_decision: "approved" | "rejected";
+}
+
+export interface ClassificationResult {
+  subspecialty: string;
+  article_type: string;
+  study_design: string;
+  reason: string;
+  version: string;
 }
 
 export interface ActivePrompt {
@@ -57,5 +70,53 @@ export async function scoreArticle(
     const match = raw.match(/\d+/);
     const confidence = match ? Math.min(100, Math.max(0, parseInt(match[0], 10))) : 50;
     return { confidence, ai_decision: confidence >= 50 ? "approved" : "rejected", version: activePrompt.version };
+  }
+}
+
+export async function scoreClassification(
+  article: { title: string; abstract: string | null },
+  specialty: string,
+  activePrompt: ActivePrompt
+): Promise<ClassificationResult> {
+  const content = activePrompt.prompt
+    .replace(/\{\{specialty\}\}|\{specialty\}/g, specialty)
+    .replace(/\{\{title\}\}|\{title\}/g,         article.title)
+    .replace(/\{\{abstract\}\}|\{abstract\}/g,   article.abstract ?? "No abstract available");
+
+  const message = await trackedCall("classification_v1", {
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 512,
+    messages: [{ role: "user", content }],
+  });
+
+  const raw = (message.content[0] as { type: string; text: string }).text.trim();
+
+  const subspecialtySet = new Set<string>(SUBSPECIALTY_OPTIONS);
+  const articleTypeSet  = new Set<string>(ARTICLE_TYPE_OPTIONS);
+  const studyDesignSet  = new Set<string>(STUDY_DESIGN_OPTIONS);
+
+  try {
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as {
+      subspecialty?: string;
+      article_type?: string;
+      study_design?: string;
+      reason?: string;
+    };
+
+    const subspecialty = subspecialtySet.has(parsed.subspecialty ?? "") ? parsed.subspecialty! : "Unknown";
+    const article_type = articleTypeSet.has(parsed.article_type ?? "")  ? parsed.article_type! : "Unknown";
+    const study_design = studyDesignSet.has(parsed.study_design ?? "")  ? parsed.study_design! : "Unknown";
+    const reason       = typeof parsed.reason === "string" ? parsed.reason.slice(0, 500) : "";
+
+    return { subspecialty, article_type, study_design, reason, version: activePrompt.version };
+  } catch {
+    return {
+      subspecialty: "Unknown",
+      article_type: "Unknown",
+      study_design: "Unknown",
+      reason: "Failed to parse AI response",
+      version: activePrompt.version,
+    };
   }
 }

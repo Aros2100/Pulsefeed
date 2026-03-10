@@ -18,14 +18,16 @@ interface CitStats {
 }
 
 interface IFStats {
-  withIF:          number;
-  withoutIF:       number;
+  hasIF:           number;
+  noData:          number;
+  noIssn:          number;
+  pending:         number;
   total:           number;
   pct:             number;
   latestFetchedAt: string | null;
 }
 
-function n(v: number) { return v.toLocaleString("da-DK"); }
+function n(v: number | undefined | null) { return (v ?? 0).toLocaleString("da-DK"); }
 
 function fmt(iso: string | null) {
   if (!iso) return "—";
@@ -157,12 +159,12 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
     ifPollRef.current = setInterval(async () => {
       const data = await fetchIFStats();
       if (!data) return;
-      if (data.withIF === ifLastWithCount.current) {
+      if (data.hasIF === ifLastWithCount.current) {
         ifStableCount.current++;
         if (ifStableCount.current >= 3) { stopIFPolling(); setIfState("done"); }
       } else {
         ifStableCount.current   = 0;
-        ifLastWithCount.current = data.withIF;
+        ifLastWithCount.current = data.hasIF;
       }
     }, 3000);
   }
@@ -243,7 +245,7 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
       const json = (await res.json()) as { ok: boolean };
       if (!json.ok) { setIfState("error"); return; }
       const current = await fetchIFStats();
-      ifLastWithCount.current = current?.withIF ?? null;
+      ifLastWithCount.current = current?.hasIF ?? null;
       startIFPolling();
     } catch { setIfState("error"); }
   }
@@ -335,16 +337,66 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
   // ── Impact Factor subset UI ──────────────────────────────────────────────────
 
   if (subset === "impact-factor") {
+    const s = ifStats;
+    const barColor = (s?.pct ?? 0) >= 80 ? "#15803d" : (s?.pct ?? 0) >= 40 ? "#d97706" : "#E83B2A";
+    const running  = ifState === "loading";
+
     return (
-      <ProgressUI
-        pct={ifStats?.pct ?? 0}
-        left={ifStats ? `${n(ifStats.withIF)} / ${n(ifStats.total)} artikler` : "—"}
-        right={ifStats ? `${n(ifStats.withoutIF)} mangler` : ""}
-        running={ifState === "loading"}
-        footer={`Sidst hentet: ${fmt(ifStats?.latestFetchedAt ?? null)}`}
-        onTrigger={() => { void triggerIF(); }}
-        btnLabel="Hent impact factor nu"
-      />
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+            <span style={{ fontSize: "12px", color: "#5a6a85", fontWeight: 600 }}>
+              {s ? `${n(s.hasIF)} / ${n(s.total)} artikler` : "—"}
+            </span>
+            <span style={{ fontSize: "12px", fontWeight: 700, color: barColor }}>{s?.pct ?? 0}%</span>
+          </div>
+          <div style={{ height: "6px", borderRadius: "3px", background: "#e5e7eb", overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${s?.pct ?? 0}%`, background: barColor, borderRadius: "3px", transition: "width 0.6s ease" }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "5px" }}>
+            <span style={{ fontSize: "11px", color: "#aaa" }}>{running ? "Henter…" : `Sidst hentet: ${fmt(s?.latestFetchedAt ?? null)}`}</span>
+          </div>
+        </div>
+
+        {/* 4-segment breakdown */}
+        {s && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px" }}>
+            <div style={{ background: "#f0fdf4", borderRadius: "6px", padding: "8px 10px", border: "1px solid #bbf7d0" }}>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: "#15803d" }}>{n(s.hasIF)}</div>
+              <div style={{ fontSize: "10px", color: "#5a6a85", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Har IF</div>
+            </div>
+            <div style={{ background: "#fff7ed", borderRadius: "6px", padding: "8px 10px", border: "1px solid #fed7aa" }}>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: "#c2410c" }}>{n(s.noData)}</div>
+              <div style={{ fontSize: "10px", color: "#5a6a85", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Ingen data</div>
+            </div>
+            <div style={{ background: "#f9fafb", borderRadius: "6px", padding: "8px 10px", border: "1px solid #d1d5db" }}>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: "#374151" }}>{n(s.noIssn)}</div>
+              <div style={{ fontSize: "10px", color: "#5a6a85", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Ingen ISSN</div>
+            </div>
+            <div style={{ background: "#eff6ff", borderRadius: "6px", padding: "8px 10px", border: "1px solid #bfdbfe" }}>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: "#1d4ed8" }}>{n(s.pending)}</div>
+              <div style={{ fontSize: "10px", color: "#5a6a85", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Afventer</div>
+            </div>
+          </div>
+        )}
+
+        <div>
+          <button
+            onClick={() => { void triggerIF(); }}
+            disabled={running}
+            style={{
+              padding: "8px 16px", borderRadius: "7px", border: "none",
+              fontFamily: "inherit", fontSize: "13px", fontWeight: 600,
+              cursor: running ? "not-allowed" : "pointer",
+              background: running ? "#f1f3f7" : "#E83B2A",
+              color:      running ? "#9ca3af"  : "#fff",
+              transition: "background 0.15s, color 0.15s",
+            }}
+          >
+            {running ? "Henter…" : "Hent impact factor nu"}
+          </button>
+        </div>
+      </div>
     );
   }
 

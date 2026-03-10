@@ -22,11 +22,19 @@ function accColor(v: number | null): string {
   return "#dc2626";
 }
 
-export default function BenchmarkTable({ versions }: { versions: VersionRow[] }) {
+interface Props {
+  versions: VersionRow[];
+  variant?: "specialty-tag" | "classification";
+}
+
+export default function BenchmarkTable({ versions, variant = "specialty-tag" }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
-  const gridCols = "130px 100px 100px 55px 55px 100px 1fr";
+  const isCls = variant === "classification";
+  const gridCols = isCls
+    ? "130px 100px 100px 80px 100px 1fr"
+    : "130px 100px 100px 55px 55px 100px 1fr";
 
   return (
     <div>
@@ -39,9 +47,9 @@ export default function BenchmarkTable({ versions }: { versions: VersionRow[] })
       }}>
         <div>Version</div>
         <div>Beslutninger</div>
-        <div>Agreement</div>
-        <div>FP</div>
-        <div>FN</div>
+        <div>{isCls ? "Agreements" : "Agreement"}</div>
+        <div>{isCls ? "Corrected" : "FP"}</div>
+        {!isCls && <div>FN</div>}
         <div>Nøjagtighed</div>
         <div>Periode</div>
       </div>
@@ -96,9 +104,11 @@ export default function BenchmarkTable({ versions }: { versions: VersionRow[] })
               <div style={{ color: v.fp > 30 ? "#ea580c" : v.fp > 0 ? "#1a1a1a" : "#aaa", fontWeight: v.fp > 30 ? 700 : 400 }}>
                 {v.fp}
               </div>
-              <div style={{ color: v.fn > 30 ? "#ea580c" : v.fn > 0 ? "#1a1a1a" : "#aaa", fontWeight: v.fn > 30 ? 700 : 400 }}>
-                {v.fn}
-              </div>
+              {!isCls && (
+                <div style={{ color: v.fn > 30 ? "#ea580c" : v.fn > 0 ? "#1a1a1a" : "#aaa", fontWeight: v.fn > 30 ? 700 : 400 }}>
+                  {v.fn}
+                </div>
+              )}
               <div style={{ fontWeight: 700, color: accColor(v.accuracy) }}>
                 {v.accuracy != null ? `${v.accuracy}%` : "—"}
               </div>
