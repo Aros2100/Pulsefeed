@@ -88,6 +88,7 @@ export default function TextValidationClient({ specialty, label }: Props) {
 
   const [verdicts, setVerdicts]               = useState<Record<string, { decision: "approved" | "rejected"; comment: string }>>({});
   const [comments, setComments]               = useState<Record<string, string>>({});
+  const [pendingReject, setPendingReject]     = useState<string | null>(null);
   const [scoring, setScoring]                 = useState(false);
   const [scoringProgress, setScoringProgress] = useState<{ scored: number; total: number } | null>(null);
   const [saving, setSaving]                   = useState(false);
@@ -224,8 +225,22 @@ export default function TextValidationClient({ specialty, label }: Props) {
 
   // ── Verdict handling ────────────────────────────────────────────────────
 
-  function setVerdict(articleId: string, decision: "approved" | "rejected") {
-    setVerdicts((prev) => ({ ...prev, [articleId]: { decision, comment: "" } }));
+  function approveArticle(articleId: string) {
+    setPendingReject(null);
+    setVerdicts((prev) => ({ ...prev, [articleId]: { decision: "approved", comment: "" } }));
+  }
+
+  function startReject(articleId: string) {
+    setPendingReject(articleId);
+  }
+
+  function confirmReject(articleId: string) {
+    setVerdicts((prev) => ({ ...prev, [articleId]: { decision: "rejected", comment: comments[articleId] ?? "" } }));
+    setPendingReject(null);
+  }
+
+  function cancelReject() {
+    setPendingReject(null);
   }
 
   function getComment(articleId: string): string {
@@ -235,6 +250,12 @@ export default function TextValidationClient({ specialty, label }: Props) {
   function setComment(articleId: string, value: string) {
     setComments((prev) => ({ ...prev, [articleId]: value }));
   }
+
+  // ── Clear pending reject on article change ──────────────────────────────
+
+  useEffect(() => {
+    setPendingReject(null);
+  }, [selectedId]);
 
   // ── Auto-advance on verdict ─────────────────────────────────────────────
 
@@ -310,6 +331,7 @@ export default function TextValidationClient({ specialty, label }: Props) {
 
   const isApproved = currentVerdict?.decision === "approved";
   const isRejected = currentVerdict?.decision === "rejected";
+  const isPendingReject = currentArticle ? pendingReject === currentArticle.id : false;
 
   // ── Loading / empty states ──────────────────────────────────────────────
 
@@ -482,26 +504,35 @@ export default function TextValidationClient({ specialty, label }: Props) {
                 {/* Content */}
                 <div style={{ padding: "14px 16px" }}>
                   {currentArticle.short_headline && (
-                    <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a1a1a", marginBottom: "12px", lineHeight: 1.4 }}>
-                      {currentArticle.short_headline}
+                    <div style={{ marginBottom: "12px" }}>
+                      <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "4px" }}>Headline</div>
+                      <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4 }}>
+                        {currentArticle.short_headline}
+                      </div>
                     </div>
                   )}
                   {currentArticle.short_resume && (
-                    <div style={{ fontSize: "14px", color: "#2a2a2a", lineHeight: 1.6, marginBottom: "12px" }}>
-                      {currentArticle.short_resume}
+                    <div style={{ marginBottom: "12px" }}>
+                      <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "4px" }}>Resumé</div>
+                      <div style={{ fontSize: "14px", color: "#2a2a2a", lineHeight: 1.6 }}>
+                        {currentArticle.short_resume}
+                      </div>
                     </div>
                   )}
                   {currentArticle.bottom_line && (
-                    <div style={{
-                      background: "#f9fafb",
-                      borderLeft: "3px solid #059669",
-                      padding: "12px",
-                      fontSize: "13px",
-                      color: "#2a2a2a",
-                      lineHeight: 1.5,
-                      fontStyle: "italic",
-                    }}>
-                      {currentArticle.bottom_line}
+                    <div style={{ marginBottom: "0" }}>
+                      <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "4px" }}>Bottom line</div>
+                      <div style={{
+                        background: "#f9fafb",
+                        borderLeft: "3px solid #059669",
+                        padding: "12px",
+                        fontSize: "13px",
+                        color: "#2a2a2a",
+                        lineHeight: 1.5,
+                        fontStyle: "italic",
+                      }}>
+                        {currentArticle.bottom_line}
+                      </div>
                     </div>
                   )}
                   {!currentArticle.short_headline && !currentArticle.short_resume && !currentArticle.bottom_line && (
@@ -518,43 +549,69 @@ export default function TextValidationClient({ specialty, label }: Props) {
 
                 {/* Actions */}
                 <div style={{ padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <div style={{ display: "flex", gap: "6px" }}>
-                    <button
-                      onClick={() => setVerdict(currentArticle.id, "approved")}
-                      style={{
-                        borderRadius: "5px", padding: "5px 14px", fontSize: "11px", fontWeight: 600,
-                        background: isApproved ? "#15803d" : "#fff",
-                        border: `1px solid ${isApproved ? "#15803d" : "#bbf7d0"}`,
-                        color: isApproved ? "#fff" : "#15803d",
-                        cursor: "pointer", whiteSpace: "nowrap",
-                      }}
-                    >
-                      ✓ Godkend
-                    </button>
-                    <button
-                      onClick={() => setVerdict(currentArticle.id, "rejected")}
-                      style={{
-                        borderRadius: "5px", padding: "5px 14px", fontSize: "11px", fontWeight: 600,
-                        background: isRejected ? "#dc2626" : "#fff",
-                        border: `1px solid ${isRejected ? "#dc2626" : "#fecaca"}`,
-                        color: isRejected ? "#fff" : "#dc2626",
-                        cursor: "pointer", whiteSpace: "nowrap",
-                      }}
-                    >
-                      ✗ Afvis
-                    </button>
-                  </div>
-                  {isRejected && (
-                    <textarea
-                      value={getComment(currentArticle.id)}
-                      onChange={(e) => setComment(currentArticle.id, e.target.value)}
-                      placeholder="Beskriv hvad der er galt..."
-                      style={{
-                        width: "100%", minHeight: "60px", padding: "8px 10px", fontSize: "12px",
-                        border: "1px solid #fecaca", borderRadius: "5px", resize: "vertical",
-                        outline: "none", fontFamily: "inherit", background: "#fff",
-                      }}
-                    />
+                  {isPendingReject ? (
+                    <>
+                      <textarea
+                        value={getComment(currentArticle.id)}
+                        onChange={(e) => setComment(currentArticle.id, e.target.value)}
+                        placeholder="Beskriv hvad der er galt..."
+                        autoFocus
+                        style={{
+                          width: "100%", minHeight: "60px", padding: "8px 10px", fontSize: "12px",
+                          border: "1px solid #fecaca", borderRadius: "5px", resize: "vertical",
+                          outline: "none", fontFamily: "inherit", background: "#fff",
+                        }}
+                      />
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        <button
+                          onClick={() => confirmReject(currentArticle.id)}
+                          style={{
+                            borderRadius: "5px", padding: "5px 14px", fontSize: "11px", fontWeight: 600,
+                            background: "#dc2626", border: "1px solid #dc2626", color: "#fff",
+                            cursor: "pointer", whiteSpace: "nowrap",
+                          }}
+                        >
+                          Bekræft afvisning
+                        </button>
+                        <button
+                          onClick={() => cancelReject()}
+                          style={{
+                            borderRadius: "5px", padding: "5px 14px", fontSize: "11px", fontWeight: 600,
+                            background: "#fff", border: "1px solid #dde3ed", color: "#5a6a85",
+                            cursor: "pointer", whiteSpace: "nowrap",
+                          }}
+                        >
+                          Fortryd
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <button
+                        onClick={() => approveArticle(currentArticle.id)}
+                        style={{
+                          borderRadius: "5px", padding: "5px 14px", fontSize: "11px", fontWeight: 600,
+                          background: isApproved ? "#15803d" : "#fff",
+                          border: `1px solid ${isApproved ? "#15803d" : "#bbf7d0"}`,
+                          color: isApproved ? "#fff" : "#15803d",
+                          cursor: "pointer", whiteSpace: "nowrap",
+                        }}
+                      >
+                        ✓ Godkend
+                      </button>
+                      <button
+                        onClick={() => startReject(currentArticle.id)}
+                        style={{
+                          borderRadius: "5px", padding: "5px 14px", fontSize: "11px", fontWeight: 600,
+                          background: isRejected ? "#dc2626" : "#fff",
+                          border: `1px solid ${isRejected ? "#dc2626" : "#fecaca"}`,
+                          color: isRejected ? "#fff" : "#dc2626",
+                          cursor: "pointer", whiteSpace: "nowrap",
+                        }}
+                      >
+                        ✗ Afvis
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

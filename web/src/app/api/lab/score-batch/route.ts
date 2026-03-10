@@ -6,10 +6,11 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { getActivePrompt, scoreArticle, type ActivePrompt } from "@/lib/lab/scorer";
 import { logArticleEvent } from "@/lib/article-events";
+import { applyUnscoredFilters } from "@/lib/lab/article-filters";
 
 const CONCURRENCY  = 1;    // sequential to avoid bursting the 50 req/min limit
 const DELAY_MS     = 1300; // 1300ms between requests ≈ 46 req/min, safely under 50
-const BATCH_LIMIT  = 100;  // score at most 100 articles per call (~130s total)
+const BATCH_LIMIT  = 100;
 
 const schema = z.object({
   specialty: z.string().refine(
@@ -99,29 +100,31 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const baseQuery = admin
-    .from("articles")
-    .select("id, title, abstract, specialty_tags")
-    .eq("status", "pending")
-    .contains("specialty_tags", [specialty])
-    .order("circle", { ascending: false, nullsFirst: false });
-
   const v = activePrompt.version;
   const { data: articles, error: fetchError } = scoreAll
     // scoreAll=true (model activation): re-score articles with different/null model version.
-    ? await baseQuery
+    ? await admin
+        .from("articles")
+        .select("id, title, abstract, specialty_tags")
+        .eq("status", "pending")
+        .contains("specialty_tags", [specialty])
         .or(`specialty_scored_at.is.null,model_version.is.null,model_version.neq.${v}`)
+        .order("circle", { ascending: false, nullsFirst: false })
         .limit(BATCH_LIMIT)
     // scoreAll=false (normal): only unscored articles, fill up to remaining slots.
-    : await baseQuery
-        .is("specialty_confidence", null)
+    : await applyUnscoredFilters(
+        admin.from("articles").select("id, title, abstract, specialty_tags"),
+        "specialty_tag",
+        specialty,
+      )
+        .order("circle", { ascending: false, nullsFirst: false })
         .limit(remaining);
 
   if (fetchError) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
   }
 
-  const toScore = articles ?? [];
+  const toScore = (articles ?? []) as Article[];
 
   // Stream SSE progress events so the client can show a live countdown
   const stream = new ReadableStream({
