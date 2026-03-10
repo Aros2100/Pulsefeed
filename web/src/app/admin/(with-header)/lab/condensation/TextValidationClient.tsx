@@ -106,6 +106,7 @@ export default function TextValidationClient({ specialty, label }: Props) {
   const [pendingHref, setPendingHref]         = useState<string | null>(null);
 
   const hasUnsavedRef = useRef(false);
+  const rejectSectionRef = useRef<HTMLDivElement>(null);
 
   // ── Load articles (with pre-scoring if needed) ────────────────────────────
 
@@ -282,6 +283,16 @@ export default function TextValidationClient({ specialty, label }: Props) {
     setRejectMode(false);
     setRejectReasons(new Set());
   }, [selectedId]);
+
+  // ── Scroll reject section into view ──────────────────────────────────────
+
+  useEffect(() => {
+    if (rejectMode) {
+      requestAnimationFrame(() => {
+        rejectSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      });
+    }
+  }, [rejectMode]);
 
   // ── Auto-advance on verdict ─────────────────────────────────────────────
 
@@ -552,7 +563,7 @@ export default function TextValidationClient({ specialty, label }: Props) {
                 </div>
 
                 {/* Actions */}
-                <div style={{ padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div ref={rejectSectionRef} style={{ padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
                   {rejectMode ? (
                     <>
                       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
