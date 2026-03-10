@@ -678,6 +678,120 @@ export default async function AdminArticleLogPage({
           </Card>
         );
       })()}
+
+      {/* Kondensering */}
+      <Card>
+        <CardHeader label="Kondensering" />
+        <CardBody>
+          {!(raw.condensed_at as string | null) ? (
+            <div style={{ fontSize: "13px", color: "#aaa" }}>Ikke kondenseret endnu</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, fontSize: "14px" }}>
+              {/* Left column: Tekst */}
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#059669", marginBottom: "8px" }}>
+                  Tekst
+                </div>
+                {a.short_headline && (
+                  <div style={{ marginBottom: "8px" }}>
+                    <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>Headline</div>
+                    <div style={{ fontSize: "15px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4 }}>{a.short_headline}</div>
+                  </div>
+                )}
+                {a.short_resume && (
+                  <div style={{ marginBottom: "8px" }}>
+                    <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>Resumé</div>
+                    <div style={{ fontSize: "14px", color: "#2a2a2a", lineHeight: 1.6 }}>{a.short_resume}</div>
+                  </div>
+                )}
+                {a.bottom_line && (
+                  <div style={{ marginBottom: "8px" }}>
+                    <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>Bottom Line</div>
+                    <div style={{ background: "#f9fafb", borderLeft: "3px solid #7c3aed", padding: "10px 12px", fontSize: "14px", fontStyle: "italic", color: "#2a2a2a", lineHeight: 1.5 }}>
+                      {a.bottom_line}
+                    </div>
+                  </div>
+                )}
+                <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", marginTop: "4px" }}>
+                  <span style={{ color: "#888" }}>Model</span>
+                  <span style={{ color: "#1a1a1a" }}>{a.condensed_model_version ? `v${a.condensed_model_version}` : "—"}</span>
+                </div>
+              </div>
+
+              {/* Right column: PICO & Sample */}
+              {(() => {
+                const cndAuthors = (Array.isArray(a.authors) ? a.authors : []) as { foreName?: string; lastName?: string }[];
+                const firstName = cndAuthors.length > 0
+                  ? [cndAuthors[0].foreName, cndAuthors[0].lastName].filter(Boolean).join(" ")
+                  : null;
+                const lastAuthor = cndAuthors.length > 1 ? cndAuthors[cndAuthors.length - 1] : null;
+                const lastName = lastAuthor
+                  ? [lastAuthor.foreName, lastAuthor.lastName].filter(Boolean).join(" ")
+                  : null;
+                const firstAuthorId = authorIdByPosition.get(1) ?? null;
+                const lastAuthorId = cndAuthors.length > 1 ? (authorIdByPosition.get(cndAuthors.length) ?? null) : null;
+
+                const authorLink = (name: string, id: string | null) =>
+                  id
+                    ? <a href={`/admin/authors/${id}`} style={{ color: "#1a6eb5", textDecoration: "none" }}>{name}</a>
+                    : <>{name}</>;
+
+                return (
+                  <div style={{ borderLeft: "1px solid #f0f0f0", paddingLeft: "20px" }}>
+                    <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "8px" }}>
+                      PICO & Sample
+                    </div>
+                    {a.pico_population == null && a.pico_intervention == null && a.pico_comparison == null && a.pico_outcome == null ? (
+                      <div style={{ fontSize: "13px", color: "#aaa", fontStyle: "italic", marginBottom: "8px" }}>Ikke relevant</div>
+                    ) : (
+                      <>
+                        {[
+                          { label: "Population", value: a.pico_population },
+                          { label: "Intervention", value: a.pico_intervention },
+                          { label: "Comparison", value: a.pico_comparison },
+                          { label: "Outcome", value: a.pico_outcome },
+                        ].map((p) => (
+                          <div key={p.label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5" }}>
+                            <span style={{ color: "#888" }}>{p.label}</span>
+                            <span style={{ color: p.value ? "#1a1a1a" : "#aaa" }}>{p.value ?? "—"}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                    <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", marginTop: "4px" }}>
+                      <span style={{ color: "#888" }}>Sample Size</span>
+                      <span style={{ color: a.sample_size != null ? "#1a1a1a" : "#aaa", fontWeight: a.sample_size != null ? 600 : 400 }}>
+                        {a.sample_size != null ? `N = ${a.sample_size.toLocaleString("da-DK")}` : "—"}
+                      </span>
+                    </div>
+                    {firstName && (
+                      <>
+                        {lastName ? (
+                          <>
+                            <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5" }}>
+                              <span style={{ color: "#888" }}>Første forfatter</span>
+                              <span style={{ color: "#1a1a1a" }}>{authorLink(firstName, firstAuthorId)}</span>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5" }}>
+                              <span style={{ color: "#888" }}>Sidste forfatter</span>
+                              <span style={{ color: "#1a1a1a" }}>{authorLink(lastName, lastAuthorId)}</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5" }}>
+                            <span style={{ color: "#888" }}>Forfatter</span>
+                            <span style={{ color: "#1a1a1a" }}>{authorLink(firstName, firstAuthorId)}</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </CardBody>
+      </Card>
     </div>
   );
 
