@@ -97,7 +97,7 @@ export default function TextValidationClient({ specialty, label }: Props) {
 
   const [verdicts, setVerdicts]               = useState<Record<string, { decision: "approved" | "rejected"; comment: string }>>({});
   const [comments, setComments]               = useState<Record<string, string>>({});
-  const [pendingReject, setPendingReject]     = useState<string | null>(null);
+  const [rejectMode, setRejectMode]           = useState(false);
   const [rejectReasons, setRejectReasons]    = useState<Set<string>>(new Set());
   const [scoring, setScoring]                 = useState(false);
   const [scoringProgress, setScoringProgress] = useState<{ scored: number; total: number } | null>(null);
@@ -236,13 +236,13 @@ export default function TextValidationClient({ specialty, label }: Props) {
   // ── Verdict handling ────────────────────────────────────────────────────
 
   function approveArticle(articleId: string) {
-    setPendingReject(null);
+    setRejectMode(false);
     setVerdicts((prev) => ({ ...prev, [articleId]: { decision: "approved", comment: "" } }));
   }
 
-  function startReject(articleId: string) {
+  function startReject() {
     setRejectReasons(new Set());
-    setPendingReject(articleId);
+    setRejectMode(true);
   }
 
   function toggleReason(reason: string) {
@@ -259,12 +259,12 @@ export default function TextValidationClient({ specialty, label }: Props) {
     const freeText = (comments[articleId] ?? "").trim();
     const combined = freeText ? `${reasons} — ${freeText}` : reasons;
     setVerdicts((prev) => ({ ...prev, [articleId]: { decision: "rejected", comment: combined } }));
-    setPendingReject(null);
+    setRejectMode(false);
     setRejectReasons(new Set());
   }
 
   function cancelReject() {
-    setPendingReject(null);
+    setRejectMode(false);
     setRejectReasons(new Set());
   }
 
@@ -276,10 +276,11 @@ export default function TextValidationClient({ specialty, label }: Props) {
     setComments((prev) => ({ ...prev, [articleId]: value }));
   }
 
-  // ── Clear pending reject on article change ──────────────────────────────
+  // ── Clear reject mode on article change ──────────────────────────────
 
   useEffect(() => {
-    setPendingReject(null);
+    setRejectMode(false);
+    setRejectReasons(new Set());
   }, [selectedId]);
 
   // ── Auto-advance on verdict ─────────────────────────────────────────────
@@ -356,7 +357,6 @@ export default function TextValidationClient({ specialty, label }: Props) {
 
   const isApproved = currentVerdict?.decision === "approved";
   const isRejected = currentVerdict?.decision === "rejected";
-  const isPendingReject = currentArticle ? pendingReject === currentArticle.id : false;
 
   // ── Loading / empty states ──────────────────────────────────────────────
 
@@ -553,7 +553,7 @@ export default function TextValidationClient({ specialty, label }: Props) {
 
                 {/* Actions */}
                 <div style={{ padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {isPendingReject ? (
+                  {rejectMode ? (
                     <>
                       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                         {REJECT_REASONS.map((reason) => (
@@ -627,7 +627,7 @@ export default function TextValidationClient({ specialty, label }: Props) {
                         ✓ Godkend
                       </button>
                       <button
-                        onClick={() => startReject(currentArticle.id)}
+                        onClick={() => startReject()}
                         style={{
                           borderRadius: "5px", padding: "5px 14px", fontSize: "11px", fontWeight: 600,
                           background: isRejected ? "#dc2626" : "#fff",
