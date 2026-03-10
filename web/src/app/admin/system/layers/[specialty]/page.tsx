@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 import LayerManager from "@/app/admin/LayerManager";
@@ -16,5 +17,16 @@ export default async function LayerPage({
 
   const initialTab = tab === "circle2" ? "circle2" : "circle1";
 
-  return <LayerManager specialty={spec.slug} label={spec.label} initialTab={initialTab} />;
+  return (
+    <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif" }}>
+      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "40px 24px 0" }}>
+        <div style={{ marginBottom: "8px" }}>
+          <Link href="/admin/system" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+            ← System
+          </Link>
+        </div>
+      </div>
+      <LayerManager specialty={spec.slug} label={spec.label} initialTab={initialTab} />
+    </div>
+  );
 }

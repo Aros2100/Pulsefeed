@@ -42,23 +42,25 @@ type Tab = "heatmap" | "selected" | "pending" | "active";
 
 /* ── Constants ────────────────────────────────────────────────── */
 
-const CYAN = "#0891b2";
-const INFO_ACCENT = "#64748b";
 const SHADOW = "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)";
 
 const thStyle: React.CSSProperties = {
   textAlign: "left",
-  padding: "10px 14px",
+  padding: "10px 16px",
   fontSize: "11px",
-  fontWeight: 600,
-  color: "#64748b",
+  fontWeight: 700,
+  color: "#5a6a85",
   textTransform: "uppercase",
-  letterSpacing: "0.5px",
+  letterSpacing: "0.06em",
+  borderBottom: "1px solid #dde3ed",
+  background: "#EEF2F7",
 };
 
 const tdStyle: React.CSSProperties = {
-  padding: "10px 14px",
-  color: "#475569",
+  padding: "12px 16px",
+  color: "#1a1a1a",
+  borderBottom: "1px solid #f1f3f7",
+  fontSize: "13px",
 };
 
 /* ── Color helpers (red scale) ────────────────────────────────── */
@@ -133,9 +135,9 @@ function MeshTag({ term }: { term: string }) {
       fontSize: "11px",
       padding: "2px 7px",
       borderRadius: "4px",
-      background: "#f0fdfa",
-      color: CYAN,
-      border: "1px solid #ccfbf1",
+      background: "#f1f5f9",
+      color: "#1a1a1a",
+      border: "1px solid #dde3ed",
       whiteSpace: "nowrap",
     }}>
       {term}
@@ -161,6 +163,7 @@ export default function CombosClient({
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("heatmap");
   const [hoveredCell, setHoveredCell] = useState<{ t1: string; t2: string; val: number } | null>(null);
+  const [hoveredIdx, setHoveredIdx] = useState<{ row: number; col: number } | null>(null);
   const [busyRecalc, setBusyRecalc] = useState(false);
   const [busyAddPair, setBusyAddPair] = useState(false);
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
@@ -417,9 +420,9 @@ export default function CombosClient({
 
   const tabConfig: { key: Tab; label: string; count?: number }[] = [
     { key: "heatmap", label: "Heatmap" },
+    { key: "active", label: "Aktive par", count: activeRules.length },
     { key: "selected", label: "Valgte par", count: trackingRules.length },
     { key: "pending", label: "Klar til auto-approve", count: pendingArticles.length },
-    { key: "active", label: "Aktive par", count: activeRules.length },
   ];
 
   /* ── SVG dimensions ────────────────────────────────────────── */
@@ -470,33 +473,41 @@ export default function CombosClient({
       {/* Tabs */}
       <div style={{
         display: "flex",
-        gap: "2px",
+        gap: "0",
         marginBottom: "20px",
-        borderBottom: "1px solid #e5e7eb",
-        background: "#f1f5f9",
-        borderRadius: "6px 6px 0 0",
-        padding: "2px 2px 0",
-        width: "fit-content",
+        borderBottom: "2px solid #e5e7eb",
       }}>
         {tabConfig.map((t) => {
           const isActive = tab === t.key;
+          const isAction = t.key === "pending";
+          const actionAccent = isAction && (t.count ?? 0) > 0;
           return (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
               style={{
                 fontSize: "13px",
-                fontWeight: isActive ? 600 : 400,
+                fontWeight: isActive ? 700 : 400,
                 padding: "8px 16px",
                 border: "none",
                 background: "transparent",
-                color: isActive ? "#334155" : INFO_ACCENT,
-                borderBottom: isActive ? `2px solid ${INFO_ACCENT}` : "2px solid transparent",
+                color: isActive ? (actionAccent ? "#dc2626" : "#1a1a1a") : "#5a6a85",
+                borderBottom: isActive ? `2px solid ${actionAccent ? "#dc2626" : "#1a1a1a"}` : "2px solid transparent",
                 cursor: "pointer",
-                marginBottom: "-1px",
+                marginBottom: "-2px",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
               }}
             >
-              {t.label}{t.count !== undefined ? ` (${t.count})` : ""}
+              {t.label}
+              {actionAccent ? (
+                <span style={{ background: "#dc2626", color: "#fff", borderRadius: "4px", padding: "1px 6px", fontSize: "10px", fontWeight: 700 }}>
+                  {t.count}
+                </span>
+              ) : t.count !== undefined ? (
+                <span>({t.count})</span>
+              ) : null}
             </button>
           );
         })}
@@ -513,10 +524,10 @@ export default function CombosClient({
                 fontSize: "13px",
                 fontWeight: 600,
                 padding: "8px 18px",
-                borderRadius: "8px",
-                border: `1px solid ${CYAN}`,
-                background: busyRecalc ? "#f0fdfa" : "#fff",
-                color: busyRecalc ? "#94a3b8" : CYAN,
+                borderRadius: "7px",
+                border: "1px solid #dde3ed",
+                background: busyRecalc ? "#f8f9fb" : "#fff",
+                color: busyRecalc ? "#94a3b8" : "#1a1a1a",
                 cursor: busyRecalc ? "not-allowed" : "pointer",
               }}
             >
@@ -552,102 +563,135 @@ export default function CombosClient({
                 width={LABEL_W + terms.length * CELL + 20}
                 height={LABEL_H + terms.length * CELL + 40}
                 style={{ display: "block" }}
+                onMouseLeave={() => { setHoveredIdx(null); setHoveredCell(null); }}
               >
-                {/* Column labels */}
-                {terms.map((t, i) => (
-                  <text
-                    key={`col-${i}`}
-                    x={LABEL_W + i * CELL + CELL / 2}
-                    y={LABEL_H - 8}
-                    textAnchor="start"
-                    fontSize={10}
-                    fill="#374151"
-                    fontWeight={500}
-                    transform={`rotate(-55, ${LABEL_W + i * CELL + CELL / 2}, ${LABEL_H - 8})`}
-                    style={{ fontFamily: "'IBM Plex Mono', 'SF Mono', monospace" }}
-                  >
-                    {t.length > 24 ? t.slice(0, 22) + "\u2026" : t}
-                  </text>
-                ))}
+                {/* Row highlight band */}
+                {hoveredIdx && (
+                  <rect
+                    x={0}
+                    y={LABEL_H + hoveredIdx.row * CELL - 1}
+                    width={LABEL_W + terms.length * CELL}
+                    height={CELL}
+                    fill="#EEF2F7"
+                    style={{ pointerEvents: "none" }}
+                  />
+                )}
 
-                {/* Rows */}
-                {terms.map((row, ri) => (
-                  <g key={`row-${ri}`}>
+                {/* Column highlight band */}
+                {hoveredIdx && (
+                  <rect
+                    x={LABEL_W + hoveredIdx.col * CELL - 1}
+                    y={0}
+                    width={CELL}
+                    height={LABEL_H + terms.length * CELL}
+                    fill="#EEF2F7"
+                    style={{ pointerEvents: "none" }}
+                  />
+                )}
+
+                {/* Column labels */}
+                {terms.map((t, i) => {
+                  const isHl = hoveredIdx?.col === i;
+                  return (
                     <text
-                      x={LABEL_W - 10}
-                      y={LABEL_H + ri * CELL + CELL / 2 + 4}
-                      textAnchor="end"
-                      fontSize={11}
-                      fill="#374151"
-                      fontWeight={500}
+                      key={`col-${i}`}
+                      x={LABEL_W + i * CELL + CELL / 2}
+                      y={LABEL_H - 8}
+                      textAnchor="start"
+                      fontSize={10}
+                      fill={isHl ? "#1a1a1a" : "#5a6a85"}
+                      fontWeight={isHl ? 700 : 500}
+                      transform={`rotate(-55, ${LABEL_W + i * CELL + CELL / 2}, ${LABEL_H - 8})`}
                       style={{ fontFamily: "'IBM Plex Mono', 'SF Mono', monospace" }}
                     >
-                      {row.length > 30 ? row.slice(0, 28) + "\u2026" : row}
+                      {t.length > 24 ? t.slice(0, 22) + "\u2026" : t}
                     </text>
+                  );
+                })}
 
-                    {terms.map((col, ci) => {
-                      const val = matrix[ri][ci];
-                      const isDiag = ri === ci;
-                      const hasValue = !isDiag && val > 0;
-                      const pairKey = row < col ? `${row}|||${col}` : `${col}|||${row}`;
-                      const pairStatus = hasValue ? ruleStatusMap.get(pairKey) : undefined;
+                {/* Rows */}
+                {terms.map((row, ri) => {
+                  const isRowHl = hoveredIdx?.row === ri;
+                  return (
+                    <g key={`row-${ri}`}>
+                      <text
+                        x={LABEL_W - 10}
+                        y={LABEL_H + ri * CELL + CELL / 2 + 4}
+                        textAnchor="end"
+                        fontSize={11}
+                        fill={isRowHl ? "#1a1a1a" : "#5a6a85"}
+                        fontWeight={isRowHl ? 700 : 500}
+                        style={{ fontFamily: "'IBM Plex Mono', 'SF Mono', monospace" }}
+                      >
+                        {row.length > 30 ? row.slice(0, 28) + "\u2026" : row}
+                      </text>
 
-                      return (
-                        <g
-                          key={`cell-${ri}-${ci}`}
-                          onClick={() => {
-                            if (hasValue && !busyAddPair) {
-                              void handleAddTracking(row, col);
-                            }
-                          }}
-                          onMouseEnter={() => {
-                            if (hasValue) setHoveredCell({ t1: row < col ? row : col, t2: row < col ? col : row, val });
-                          }}
-                          onMouseLeave={() => setHoveredCell(null)}
-                        >
-                          <rect
-                            x={LABEL_W + ci * CELL}
-                            y={LABEL_H + ri * CELL}
-                            width={CELL - 2}
-                            height={CELL - 2}
-                            rx={4}
-                            fill={hasValue ? getColor(val, maxCount) : "#f9fafb"}
-                            stroke={hasValue && pairStatus ? (pairStatus === "active" ? "#059669" : "#0369a1") : "none"}
-                            strokeWidth={hasValue && pairStatus ? 2 : 0}
-                            style={{
-                              cursor: hasValue ? "pointer" : "default",
-                              transition: "all 0.15s",
+                      {terms.map((col, ci) => {
+                        const val = matrix[ri][ci];
+                        const isDiag = ri === ci;
+                        const hasValue = !isDiag && val > 0;
+                        const pairKey = row < col ? `${row}|||${col}` : `${col}|||${row}`;
+                        const pairStatus = hasValue ? ruleStatusMap.get(pairKey) : undefined;
+                        const isCellHovered = hoveredIdx?.row === ri && hoveredIdx?.col === ci;
+
+                        return (
+                          <g
+                            key={`cell-${ri}-${ci}`}
+                            onClick={() => {
+                              if (hasValue && !busyAddPair) {
+                                void handleAddTracking(row, col);
+                              }
                             }}
-                          />
-                          {hasValue && (
-                            <text
-                              x={LABEL_W + ci * CELL + (CELL - 2) / 2}
-                              y={LABEL_H + ri * CELL + (CELL - 2) / 2 + 4}
-                              textAnchor="middle"
-                              fontSize={10}
-                              fontWeight={700}
-                              fill={getTextColor(val, maxCount)}
-                              style={{ pointerEvents: "none", fontFamily: "'IBM Plex Mono', monospace" }}
-                            >
-                              {val}
-                            </text>
-                          )}
-                          {hasValue && pairStatus && (
-                            <circle
-                              cx={LABEL_W + ci * CELL + CELL - 7}
-                              cy={LABEL_H + ri * CELL + 7}
-                              r={4}
-                              fill={pairStatus === "active" ? "#059669" : "#0ea5e9"}
-                              stroke="#fff"
-                              strokeWidth={1.5}
-                              style={{ pointerEvents: "none" }}
+                            onMouseEnter={() => {
+                              setHoveredIdx({ row: ri, col: ci });
+                              if (hasValue) setHoveredCell({ t1: row < col ? row : col, t2: row < col ? col : row, val });
+                              else setHoveredCell(null);
+                            }}
+                          >
+                            <rect
+                              x={LABEL_W + ci * CELL}
+                              y={LABEL_H + ri * CELL}
+                              width={CELL - 2}
+                              height={CELL - 2}
+                              rx={4}
+                              fill={isCellHovered && hasValue ? "#1a1a1a" : hasValue ? getColor(val, maxCount) : "#f9fafb"}
+                              stroke={isCellHovered && hasValue ? "#1a1a1a" : hasValue && pairStatus ? (pairStatus === "active" ? "#059669" : "#0369a1") : "none"}
+                              strokeWidth={isCellHovered && hasValue ? 2 : hasValue && pairStatus ? 2 : 0}
+                              style={{
+                                cursor: hasValue ? "pointer" : "default",
+                                transition: "all 0.1s",
+                              }}
                             />
-                          )}
-                        </g>
-                      );
-                    })}
-                  </g>
-                ))}
+                            {hasValue && (
+                              <text
+                                x={LABEL_W + ci * CELL + (CELL - 2) / 2}
+                                y={LABEL_H + ri * CELL + (CELL - 2) / 2 + 4}
+                                textAnchor="middle"
+                                fontSize={10}
+                                fontWeight={700}
+                                fill={isCellHovered ? "#fff" : getTextColor(val, maxCount)}
+                                style={{ pointerEvents: "none", fontFamily: "'IBM Plex Mono', monospace" }}
+                              >
+                                {val}
+                              </text>
+                            )}
+                            {hasValue && pairStatus && (
+                              <circle
+                                cx={LABEL_W + ci * CELL + CELL - 7}
+                                cy={LABEL_H + ri * CELL + 7}
+                                r={4}
+                                fill={pairStatus === "active" ? "#059669" : "#2563eb"}
+                                stroke="#fff"
+                                strokeWidth={1.5}
+                                style={{ pointerEvents: "none" }}
+                              />
+                            )}
+                          </g>
+                        );
+                      })}
+                    </g>
+                  );
+                })}
 
                 {/* Legend */}
                 <g transform={`translate(${LABEL_W}, ${LABEL_H + terms.length * CELL + 16})`}>
@@ -670,7 +714,7 @@ export default function CombosClient({
                   ))}
                   {/* Status indicators in legend */}
                   <g transform={`translate(${8 * 80}, 0)`}>
-                    <circle cx={8} cy={8} r={4} fill="#0ea5e9" />
+                    <circle cx={8} cy={8} r={4} fill="#2563eb" />
                     <text x={20} y={12} fontSize={11} fill="#6b7280" fontWeight={500}>Valgt</text>
                   </g>
                   <g transform={`translate(${8 * 80 + 65}, 0)`}>
@@ -694,7 +738,7 @@ export default function CombosClient({
         }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
             <thead>
-              <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e5e7eb" }}>
+              <tr>
                 <th style={thStyle}>Term 1</th>
                 <th style={thStyle}>Term 2</th>
                 <th style={thStyle}>Co-occurrences</th>
@@ -714,9 +758,9 @@ export default function CombosClient({
               )}
               {trackingRules.map((rule) => {
                 const labCount = rule.approved + rule.rejected;
-                const rateColor = rule.approve_rate >= 95 ? "#059669" : rule.approve_rate >= 80 ? "#d97706" : "#dc2626";
+                const rateColor = rule.approve_rate >= 95 ? "#15803d" : rule.approve_rate >= 80 ? "#d97706" : "#dc2626";
                 return (
-                <tr key={rule.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                <tr key={rule.id} style={{ borderBottom: "1px solid #f1f3f7" }}>
                   <td style={tdStyle}>
                     <span style={{ fontWeight: 500, color: "#1a1a1a" }}>{rule.term_1}</span>
                   </td>
@@ -747,9 +791,9 @@ export default function CombosClient({
                         fontSize: "11px",
                         fontWeight: 600,
                         padding: "4px 12px",
-                        borderRadius: "6px",
+                        borderRadius: "7px",
                         border: "none",
-                        background: busyActionId === rule.id ? "#a5f3fc" : CYAN,
+                        background: busyActionId === rule.id ? "#d1d5db" : "#1a1a1a",
                         color: "#fff",
                         cursor: busyActionId === rule.id ? "not-allowed" : "pointer",
                       }}
@@ -763,10 +807,10 @@ export default function CombosClient({
                         fontSize: "11px",
                         fontWeight: 600,
                         padding: "4px 12px",
-                        borderRadius: "6px",
-                        border: "1px solid #e2e8f0",
+                        borderRadius: "7px",
+                        border: "1px solid #dde3ed",
                         background: "#fff",
-                        color: busyActionId === rule.id ? "#94a3b8" : "#64748b",
+                        color: busyActionId === rule.id ? "#94a3b8" : "#1a1a1a",
                         cursor: busyActionId === rule.id ? "not-allowed" : "pointer",
                       }}
                     >
@@ -795,12 +839,12 @@ export default function CombosClient({
             gap: "16px",
             marginBottom: "12px",
           }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "#475569", cursor: "pointer" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "#1a1a1a", cursor: "pointer" }}>
               <input
                 type="checkbox"
                 checked={pendingArticles.length > 0 && selectedArticles.size === pendingArticles.length}
                 onChange={toggleAllArticles}
-                style={{ accentColor: "#059669" }}
+                style={{ accentColor: "#1a1a1a" }}
               />
               V&aelig;lg alle
             </label>
@@ -812,9 +856,9 @@ export default function CombosClient({
                   fontSize: "13px",
                   fontWeight: 600,
                   padding: "7px 18px",
-                  borderRadius: "8px",
+                  borderRadius: "7px",
                   border: "none",
-                  background: busyBatchApprove ? "#a7f3d0" : "#059669",
+                  background: busyBatchApprove ? "#d1d5db" : "#1a1a1a",
                   color: "#fff",
                   cursor: busyBatchApprove ? "not-allowed" : "pointer",
                 }}
@@ -831,7 +875,7 @@ export default function CombosClient({
           }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
               <thead>
-                <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e5e7eb" }}>
+                <tr>
                   <th style={{ ...thStyle, width: "40px" }}></th>
                   <th style={thStyle}>Titel</th>
                   <th style={{ ...thStyle, width: "100px" }}>Tidsskrift</th>
@@ -848,13 +892,13 @@ export default function CombosClient({
                   </tr>
                 )}
                 {pendingArticles.map((article) => (
-                  <tr key={article.article_id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                  <tr key={article.article_id} style={{ borderBottom: "1px solid #f1f3f7" }}>
                     <td style={{ ...tdStyle, textAlign: "center" }}>
                       <input
                         type="checkbox"
                         checked={selectedArticles.has(article.article_id)}
                         onChange={() => toggleArticle(article.article_id)}
-                        style={{ accentColor: "#059669" }}
+                        style={{ accentColor: "#1a1a1a" }}
                       />
                     </td>
                     <td style={tdStyle}>
@@ -863,21 +907,21 @@ export default function CombosClient({
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
-                          fontWeight: 500,
+                          fontWeight: 600,
                           color: "#1a1a1a",
                           textDecoration: "none",
                           borderBottom: "1px solid transparent",
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.borderBottomColor = CYAN)}
+                        onMouseEnter={(e) => (e.currentTarget.style.borderBottomColor = "#1a1a1a")}
                         onMouseLeave={(e) => (e.currentTarget.style.borderBottomColor = "transparent")}
                       >
                         {article.title}
                       </a>
                     </td>
-                    <td style={{ ...tdStyle, fontSize: "12px", color: "#64748b" }}>
+                    <td style={{ ...tdStyle, fontSize: "12px", color: "#5a6a85" }}>
                       {article.journal_abbr ?? "\u2014"}
                     </td>
-                    <td style={{ ...tdStyle, fontSize: "12px", color: "#64748b" }}>
+                    <td style={{ ...tdStyle, fontSize: "12px", color: "#5a6a85" }}>
                       {article.published_date ?? "\u2014"}
                     </td>
                     <td style={tdStyle}>
@@ -918,7 +962,7 @@ export default function CombosClient({
         }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
             <thead>
-              <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e5e7eb" }}>
+              <tr>
                 <th style={thStyle}>Term 1</th>
                 <th style={thStyle}>Term 2</th>
                 <th style={thStyle}>Co-occurrences</th>
@@ -937,7 +981,7 @@ export default function CombosClient({
                 </tr>
               )}
               {activeRules.map((rule) => (
-                <tr key={rule.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                <tr key={rule.id} style={{ borderBottom: "1px solid #f1f3f7" }}>
                   <td style={tdStyle}>
                     <span style={{ fontWeight: 500, color: "#1a1a1a" }}>{rule.term_1}</span>
                   </td>
@@ -964,10 +1008,10 @@ export default function CombosClient({
                         fontSize: "11px",
                         fontWeight: 600,
                         padding: "4px 10px",
-                        borderRadius: "6px",
-                        border: "1px solid #e2e8f0",
-                        background: busyActionId === rule.id ? "#f8fafc" : "#fff",
-                        color: busyActionId === rule.id ? "#94a3b8" : "#64748b",
+                        borderRadius: "7px",
+                        border: "1px solid #dde3ed",
+                        background: busyActionId === rule.id ? "#f8f9fb" : "#fff",
+                        color: busyActionId === rule.id ? "#94a3b8" : "#1a1a1a",
                         cursor: busyActionId === rule.id ? "not-allowed" : "pointer",
                       }}
                     >

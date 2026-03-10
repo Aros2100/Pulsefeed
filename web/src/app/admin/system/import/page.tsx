@@ -199,8 +199,8 @@ export default async function ImportDashboardPage() {
 
         {/* Breadcrumb */}
         <div style={{ marginBottom: "8px" }}>
-          <Link href="/admin" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
-            ← Admin
+          <Link href="/admin/system" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+            ← System
           </Link>
         </div>
 

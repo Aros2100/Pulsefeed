@@ -136,7 +136,7 @@ export default async function AdminAuthorDetailPage({
         {/* Back */}
         <div style={{ marginBottom: "20px" }}>
           <Link href="/admin/authors" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
-            ← Authors
+            ← Forfattere
           </Link>
         </div>
 

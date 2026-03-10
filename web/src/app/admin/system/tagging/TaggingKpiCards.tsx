@@ -23,7 +23,7 @@ function KpiCard({ label, value, accent }: { label: string; value: number; accen
       <div style={{ fontSize: "28px", fontWeight: 700, color: accent ?? "#1a1a1a" }}>
         {value}
       </div>
-      <div style={{ fontSize: "12px", color: "#888", marginTop: "4px" }}>{label}</div>
+      <div style={{ fontSize: "12px", color: "#5a6a85", marginTop: "4px" }}>{label}</div>
     </div>
   );
 }
@@ -34,8 +34,8 @@ export default function TaggingKpiCards({ kpis }: { kpis: TaggingKpis }) {
       <KpiCard label="Total pending" value={kpis.totalPending} />
       <KpiCard label="Ingen MeSH data" value={kpis.noMesh} />
       <KpiCard label="Ingen aktiv match" value={kpis.noMatch} />
-      <KpiCard label="Single: Klar" value={kpis.singleReady} accent="#059669" />
-      <KpiCard label="Combo: Klar" value={kpis.comboReady} accent="#0891b2" />
+      <KpiCard label="Single: Klar" value={kpis.singleReady} accent="#15803d" />
+      <KpiCard label="Combo: Klar" value={kpis.comboReady} accent="#15803d" />
     </div>
   );
 }

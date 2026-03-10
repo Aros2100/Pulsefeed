@@ -78,8 +78,8 @@ export default async function OptimizePage() {
 
         {/* Back */}
         <div style={{ marginBottom: "8px" }}>
-          <Link href="/admin/lab/specialty-tag/evaluation" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
-            ← Prompt Evaluation
+          <Link href="/admin/lab/specialty-tag" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+            ← Speciale-validering
           </Link>
         </div>
 

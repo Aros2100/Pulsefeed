@@ -57,12 +57,6 @@ export default async function LabPage() {
     }}>
       <div style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
-        {/* Back link */}
-        <div style={{ marginBottom: "8px" }}>
-          <Link href="/admin" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
-            ← Admin
-          </Link>
-        </div>
 
         {/* Heading */}
         <div style={{ marginBottom: "36px" }}>

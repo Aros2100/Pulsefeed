@@ -33,23 +33,25 @@ type Tab = "ready" | "engine" | "active" | "rejected";
 
 /* ── Constants ────────────────────────────────────────────────── */
 
-const INFO_ACCENT = "#64748b";
-const CYAN = "#0891b2";
 const SHADOW = "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)";
 
 const thStyle: React.CSSProperties = {
   textAlign: "left",
-  padding: "10px 14px",
+  padding: "10px 16px",
   fontSize: "11px",
-  fontWeight: 600,
-  color: "#64748b",
+  fontWeight: 700,
+  color: "#5a6a85",
   textTransform: "uppercase",
-  letterSpacing: "0.5px",
+  letterSpacing: "0.06em",
+  borderBottom: "1px solid #dde3ed",
+  background: "#EEF2F7",
 };
 
 const tdStyle: React.CSSProperties = {
-  padding: "10px 14px",
-  color: "#475569",
+  padding: "12px 16px",
+  color: "#1a1a1a",
+  borderBottom: "1px solid #f1f3f7",
+  fontSize: "13px",
 };
 
 /* ── Small components ─────────────────────────────────────────── */
@@ -60,9 +62,9 @@ function MeshTag({ term }: { term: string }) {
       fontSize: "11px",
       padding: "2px 7px",
       borderRadius: "4px",
-      background: "#f0fdfa",
-      color: CYAN,
-      border: "1px solid #ccfbf1",
+      background: "#f1f5f9",
+      color: "#1a1a1a",
+      border: "1px solid #dde3ed",
       whiteSpace: "nowrap",
     }}>
       {term}
@@ -149,7 +151,7 @@ function RulesTable({
     }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
         <thead>
-          <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e5e7eb" }}>
+          <tr>
             {showCheckbox && <th style={{ ...thStyle, width: "40px" }}></th>}
             <th style={thStyle}>MeSH Term</th>
             <th style={{ ...thStyle, width: "160px" }}>Beslutninger</th>
@@ -172,17 +174,17 @@ function RulesTable({
             const progress = Math.min(100, (rule.total_decisions / rule.min_decisions) * 100);
             const labCount = rule.approved + rule.rejected;
             const hasLabData = labCount > 0;
-            const rateColor = rule.approve_rate >= 95 ? "#059669" : rule.approve_rate >= 80 ? "#d97706" : "#dc2626";
+            const rateColor = rule.approve_rate >= 95 ? "#15803d" : rule.approve_rate >= 80 ? "#d97706" : "#dc2626";
 
             return (
-              <tr key={rule.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+              <tr key={rule.id} style={{ borderBottom: "1px solid #f1f3f7" }}>
                 {showCheckbox && (
                   <td style={{ ...tdStyle, textAlign: "center" }}>
                     <input
                       type="checkbox"
                       checked={checkedIds?.has(rule.id) ?? false}
                       onChange={() => onToggleCheck?.(rule.id)}
-                      style={{ accentColor: CYAN }}
+                      style={{ accentColor: "#1a1a1a" }}
                     />
                   </td>
                 )}
@@ -192,12 +194,12 @@ function RulesTable({
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
-                      fontWeight: 500,
+                      fontWeight: 600,
                       color: "#1a1a1a",
                       textDecoration: "none",
                       borderBottom: "1px solid transparent",
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.borderBottomColor = CYAN)}
+                    onMouseEnter={(e) => (e.currentTarget.style.borderBottomColor = "#1a1a1a")}
                     onMouseLeave={(e) => (e.currentTarget.style.borderBottomColor = "transparent")}
                   >
                     {rule.term}
@@ -215,7 +217,7 @@ function RulesTable({
                       <div style={{
                         width: `${progress}%`,
                         height: "100%",
-                        background: progress >= 100 ? CYAN : "#cbd5e1",
+                        background: progress >= 100 ? "#15803d" : "#cbd5e1",
                         borderRadius: "3px",
                       }} />
                     </div>
@@ -245,10 +247,10 @@ function RulesTable({
                         fontSize: "11px",
                         fontWeight: 600,
                         padding: "4px 10px",
-                        borderRadius: "6px",
-                        border: "1px solid #e2e8f0",
-                        background: actionBusyId === rule.id ? "#f8fafc" : "#fff",
-                        color: actionBusyId === rule.id ? "#94a3b8" : "#64748b",
+                        borderRadius: "7px",
+                        border: "1px solid #dde3ed",
+                        background: actionBusyId === rule.id ? "#f8f9fb" : "#fff",
+                        color: actionBusyId === rule.id ? "#94a3b8" : "#1a1a1a",
                         cursor: actionBusyId === rule.id ? "not-allowed" : "pointer",
                       }}
                     >
@@ -279,7 +281,7 @@ export default function TaggingClient({
   specialty: string;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("ready");
+  const [tab, setTab] = useState<Tab>("engine");
   const [busyRecalc, setBusyRecalc] = useState(false);
   const [busyDisableId, setBusyDisableId] = useState<string | null>(null);
   const [busyRejectId, setBusyRejectId] = useState<string | null>(null);
@@ -506,14 +508,11 @@ export default function TaggingClient({
 
   /* ── Tabs config ────────────────────────────────────────────── */
 
-  const articleTabs: { key: Tab; label: string; count: number }[] = [
-    { key: "ready", label: "Klar til auto-approve", count: readyArticles.length },
-  ];
-
-  const termTabs: { key: Tab; label: string; count: number }[] = [
+  const allTabs: { key: Tab; label: string; count: number }[] = [
     { key: "engine", label: "Under motorhjelmen", count: trackingRules.length },
     { key: "active", label: "Aktive terms", count: activeRules.length },
     { key: "rejected", label: "Afviste terms", count: rejectedRules.length },
+    { key: "ready", label: "Klar til auto-approve", count: readyArticles.length },
   ];
 
   /* ── Render article table ──────────────────────────────────── */
@@ -541,7 +540,7 @@ export default function TaggingClient({
       }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
           <thead>
-            <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e5e7eb" }}>
+            <tr>
               {hasCheckbox && <th style={{ ...thStyle, width: "40px" }}></th>}
               <th style={thStyle}>Titel</th>
               <th style={{ ...thStyle, width: "100px" }}>Tidsskrift</th>
@@ -559,14 +558,14 @@ export default function TaggingClient({
               </tr>
             )}
             {articles.map((article) => (
-              <tr key={article.article_id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+              <tr key={article.article_id} style={{ borderBottom: "1px solid #f1f3f7" }}>
                 {hasCheckbox && (
                   <td style={{ ...tdStyle, textAlign: "center" }}>
                     <input
                       type="checkbox"
                       checked={opts?.checkedIds?.has(article.article_id) ?? false}
                       onChange={() => opts?.onToggle?.(article.article_id)}
-                      style={{ accentColor: "#059669" }}
+                      style={{ accentColor: "#1a1a1a" }}
                     />
                   </td>
                 )}
@@ -576,21 +575,21 @@ export default function TaggingClient({
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
-                      fontWeight: 500,
+                      fontWeight: 600,
                       color: "#1a1a1a",
                       textDecoration: "none",
                       borderBottom: "1px solid transparent",
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.borderBottomColor = CYAN)}
+                    onMouseEnter={(e) => (e.currentTarget.style.borderBottomColor = "#1a1a1a")}
                     onMouseLeave={(e) => (e.currentTarget.style.borderBottomColor = "transparent")}
                   >
                     {article.title}
                   </a>
                 </td>
-                <td style={{ ...tdStyle, fontSize: "12px", color: "#64748b" }}>
+                <td style={{ ...tdStyle, fontSize: "12px", color: "#5a6a85" }}>
                   {article.journal_abbr ?? "—"}
                 </td>
-                <td style={{ ...tdStyle, fontSize: "12px", color: "#64748b" }}>
+                <td style={{ ...tdStyle, fontSize: "12px", color: "#5a6a85" }}>
                   {article.published_date ?? "—"}
                 </td>
                 <td style={tdStyle}>
@@ -609,9 +608,9 @@ export default function TaggingClient({
                         fontSize: "11px",
                         fontWeight: 600,
                         padding: "4px 12px",
-                        borderRadius: "6px",
+                        borderRadius: "7px",
                         border: "none",
-                        background: busyArticleId === article.article_id ? "#a7f3d0" : "#059669",
+                        background: busyArticleId === article.article_id ? "#d1d5db" : "#1a1a1a",
                         color: "#fff",
                         cursor: busyArticleId === article.article_id ? "not-allowed" : "pointer",
                       }}
@@ -625,10 +624,10 @@ export default function TaggingClient({
                         fontSize: "11px",
                         fontWeight: 600,
                         padding: "4px 12px",
-                        borderRadius: "6px",
-                        border: "1px solid #e2e8f0",
+                        borderRadius: "7px",
+                        border: "1px solid #dde3ed",
                         background: "#fff",
-                        color: busyArticleId === article.article_id ? "#94a3b8" : "#64748b",
+                        color: busyArticleId === article.article_id ? "#94a3b8" : "#1a1a1a",
                         cursor: busyArticleId === article.article_id ? "not-allowed" : "pointer",
                       }}
                     >
@@ -661,75 +660,44 @@ export default function TaggingClient({
       {/* Tabs */}
       <div style={{
         display: "flex",
-        gap: "4px",
+        gap: "0",
         marginBottom: "20px",
-        borderBottom: "1px solid #e5e7eb",
+        borderBottom: "2px solid #e5e7eb",
       }}>
-        {/* Gruppe 1: Artikler */}
-        <div style={{
-          display: "flex",
-          gap: "2px",
-          background: "#eff6ff",
-          borderRadius: "6px 6px 0 0",
-          padding: "2px 2px 0",
-        }}>
-          {articleTabs.map((t) => {
-            const isActive = tab === t.key;
-            return (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                style={{
-                  fontSize: "13px",
-                  fontWeight: isActive ? 600 : 400,
-                  padding: "8px 16px",
-                  border: "none",
-                  background: "transparent",
-                  color: isActive ? "#334155" : INFO_ACCENT,
-                  borderBottom: isActive ? `2px solid ${INFO_ACCENT}` : "2px solid transparent",
-                  cursor: "pointer",
-                  marginBottom: "-1px",
-                }}
-              >
-                {t.label} ({t.count})
-              </button>
-            );
-          })}
-        </div>
-
-        <div style={{ width: "12px" }} />
-
-        {/* Gruppe 2: MeSH terms */}
-        <div style={{
-          display: "flex",
-          gap: "2px",
-          background: "#f1f5f9",
-          borderRadius: "6px 6px 0 0",
-          padding: "2px 2px 0",
-        }}>
-          {termTabs.map((t) => {
-            const isActive = tab === t.key;
-            return (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                style={{
-                  fontSize: "13px",
-                  fontWeight: isActive ? 600 : 400,
-                  padding: "8px 16px",
-                  border: "none",
-                  background: "transparent",
-                  color: isActive ? "#334155" : INFO_ACCENT,
-                  borderBottom: isActive ? `2px solid ${INFO_ACCENT}` : "2px solid transparent",
-                  cursor: "pointer",
-                  marginBottom: "-1px",
-                }}
-              >
-                {t.label} ({t.count})
-              </button>
-            );
-          })}
-        </div>
+        {allTabs.map((t) => {
+          const isActive = tab === t.key;
+          const isAction = t.key === "ready";
+          const actionAccent = isAction && t.count > 0;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              style={{
+                fontSize: "13px",
+                fontWeight: isActive ? 700 : 400,
+                padding: "8px 16px",
+                border: "none",
+                background: "transparent",
+                color: isActive ? (actionAccent ? "#dc2626" : "#1a1a1a") : "#5a6a85",
+                borderBottom: isActive ? `2px solid ${actionAccent ? "#dc2626" : "#1a1a1a"}` : "2px solid transparent",
+                cursor: "pointer",
+                marginBottom: "-2px",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              {t.label}
+              {actionAccent ? (
+                <span style={{ background: "#dc2626", color: "#fff", borderRadius: "4px", padding: "1px 6px", fontSize: "10px", fontWeight: 700 }}>
+                  {t.count}
+                </span>
+              ) : (
+                <span>({t.count})</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* ═══ Tab 1: Klar til auto-approve — ARTIKLER med aktiv single match ═══ */}
@@ -741,12 +709,12 @@ export default function TaggingClient({
             gap: "16px",
             marginBottom: "12px",
           }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "#475569", cursor: "pointer" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "#1a1a1a", cursor: "pointer" }}>
               <input
                 type="checkbox"
                 checked={readyArticles.length > 0 && selected.size === readyArticles.length}
                 onChange={toggleAll}
-                style={{ accentColor: "#059669" }}
+                style={{ accentColor: "#1a1a1a" }}
               />
               V&aelig;lg alle
             </label>
@@ -758,9 +726,9 @@ export default function TaggingClient({
                   fontSize: "13px",
                   fontWeight: 600,
                   padding: "7px 18px",
-                  borderRadius: "8px",
+                  borderRadius: "7px",
                   border: "none",
-                  background: busyBatchApprove ? "#a7f3d0" : "#059669",
+                  background: busyBatchApprove ? "#d1d5db" : "#1a1a1a",
                   color: "#fff",
                   cursor: busyBatchApprove ? "not-allowed" : "pointer",
                 }}
@@ -789,9 +757,9 @@ export default function TaggingClient({
                 fontSize: "13px",
                 fontWeight: 600,
                 padding: "8px 18px",
-                borderRadius: "8px",
+                borderRadius: "7px",
                 border: "none",
-                background: busySave ? "#a5b4fc" : CYAN,
+                background: busySave ? "#d1d5db" : "#1a1a1a",
                 color: "#fff",
                 cursor: busySave ? "not-allowed" : "pointer",
               }}
@@ -805,10 +773,10 @@ export default function TaggingClient({
                 fontSize: "13px",
                 fontWeight: 600,
                 padding: "8px 18px",
-                borderRadius: "8px",
-                border: `1px solid ${CYAN}`,
-                background: busyRecalc ? "#f0fdfa" : "#fff",
-                color: busyRecalc ? "#94a3b8" : CYAN,
+                borderRadius: "7px",
+                border: "1px solid #dde3ed",
+                background: busyRecalc ? "#f8f9fb" : "#fff",
+                color: busyRecalc ? "#94a3b8" : "#1a1a1a",
                 cursor: busyRecalc ? "not-allowed" : "pointer",
               }}
             >
@@ -837,10 +805,10 @@ export default function TaggingClient({
                 fontSize: "13px",
                 fontWeight: 500,
                 padding: "8px 16px",
-                border: "1px solid #e2e8f0",
-                borderRadius: "8px",
+                border: "1px solid #dde3ed",
+                borderRadius: "7px",
                 background: "#fff",
-                color: "#64748b",
+                color: "#1a1a1a",
                 cursor: "pointer",
               }}
             >

@@ -13,6 +13,12 @@ export default function TaggingNav() {
 
   return (
     <div style={{ marginBottom: "28px" }}>
+      <div style={{
+        fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A",
+        textTransform: "uppercase", fontWeight: 700, marginBottom: "6px",
+      }}>
+        System · Auto-Tagging
+      </div>
       <h1 style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a", margin: "0 0 16px" }}>
         Auto-Tagging
       </h1>
@@ -28,10 +34,10 @@ export default function TaggingNav() {
               href={t.href}
               style={{
                 fontSize: "14px",
-                fontWeight: isActive ? 600 : 400,
+                fontWeight: isActive ? 700 : 400,
                 padding: "8px 20px",
-                color: isActive ? "#0891b2" : "#64748b",
-                borderBottom: isActive ? "2px solid #0891b2" : "2px solid transparent",
+                color: isActive ? "#1a1a1a" : "#5a6a85",
+                borderBottom: isActive ? "2px solid #1a1a1a" : "2px solid transparent",
                 marginBottom: "-2px",
                 textDecoration: "none",
                 transition: "color 0.15s",

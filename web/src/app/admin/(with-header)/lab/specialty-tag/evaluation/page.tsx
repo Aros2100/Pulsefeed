@@ -254,8 +254,8 @@ export default async function EvaluationPage({ searchParams }: Props) {
 
         {/* Back */}
         <div style={{ marginBottom: "8px" }}>
-          <Link href="/admin/lab" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
-            ← The Lab
+          <Link href="/admin/lab/specialty-tag" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+            ← Speciale-validering
           </Link>
         </div>
 
