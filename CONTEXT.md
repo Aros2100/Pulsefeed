@@ -30,13 +30,19 @@ pulsefeed/
 │   │   │   │   │   │   ├── [id]/         # Forfatter-profil
 │   │   │   │   │   │   └── merge/        # Forfatter-merge UI (MergeClient.tsx)
 │   │   │   │   │   ├── lab/              # AI-træning — modul-index + undersider
-│   │   │   │   │   │   ├── page.tsx             # Modul-oversigt (2 kort: specialty-tag + classification)
+│   │   │   │   │   │   ├── page.tsx             # Modul-oversigt (3 kort: specialty-tag, classification, condensation)
 │   │   │   │   │   │   ├── SectionCard.tsx      # Delt KPI-kort komponent
 │   │   │   │   │   │   ├── specialty-tag/       # Speciale-validering forside (3 SectionCards)
-│   │   │   │   │   │   └── classification/      # Klassificering
-│   │   │   │   │   │       ├── page.tsx             # Forside med KPI'er (Validering + Performance)
-│   │   │   │   │   │       ├── session/page.tsx     # Scoring-session (ClassificationClient)
-│   │   │   │   │   │       └── ClassificationClient.tsx  # Splitscreen validerings-UI
+│   │   │   │   │   │   ├── classification/      # Klassificering
+│   │   │   │   │   │   │   ├── page.tsx             # Forside med KPI'er (Validering + Performance)
+│   │   │   │   │   │   │   ├── session/page.tsx     # Scoring-session (ClassificationClient)
+│   │   │   │   │   │   │   └── ClassificationClient.tsx  # Splitscreen validerings-UI
+│   │   │   │   │   │   └── condensation/        # Kondensering (tekst + PICO)
+│   │   │   │   │   │       ├── page.tsx             # Forside med 4 SectionCards
+│   │   │   │   │   │       ├── TextValidationClient.tsx  # Splitscreen tekst-validering
+│   │   │   │   │   │       ├── PicoValidationClient.tsx  # Splitscreen PICO-validering
+│   │   │   │   │   │       ├── text/page.tsx        # Server comp → TextValidationClient
+│   │   │   │   │   │       └── pico/page.tsx        # Server comp → PicoValidationClient
 │   │   │   │   │   ├── newsletter/
 │   │   │   │   │   └── subscribers/
 │   │   │   │   ├── system/               # Har egen Header i system/layout.tsx
@@ -73,7 +79,7 @@ pulsefeed/
 │   │   │       │   ├── cleanup-stuck-jobs/     # POST: nulstil hængte jobs
 │   │   │       │   └── circle3-sources/  # GET/PUT circle_3_sources
 │   │   │       ├── alerts/       # GET (public): aktive system-alerts
-│   │   │       ├── lab/          # Lab (scoring + sessions)
+│   │   │       ├── lab/          # Lab (scoring + sessions + condensation)
 │   │   │       └── internal/     # Cron-jobs
 │   │   ├── lib/
 │   │   │   ├── supabase/         # DB-klient (admin.ts, client.ts, server.ts, types.ts)
@@ -90,6 +96,9 @@ pulsefeed/
 │   │   │   │   └── auto-tagger.ts   # MeSH-based auto-tagging
 │   │   │   ├── affiliations.ts   # Affiliation parsing
 │   │   │   ├── article-events.ts # Article event tracking
+│   │   │   ├── lab/
+│   │   │   │   ├── scorer.ts        # scoreArticle(), getActivePrompt()
+│   │   │   │   └── article-filters.ts # applyUnscoredFilters() — delt filter-logik for score-batch routes
 │   │   │   └── ai/               # Anthropic tracked-client
 │   │   └── components/
 │   │       ├── articles/
@@ -111,7 +120,7 @@ pulsefeed/
 
 | Tabel | Formål |
 |-------|--------|
-| `articles` | Artikler fra PubMed — `pubmed_id`, `title`, `abstract`, `authors` (JSONB), `circle`, `specialty_tags`, `status`, `country`, `source_id`, `citation_count`, `impact_factor`, `journal_h_index`, `evidence_score` (generated), `approval_method`, `auto_tagged_at`, `subspecialty_ai`, `article_type_ai`, `study_design_ai`, `classification_reason`, `classification_scored_at`, `classification_model_version` |
+| `articles` | Artikler fra PubMed — `pubmed_id`, `title`, `abstract`, `authors` (JSONB), `circle`, `specialty_tags`, `status`, `country`, `source_id`, `citation_count`, `impact_factor`, `journal_h_index`, `evidence_score` (generated), `approval_method`, `auto_tagged_at`, `subspecialty_ai`, `article_type_ai`, `study_design_ai`, `classification_reason`, `classification_scored_at`, `classification_model_version`, `short_headline`, `short_resume`, `bottom_line`, `pico_population`, `pico_intervention`, `pico_comparison`, `pico_outcome`, `sample_size`, `condensed_model_version`, `condensed_at` |
 | `authors` | Forfatter-database — `display_name`, `city`, `country`, `specialty`, `affiliations` (TEXT[]), `article_count`, `author_score`, `orcid` |
 | `article_authors` | Many-to-many: artikler ↔ forfattere |
 | `pubmed_filters` | Circle 1 søge-konfiguration (journal-lister, query_string, specialty) |
@@ -122,7 +131,7 @@ pulsefeed/
 | `author_linking_logs` | Log pr. forfatter-linking-kørsel — `new_authors`, `duplicates`, `rejected` |
 | `rejected_authors` | Forfattere der ikke kunne linkes |
 | `system_alerts` | System-beskeder til brugere — `title`, `message`, `type`, `active`, `expires_at` |
-| `lab_decisions` | Trænings-verdicts: `decision`, `ai_decision`, `ai_confidence`, `model_version`, `disagreement_reason`. Moduler: `specialty_tag`, `classification_subspecialty`, `classification_article_type`, `classification_study_design` |
+| `lab_decisions` | Trænings-verdicts: `decision`, `ai_decision`, `ai_confidence`, `model_version`, `disagreement_reason`. Moduler: `specialty_tag`, `classification_subspecialty`, `classification_article_type`, `classification_study_design`, `condensation_text`, `condensation_pico` |
 | `lab_sessions` | Samlet session pr. træningskørsel |
 | `model_versions` | Aktive model-versioner pr. specialty+module — `version`, `active`, `prompt` |
 | `model_optimization_runs` | AI-optimeringsanalyse — `improved_prompt`, `fp_count`, `fn_count`, `refinement_iterations` (JSONB) |
@@ -288,7 +297,7 @@ Delt komponent `CircleImportPage.tsx` med:
 
 ### Navigation
 ```
-/admin/lab                          ← Modul-index (2 kort med kø-counts)
+/admin/lab                          ← Modul-index (3 kort: specialty-tag, classification, condensation)
 /admin/lab/specialty-tag            ← Speciale-validering forside (3 SectionCards)
 /admin/lab/specialty-tag/dashboard  ← KPI-kort, kalibreringstabel
 /admin/lab/specialty-tag/evaluation ← Uenigheder + VersionSelector
@@ -296,20 +305,31 @@ Delt komponent `CircleImportPage.tsx` med:
 /admin/lab/specialty-tag/simulate   ← Prompt-simulator (Step 3–4)
 /admin/lab/classification           ← Klassificering forside (Validering + Performance)
 /admin/lab/classification/session   ← Scoring-session (splitscreen)
+/admin/lab/condensation             ← Kondensering forside (4 SectionCards: Tekst, PICO, Performance, Prompt)
+/admin/lab/condensation/text        ← Tekst-validering session (splitscreen)
+/admin/lab/condensation/pico        ← PICO-validering session (splitscreen)
 ```
 
 ### Filer
 | Fil | Formål |
 |-----|--------|
-| `web/src/app/admin/(with-header)/lab/page.tsx` | Modul-index — viser 2 kort med kø-counts via RPC |
+| `web/src/app/admin/(with-header)/lab/page.tsx` | Modul-index — viser 3 kort med kø-counts via RPC |
 | `web/src/app/admin/(with-header)/lab/SectionCard.tsx` | Delt KPI-kort komponent |
 | `web/src/app/admin/(with-header)/lab/specialty-tag/page.tsx` | Speciale-validering forside — 3 SectionCards |
 | `web/src/app/admin/(with-header)/lab/classification/page.tsx` | Klassificering forside — Validering + Performance |
 | `web/src/app/admin/(with-header)/lab/classification/session/page.tsx` | Starter ClassificationClient |
 | `web/src/app/admin/(with-header)/lab/classification/ClassificationClient.tsx` | Splitscreen: artikel venstre, 3 parameter-kort højre |
+| `web/src/app/admin/(with-header)/lab/condensation/page.tsx` | Kondensering forside — 4 SectionCards (Tekst, PICO, Performance, Prompt) |
+| `web/src/app/admin/(with-header)/lab/condensation/text/page.tsx` | Server component → TextValidationClient |
+| `web/src/app/admin/(with-header)/lab/condensation/pico/page.tsx` | Server component → PicoValidationClient |
+| `web/src/app/admin/(with-header)/lab/condensation/TextValidationClient.tsx` | Splitscreen: artikel venstre, headline+resumé+bottom line højre |
+| `web/src/app/admin/(with-header)/lab/condensation/PicoValidationClient.tsx` | Splitscreen: artikel venstre, PICO-felter+sample size højre |
 | `web/src/app/api/lab/score-batch/` | SSE-scoring af specialty_tag (fill-up-to-100 logik) |
 | `web/src/app/api/lab/score-classification/` | SSE-scoring af classification (fill-up-to-100 logik) |
+| `web/src/app/api/lab/score-condensation/` | SSE-scoring af kondensering (fill-up-to-100 logik) |
 | `web/src/app/api/lab/classification-sessions/` | Gem klassificerings-session (3 lab_decisions per artikel) |
+| `web/src/app/api/lab/condensation-sessions/` | Gem kondenserings-session (1 lab_decision per artikel per modul) |
+| `web/src/app/api/admin/training/condensation-pico-articles/` | GET: artikler med tekst-valideret men ikke PICO-valideret |
 | `web/src/app/api/lab/simulate-prompt/` | SSE-scoring mod specifik prompt |
 | `web/src/app/api/lab/analyze-patterns/` | AI-analyse af FP/FN-mønstre |
 | `web/src/app/api/lab/refine-prompt/` | Iterativ prompt-forfining med ekspert-feedback |
@@ -340,12 +360,35 @@ Delt komponent `CircleImportPage.tsx` med:
 | `count_scored_not_validated(p_specialty)` | 0038 | Tæl dem (til fill-up-to-100) |
 | `get_classification_not_validated_articles(p_specialty, p_limit)` | 0039 | Hent klassificerings-scorede-ikke-validerede |
 | `count_classification_not_validated(p_specialty)` | 0039 | Tæl dem (til fill-up-to-100) |
+| `count_condensation_not_validated(p_specialty)` | 0041 | Tæl tekst-scorede-ikke-validerede (kondensering) |
+| `get_pico_not_validated_articles(p_specialty, p_limit)` | 0041 | Hent artikler med tekst-valideret men ikke PICO-valideret |
+| `count_pico_not_validated(p_specialty)` | 0041 | Tæl dem |
 
 ### Simulation (`simulate/SimulatorClient.tsx`)
 - **To sektioner**: Fejlrettelse (uenigheder) + Regressionstest (enigheder fra aktiv model)
 - **To sekventielle SSE-kald**: først disagreements, derefter agreement-sample
 - Kombineret fremskridtslinje over alle artikler
 - Regressionsadvarsel: `> 5` regressioner → rød advarsel; `≤ 5` → grøn
+
+### Kondensering (condensation)
+
+Split i to uafhængige valideringsmoduler:
+
+**Tekst-validering** (`condensation_text`):
+- Validerer `short_headline`, `short_resume`, `bottom_line`
+- Strukturerede afvisningsårsager (checkboxes): "Headline upræcis", "Headline forkert fokus", "Resumé mangler nøgletal", "Resumé forkert fokus", "Bottom line gentager titlen", "Bottom line mangler kernefund"
+- Valgfri fritekst-kommentar tilføjet efter " — "
+- To-trins afvisning: klik Afvis → vis checkboxes → Bekræft/Fortryd
+
+**PICO-validering** (`condensation_pico`):
+- Validerer `pico_population`, `pico_intervention`, `pico_comparison`, `pico_outcome`, `sample_size`
+- Kræver at tekst-validering er gennemført først (filtreres via `get_pico_not_validated_articles` RPC)
+- Fritekst-kommentar ved afvisning
+- Viser "Ikke relevant for denne artikeltype" hvis alle PICO-felter er null
+
+**condensation-sessions** (`/api/lab/condensation-sessions`):
+- Single-module schema: `{ specialty, module: 'condensation_text' | 'condensation_pico', decisions: [{ article_id, decision, comment }] }`
+- Opretter 1 `lab_decisions` row per artikel for det angivne modul
 
 ### Rejection reasons med TAG_REMAP
 | Reason | → tag |
@@ -373,12 +416,15 @@ Delt komponent `CircleImportPage.tsx` med:
 | `/admin/system/tagging` | MeSH auto-tagging rules management |
 | `/admin/system/layers/[specialty]` | C1 filter + C2/C3 affiliation management |
 | `/admin/system/author-linking` | Forfatter-linking dashboard |
-| `/admin/lab` | Modul-index — 2 kort (Speciale-validering + Klassificering) med kø-counts |
+| `/admin/lab` | Modul-index — 3 kort (Speciale-validering, Klassificering, Kondensering) med kø-counts |
 | `/admin/lab/specialty-tag` | Speciale-validering forside — 3 SectionCards (Validering, Performance, Prompt) |
 | `/admin/lab/classification` | Klassificering forside — Validering + Performance KPI'er |
 | `/admin/lab/classification/session` | Klassificering scoring-session (splitscreen) |
+| `/admin/lab/condensation` | Kondensering forside — 4 SectionCards (Tekst, PICO, Performance, Prompt) |
+| `/admin/lab/condensation/text` | Tekst-validering session (headline, resumé, bottom line) |
+| `/admin/lab/condensation/pico` | PICO-validering session (population, intervention, comparison, outcome, sample size) |
 | `/admin/articles` | Artikel-liste med filter + evidence_score badge |
-| `/admin/articles/[id]` | Artikel-stamkort: historik + redigerbare tags/status |
+| `/admin/articles/[id]` | Artikel-stamkort: historik + redigerbare tags/status. Berigelse-tab har Kondensering-kort med headline, resumé, bottom line, PICO, sample size, første/sidste forfatter |
 | `/admin/authors` | Forfatter-liste sorteret på author_score DESC NULLS LAST |
 | `/admin/authors/[id]` | Forfatter-profil med author_score badge + articles |
 | `/admin/authors/merge` | Forfatter-merge: duplikat-grupper → kort → bekræft |
@@ -446,6 +492,7 @@ NEXT_PUBLIC_SITE_URL
 | `0038` | `get_scored_not_validated_articles` + `count_scored_not_validated` RPCs (specialty_tag fill-up-to-100) |
 | `0039` | Classification kolonner på articles + `get_classification_not_validated_articles` + `count_classification_not_validated` RPCs |
 | `0040` | Seed: initial classification prompt (v1) for neurosurgery i `model_versions` |
+| `0041` | `get_pico_not_validated_articles` + `count_pico_not_validated` + `count_condensation_not_validated` RPCs |
 
 Ældre migrationer (0046–0064 i `web/supabase/`) er renummereret/sammenlagt — de nuværende 0001–0065 er den aktive migration-serie.
 
