@@ -1,0 +1,63 @@
+// IMPORTANT: These filters must match the corresponding RPC functions in Supabase.
+// If you change filters here, also update:
+//   - get_scored_not_validated_articles (specialty_tag)
+//   - get_classification_not_validated_articles (classification)
+//   - get_condensation_not_validated_articles (condensation)
+//   - count_scored_not_validated, count_classification_not_validated, count_condensation_not_validated
+
+/**
+ * Central filter definitions per Lab module.
+ * Used by BOTH scoring routes and referenced by RPC functions.
+ * If you change filters here, update the corresponding RPC in Supabase.
+ */
+export const MODULE_FILTERS = {
+  specialty_tag: {
+    description: "Pending articles for specialty validation",
+    filters: { status: "pending", circle: null },
+    requireAbstract: false,
+    nullCheck: "specialty_confidence",
+  },
+  classification: {
+    description: "Approved C3 articles for classification",
+    filters: { status: "approved", circle: 3 },
+    requireAbstract: true,
+    nullCheck: "classification_scored_at",
+  },
+  condensation: {
+    description: "Approved C3 articles for condensation",
+    filters: { status: "approved", circle: 3 },
+    requireAbstract: true,
+    nullCheck: "condensed_at",
+  },
+} as const;
+
+export type ModuleKey = keyof typeof MODULE_FILTERS;
+
+/**
+ * Apply standard filters to an articles query for a given module.
+ * Returns articles that are ELIGIBLE for scoring (not yet scored).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function applyUnscoredFilters(
+  query: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+  module: ModuleKey,
+  specialty: string,
+) {
+  const config = MODULE_FILTERS[module];
+
+  let q = query.contains("specialty_tags", [specialty]);
+
+  q = q.eq("status", config.filters.status);
+
+  if (config.filters.circle !== null) {
+    q = q.eq("circle", config.filters.circle);
+  }
+
+  if (config.requireAbstract) {
+    q = q.not("abstract", "is", null);
+  }
+
+  q = q.is(config.nullCheck, null);
+
+  return q;
+}
