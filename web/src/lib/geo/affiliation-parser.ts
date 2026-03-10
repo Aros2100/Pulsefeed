@@ -4,6 +4,7 @@
  */
 
 import { lookupCountry, CANONICAL_COUNTRIES, US_STATES } from "./country-map";
+import { lookupInstitution } from "./institution-map";
 
 export type ParsedAffiliation = {
   department: string | null;
@@ -71,11 +72,75 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
 
   if (!text) return null;
 
+  // Step 3b (Fix 1): Strip trailing author initials in parentheses
+  // e.g. "Louisville, Kentucky (R.A.K., A.M.M)." → "Louisville, Kentucky"
+  text = text.replace(/\s*\([A-Z][A-Za-z.\-,\s]+\)\s*\.?\s*$/, "").trim();
+  // Trim trailing dots/whitespace again after stripping
+  text = text.replace(/[.\s]+$/, "").trim();
+
+  // Step 3c (Fix 1): Strip leading "From the " or "From " prefix
+  text = text.replace(/^From\s+the\s+/i, "").replace(/^From\s+/i, "").trim();
+
+  if (!text) return null;
+
   // Step 4: Split into segments
   const segments = text.split(/,\s*/).map((s) => s.trim()).filter(Boolean);
   if (segments.length === 0) return null;
 
-  const totalSegments = segments.length;
+  // Step 4b (Fix 2): Strip trailing postal/zip code segments
+  // If last segment is purely numeric (3-6 digits), remove it
+  while (segments.length > 1 && /^\d{3,6}$/.test(segments[segments.length - 1])) {
+    segments.pop();
+  }
+  // Handle "77030 USA" pattern: last segment is "ZIP COUNTRY"
+  if (segments.length > 0) {
+    const lastSeg = segments[segments.length - 1];
+    const zipCountryMatch = lastSeg.match(/^(\d{3,6})\s+(.+)$/);
+    if (zipCountryMatch) {
+      // Replace the combined segment with just the country part
+      segments[segments.length - 1] = zipCountryMatch[2].trim();
+    }
+  }
+
+  // Step 4c (Fix 3): Check for known institution as last segment
+  // This handles cases like "Department of X, Aarhus University Hospital" with no city/country
+  // Check last segment, then second-to-last
+  for (let i = segments.length - 1; i >= Math.max(0, segments.length - 2); i--) {
+    const instInfo = lookupInstitution(segments[i]);
+    if (instInfo) {
+      // Check if any segment AFTER this one looks like a country
+      const hasCountryAfter = segments.slice(i + 1).some((s) => {
+        const cleaned = s.replace(/\.+$/, "").trim();
+        return lookupCountry(cleaned) !== null || US_STATES[cleaned.toUpperCase()] !== undefined;
+      });
+
+      if (!hasCountryAfter) {
+        // No country after the institution — use the lookup data
+        let department: string | null = null;
+        const institution = segments[i];
+
+        // Check earlier segments for department keywords
+        for (let j = 0; j < i; j++) {
+          if (matchesKeywords(segments[j], DEPT_KEYWORDS)) {
+            department = segments[j];
+            break;
+          }
+        }
+        // If no keyword match but there's a segment before institution, use it as department
+        if (!department && i > 0) {
+          department = segments[0];
+        }
+
+        return {
+          department,
+          institution,
+          city: instInfo.city,
+          country: instInfo.country,
+          confidence: "high",
+        };
+      }
+    }
+  }
 
   // Step 5: Extract country (last segment)
   let country: string | null = null;
@@ -124,13 +189,17 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
       }
     }
 
-    // If country is US, also check if the now-last segment is a US state abbreviation
+    // If country is US, also check if the now-last segment is a US state abbreviation or full state name
     // e.g. segments = ["Dept...", "University of Minnesota", "Minneapolis", "MN"] and country=US
-    // In this case "MN" should be consumed as the state, not the city
+    // or segments = ["...", "Houston", "Texas"] and country=US
     if (isUS && segments.length > 0) {
-      const maybeSt = segments[segments.length - 1].replace(/\.+$/, "").trim().toUpperCase();
-      if (US_STATES[maybeSt]) {
-        segments.pop(); // consume the state abbreviation
+      const maybeSt = segments[segments.length - 1].replace(/\.+$/, "").trim();
+      const maybeStUpper = maybeSt.toUpperCase();
+      if (US_STATES[maybeStUpper]) {
+        segments.pop(); // consume 2-letter state abbreviation
+      } else if (lookupCountry(maybeSt) === "United States") {
+        // Full state name like "Texas", "California" etc. (mapped to US in country-map)
+        segments.pop();
       }
     }
   }

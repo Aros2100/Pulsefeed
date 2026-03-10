@@ -31,11 +31,13 @@ export async function runLocationParsing(limit = 500): Promise<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = admin as any;
 
+  console.log("[geo/run-parse] Starting parse, targeting unparsed + low-confidence articles");
+
   const { data: articles, error } = await db
     .from("articles")
     .select("id, authors")
-    .is("location_parsed_at", null)
     .not("authors", "is", null)
+    .or("location_parsed_at.is.null,location_confidence.eq.low")
     .limit(limit);
 
   if (error) throw new Error(`Failed to fetch articles: ${error.message}`);
