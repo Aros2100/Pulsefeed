@@ -43,6 +43,16 @@ export interface ArticleData {
   classification_reason: string | null;
   classification_model_version: string | null;
   classification_scored_at: string | null;
+  // Condensation (AI-scored)
+  short_headline: string | null;
+  bottom_line: string | null;
+  pico_population: string | null;
+  pico_intervention: string | null;
+  pico_comparison: string | null;
+  pico_outcome: string | null;
+  sample_size: number | null;
+  condensed_model_version: string | null;
+  condensed_at: string | null;
   // Classification (computed)
   full_text_available: boolean | null;
   time_to_read: number | null;

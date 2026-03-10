@@ -6,9 +6,24 @@ import {
   STUDY_DESIGN_OPTIONS,
 } from "@/lib/lab/classification-options";
 
+export const SCORING_MODEL = process.env.AI_SCORING_MODEL ?? "claude-haiku-4-5-20251001";
+export const ANALYSIS_MODEL = process.env.AI_ANALYSIS_MODEL ?? "claude-sonnet-4-20250514";
+
 export interface ScoreResult {
   confidence: number;
   ai_decision: "approved" | "rejected";
+}
+
+export interface CondensationResult {
+  short_headline: string;
+  short_resume: string;
+  bottom_line: string;
+  pico_population: string | null;
+  pico_intervention: string | null;
+  pico_comparison: string | null;
+  pico_outcome: string | null;
+  sample_size: number | null;
+  version: string;
 }
 
 export interface ClassificationResult {
@@ -52,8 +67,8 @@ export async function scoreArticle(
     .replace(/\{\{title\}\}|\{title\}/g,         article.title)
     .replace(/\{\{abstract\}\}|\{abstract\}/g,   article.abstract ?? "No abstract available");
 
-  const message = await trackedCall("specialty_tag_v1", {
-    model: "claude-haiku-4-5-20251001",
+  const message = await trackedCall(`specialty_tag_${activePrompt.version}`, {
+    model: SCORING_MODEL,
     max_tokens: 256,
     messages: [{ role: "user", content }],
   });
@@ -83,8 +98,8 @@ export async function scoreClassification(
     .replace(/\{\{title\}\}|\{title\}/g,         article.title)
     .replace(/\{\{abstract\}\}|\{abstract\}/g,   article.abstract ?? "No abstract available");
 
-  const message = await trackedCall("classification_v1", {
-    model: "claude-haiku-4-5-20251001",
+  const message = await trackedCall(`classification_${activePrompt.version}`, {
+    model: SCORING_MODEL,
     max_tokens: 512,
     messages: [{ role: "user", content }],
   });
@@ -117,6 +132,63 @@ export async function scoreClassification(
       study_design: "Unknown",
       reason: "Failed to parse AI response",
       version: activePrompt.version,
+    };
+  }
+}
+
+export async function scoreCondensation(
+  article: { title: string; abstract: string | null },
+  specialty: string,
+  activePrompt: ActivePrompt
+): Promise<CondensationResult> {
+  const content = activePrompt.prompt
+    .replace(/\{\{specialty\}\}|\{specialty\}/g, specialty)
+    .replace(/\{\{title\}\}|\{title\}/g,         article.title)
+    .replace(/\{\{abstract\}\}|\{abstract\}/g,   article.abstract ?? "No abstract available");
+
+  const message = await trackedCall(`condensation_${activePrompt.version}`, {
+    model: SCORING_MODEL,
+    max_tokens: 1024,
+    messages: [{ role: "user", content }],
+  });
+
+  const raw = (message.content[0] as { type: string; text: string }).text.trim();
+
+  try {
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as {
+      short_headline?: string;
+      short_resume?: string;
+      bottom_line?: string;
+      pico_population?: string;
+      pico_intervention?: string;
+      pico_comparison?: string;
+      pico_outcome?: string;
+      sample_size?: unknown;
+    };
+
+    const short_headline = typeof parsed.short_headline === "string" ? parsed.short_headline.slice(0, 100) : "";
+    const short_resume   = typeof parsed.short_resume === "string"   ? parsed.short_resume.slice(0, 500)   : "";
+    const bottom_line    = typeof parsed.bottom_line === "string"    ? parsed.bottom_line.slice(0, 200)    : "";
+
+    const pico_population   = typeof parsed.pico_population === "string"   ? parsed.pico_population   : null;
+    const pico_intervention = typeof parsed.pico_intervention === "string" ? parsed.pico_intervention : null;
+    const pico_comparison   = typeof parsed.pico_comparison === "string"   ? parsed.pico_comparison   : null;
+    const pico_outcome      = typeof parsed.pico_outcome === "string"      ? parsed.pico_outcome      : null;
+
+    const rawSize = Number(parsed.sample_size);
+    const sample_size = Number.isFinite(rawSize) && rawSize > 0 ? Math.round(rawSize) : null;
+
+    return {
+      short_headline, short_resume, bottom_line,
+      pico_population, pico_intervention, pico_comparison, pico_outcome,
+      sample_size, version: activePrompt.version,
+    };
+  } catch {
+    return {
+      short_headline: "", short_resume: "", bottom_line: "",
+      pico_population: null, pico_intervention: null, pico_comparison: null, pico_outcome: null,
+      sample_size: null, version: activePrompt.version,
     };
   }
 }

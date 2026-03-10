@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
-import { getActivePrompt } from "@/lib/lab/scorer";
+import { getActivePrompt, ANALYSIS_MODEL } from "@/lib/lab/scorer";
 import { trackedCall } from "@/lib/ai/tracked-client";
 
 const schema = z.object({
@@ -113,7 +113,7 @@ Respond in JSON only — no markdown, no backticks:
 
   try {
     const message = await trackedCall("pattern_analysis", {
-      model: "claude-sonnet-4-20250514",
+      model: ANALYSIS_MODEL,
       max_tokens: 4096,
       messages: [{ role: "user", content: userMessage }],
     });

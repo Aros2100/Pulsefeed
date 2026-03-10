@@ -22,13 +22,15 @@ export default async function LabPage() {
 
   const admin = createAdminClient();
 
-  const [specQueueResult, clsQueueResult] = await Promise.all([
+  const [specQueueResult, clsQueueResult, cndQueueResult] = await Promise.all([
     admin.rpc("count_scored_not_validated" as never, { p_specialty: specialty } as never),
     admin.rpc("count_classification_not_validated" as never, { p_specialty: specialty } as never),
+    admin.rpc("count_condensation_not_validated" as never, { p_specialty: specialty } as never),
   ]);
 
   const specQueueCount = (specQueueResult.data as number | null) ?? 0;
   const clsQueueCount = (clsQueueResult.data as number | null) ?? 0;
+  const cndQueueCount = (cndQueueResult.data as number | null) ?? 0;
 
   const modules = [
     {
@@ -44,6 +46,13 @@ export default async function LabPage() {
       queue: clsQueueCount,
       href: "/admin/lab/classification",
       color: "#7c3aed",
+    },
+    {
+      title: "Kondensering",
+      description: "Validér AI-genereret overskrift, resumé, bottom line, PICO og sample size",
+      queue: cndQueueCount,
+      href: "/admin/lab/condensation",
+      color: "#059669",
       badge: "Ny",
     },
   ];

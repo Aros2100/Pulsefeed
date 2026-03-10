@@ -24,14 +24,14 @@ function accColor(v: number | null): string {
 
 interface Props {
   versions: VersionRow[];
-  variant?: "specialty-tag" | "classification";
+  variant?: "specialty-tag" | "classification" | "condensation";
 }
 
 export default function BenchmarkTable({ versions, variant = "specialty-tag" }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
-  const isCls = variant === "classification";
+  const isCls = variant === "classification" || variant === "condensation";
   const gridCols = isCls
     ? "130px 100px 100px 80px 100px 1fr"
     : "130px 100px 100px 55px 55px 100px 1fr";
@@ -47,8 +47,8 @@ export default function BenchmarkTable({ versions, variant = "specialty-tag" }: 
       }}>
         <div>Version</div>
         <div>Beslutninger</div>
-        <div>{isCls ? "Agreements" : "Agreement"}</div>
-        <div>{isCls ? "Corrected" : "FP"}</div>
+        <div>{isCls ? (variant === "condensation" ? "Approved" : "Agreements") : "Agreement"}</div>
+        <div>{isCls ? (variant === "condensation" ? "Rejected" : "Corrected") : "FP"}</div>
         {!isCls && <div>FN</div>}
         <div>Nøjagtighed</div>
         <div>Periode</div>

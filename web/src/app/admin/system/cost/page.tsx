@@ -17,27 +17,62 @@ function monthStart(): string {
 }
 
 function fmt$(n: number): string {
-  if (n === 0) return "$0.00";
-  if (n < 0.01) return `$${(n * 100).toFixed(3)}¢`;
-  return `$${n.toFixed(4)}`;
+  if (n === 0) return "$0,00";
+  if (n < 0.01) return "<$0,01";
+  return "$" + n.toFixed(2).replace(".", ",");
 }
 
 function n(v: number) { return v.toLocaleString("da-DK"); }
+
+const FUNCTION_INFO: Record<string, { label: string; description: string }> = {
+  specialty_tag:    { label: "Speciale-validering", description: "Vurderer om en artikel tilhører specialet" },
+  classification:   { label: "Klassificering",      description: "Bestemmer subspeciale, artikeltype og studiedesign" },
+  simulate_prompt:  { label: "Prompt-simulering",   description: "Tester ny prompt mod eksisterende data" },
+  pattern_analysis: { label: "Mønsteranalyse",      description: "Analyserer fejlmønstre for at forbedre prompts" },
+  condensation:     { label: "Kondensering",          description: "Genererer overskrift, resumé, bottom line, PICO og sample size" },
+  enrichment:       { label: "Berigelse",            description: "Genererer resumé, PICO og klinisk relevans" },
+};
+
+const FUNCTION_KEYS = Object.keys(FUNCTION_INFO).sort((a, b) => b.length - a.length);
+
+function parseModelKey(raw: string): { key: string; label: string; description: string; version: string | null } {
+  for (const fn of FUNCTION_KEYS) {
+    const { label, description } = FUNCTION_INFO[fn];
+    if (raw === fn) return { key: fn, label, description, version: null };
+    if (raw.startsWith(fn + "_")) {
+      return { key: fn, label, description, version: raw.slice(fn.length + 1) || null };
+    }
+  }
+  return { key: raw, label: raw, description: "", version: null };
+}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function CostPage() {
   const admin = createAdminClient();
 
-  const [weekRes, monthRes, allRes] = await Promise.all([
+  const [weekRes, monthRes, allRes, scoredRes, classifiedRes, condensedRes] = await Promise.all([
     admin.from("api_usage").select("model_key, total_tokens, cost_usd").gte("called_at", weekStart()),
     admin.from("api_usage").select("model_key, total_tokens, cost_usd").gte("called_at", monthStart()),
     admin.from("api_usage").select("model_key, total_tokens, cost_usd"),
+    admin.from("articles").select("*", { count: "exact", head: true }).not("specialty_confidence", "is", null),
+    admin.from("articles").select("*", { count: "exact", head: true }).not("classification_scored_at", "is", null),
+    admin.from("articles").select("*", { count: "exact", head: true }).not("condensed_at", "is", null),
   ]);
 
   const week  = weekRes.data  ?? [];
   const month = monthRes.data ?? [];
   const all   = allRes.data   ?? [];
+  const scoredArticles = scoredRes.count ?? 0;
+
+  const fnArticleCounts: Record<string, number | null> = {
+    specialty_tag: scoredRes.count ?? 0,
+    classification: classifiedRes.count ?? 0,
+    condensation: condensedRes.count ?? 0,
+    simulate_prompt: null,
+    pattern_analysis: null,
+    enrichment: null,
+  };
 
   const sumCost = (rows: { cost_usd: unknown }[]) =>
     rows.reduce((s, r) => s + Number(r.cost_usd ?? 0), 0);
@@ -52,16 +87,17 @@ export default async function CostPage() {
   ).getUTCDate();
   const estMonthly = (costMonth / daysElapsed) * daysInMonth;
 
-  // Breakdown by call type — all time
-  const byKey: Record<string, { calls: number; tokens: number; cost: number }> = {};
+  // Breakdown by function — all time, aggregated by parsed function key
+  const byFn: Record<string, { key: string; label: string; description: string; calls: number; tokens: number; cost: number }> = {};
   for (const r of all) {
     const k = (r.model_key as string) ?? "unknown";
-    if (!byKey[k]) byKey[k] = { calls: 0, tokens: 0, cost: 0 };
-    byKey[k].calls++;
-    byKey[k].tokens += (r.total_tokens as number) ?? 0;
-    byKey[k].cost   += Number(r.cost_usd ?? 0);
+    const { key: fnKey, label, description } = parseModelKey(k);
+    if (!byFn[fnKey]) byFn[fnKey] = { key: fnKey, label, description, calls: 0, tokens: 0, cost: 0 };
+    byFn[fnKey].calls++;
+    byFn[fnKey].tokens += (r.total_tokens as number) ?? 0;
+    byFn[fnKey].cost   += Number(r.cost_usd ?? 0);
   }
-  const byKeyEntries = Object.entries(byKey).sort((a, b) => b[1].cost - a[1].cost);
+  const byFnEntries = Object.values(byFn).sort((a, b) => b.cost - a.cost);
 
   // ── Styles ─────────────────────────────────────────────────────────────────
   const card: React.CSSProperties = {
@@ -70,11 +106,36 @@ export default async function CostPage() {
     overflow: "hidden",
   };
 
+  const sectionHeader: React.CSSProperties = {
+    background: "#EEF2F7", borderBottom: "1px solid #dde3ed",
+    padding: "10px 20px", fontSize: "11px", fontWeight: 700,
+    letterSpacing: "0.08em", textTransform: "uppercase", color: "#5a6a85",
+  };
+
+  const thStyle: React.CSSProperties = {
+    padding: "10px 20px", textAlign: "left", fontSize: "11px",
+    fontWeight: 700, color: "#5a6a85", textTransform: "uppercase",
+    letterSpacing: "0.06em", borderBottom: "1px solid #dde3ed",
+    background: "#f8f9fb",
+  };
+
+  const tdStyle: React.CSSProperties = {
+    padding: "12px 20px", color: "#1a1a1a",
+    borderBottom: "1px solid #f1f3f7", fontSize: "13px",
+  };
+
+  const totalCalls  = all.length;
+  const totalTokens = all.reduce((s, r) => s + ((r.total_tokens as number) ?? 0), 0);
+  const costPerArticle = costAll / (scoredArticles || 1);
+  const tokensPerCall  = totalCalls > 0 ? Math.round(totalTokens / totalCalls) : 0;
+
   const kpis = [
-    { label: "Denne uge",   value: fmt$(costWeek) },
-    { label: "Denne måned", value: fmt$(costMonth) },
-    { label: "Est. måned",  value: fmt$(estMonthly) },
-    { label: "Total",       value: fmt$(costAll) },
+    { label: "Denne uge",             value: fmt$(costWeek) },
+    { label: "Denne måned",           value: fmt$(costMonth) },
+    { label: "Est. måned",            value: fmt$(estMonthly) },
+    { label: "Total",                 value: fmt$(costAll) },
+    { label: "Pris pr. artikel",      value: fmt$(costPerArticle) },
+    { label: "Gns. tokens pr. kald",  value: n(tokensPerCall) },
   ];
 
   return (
@@ -97,10 +158,10 @@ export default async function CostPage() {
         </div>
 
         {/* KPI cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "28px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "28px" }}>
           {kpis.map(({ label, value }) => (
             <div key={label} style={{ ...card, padding: "20px 22px" }}>
-              <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>
+              <div style={{ fontSize: "11px", color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: "6px" }}>
                 {label}
               </div>
               <div style={{ fontSize: "22px", fontWeight: 700 }}>{value}</div>
@@ -109,41 +170,79 @@ export default async function CostPage() {
         </div>
 
         {/* Breakdown by call type */}
-        <div style={card}>
-          <div style={{
-            background: "#EEF2F7", borderBottom: "1px solid #dde3ed",
-            padding: "10px 20px", fontSize: "11px", fontWeight: 700,
-            letterSpacing: "0.07em", textTransform: "uppercase", color: "#5a6a85",
-          }}>
-            Fordeling på call type · alt tid
+        <div style={{ ...card, marginBottom: "28px" }}>
+          <div style={sectionHeader}>
+            Fordeling p&aring; call type &middot; alt tid
           </div>
-          {byKeyEntries.length === 0 ? (
-            <div style={{ padding: "32px", textAlign: "center", fontSize: "13px", color: "#888" }}>
+          {byFnEntries.length === 0 ? (
+            <div style={{ padding: "32px", textAlign: "center", fontSize: "13px", color: "#5a6a85" }}>
               Ingen API-kald registreret endnu
             </div>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
               <thead>
-                <tr style={{ borderBottom: "1px solid #f0f2f5" }}>
-                  {["Call type", "Kald", "Tokens", "Pris"].map((h) => (
-                    <th key={h} style={{ padding: "10px 20px", textAlign: "left", fontSize: "11px", color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                      {h}
-                    </th>
+                <tr>
+                  {["Funktion", "Artikler", "Kald", "Tokens", "Pris", "Pris/artikel"].map((h) => (
+                    <th key={h} style={{ ...thStyle, ...(h === "Pris" || h === "Pris/artikel" ? { textAlign: "right" } : {}) }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {byKeyEntries.map(([key, v], i) => (
-                  <tr key={key} style={{ borderBottom: i < byKeyEntries.length - 1 ? "1px solid #f9f9f9" : undefined }}>
-                    <td style={{ padding: "12px 20px", fontFamily: "monospace", color: "#5a6a85" }}>{key}</td>
-                    <td style={{ padding: "12px 20px" }}>{n(v.calls)}</td>
-                    <td style={{ padding: "12px 20px", color: "#888" }}>{n(v.tokens)}</td>
-                    <td style={{ padding: "12px 20px", fontWeight: 600 }}>{fmt$(v.cost)}</td>
-                  </tr>
-                ))}
+                {byFnEntries.map((v) => {
+                  const ac = fnArticleCounts[v.key] ?? null;
+                  return (
+                    <tr key={v.key} style={{ borderBottom: "1px solid #f1f3f7" }}>
+                      <td style={tdStyle}>
+                        <div style={{ fontWeight: 600 }}>{v.label}</div>
+                        {v.description && <div style={{ fontSize: "11px", color: "#888", fontWeight: 400 }}>{v.description}</div>}
+                      </td>
+                      <td style={tdStyle}>{ac != null ? n(ac) : "—"}</td>
+                      <td style={tdStyle}>{n(v.calls)}</td>
+                      <td style={{ ...tdStyle, color: "#5a6a85" }}>{n(v.tokens)}</td>
+                      <td style={{ ...tdStyle, fontWeight: 600, textAlign: "right" }}>{fmt$(v.cost)}</td>
+                      <td style={{ ...tdStyle, textAlign: "right", color: "#5a6a85" }}>{ac ? fmt$(v.cost / ac) : "—"}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
+        </div>
+
+        {/* Model info */}
+        <div style={card}>
+          <div style={sectionHeader}>
+            Modeloversigt
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+            <thead>
+              <tr>
+                {["Funktion", "Model", "Input", "Output"].map((h) => (
+                  <th key={h} style={thStyle}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {([
+                { fn: "Speciale-validering", desc: "Vurderer om en artikel tilhører specialet",              model: "claude-haiku",  input: "$0.25/1M", output: "$1.25/1M", planned: false },
+                { fn: "Klassificering",      desc: "Bestemmer subspeciale, artikeltype og studiedesign",                    model: "claude-haiku",  input: "$0.25/1M", output: "$1.25/1M", planned: false },
+                { fn: "Kondensering",        desc: "Genererer overskrift, resumé, bottom line, PICO og sample size", model: "claude-haiku",  input: "$0.25/1M", output: "$1.25/1M", planned: false },
+                { fn: "Prompt-simulering",   desc: "Tester ny prompt mod eksisterende data",                         model: "claude-haiku",  input: "$0.25/1M", output: "$1.25/1M", planned: false },
+                { fn: "Mønsteranalyse",      desc: "Analyserer fejlmønstre for at forbedre prompts",       model: "claude-sonnet", input: "$3/1M",    output: "$15/1M",   planned: false },
+                { fn: "Berigelse",           desc: "Genererer resumé, PICO og klinisk relevans (planlagt)", model: "claude-sonnet", input: "$3/1M",    output: "$15/1M",   planned: true },
+              ]).map((row) => (
+                <tr key={row.fn} style={{ borderBottom: "1px solid #f1f3f7" }}>
+                  <td style={{ ...tdStyle, fontStyle: row.planned ? "italic" : undefined, color: row.planned ? "#5a6a85" : "#1a1a1a" }}>
+                    <div style={{ fontWeight: row.planned ? 400 : 600 }}>{row.fn}</div>
+                    <div style={{ fontSize: "11px", color: "#888", fontWeight: 400 }}>{row.desc}</div>
+                  </td>
+                  <td style={{ ...tdStyle, fontFamily: "monospace", color: row.planned ? "#94a3b8" : "#5a6a85" }}>{row.model}</td>
+                  <td style={{ ...tdStyle, color: row.planned ? "#94a3b8" : "#5a6a85" }}>{row.input}</td>
+                  <td style={{ ...tdStyle, color: row.planned ? "#94a3b8" : "#5a6a85" }}>{row.output}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
       </div>

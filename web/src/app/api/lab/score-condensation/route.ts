@@ -4,7 +4,7 @@ import pLimit from "p-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
-import { getActivePrompt, scoreClassification, type ActivePrompt } from "@/lib/lab/scorer";
+import { getActivePrompt, scoreCondensation, type ActivePrompt } from "@/lib/lab/scorer";
 import { applyUnscoredFilters } from "@/lib/lab/article-filters";
 
 const CONCURRENCY  = 1;
@@ -20,16 +20,16 @@ const schema = z.object({
 
 type Article = { id: string; title: string; abstract: string | null };
 
-async function classifyWithDelay(
+async function condenseWithDelay(
   article: Article,
   specialty: string,
   activePrompt: ActivePrompt
 ) {
   await new Promise((r) => setTimeout(r, DELAY_MS));
-  return classifyWithRetry(article, specialty, activePrompt);
+  return condenseWithRetry(article, specialty, activePrompt);
 }
 
-async function classifyWithRetry(
+async function condenseWithRetry(
   article: Article,
   specialty: string,
   activePrompt: ActivePrompt,
@@ -37,12 +37,12 @@ async function classifyWithRetry(
 ) {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      return await scoreClassification(article, specialty, activePrompt);
+      return await scoreCondensation(article, specialty, activePrompt);
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
       if (status === 429 && attempt < retries - 1) {
         const waitMs = (attempt + 1) * 60_000;
-        console.warn(`[score-classification] rate limited — waiting ${waitMs / 1000}s before retry ${attempt + 1}/${retries - 1}`);
+        console.warn(`[score-condensation] rate limited — waiting ${waitMs / 1000}s before retry ${attempt + 1}/${retries - 1}`);
         await new Promise((r) => setTimeout(r, waitMs));
         continue;
       }
@@ -70,14 +70,14 @@ export async function POST(request: NextRequest) {
 
   let activePrompt;
   try {
-    activePrompt = await getActivePrompt(specialty, "classification");
+    activePrompt = await getActivePrompt(specialty, "condensation");
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
   // Count how many scored-but-not-validated articles already exist.
   const { data: alreadyScoredCount } = await admin.rpc(
-    "count_classification_not_validated" as never,
+    "count_condensation_not_validated" as never,
     { p_specialty: specialty } as never,
   );
   const existing = Number(alreadyScoredCount ?? 0);
@@ -96,13 +96,12 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Eligible: approved C3, not yet classification-scored, has abstract
   const { data: articles, error: fetchError } = await applyUnscoredFilters(
     admin.from("articles").select("id, title, abstract"),
-    "classification",
+    "condensation",
     specialty,
   )
-    .order("circle", { ascending: false, nullsFirst: false })
+    .order("published_date", { ascending: false })
     .limit(remaining);
 
   if (fetchError) {
@@ -127,22 +126,29 @@ export async function POST(request: NextRequest) {
           toScore.map((article) =>
             limiter(async () => {
               try {
-                const cls = await classifyWithDelay(article, specialty, activePrompt!);
-                const { error } = await admin
+                const cnd = await condenseWithDelay(article, specialty, activePrompt!);
+                const updatePayload = {
+                  short_headline:             cnd.short_headline,
+                  short_resume:               cnd.short_resume,
+                  bottom_line:                cnd.bottom_line,
+                  pico_population:            cnd.pico_population,
+                  pico_intervention:          cnd.pico_intervention,
+                  pico_comparison:            cnd.pico_comparison,
+                  pico_outcome:               cnd.pico_outcome,
+                  sample_size:                cnd.sample_size,
+                  condensed_model_version:    cnd.version,
+                  condensed_at:               new Date().toISOString(),
+                };
+                console.log(`[score-condensation] update payload for ${article.id}:`, JSON.stringify(updatePayload));
+                const { data, error } = await admin
                   .from("articles")
-                  .update({
-                    subspecialty_ai:              cls.subspecialty,
-                    article_type_ai:              cls.article_type,
-                    study_design_ai:              cls.study_design,
-                    classification_reason:        cls.reason,
-                    classification_model_version: cls.version,
-                    classification_scored_at:     new Date().toISOString(),
-                  })
+                  .update(updatePayload)
                   .eq("id", article.id);
+                console.log(`[score-condensation] DB update for ${article.id}:`, JSON.stringify({ error: error?.message ?? null, data }));
                 if (error) throw new Error(error.message);
                 scored++;
               } catch (e) {
-                console.error(`[score-classification] failed article ${article.id}:`, e);
+                console.error(`[score-condensation] failed article ${article.id}:`, e);
                 failedIds.push(article.id);
               }
               send({ scored, total: toScore.length });
@@ -150,7 +156,7 @@ export async function POST(request: NextRequest) {
           )
         );
 
-        console.log(`[score-classification] done — scored: ${scored}, failed: ${failedIds.length}, total: ${toScore.length}`);
+        console.log(`[score-condensation] done — scored: ${scored}, failed: ${failedIds.length}, total: ${toScore.length}`);
         send({ done: true, scored, failed: failedIds.length, total: toScore.length });
       } catch (e) {
         send({ done: true, error: String(e), scored, failed: failedIds.length, total: toScore.length });
