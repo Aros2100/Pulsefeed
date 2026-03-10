@@ -116,12 +116,17 @@ function FieldCard({
       borderRadius: "6px",
       padding: "14px 16px",
     }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "10px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
           <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#5a6a85" }}>
             {label}
           </span>
-          <span style={{ fontSize: "12px", fontWeight: 600, color: "#1a1a1a" }}>
+          <span style={{
+            fontSize: "13px", fontWeight: 700, color: "#7c3aed",
+            background: "#f5f3ff", border: "1px solid #ddd6fe",
+            borderRadius: "5px", padding: "4px 10px",
+            display: "inline-block", width: "fit-content",
+          }}>
             {aiValue ?? "—"}
           </span>
         </div>
