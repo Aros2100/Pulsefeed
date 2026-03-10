@@ -71,6 +71,15 @@ function Spinner({ size = 12 }: { size?: number }) {
   );
 }
 
+const REJECT_REASONS = [
+  "Headline upræcis",
+  "Headline forkert fokus",
+  "Resumé mangler nøgletal",
+  "Resumé forkert fokus",
+  "Bottom line gentager titlen",
+  "Bottom line mangler kernefund",
+] as const;
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 interface Props {
@@ -89,6 +98,7 @@ export default function TextValidationClient({ specialty, label }: Props) {
   const [verdicts, setVerdicts]               = useState<Record<string, { decision: "approved" | "rejected"; comment: string }>>({});
   const [comments, setComments]               = useState<Record<string, string>>({});
   const [pendingReject, setPendingReject]     = useState<string | null>(null);
+  const [rejectReasons, setRejectReasons]    = useState<Set<string>>(new Set());
   const [scoring, setScoring]                 = useState(false);
   const [scoringProgress, setScoringProgress] = useState<{ scored: number; total: number } | null>(null);
   const [saving, setSaving]                   = useState(false);
@@ -231,16 +241,31 @@ export default function TextValidationClient({ specialty, label }: Props) {
   }
 
   function startReject(articleId: string) {
+    setRejectReasons(new Set());
     setPendingReject(articleId);
   }
 
+  function toggleReason(reason: string) {
+    setRejectReasons((prev) => {
+      const next = new Set(prev);
+      if (next.has(reason)) next.delete(reason);
+      else next.add(reason);
+      return next;
+    });
+  }
+
   function confirmReject(articleId: string) {
-    setVerdicts((prev) => ({ ...prev, [articleId]: { decision: "rejected", comment: comments[articleId] ?? "" } }));
+    const reasons = REJECT_REASONS.filter((r) => rejectReasons.has(r)).join(" | ");
+    const freeText = (comments[articleId] ?? "").trim();
+    const combined = freeText ? `${reasons} — ${freeText}` : reasons;
+    setVerdicts((prev) => ({ ...prev, [articleId]: { decision: "rejected", comment: combined } }));
     setPendingReject(null);
+    setRejectReasons(new Set());
   }
 
   function cancelReject() {
     setPendingReject(null);
+    setRejectReasons(new Set());
   }
 
   function getComment(articleId: string): string {
@@ -551,24 +576,47 @@ export default function TextValidationClient({ specialty, label }: Props) {
                 <div style={{ padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
                   {isPendingReject ? (
                     <>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                        {REJECT_REASONS.map((reason) => (
+                          <label
+                            key={reason}
+                            style={{
+                              display: "flex", alignItems: "center", gap: "6px",
+                              fontSize: "12px", color: "#1a1a1a", cursor: "pointer",
+                              padding: "3px 0",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={rejectReasons.has(reason)}
+                              onChange={() => toggleReason(reason)}
+                              style={{ accentColor: "#dc2626", margin: 0 }}
+                            />
+                            {reason}
+                          </label>
+                        ))}
+                      </div>
                       <textarea
                         value={getComment(currentArticle.id)}
                         onChange={(e) => setComment(currentArticle.id, e.target.value)}
-                        placeholder="Beskriv hvad der er galt..."
-                        autoFocus
+                        placeholder="Eventuelt uddybende kommentar..."
                         style={{
-                          width: "100%", minHeight: "60px", padding: "8px 10px", fontSize: "12px",
-                          border: "1px solid #fecaca", borderRadius: "5px", resize: "vertical",
+                          width: "100%", minHeight: "44px", padding: "8px 10px", fontSize: "12px",
+                          border: "1px solid #e2e8f0", borderRadius: "5px", resize: "vertical",
                           outline: "none", fontFamily: "inherit", background: "#fff",
                         }}
                       />
                       <div style={{ display: "flex", gap: "6px" }}>
                         <button
                           onClick={() => confirmReject(currentArticle.id)}
+                          disabled={rejectReasons.size === 0}
                           style={{
                             borderRadius: "5px", padding: "5px 14px", fontSize: "11px", fontWeight: 600,
-                            background: "#dc2626", border: "1px solid #dc2626", color: "#fff",
-                            cursor: "pointer", whiteSpace: "nowrap",
+                            background: rejectReasons.size > 0 ? "#dc2626" : "#e2e8f0",
+                            border: `1px solid ${rejectReasons.size > 0 ? "#dc2626" : "#e2e8f0"}`,
+                            color: rejectReasons.size > 0 ? "#fff" : "#94a3b8",
+                            cursor: rejectReasons.size > 0 ? "pointer" : "not-allowed",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Bekræft afvisning
