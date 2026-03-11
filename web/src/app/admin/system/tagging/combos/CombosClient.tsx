@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import TaggingKpiCards from "../TaggingKpiCards";
 import type { TaggingKpis } from "../TaggingKpiCards";
@@ -38,7 +38,7 @@ interface PendingArticle {
   matched_combos: { term_1: string; term_2: string }[];
 }
 
-type Tab = "heatmap" | "selected" | "pending" | "active";
+type Tab = "heatmap" | "hitlist" | "selected" | "pending" | "active";
 
 /* ── Constants ────────────────────────────────────────────────── */
 
@@ -182,6 +182,8 @@ export default function CombosClient({
     return m;
   }, [rules]);
 
+
+
   function showToast(msg: string, ok: boolean) {
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 4000);
@@ -294,13 +296,13 @@ export default function CombosClient({
     }
   }
 
-  async function handleAddTracking(t1: string, t2: string) {
+  async function handleAddTracking(t1: string, t2: string, activate?: boolean) {
     setBusyAddPair(true);
     try {
       const res = await fetch("/api/admin/tagging/combos/add-tracking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ specialty, term_1: t1, term_2: t2 }),
+        body: JSON.stringify({ specialty, term_1: t1, term_2: t2, ...(activate ? { activate: true } : {}) }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
@@ -309,12 +311,13 @@ export default function CombosClient({
       }
       const msgs: Record<string, string> = {
         created: "Par tilf\u00f8jet",
+        activated: "Combo aktiveret",
         already_tracking: "Par allerede valgt",
         already_active: "Par allerede aktivt",
         restored: "Par genaktiveret",
       };
       showToast(msgs[data.result] ?? "OK", true);
-      if (data.result === "created" || data.result === "restored") {
+      if (data.result === "created" || data.result === "restored" || data.result === "activated") {
         setTimeout(() => router.refresh(), 800);
       }
     } catch {
@@ -418,14 +421,23 @@ export default function CombosClient({
 
   /* ── Tabs config ───────────────────────────────────────────── */
 
+  const hitlist = useMemo(() =>
+    coOccurrences
+      .map((c) => ({ ...c, pair_count: Number(c.pair_count) }))
+      .filter((c) => c.pair_count >= MIN_PAIR_COUNT)
+      .sort((a, b) => b.pair_count - a.pair_count),
+    [coOccurrences],
+  );
+
   const tabConfig: { key: Tab; label: string; count?: number }[] = [
     { key: "heatmap", label: "Heatmap" },
+    { key: "hitlist", label: "Hitliste", count: hitlist.length },
     { key: "active", label: "Aktive par", count: activeRules.length },
     { key: "selected", label: "Valgte par", count: trackingRules.length },
     { key: "pending", label: "Klar til auto-approve", count: pendingArticles.length },
   ];
 
-  /* ── SVG dimensions ────────────────────────────────────────── */
+  /* ── Grid dimensions ───────────────────────────────────────── */
 
   const CELL = 42;
   const LABEL_W = 250;
@@ -551,6 +563,7 @@ export default function CombosClient({
               Ingen co-occurrences fundet. K&oslash;r &quot;Genberegn&quot; for at scanne artikler.
             </div>
           ) : (
+            <>
             <div style={{
               overflowX: "auto",
               overflowY: "auto",
@@ -559,73 +572,94 @@ export default function CombosClient({
               borderRadius: 8,
               background: "#fff",
             }}>
-              <svg
-                width={LABEL_W + terms.length * CELL + 20}
-                height={LABEL_H + terms.length * CELL + 40}
-                style={{ display: "block" }}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: `${LABEL_W}px repeat(${terms.length}, ${CELL}px)`,
+                  gridTemplateRows: `${LABEL_H}px repeat(${terms.length}, ${CELL}px)`,
+                  position: "relative",
+                  width: "fit-content",
+                }}
                 onMouseLeave={() => { setHoveredIdx(null); setHoveredCell(null); }}
               >
-                {/* Row highlight band */}
-                {hoveredIdx && (
-                  <rect
-                    x={0}
-                    y={LABEL_H + hoveredIdx.row * CELL - 1}
-                    width={LABEL_W + terms.length * CELL}
-                    height={CELL}
-                    fill="#EEF2F7"
-                    style={{ pointerEvents: "none" }}
-                  />
-                )}
+                {/* Corner cell */}
+                <div style={{
+                  position: "sticky",
+                  top: 0,
+                  left: 0,
+                  zIndex: 3,
+                  background: "#fff",
+                  gridRow: 1,
+                  gridColumn: 1,
+                }} />
 
-                {/* Column highlight band */}
-                {hoveredIdx && (
-                  <rect
-                    x={LABEL_W + hoveredIdx.col * CELL - 1}
-                    y={0}
-                    width={CELL}
-                    height={LABEL_H + terms.length * CELL}
-                    fill="#EEF2F7"
-                    style={{ pointerEvents: "none" }}
-                  />
-                )}
-
-                {/* Column labels */}
+                {/* Column headers */}
                 {terms.map((t, i) => {
                   const isHl = hoveredIdx?.col === i;
                   return (
-                    <text
+                    <div
                       key={`col-${i}`}
-                      x={LABEL_W + i * CELL + CELL / 2}
-                      y={LABEL_H - 8}
-                      textAnchor="start"
-                      fontSize={10}
-                      fill={isHl ? "#1a1a1a" : "#5a6a85"}
-                      fontWeight={isHl ? 700 : 500}
-                      transform={`rotate(-55, ${LABEL_W + i * CELL + CELL / 2}, ${LABEL_H - 8})`}
-                      style={{ fontFamily: "'IBM Plex Mono', 'SF Mono', monospace" }}
+                      style={{
+                        position: "sticky",
+                        top: 0,
+                        zIndex: 2,
+                        background: hoveredIdx?.col === i ? "#EEF2F7" : "#fff",
+                        gridRow: 1,
+                        gridColumn: i + 2,
+                        overflow: "hidden",
+                        display: "flex",
+                        alignItems: "flex-end",
+                        justifyContent: "center",
+                        paddingBottom: 6,
+                      }}
                     >
-                      {t.length > 24 ? t.slice(0, 22) + "\u2026" : t}
-                    </text>
+                      <span style={{
+                        writingMode: "vertical-rl",
+                        transform: "rotate(180deg)",
+                        whiteSpace: "nowrap",
+                        fontFamily: "'IBM Plex Mono', 'SF Mono', monospace",
+                        fontSize: 10,
+                        fontWeight: isHl ? 700 : 500,
+                        color: isHl ? "#1a1a1a" : "#5a6a85",
+                        lineHeight: 1,
+                        maxHeight: LABEL_H - 12,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}>
+                        {t}
+                      </span>
+                    </div>
                   );
                 })}
 
-                {/* Rows */}
+                {/* Rows: labels + data cells */}
                 {terms.map((row, ri) => {
                   const isRowHl = hoveredIdx?.row === ri;
                   return (
-                    <g key={`row-${ri}`}>
-                      <text
-                        x={LABEL_W - 10}
-                        y={LABEL_H + ri * CELL + CELL / 2 + 4}
-                        textAnchor="end"
-                        fontSize={11}
-                        fill={isRowHl ? "#1a1a1a" : "#5a6a85"}
-                        fontWeight={isRowHl ? 700 : 500}
-                        style={{ fontFamily: "'IBM Plex Mono', 'SF Mono', monospace" }}
-                      >
+                    <React.Fragment key={`row-${ri}`}>
+                      {/* Row label */}
+                      <div style={{
+                        position: "sticky",
+                        left: 0,
+                        zIndex: 1,
+                        background: isRowHl ? "#EEF2F7" : "#fff",
+                        gridRow: ri + 2,
+                        gridColumn: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "flex-end",
+                        paddingRight: 10,
+                        fontFamily: "'IBM Plex Mono', 'SF Mono', monospace",
+                        fontSize: 11,
+                        fontWeight: isRowHl ? 700 : 500,
+                        color: isRowHl ? "#1a1a1a" : "#5a6a85",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                      }}>
                         {row.length > 30 ? row.slice(0, 28) + "\u2026" : row}
-                      </text>
+                      </div>
 
+                      {/* Data cells */}
                       {terms.map((col, ci) => {
                         const val = matrix[ri][ci];
                         const isDiag = ri === ci;
@@ -633,10 +667,19 @@ export default function CombosClient({
                         const pairKey = row < col ? `${row}|||${col}` : `${col}|||${row}`;
                         const pairStatus = hasValue ? ruleStatusMap.get(pairKey) : undefined;
                         const isCellHovered = hoveredIdx?.row === ri && hoveredIdx?.col === ci;
+                        const isInBand = hoveredIdx?.row === ri || hoveredIdx?.col === ci;
 
                         return (
-                          <g
+                          <div
                             key={`cell-${ri}-${ci}`}
+                            style={{
+                              gridRow: ri + 2,
+                              gridColumn: ci + 2,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              background: isInBand && !isCellHovered ? "#EEF2F7" : "transparent",
+                            }}
                             onClick={() => {
                               if (hasValue && !busyAddPair) {
                                 void handleAddTracking(row, col);
@@ -648,83 +691,162 @@ export default function CombosClient({
                               else setHoveredCell(null);
                             }}
                           >
-                            <rect
-                              x={LABEL_W + ci * CELL}
-                              y={LABEL_H + ri * CELL}
-                              width={CELL - 2}
-                              height={CELL - 2}
-                              rx={4}
-                              fill={isCellHovered && hasValue ? "#1a1a1a" : hasValue ? getColor(val, maxCount) : "#f9fafb"}
-                              stroke={isCellHovered && hasValue ? "#1a1a1a" : hasValue && pairStatus ? (pairStatus === "active" ? "#059669" : "#0369a1") : "none"}
-                              strokeWidth={isCellHovered && hasValue ? 2 : hasValue && pairStatus ? 2 : 0}
-                              style={{
-                                cursor: hasValue ? "pointer" : "default",
-                                transition: "all 0.1s",
-                              }}
-                            />
-                            {hasValue && (
-                              <text
-                                x={LABEL_W + ci * CELL + (CELL - 2) / 2}
-                                y={LABEL_H + ri * CELL + (CELL - 2) / 2 + 4}
-                                textAnchor="middle"
-                                fontSize={10}
-                                fontWeight={700}
-                                fill={isCellHovered ? "#fff" : getTextColor(val, maxCount)}
-                                style={{ pointerEvents: "none", fontFamily: "'IBM Plex Mono', monospace" }}
-                              >
-                                {val}
-                              </text>
-                            )}
-                            {hasValue && pairStatus && (
-                              <circle
-                                cx={LABEL_W + ci * CELL + CELL - 7}
-                                cy={LABEL_H + ri * CELL + 7}
-                                r={4}
-                                fill={pairStatus === "active" ? "#059669" : "#2563eb"}
-                                stroke="#fff"
-                                strokeWidth={1.5}
-                                style={{ pointerEvents: "none" }}
-                              />
-                            )}
-                          </g>
+                            <div style={{
+                              position: "relative",
+                              width: CELL - 2,
+                              height: CELL - 2,
+                              borderRadius: 4,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              background: isCellHovered && hasValue ? "#1a1a1a" : hasValue ? getColor(val, maxCount) : "#f9fafb",
+                              border: isCellHovered && hasValue
+                                ? "2px solid #1a1a1a"
+                                : hasValue && pairStatus
+                                  ? `2px solid ${pairStatus === "active" ? "#059669" : "#0369a1"}`
+                                  : "none",
+                              cursor: hasValue ? "pointer" : "default",
+                              transition: "all 0.1s",
+                            }}>
+                              {hasValue && (
+                                <span style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  color: isCellHovered ? "#fff" : getTextColor(val, maxCount),
+                                  pointerEvents: "none",
+                                  fontFamily: "'IBM Plex Mono', monospace",
+                                }}>
+                                  {val}
+                                </span>
+                              )}
+                              {hasValue && pairStatus && (
+                                <span style={{
+                                  position: "absolute",
+                                  top: 2,
+                                  right: 2,
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: "50%",
+                                  background: pairStatus === "active" ? "#059669" : "#2563eb",
+                                  border: "1.5px solid #fff",
+                                  pointerEvents: "none",
+                                }} />
+                              )}
+                            </div>
+                          </div>
                         );
                       })}
-                    </g>
+                    </React.Fragment>
                   );
                 })}
-
-                {/* Legend */}
-                <g transform={`translate(${LABEL_W}, ${LABEL_H + terms.length * CELL + 16})`}>
-                  {[
-                    { label: "0", color: "#fafafa" },
-                    { label: "1\u20137", color: "#fca5a5" },
-                    { label: "8\u201314", color: "#f87171" },
-                    { label: "15\u201323", color: "#ef4444" },
-                    { label: "24\u201337", color: "#dc2626" },
-                    { label: "38\u201351", color: "#b91c1c" },
-                    { label: "52\u201369", color: "#991b1b" },
-                    { label: "70+", color: "#7f1d1d" },
-                  ].map((item, i) => (
-                    <g key={i} transform={`translate(${i * 80}, 0)`}>
-                      <rect width={16} height={16} rx={3} fill={item.color} />
-                      <text x={20} y={12} fontSize={11} fill="#6b7280" fontWeight={500}>
-                        {item.label}
-                      </text>
-                    </g>
-                  ))}
-                  {/* Status indicators in legend */}
-                  <g transform={`translate(${8 * 80}, 0)`}>
-                    <circle cx={8} cy={8} r={4} fill="#2563eb" />
-                    <text x={20} y={12} fontSize={11} fill="#6b7280" fontWeight={500}>Valgt</text>
-                  </g>
-                  <g transform={`translate(${8 * 80 + 65}, 0)`}>
-                    <circle cx={8} cy={8} r={4} fill="#059669" />
-                    <text x={20} y={12} fontSize={11} fill="#6b7280" fontWeight={500}>Aktiv</text>
-                  </g>
-                </g>
-              </svg>
+              </div>
             </div>
+
+            {/* Legend */}
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              flexWrap: "wrap",
+              marginTop: 12,
+              paddingLeft: LABEL_W,
+            }}>
+              {[
+                { label: "0", color: "#fafafa" },
+                { label: "1\u20137", color: "#fca5a5" },
+                { label: "8\u201314", color: "#f87171" },
+                { label: "15\u201323", color: "#ef4444" },
+                { label: "24\u201337", color: "#dc2626" },
+                { label: "38\u201351", color: "#b91c1c" },
+                { label: "52\u201369", color: "#991b1b" },
+                { label: "70+", color: "#7f1d1d" },
+              ].map((item, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, marginRight: 10 }}>
+                  <span style={{ display: "inline-block", width: 16, height: 16, borderRadius: 3, background: item.color }} />
+                  <span style={{ fontSize: 11, color: "#6b7280", fontWeight: 500 }}>{item.label}</span>
+                </div>
+              ))}
+              <div style={{ display: "flex", alignItems: "center", gap: 4, marginRight: 10 }}>
+                <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#2563eb" }} />
+                <span style={{ fontSize: 11, color: "#6b7280", fontWeight: 500 }}>Valgt</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#059669" }} />
+                <span style={{ fontSize: 11, color: "#6b7280", fontWeight: 500 }}>Aktiv</span>
+              </div>
+            </div>
+            </>
           )}
+        </div>
+      )}
+
+      {/* ═══ Tab: Hitliste ═══ */}
+      {tab === "hitlist" && (
+        <div style={{
+          background: "#fff",
+          borderRadius: "10px",
+          boxShadow: SHADOW,
+          overflow: "hidden",
+        }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>Term 1</th>
+                <th style={thStyle}>Term 2</th>
+                <th style={thStyle}>Forekomster</th>
+                <th style={{ ...thStyle, width: "100px" }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {hitlist.length === 0 && (
+                <tr>
+                  <td colSpan={4} style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>
+                    Ingen co-occurrences over {MIN_PAIR_COUNT}. K&oslash;r &quot;Genberegn&quot;.
+                  </td>
+                </tr>
+              )}
+              {hitlist.map((pair, i) => {
+                const pairKey = pair.term_1 < pair.term_2
+                  ? `${pair.term_1}|||${pair.term_2}`
+                  : `${pair.term_2}|||${pair.term_1}`;
+                const isActive = ruleStatusMap.get(pairKey) === "active";
+                return (
+                  <tr
+                    key={i}
+                    style={{ borderBottom: "1px solid #f1f3f7", opacity: isActive ? 0.5 : 1 }}
+                    onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "#f8f9fb"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = ""; }}
+                  >
+                    <td style={tdStyle}>
+                      <span style={{ fontWeight: 500, color: "#1a1a1a" }}>{pair.term_1}</span>
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={{ fontWeight: 500, color: "#1a1a1a" }}>{pair.term_2}</span>
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={{ fontWeight: 600 }}>{pair.pair_count}</span>
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right" }}>
+                      {!isActive && (
+                        <button
+                          onClick={() => { if (!busyAddPair) void handleAddTracking(pair.term_1, pair.term_2, true); }}
+                          disabled={busyAddPair}
+                          style={{
+                            fontSize: "11px", fontWeight: 600, padding: "4px 12px", borderRadius: "7px",
+                            border: "none", background: busyAddPair ? "#d1d5db" : "#1a1a1a",
+                            color: "#fff",
+                            cursor: busyAddPair ? "not-allowed" : "pointer",
+                          }}
+                        >
+                          {busyAddPair ? "\u2026" : "Aktiv\u00e9r"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 

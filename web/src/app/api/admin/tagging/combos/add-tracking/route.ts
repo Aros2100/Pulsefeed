@@ -7,6 +7,7 @@ const schema = z.object({
   specialty: z.string(),
   term_1: z.string(),
   term_2: z.string(),
+  activate: z.boolean().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { specialty } = parsed.data;
+  const { specialty, activate } = parsed.data;
   const t1 = parsed.data.term_1 < parsed.data.term_2 ? parsed.data.term_1 : parsed.data.term_2;
   const t2 = parsed.data.term_1 < parsed.data.term_2 ? parsed.data.term_2 : parsed.data.term_1;
 
@@ -40,11 +41,23 @@ export async function POST(request: NextRequest) {
   const row = existing as { id: string; status: string } | null;
 
   if (row) {
-    if (row.status === "tracking") {
-      return NextResponse.json({ ok: true, result: "already_tracking" });
-    }
     if (row.status === "active") {
       return NextResponse.json({ ok: true, result: "already_active" });
+    }
+    if (activate) {
+      // tracking/draft/disabled → activate
+      await admin
+        .from("tagging_rule_combos" as never)
+        .update({
+          status: "active",
+          activated_at: new Date().toISOString(),
+          activated_by: auth.userId,
+        } as never)
+        .eq("id" as never, row.id as never);
+      return NextResponse.json({ ok: true, result: "activated" });
+    }
+    if (row.status === "tracking") {
+      return NextResponse.json({ ok: true, result: "already_tracking" });
     }
     // disabled → restore to tracking
     await admin
@@ -54,14 +67,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, result: "restored" });
   }
 
-  // Insert new tracking rule
+  // Insert new rule
   const { error } = await admin
     .from("tagging_rule_combos" as never)
     .insert({
       specialty,
       term_1: t1,
       term_2: t2,
-      status: "tracking",
+      status: activate ? "active" : "tracking",
+      ...(activate ? { activated_at: new Date().toISOString(), activated_by: auth.userId } : {}),
     } as never);
 
   if (error) {
@@ -71,5 +85,5 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ ok: true, result: "created" });
+  return NextResponse.json({ ok: true, result: activate ? "activated" : "created" });
 }
