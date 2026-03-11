@@ -27,6 +27,9 @@ const RAW_INSTITUTIONS: [string, InstitutionInfo][] = [
   ["zealand university hospital", { institution: "Zealand University Hospital", city: "Roskilde", country: "Denmark" }],
   ["danish epilepsy centre", { institution: "Danish Epilepsy Centre", city: "Dianalund", country: "Denmark" }],
   ["danish epilepsy center", { institution: "Danish Epilepsy Centre", city: "Dianalund", country: "Denmark" }],
+  ["aalborg hospital", { institution: "Aalborg Hospital", city: "Aalborg", country: "Denmark" }],
+  ["aarhus kommunehospital", { institution: "Aarhus Kommunehospital", city: "Aarhus", country: "Denmark" }],
+  ["horsens regional hospital", { institution: "Horsens Regional Hospital", city: "Horsens", country: "Denmark" }],
 
   // Danish universities (longer keys first)
   ["university of southern denmark", { institution: "University of Southern Denmark", city: "Odense", country: "Denmark" }],

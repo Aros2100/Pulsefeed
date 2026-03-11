@@ -53,6 +53,12 @@ const REGIONS = new Set([
   "minas gerais", "rio grande do sul", "paraná", "parana",
   "santa catarina", "bahia", "pernambuco", "ceará", "ceara",
 
+  // Canadian provinces
+  "alberta", "ontario", "quebec", "british columbia", "manitoba",
+  "saskatchewan", "nova scotia", "new brunswick",
+  "newfoundland and labrador", "prince edward island",
+  "northwest territories", "nunavut", "yukon",
+
   // South Korean provinces
   "gyeonggi", "gyeongsang", "chungcheong", "jeolla", "gangwon", "jeju",
 ]);

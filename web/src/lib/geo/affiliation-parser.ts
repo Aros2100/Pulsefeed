@@ -78,21 +78,31 @@ function looksLikeInstitution(segment: string): boolean {
   return instWords.some((w) => lower.includes(w.toLowerCase()));
 }
 
-/** Clean city string: strip DK-prefix, postal codes, district suffixes */
+/** Clean city string: strip DK-prefix, postal codes, district suffixes, UK postcodes */
 function cleanCity(raw: string): string {
   let city = raw;
   // Strip leading "DK-NNNN " or "DK " prefix
   city = city.replace(/^DK[-\s]?\d{0,4}\s*/i, "").trim();
   // Strip leading letter-prefixed postal codes: "A-8036 Graz" → "Graz", "F-69008 Lyon" → "Lyon"
   city = city.replace(/^[A-Z]{1,2}[-\s]?\d{3,6}\s+/i, "").trim();
-  // Strip leading pure digit postal codes: "8200 Aarhus" → "Aarhus", "2650 Hvidovre" → "Hvidovre"
-  city = city.replace(/^\d{3,5}[-\s]+/, "").trim();
+  // Strip leading pure digit postal codes: "8200 Aarhus" → "Aarhus", "93 Lodz" → "Lodz"
+  city = city.replace(/^\d{2,5}[-\s]+/, "").trim();
   // Strip embedded postal-like patterns: "Beyrouth 11-5076" → "Beyrouth"
   city = city.replace(/\s+\d{1,3}[-]\d{3,5}$/, "").trim();
-  // Strip trailing postal district letter: "Aarhus N" → "Aarhus", "Odense C" → "Odense"
-  const withoutSuffix = city.replace(/\s+[A-Z]$/, "");
+  // Strip trailing UK postcodes: "London SE5 9RS" → "London", "Oxford OX1 3QT" → "Oxford"
+  city = city.replace(/\s+[A-Z]{1,2}\d{1,2}\s*\d[A-Z]{2}$/i, "").trim();
+  // Strip trailing postal district letter (including Nordic: Ø, Ö, Ü, Æ, Å)
+  const withoutSuffix = city.replace(/\s+[A-ZØÖÜÆÅ]$/u, "");
   if (withoutSuffix.length >= 3) {
     city = withoutSuffix;
+  }
+  // Strip trailing US state name from city: "Portland Oregon" → "Portland"
+  const lastSpaceIdx = city.lastIndexOf(" ");
+  if (lastSpaceIdx > 2) {
+    const maybeState = city.slice(lastSpaceIdx + 1);
+    if (lookupCountry(maybeState) === "United States") {
+      city = city.slice(0, lastSpaceIdx).trim();
+    }
   }
   // Strip trailing dots/whitespace
   city = city.replace(/[.\s]+$/, "").trim();
@@ -218,6 +228,14 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
       }
     }
 
+    // Strip short segments that are ≤4 chars and only uppercase+dots (e.g. "D.C", "D.C.")
+    for (let i = segments.length - 1; i >= 0; i--) {
+      const seg = segments[i].replace(/\.+$/, "").trim();
+      if (seg.length <= 4 && /^[A-Z.]+$/i.test(seg) && seg.includes(".")) {
+        segments.splice(i, 1);
+      }
+    }
+
     // Consume US state abbreviation or full state name after country
     if (isUS && segments.length > 0) {
       const maybeSt = segments[segments.length - 1].replace(/\.+$/, "").trim();
@@ -265,8 +283,15 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
             segments.splice(cityIdx, 1);
           }
         } else {
-          city = rawCity;
-          segments.splice(cityIdx, 1);
+          // Also try institution-map even if keywords don't match (e.g. "Kliniken")
+          const instInfo2 = lookupInstitution(segments[cityIdx]);
+          if (instInfo2) {
+            city = instInfo2.city;
+            // Don't remove — will be picked up as institution in step 9
+          } else {
+            city = rawCity;
+            segments.splice(cityIdx, 1);
+          }
         }
       } else {
         confidence = "low";
