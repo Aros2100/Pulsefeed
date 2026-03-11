@@ -5,6 +5,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseAffiliation, type ParsedAffiliation } from "./affiliation-parser";
+import { getRegion } from "./continent-map";
 
 type AuthorEntry = {
   affiliation?: string | null;
@@ -62,10 +63,12 @@ export async function runLocationParsing(limit = 500): Promise<{
     first_author_institution: string | null;
     first_author_city: string | null;
     first_author_country: string | null;
+    first_author_region: string | null;
     last_author_department: string | null;
     last_author_institution: string | null;
     last_author_city: string | null;
     last_author_country: string | null;
+    last_author_region: string | null;
     location_parsed_at: string;
     location_confidence: "high" | "low" | null;
   };
@@ -93,10 +96,12 @@ export async function runLocationParsing(limit = 500): Promise<{
         first_author_institution: null,
         first_author_city: null,
         first_author_country: null,
+        first_author_region: null,
         last_author_department: null,
         last_author_institution: null,
         last_author_city: null,
         last_author_country: null,
+        last_author_region: null,
         location_parsed_at: now,
         location_confidence: null,
       });
@@ -126,10 +131,12 @@ export async function runLocationParsing(limit = 500): Promise<{
       first_author_institution: firstParsed?.institution ?? null,
       first_author_city: firstParsed?.city ?? null,
       first_author_country: firstParsed?.country ?? null,
+      first_author_region: firstParsed?.country ? getRegion(firstParsed.country) ?? null : null,
       last_author_department: lastParsed?.department ?? null,
       last_author_institution: lastParsed?.institution ?? null,
       last_author_city: lastParsed?.city ?? null,
       last_author_country: lastParsed?.country ?? null,
+      last_author_region: lastParsed?.country ? getRegion(lastParsed.country) ?? null : null,
       location_parsed_at: now,
       location_confidence: overallConfidence,
     });
@@ -145,10 +152,12 @@ export async function runLocationParsing(limit = 500): Promise<{
       first_author_institution: null,
       first_author_city: null,
       first_author_country: null,
+      first_author_region: null,
       last_author_department: null,
       last_author_institution: null,
       last_author_city: null,
       last_author_country: null,
+      last_author_region: null,
       location_parsed_at: new Date().toISOString(),
       location_confidence: null,
     });
@@ -228,10 +237,12 @@ export async function reparseLowConfidence(cutoffDate: string, limit = 500): Pro
         first_author_institution: firstParsed?.institution ?? null,
         first_author_city: firstParsed?.city ?? null,
         first_author_country: firstParsed?.country ?? null,
+        first_author_region: firstParsed?.country ? getRegion(firstParsed.country) ?? null : null,
         last_author_department: lastParsed?.department ?? null,
         last_author_institution: lastParsed?.institution ?? null,
         last_author_city: lastParsed?.city ?? null,
         last_author_country: lastParsed?.country ?? null,
+        last_author_region: lastParsed?.country ? getRegion(lastParsed.country) ?? null : null,
         location_parsed_at: new Date().toISOString(),
         location_confidence: overallConfidence,
       },

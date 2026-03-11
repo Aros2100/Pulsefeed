@@ -6,6 +6,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { aiParseAffiliation, type AIParsedLocation } from "./ai-location-parser";
 import { lookupCountry } from "./country-map";
+import { getRegion } from "./continent-map";
 
 type AuthorEntry = {
   affiliation?: string | null;
@@ -208,10 +209,12 @@ export async function runAILocationParsing(
         first_author_institution: firstCheck.fields.institution,
         first_author_city: firstCheck.fields.city,
         first_author_country: firstCheck.fields.country,
+        first_author_region: getRegion(firstCheck.fields.country ?? "") ?? null,
         last_author_department: lastCheck.fields.department,
         last_author_institution: lastCheck.fields.institution,
         last_author_city: lastCheck.fields.city,
         last_author_country: lastCheck.fields.country,
+        last_author_region: getRegion(lastCheck.fields.country ?? "") ?? null,
         location_confidence: newConfidence,
         location_parsed_at: new Date().toISOString(),
         ai_location_attempted: true,
