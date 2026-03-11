@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest, after } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { runImport } from "@/lib/pubmed/importer";
 import { runCitationFetch } from "@/lib/pubmed/fetch-citations";
+import { runLocationParsing } from "@/lib/geo/location-scorer";
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
@@ -20,6 +21,10 @@ export async function POST(request: NextRequest) {
 
   after(async () => {
     await runCitationFetch(200);
+  });
+
+  after(() => {
+    runLocationParsing(200).then(r => console.log("[geo/auto-parse]", r)).catch(e => console.error("[geo/auto-parse] error:", e));
   });
 
   return NextResponse.json({ ok: true });

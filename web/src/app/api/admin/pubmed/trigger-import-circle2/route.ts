@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { runImportCircle2 } from "@/lib/pubmed/importer-circle2";
 import { runCitationFetch } from "@/lib/pubmed/fetch-citations";
+import { runLocationParsing } from "@/lib/geo/location-scorer";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // Allow up to 5 minutes — import kan tage tid ved mange PMIDs
@@ -75,6 +76,10 @@ export async function POST(request: NextRequest) {
 
   after(async () => {
     await runCitationFetch(200);
+  });
+
+  after(() => {
+    runLocationParsing(200).then(r => console.log("[geo/auto-parse]", r)).catch(e => console.error("[geo/auto-parse] error:", e));
   });
 
   return NextResponse.json({ ok: true });
