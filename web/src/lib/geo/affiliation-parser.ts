@@ -5,6 +5,7 @@
 
 import { lookupCountry, CANONICAL_COUNTRIES, US_STATES } from "./country-map";
 import { lookupInstitution } from "./institution-map";
+import { isAdministrativeRegion } from "./region-map";
 
 export type ParsedAffiliation = {
   department: string | null;
@@ -39,6 +40,8 @@ const INST_KEYWORDS = [
   "Paracelsus",
   "Institut",
   "Institute",
+  "Foundation",
+  "College",
 ];
 
 function matchesKeywords(segment: string, keywords: string[]): boolean {
@@ -46,10 +49,54 @@ function matchesKeywords(segment: string, keywords: string[]): boolean {
   return keywords.some((kw) => lower.includes(kw.toLowerCase()));
 }
 
-/** Matches postal/zip code segments: pure digits, or letter-prefixed like "A-8036", "F-69008" */
+/** Matches postal/zip code segments */
 function isPostalCode(segment: string): boolean {
   const s = segment.trim();
-  return /^\d{3,6}$/.test(s) || /^[A-Z]{1,2}[-\s]?\d{3,6}$/i.test(s);
+  // Pure digits 3-6 chars
+  if (/^\d{3,6}$/.test(s)) return true;
+  // Letter-prefixed: "A-8036", "F-69008", "DK-2650"
+  if (/^[A-Z]{1,2}[-\s]?\d{3,6}$/i.test(s)) return true;
+  // Postal codes with letters: "2300 RC"
+  if (/^\d{3,5}\s+[A-Z]{1,3}$/i.test(s)) return true;
+  // Patterns like "71-252"
+  if (/^\d{2,3}-\d{2,4}$/.test(s)) return true;
+  return false;
+}
+
+/** Matches phone number segments */
+function isPhoneNumber(segment: string): boolean {
+  return /^[\d\s\-+().]{7,}$/.test(segment.trim());
+}
+
+/** Check if segment looks like an institution name (not a city) */
+function looksLikeInstitution(segment: string): boolean {
+  const instWords = [
+    "University", "Hospital", "Institute", "Medical Center", "Medical Centre",
+    "College", "School", "Foundation", "Clinic", "Academy",
+  ];
+  const lower = segment.toLowerCase();
+  return instWords.some((w) => lower.includes(w.toLowerCase()));
+}
+
+/** Clean city string: strip DK-prefix, postal codes, district suffixes */
+function cleanCity(raw: string): string {
+  let city = raw;
+  // Strip leading "DK-NNNN " or "DK " prefix
+  city = city.replace(/^DK[-\s]?\d{0,4}\s*/i, "").trim();
+  // Strip leading letter-prefixed postal codes: "A-8036 Graz" → "Graz", "F-69008 Lyon" → "Lyon"
+  city = city.replace(/^[A-Z]{1,2}[-\s]?\d{3,6}\s+/i, "").trim();
+  // Strip leading pure digit postal codes: "8200 Aarhus" → "Aarhus", "2650 Hvidovre" → "Hvidovre"
+  city = city.replace(/^\d{3,5}[-\s]+/, "").trim();
+  // Strip embedded postal-like patterns: "Beyrouth 11-5076" → "Beyrouth"
+  city = city.replace(/\s+\d{1,3}[-]\d{3,5}$/, "").trim();
+  // Strip trailing postal district letter: "Aarhus N" → "Aarhus", "Odense C" → "Odense"
+  const withoutSuffix = city.replace(/\s+[A-Z]$/, "");
+  if (withoutSuffix.length >= 3) {
+    city = withoutSuffix;
+  }
+  // Strip trailing dots/whitespace
+  city = city.replace(/[.\s]+$/, "").trim();
+  return city;
 }
 
 export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
@@ -57,30 +104,19 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
   if (!raw || !raw.trim()) return null;
 
   // Step 1b: Strip trailing author initials from raw string BEFORE splitting on ";"
-  // e.g. "Shanghai, 200120, China (H.X., T.J., C.Z., M.C.)." → "Shanghai, 200120, China"
   let text = raw.replace(/\s*\([A-Za-z][A-Za-z.\-,\s]{2,}\)\s*\.?\s*$/, "").trim();
 
   // Step 2: Take first affiliation only (split on "; " or ".; ")
   text = text.split(/\.\s*;\s*|;\s+/)[0].trim();
 
   // Step 3: Clean
-  // Remove "Electronic address: ..." and everything after
   text = text.replace(/\.\s*Electronic address:.*$/i, "").trim();
   text = text.replace(/Electronic address:.*$/i, "").trim();
-
-  // Remove trailing email addresses
   text = text.replace(/\s*\S+@\S+\.[\w.]+\s*$/, "").trim();
-
-  // Remove leading number prefixes: "1Department" → "Department"
-  text = text.replace(/^\d+([A-Z])/, "$1");
-
-  // Remove leading single lowercase letter prefix: "a Faculty" → "Faculty"
+  // Remove leading number prefixes: "1Department" → "Department", "1 Department" → "Department"
+  text = text.replace(/^\d+\s*([A-Z])/, "$1");
   text = text.replace(/^([a-z])\s+([A-Z])/, "$2");
-
-  // Strip leading "From the " or "From " prefix
   text = text.replace(/^From\s+the\s+/i, "").replace(/^From\s+/i, "").trim();
-
-  // Trim trailing dots and whitespace
   text = text.replace(/[.\s]+$/, "").trim();
 
   if (!text) return null;
@@ -89,15 +125,15 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
   const segments = text.split(/,\s*/).map((s) => s.trim()).filter(Boolean);
   if (segments.length === 0) return null;
 
-  // Step 5: Remove ALL postal code segments from the array
-  // This handles "Beijing, 100101, China" → ["Beijing", "China"]
-  // and "Lyon, F-69008, France" → ["Lyon", "France"]
+  // Step 5: Remove postal code and phone number segments
   for (let i = segments.length - 1; i >= 0; i--) {
     const seg = segments[i];
     if (isPostalCode(seg)) {
       segments.splice(i, 1);
+    } else if (isPhoneNumber(seg)) {
+      segments.splice(i, 1);
     } else {
-      // Also handle "77030 USA" — zip+country combined in one segment
+      // Handle "77030 USA" — zip+country combined
       const zipCountryMatch = seg.match(/^(\d{3,6})\s+(.+)$/);
       if (zipCountryMatch) {
         segments[i] = zipCountryMatch[2].trim();
@@ -108,11 +144,9 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
   if (segments.length === 0) return null;
 
   // Step 6: Check for known institution as last segment (early return)
-  // Handles "Department of X, Aarhus University Hospital" with no city/country
   for (let i = segments.length - 1; i >= Math.max(0, segments.length - 2); i--) {
     const instInfo = lookupInstitution(segments[i]);
     if (instInfo) {
-      // Check if any segment AFTER this one looks like a country
       const hasCountryAfter = segments.slice(i + 1).some((s) => {
         const cleaned = s.replace(/\.+$/, "").trim();
         return lookupCountry(cleaned) !== null || US_STATES[cleaned.toUpperCase()] !== undefined;
@@ -151,21 +185,18 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
   if (segments.length > 0) {
     const lastSeg = segments[segments.length - 1].replace(/\.+$/, "").trim();
 
-    // Direct lookup
     const directMatch = lookupCountry(lastSeg);
     if (directMatch) {
       country = directMatch;
       if (directMatch === "United States") isUS = true;
       segments.pop();
     } else {
-      // Check if last segment is a US state abbreviation
       const upperLast = lastSeg.toUpperCase();
       if (US_STATES[upperLast]) {
         country = "United States";
         isUS = true;
         segments.pop();
       } else {
-        // Substring match: check if last segment contains a known country name
         const lowerLast = lastSeg.toLowerCase();
         const found = CANONICAL_COUNTRIES.find((c) =>
           lowerLast.includes(c.toLowerCase())
@@ -180,7 +211,6 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
             segments.push(beforeCountry);
           }
         } else {
-          // Not recognized — set as country anyway with low confidence
           confidence = "low";
           country = lastSeg;
           segments.pop();
@@ -200,29 +230,56 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
     }
   }
 
-  // Step 8: Extract city (now-last segment)
+  // Step 8: Extract city — walk right to left, skip administrative regions
   let city: string | null = null;
   if (segments.length > 0) {
-    let citySeg = segments[segments.length - 1];
-
-    // Strip postal/zip codes embedded in city segment
-    citySeg = citySeg.replace(/\b[A-Z]?-?\d{3,6}\b/g, "").trim();
-    citySeg = citySeg.replace(/P\.?O\.?\s*Box\s*\d*/gi, "").trim();
-
-    // Strip US state abbreviations if country is US
-    if (isUS) {
-      citySeg = citySeg.replace(/\s+[A-Z]{2}$/, "").trim();
+    // Find city: skip regions/postal codes from the right
+    let cityIdx = segments.length - 1;
+    while (cityIdx >= 0) {
+      const candidate = segments[cityIdx].replace(/\.+$/, "").trim();
+      if (isAdministrativeRegion(candidate)) {
+        cityIdx--;
+        continue;
+      }
+      // Also skip if it's a postal code that slipped through
+      if (isPostalCode(candidate)) {
+        cityIdx--;
+        continue;
+      }
+      break;
     }
 
-    // Strip trailing dots/whitespace
-    citySeg = citySeg.replace(/[.\s]+$/, "").trim();
+    if (cityIdx >= 0) {
+      const rawCity = cleanCity(segments[cityIdx]);
 
-    if (citySeg) {
-      city = citySeg;
-      segments.pop();
-    } else {
-      confidence = "low";
-      segments.pop();
+      if (rawCity) {
+        // Check if the "city" actually looks like an institution
+        if (looksLikeInstitution(rawCity)) {
+          const instInfo = lookupInstitution(segments[cityIdx]);
+          if (instInfo) {
+            city = instInfo.city;
+            // Don't remove this segment — it will be picked up as institution in step 9
+          } else {
+            confidence = "low";
+            city = rawCity;
+            segments.splice(cityIdx, 1);
+          }
+        } else {
+          city = rawCity;
+          segments.splice(cityIdx, 1);
+        }
+      } else {
+        confidence = "low";
+        segments.splice(cityIdx, 1);
+      }
+    }
+
+    // Also remove consumed region segments so they don't pollute dept/inst extraction
+    for (let i = segments.length - 1; i >= 0; i--) {
+      const seg = segments[i].replace(/\.+$/, "").trim();
+      if (isAdministrativeRegion(seg)) {
+        segments.splice(i, 1);
+      }
     }
   }
 
