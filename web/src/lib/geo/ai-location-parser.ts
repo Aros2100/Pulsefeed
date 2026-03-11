@@ -38,11 +38,16 @@ Affiliation: "${raw}"`,
       response.content[0].type === "text" ? response.content[0].text : null;
     if (!text) return null;
 
-    // Extract JSON from response (handle markdown code blocks)
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
+    // Strip markdown fences
+    let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    // Extract JSON object: find first { and last }
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) return null;
+
+    const jsonStr = cleaned.substring(firstBrace, lastBrace + 1);
+    const parsed = JSON.parse(jsonStr);
     return {
       department: parsed.department ?? null,
       institution: parsed.institution ?? null,
