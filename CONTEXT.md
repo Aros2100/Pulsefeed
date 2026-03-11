@@ -76,6 +76,10 @@ pulsefeed/
 │   │   │       │   ├── citations/        # fetch + status
 │   │   │       │   ├── impact-factor/    # fetch + status
 │   │   │       │   ├── alerts/           # GET/POST/PATCH/DELETE system_alerts
+│   │   │       │   ├── geo/              # Geo-location endpoints
+│   │   │       │   │   ├── run-parse/   # POST: parse unparsed articles
+│   │   │       │   │   ├── reparse-low/ # POST: re-parse low-confidence
+│   │   │       │   │   └── ai-parse/    # POST: AI parse low-confidence (loops all)
 │   │   │       │   ├── cleanup-stuck-jobs/     # POST: nulstil hængte jobs
 │   │   │       │   └── circle3-sources/  # GET/PUT circle_3_sources
 │   │   │       ├── alerts/       # GET (public): aktive system-alerts
@@ -94,6 +98,16 @@ pulsefeed/
 │   │   │   ├── auth/             # require-admin.ts, specialties.ts, schemas.ts, errors.ts
 │   │   │   ├── tagging/
 │   │   │   │   └── auto-tagger.ts   # MeSH-based auto-tagging
+│   │   │   ├── geo/             # Geo-location parsing module
+│   │   │   │   ├── affiliation-parser.ts      # Deterministic parser (no AI)
+│   │   │   │   ├── country-map.ts             # Country normalization + US states
+│   │   │   │   ├── institution-map.ts         # Known institutions → city/country
+│   │   │   │   ├── region-map.ts              # Administrative regions (skip as city)
+│   │   │   │   ├── continent-map.ts           # Country → world region mapping
+│   │   │   │   ├── article-location-summary.ts # Build deduped summary arrays
+│   │   │   │   ├── location-scorer.ts         # Batch runner (deterministic)
+│   │   │   │   ├── ai-location-parser.ts      # Claude Haiku parser (fallback)
+│   │   │   │   └── ai-location-scorer.ts      # AI batch runner (low-confidence)
 │   │   │   ├── affiliations.ts   # Affiliation parsing
 │   │   │   ├── article-events.ts # Article event tracking
 │   │   │   ├── lab/
@@ -114,13 +128,15 @@ pulsefeed/
 │   │       └── RelativeTime.tsx
 │   └── supabase/
 │       └── migrations/           # 0020–0065 SQL-migrationer
+├── supabase/
+│   └── migrations/               # 0001–0044 SQL-migrationer (aktiv serie)
 ```
 
 ## Database — vigtigste tabeller
 
 | Tabel | Formål |
 |-------|--------|
-| `articles` | Artikler fra PubMed — `pubmed_id`, `title`, `abstract`, `authors` (JSONB), `circle`, `specialty_tags`, `status`, `country`, `source_id`, `citation_count`, `impact_factor`, `journal_h_index`, `evidence_score` (generated), `approval_method`, `auto_tagged_at`, `subspecialty_ai`, `article_type_ai`, `study_design_ai`, `classification_reason`, `classification_scored_at`, `classification_model_version`, `short_headline`, `short_resume`, `bottom_line`, `pico_population`, `pico_intervention`, `pico_comparison`, `pico_outcome`, `sample_size`, `condensed_model_version`, `condensed_at` |
+| `articles` | Artikler fra PubMed — `pubmed_id`, `title`, `abstract`, `authors` (JSONB), `circle`, `specialty_tags`, `status`, `country`, `source_id`, `citation_count`, `impact_factor`, `journal_h_index`, `evidence_score` (generated), `approval_method`, `auto_tagged_at`, `subspecialty_ai`, `article_type_ai`, `study_design_ai`, `classification_reason`, `classification_scored_at`, `classification_model_version`, `short_headline`, `short_resume`, `bottom_line`, `pico_population`, `pico_intervention`, `pico_comparison`, `pico_outcome`, `sample_size`, `condensed_model_version`, `condensed_at`, geo-location: `first_author_department`, `first_author_institution`, `first_author_city`, `first_author_country`, `first_author_region`, `last_author_*` (same), `location_parsed_at`, `location_confidence` (high/low), `ai_location_attempted` (bool), `article_regions` (TEXT[]), `article_countries` (TEXT[]), `article_cities` (TEXT[]), `article_institutions` (TEXT[]) |
 | `authors` | Forfatter-database — `display_name`, `city`, `country`, `specialty`, `affiliations` (TEXT[]), `article_count`, `author_score`, `orcid` |
 | `article_authors` | Many-to-many: artikler ↔ forfattere |
 | `pubmed_filters` | Circle 1 søge-konfiguration (journal-lister, query_string, specialty) |
@@ -200,6 +216,7 @@ import_logs oprettes (inkl. circle-kolonne)
 author-linker: JSONB authors → article_authors (via resolveAuthorId)
     ↓
 after(): runCitationFetch(200)   ← automatisk efter C1/C2/C3 import
+after(): runLocationParsing(200) ← automatisk geo-parsing efter import
 ```
 
 ### Circle 1 (`importer.ts`)
@@ -429,6 +446,43 @@ Split i to uafhængige valideringsmoduler:
 | `/admin/authors/[id]` | Forfatter-profil med author_score badge + articles |
 | `/admin/authors/merge` | Forfatter-merge: duplikat-grupper → kort → bekræft |
 
+## Geo-location modul
+
+Automatisk parsing af forfatter-affiliations til strukturerede lokationsfelter. To-trins pipeline: deterministisk parser → AI fallback.
+
+### Deterministisk parser (`affiliation-parser.ts`)
+- Ren string-parsing — ingen AI, ingen eksterne API'er
+- Processing: strip initials → first affiliation → clean → split → remove postal/phone → institution lookup → country → city (right-to-left, skip regions) → dept/inst → confidence
+- `cleanCity()`: Stripper DK-prefix, SE-prefix, postcodes, UK postcodes, Nordic district-bogstaver (Ø, Ö, Ü, Æ, Å), US state-navne
+- Confidence: `high` når country+city+institution alle er fundet, ellers `low`
+
+### Hjælpefiler
+| Fil | Formål |
+|-----|--------|
+| `country-map.ts` | `lookupCountry(raw)` — ~180 country aliases + US state names → canonical form |
+| `institution-map.ts` | `lookupInstitution(segment)` — ~25 kendte institutioner med city/country (danske hospitaler, Karolinska, Mayo Clinic, Charité) |
+| `region-map.ts` | `isAdministrativeRegion(segment)` — ~150 regioner (US states, kinesiske provinser, japanske prefekturer, canadiske provinser) der IKKE er byer. `isProvinceCode(segment)` for 2-bogstavs canadiske provinskoder |
+| `continent-map.ts` | `getRegion(country)` — 200+ lande → 14 verdensregioner (Scandinavia, Western Europe, East Asia etc.) |
+| `article-location-summary.ts` | `buildLocationSummary(first, last)` — deduplikerede, sorterede arrays af regions/countries/cities/institutions |
+
+### Batch runners
+| Runner | Trigger | Formål |
+|--------|---------|--------|
+| `location-scorer.ts` → `runLocationParsing(limit)` | Automatisk efter import (C1/C2/C3) + manuelt via `/api/admin/geo/run-parse` | Parser uparsede artikler (`location_parsed_at IS NULL`) |
+| `location-scorer.ts` → `reparseLowConfidence(cutoffDate, limit)` | Manuelt via `/api/admin/geo/reparse-low` | Re-parser low-confidence efter parser-forbedringer |
+| `ai-location-scorer.ts` → `runAILocationParsing(limit)` | Manuelt via `/api/admin/geo/ai-parse` | AI fallback for low-confidence, loops alle batches |
+
+### AI parser (`ai-location-parser.ts`)
+- Model: `claude-haiku-4-5-20251001` (via `trackedCall`)
+- Cross-check: AI-resultat sammenlignes med eksisterende parser-resultat via `lookupCountry()` normalisering
+- Agree → upgrade til `high`, disagree → forbliver `low`, failed → forbliver `low`
+- `ai_location_attempted = true` forhindrer re-processing
+
+### Article summary arrays
+- `article_regions`, `article_countries`, `article_cities`, `article_institutions` (TEXT[] med GIN-indexes)
+- Deduplikeret union af first + last author værdier
+- Populeres i både deterministisk og AI scorer
+
 ## Vigtige konventioner
 
 - **Admin-klient**: Brug altid `createAdminClient()` fra `@/lib/supabase/admin` i server-kode
@@ -493,6 +547,9 @@ NEXT_PUBLIC_SITE_URL
 | `0039` | Classification kolonner på articles + `get_classification_not_validated_articles` + `count_classification_not_validated` RPCs |
 | `0040` | Seed: initial classification prompt (v1) for neurosurgery i `model_versions` |
 | `0041` | `get_pico_not_validated_articles` + `count_pico_not_validated` + `count_condensation_not_validated` RPCs |
+| `0042` | `ai_location_attempted` BOOLEAN kolonne på articles |
+| `0043` | `first_author_region`, `last_author_region` TEXT kolonner + indexes |
+| `0044` | `article_regions`, `article_countries`, `article_cities`, `article_institutions` TEXT[] kolonner + GIN indexes |
 
 Ældre migrationer (0046–0064 i `web/supabase/`) er renummereret/sammenlagt — de nuværende 0001–0065 er den aktive migration-serie.
 
