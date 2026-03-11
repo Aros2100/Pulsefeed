@@ -35,6 +35,9 @@ const RAW_INSTITUTIONS: [string, InstitutionInfo][] = [
   ["aalborg university", { institution: "Aalborg University", city: "Aalborg", country: "Denmark" }],
 
   // Other frequently seen
+  ["helsinki university hospital", { institution: "Helsinki University Hospital", city: "Helsinki", country: "Finland" }],
+  ["thomas jefferson university", { institution: "Thomas Jefferson University", city: "Philadelphia", country: "United States" }],
+  ["jefferson hospital for neuroscience", { institution: "Jefferson Hospital for Neuroscience", city: "Philadelphia", country: "United States" }],
   ["mayo clinic", { institution: "Mayo Clinic", city: "Rochester", country: "United States" }],
   ["karolinska", { institution: "Karolinska Institutet", city: "Stockholm", country: "Sweden" }],
   ["charité", { institution: "Charité – Universitätsmedizin Berlin", city: "Berlin", country: "Germany" }],

@@ -46,12 +46,22 @@ function matchesKeywords(segment: string, keywords: string[]): boolean {
   return keywords.some((kw) => lower.includes(kw.toLowerCase()));
 }
 
+/** Matches postal/zip code segments: pure digits, or letter-prefixed like "A-8036", "F-69008" */
+function isPostalCode(segment: string): boolean {
+  const s = segment.trim();
+  return /^\d{3,6}$/.test(s) || /^[A-Z]{1,2}[-\s]?\d{3,6}$/i.test(s);
+}
+
 export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
   // Step 1: Handle null/empty
   if (!raw || !raw.trim()) return null;
 
+  // Step 1b: Strip trailing author initials from raw string BEFORE splitting on ";"
+  // e.g. "Shanghai, 200120, China (H.X., T.J., C.Z., M.C.)." → "Shanghai, 200120, China"
+  let text = raw.replace(/\s*\([A-Za-z][A-Za-z.\-,\s]{2,}\)\s*\.?\s*$/, "").trim();
+
   // Step 2: Take first affiliation only (split on "; " or ".; ")
-  let text = raw.split(/\.\s*;\s*|;\s+/)[0].trim();
+  text = text.split(/\.\s*;\s*|;\s+/)[0].trim();
 
   // Step 3: Clean
   // Remove "Electronic address: ..." and everything after
@@ -67,19 +77,11 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
   // Remove leading single lowercase letter prefix: "a Faculty" → "Faculty"
   text = text.replace(/^([a-z])\s+([A-Z])/, "$2");
 
+  // Strip leading "From the " or "From " prefix
+  text = text.replace(/^From\s+the\s+/i, "").replace(/^From\s+/i, "").trim();
+
   // Trim trailing dots and whitespace
   text = text.replace(/[.\s]+$/, "").trim();
-
-  if (!text) return null;
-
-  // Step 3b (Fix 1): Strip trailing author initials in parentheses
-  // e.g. "Louisville, Kentucky (R.A.K., A.M.M)." → "Louisville, Kentucky"
-  text = text.replace(/\s*\([A-Z][A-Za-z.\-,\s]+\)\s*\.?\s*$/, "").trim();
-  // Trim trailing dots/whitespace again after stripping
-  text = text.replace(/[.\s]+$/, "").trim();
-
-  // Step 3c (Fix 1): Strip leading "From the " or "From " prefix
-  text = text.replace(/^From\s+the\s+/i, "").replace(/^From\s+/i, "").trim();
 
   if (!text) return null;
 
@@ -87,24 +89,26 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
   const segments = text.split(/,\s*/).map((s) => s.trim()).filter(Boolean);
   if (segments.length === 0) return null;
 
-  // Step 4b (Fix 2): Strip trailing postal/zip code segments
-  // If last segment is purely numeric (3-6 digits), remove it
-  while (segments.length > 1 && /^\d{3,6}$/.test(segments[segments.length - 1])) {
-    segments.pop();
-  }
-  // Handle "77030 USA" pattern: last segment is "ZIP COUNTRY"
-  if (segments.length > 0) {
-    const lastSeg = segments[segments.length - 1];
-    const zipCountryMatch = lastSeg.match(/^(\d{3,6})\s+(.+)$/);
-    if (zipCountryMatch) {
-      // Replace the combined segment with just the country part
-      segments[segments.length - 1] = zipCountryMatch[2].trim();
+  // Step 5: Remove ALL postal code segments from the array
+  // This handles "Beijing, 100101, China" → ["Beijing", "China"]
+  // and "Lyon, F-69008, France" → ["Lyon", "France"]
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const seg = segments[i];
+    if (isPostalCode(seg)) {
+      segments.splice(i, 1);
+    } else {
+      // Also handle "77030 USA" — zip+country combined in one segment
+      const zipCountryMatch = seg.match(/^(\d{3,6})\s+(.+)$/);
+      if (zipCountryMatch) {
+        segments[i] = zipCountryMatch[2].trim();
+      }
     }
   }
 
-  // Step 4c (Fix 3): Check for known institution as last segment
-  // This handles cases like "Department of X, Aarhus University Hospital" with no city/country
-  // Check last segment, then second-to-last
+  if (segments.length === 0) return null;
+
+  // Step 6: Check for known institution as last segment (early return)
+  // Handles "Department of X, Aarhus University Hospital" with no city/country
   for (let i = segments.length - 1; i >= Math.max(0, segments.length - 2); i--) {
     const instInfo = lookupInstitution(segments[i]);
     if (instInfo) {
@@ -115,18 +119,15 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
       });
 
       if (!hasCountryAfter) {
-        // No country after the institution — use the lookup data
         let department: string | null = null;
         const institution = segments[i];
 
-        // Check earlier segments for department keywords
         for (let j = 0; j < i; j++) {
           if (matchesKeywords(segments[j], DEPT_KEYWORDS)) {
             department = segments[j];
             break;
           }
         }
-        // If no keyword match but there's a segment before institution, use it as department
         if (!department && i > 0) {
           department = segments[0];
         }
@@ -142,7 +143,7 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
     }
   }
 
-  // Step 5: Extract country (last segment)
+  // Step 7: Extract country (last segment)
   let country: string | null = null;
   let confidence: "high" | "low" = "high";
   let isUS = false;
@@ -172,8 +173,6 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
         if (found) {
           country = found;
           if (found === "United States") isUS = true;
-          // Extract city from combined segment if it contains more than just the country
-          // e.g. "A-8036 Graz Austria" → country=Austria, push back "A-8036 Graz"
           const countryIdx = lowerLast.lastIndexOf(found.toLowerCase());
           const beforeCountry = lastSeg.slice(0, countryIdx).trim();
           segments.pop();
@@ -189,34 +188,29 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
       }
     }
 
-    // If country is US, also check if the now-last segment is a US state abbreviation or full state name
-    // e.g. segments = ["Dept...", "University of Minnesota", "Minneapolis", "MN"] and country=US
-    // or segments = ["...", "Houston", "Texas"] and country=US
+    // Consume US state abbreviation or full state name after country
     if (isUS && segments.length > 0) {
       const maybeSt = segments[segments.length - 1].replace(/\.+$/, "").trim();
       const maybeStUpper = maybeSt.toUpperCase();
       if (US_STATES[maybeStUpper]) {
-        segments.pop(); // consume 2-letter state abbreviation
+        segments.pop();
       } else if (lookupCountry(maybeSt) === "United States") {
-        // Full state name like "Texas", "California" etc. (mapped to US in country-map)
         segments.pop();
       }
     }
   }
 
-  // Step 6: Extract city (now-last segment)
+  // Step 8: Extract city (now-last segment)
   let city: string | null = null;
   if (segments.length > 0) {
     let citySeg = segments[segments.length - 1];
 
-    // Strip postal/zip codes: patterns like "A-8036", "1000", "75013", etc.
+    // Strip postal/zip codes embedded in city segment
     citySeg = citySeg.replace(/\b[A-Z]?-?\d{3,6}\b/g, "").trim();
-    // Also strip "P.O. Box NNN" patterns
     citySeg = citySeg.replace(/P\.?O\.?\s*Box\s*\d*/gi, "").trim();
 
     // Strip US state abbreviations if country is US
     if (isUS) {
-      // Remove trailing 2-letter state code: "Minneapolis MN" or just "MN"
       citySeg = citySeg.replace(/\s+[A-Z]{2}$/, "").trim();
     }
 
@@ -232,8 +226,7 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
     }
   }
 
-  // Step 7: Extract department and institution from remaining segments
-  // First pass: assign segments that match keywords
+  // Step 9: Extract department and institution from remaining segments
   let department: string | null = null;
   let institution: string | null = null;
   const unmatched: string[] = [];
@@ -254,7 +247,6 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
     }
   }
 
-  // Second pass: fill gaps with unmatched segments
   if (!department && !institution && unmatched.length === 1) {
     institution = unmatched[0];
   } else if (!department && unmatched.length > 0) {
@@ -263,14 +255,12 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
     institution = unmatched[0];
   }
 
-  // If no institution found but department found → swap
   if (!institution && department) {
     institution = department;
     department = null;
   }
 
-  // Step 8: Determine confidence
-  // Count effective parts: country + city + at least one of dept/inst
+  // Step 10: Determine confidence
   const hasParts = (country ? 1 : 0) + (city ? 1 : 0) + (institution ? 1 : 0) + (department ? 1 : 0);
   if (
     country &&

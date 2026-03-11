@@ -33,6 +33,7 @@ const RAW_COUNTRY_MAP: Record<string, string> = {
   "republic of korea": "South Korea",
   "south korea": "South Korea",
   "rok": "South Korea",
+  "korea": "South Korea",
 
   "republic of north macedonia": "North Macedonia",
   "rn macedonia": "North Macedonia",
@@ -66,10 +67,12 @@ const RAW_COUNTRY_MAP: Record<string, string> = {
   "australia": "Australia",
   "canada": "Canada",
   "brazil": "Brazil",
+  "brasil": "Brazil",
   "india": "India",
   "israel": "Israel",
   "turkey": "Turkey",
   "türkiye": "Turkey",
+  "turkiye": "Turkey",
   "egypt": "Egypt",
   "saudi arabia": "Saudi Arabia",
   "iran": "Iran",
@@ -79,6 +82,7 @@ const RAW_COUNTRY_MAP: Record<string, string> = {
   "nigeria": "Nigeria",
   "argentina": "Argentina",
   "mexico": "Mexico",
+  "mex": "Mexico",
   "colombia": "Colombia",
   "chile": "Chile",
   "taiwan": "Taiwan",
@@ -174,6 +178,8 @@ const RAW_COUNTRY_MAP: Record<string, string> = {
   "turkmenistan": "Turkmenistan",
   "tajikistan": "Tajikistan",
   "kyrgyzstan": "Kyrgyzstan",
+  "curaçao": "Curaçao",
+  "curacao": "Curaçao",
 
   // US state full names → "United States"
   "texas": "United States",
