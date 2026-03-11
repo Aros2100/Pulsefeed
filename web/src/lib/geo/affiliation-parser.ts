@@ -5,7 +5,7 @@
 
 import { lookupCountry, CANONICAL_COUNTRIES, US_STATES } from "./country-map";
 import { lookupInstitution } from "./institution-map";
-import { isAdministrativeRegion } from "./region-map";
+import { isAdministrativeRegion, isProvinceCode } from "./region-map";
 
 export type ParsedAffiliation = {
   department: string | null;
@@ -83,14 +83,18 @@ function cleanCity(raw: string): string {
   let city = raw;
   // Strip leading "DK-NNNN " or "DK " prefix
   city = city.replace(/^DK[-\s]?\d{0,4}\s*/i, "").trim();
+  // Strip leading country/region prefix codes: "SE_17176 Stockholm", "SE-17176 Stockholm"
+  city = city.replace(/^[A-Z]{2}[-_]\d{4,5}\s+/i, "").trim();
   // Strip leading letter-prefixed postal codes: "A-8036 Graz" → "Graz", "F-69008 Lyon" → "Lyon"
   city = city.replace(/^[A-Z]{1,2}[-\s]?\d{3,6}\s+/i, "").trim();
   // Strip leading pure digit postal codes: "8200 Aarhus" → "Aarhus", "93 Lodz" → "Lodz"
   city = city.replace(/^\d{2,5}[-\s]+/, "").trim();
   // Strip embedded postal-like patterns: "Beyrouth 11-5076" → "Beyrouth"
   city = city.replace(/\s+\d{1,3}[-]\d{3,5}$/, "").trim();
-  // Strip trailing UK postcodes: "London SE5 9RS" → "London", "Oxford OX1 3QT" → "Oxford"
-  city = city.replace(/\s+[A-Z]{1,2}\d{1,2}\s*\d[A-Z]{2}$/i, "").trim();
+  // Strip trailing 4-6 digit postcodes: "Seongnam-si 13488" → "Seongnam-si", "Manisa 45000" → "Manisa"
+  city = city.replace(/\s+\d{4,6}$/, "").trim();
+  // Strip trailing UK postcodes: "London WC1E 6DE", "London SE5 9RS", "Oxford OX1 3QT"
+  city = city.replace(/\s+[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i, "").trim();
   // Strip trailing postal district letter (including Nordic: Ø, Ö, Ü, Æ, Å)
   const withoutSuffix = city.replace(/\s+[A-ZØÖÜÆÅ]$/u, "");
   if (withoutSuffix.length >= 3) {
@@ -251,11 +255,18 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
   // Step 8: Extract city — walk right to left, skip administrative regions
   let city: string | null = null;
   if (segments.length > 0) {
-    // Find city: skip regions/postal codes from the right
+    // Find city: skip regions/postal codes/province codes from the right
     let cityIdx = segments.length - 1;
     while (cityIdx >= 0) {
       const candidate = segments[cityIdx].replace(/\.+$/, "").trim();
-      if (isAdministrativeRegion(candidate)) {
+      // Also check region after stripping trailing postcodes: "Guangdong 510000" → "Guangdong"
+      const candidateCleaned = candidate.replace(/\s+\d{4,6}$/, "").trim();
+      if (isAdministrativeRegion(candidate) || isAdministrativeRegion(candidateCleaned)) {
+        cityIdx--;
+        continue;
+      }
+      // Skip 2-letter province/state codes: ON, QC, BC, CA, TX, etc.
+      if (candidate.length === 2 && (US_STATES[candidate.toUpperCase()] || isProvinceCode(candidate))) {
         cityIdx--;
         continue;
       }
@@ -299,10 +310,13 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
       }
     }
 
-    // Also remove consumed region segments so they don't pollute dept/inst extraction
+    // Also remove consumed region/province-code segments so they don't pollute dept/inst extraction
     for (let i = segments.length - 1; i >= 0; i--) {
       const seg = segments[i].replace(/\.+$/, "").trim();
-      if (isAdministrativeRegion(seg)) {
+      const segCleaned = seg.replace(/\s+\d{4,6}$/, "").trim();
+      if (isAdministrativeRegion(seg) || isAdministrativeRegion(segCleaned)) {
+        segments.splice(i, 1);
+      } else if (seg.length === 2 && (US_STATES[seg.toUpperCase()] || isProvinceCode(seg))) {
         segments.splice(i, 1);
       }
     }

@@ -61,8 +61,26 @@ const REGIONS = new Set([
 
   // South Korean provinces
   "gyeonggi", "gyeongsang", "chungcheong", "jeolla", "gangwon", "jeju",
+
+  // Ecuadorian provinces
+  "guayas",
 ]);
 
+/** Canadian province abbreviations */
+const PROVINCE_CODES = new Set([
+  "ON", "QC", "BC", "AB", "MB", "SK", "NS", "NB", "NL", "PE", "NT", "NU", "YT",
+]);
+
+export function isProvinceCode(segment: string): boolean {
+  return PROVINCE_CODES.has(segment.trim().toUpperCase());
+}
+
 export function isAdministrativeRegion(segment: string): boolean {
-  return REGIONS.has(segment.trim().toLowerCase());
+  const cleaned = segment.trim().toLowerCase();
+  if (REGIONS.has(cleaned)) return true;
+  // Strip trailing " Province", " State", " Prefecture", " Region" and check again
+  const stripped = cleaned
+    .replace(/\s+(province|state|prefecture|region)$/i, "");
+  if (stripped !== cleaned && REGIONS.has(stripped)) return true;
+  return false;
 }
