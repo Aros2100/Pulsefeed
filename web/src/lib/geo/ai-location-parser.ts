@@ -41,18 +41,43 @@ Affiliation: "${raw}"`,
     // Strip markdown fences
     let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
 
-    // Extract JSON object: find first { and last }
+    // Extract JSON - handle both single object and array
     const firstBrace = cleaned.indexOf('{');
-    const lastBrace = cleaned.lastIndexOf('}');
-    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) return null;
+    const firstBracket = cleaned.indexOf('[');
 
-    const jsonStr = cleaned.substring(firstBrace, lastBrace + 1);
-    const parsed = JSON.parse(jsonStr);
+    let parsed: Record<string, unknown>;
+
+    if (firstBracket !== -1 && (firstBracket < firstBrace || firstBrace === -1)) {
+      // Array response - parse array, take first element
+      const lastBracket = cleaned.lastIndexOf(']');
+      if (lastBracket === -1 || lastBracket <= firstBracket) return null;
+      const arrStr = cleaned.substring(firstBracket, lastBracket + 1);
+      const arr = JSON.parse(arrStr);
+      if (!Array.isArray(arr) || arr.length === 0) return null;
+      parsed = arr[0];
+    } else if (firstBrace !== -1) {
+      // Single object response - find matching closing brace
+      let depth = 0;
+      let endIndex = -1;
+      for (let i = firstBrace; i < cleaned.length; i++) {
+        if (cleaned[i] === '{') depth++;
+        if (cleaned[i] === '}') depth--;
+        if (depth === 0) { endIndex = i; break; }
+      }
+      if (endIndex === -1) return null;
+      const jsonStr = cleaned.substring(firstBrace, endIndex + 1);
+      parsed = JSON.parse(jsonStr);
+    } else {
+      return null;
+    }
+    const str = (v: unknown): string | null =>
+      typeof v === "string" && v.trim() ? v.trim() : null;
+
     return {
-      department: parsed.department ?? null,
-      institution: parsed.institution ?? null,
-      city: parsed.city ?? null,
-      country: parsed.country ?? null,
+      department: str(parsed.department),
+      institution: str(parsed.institution),
+      city: str(parsed.city),
+      country: str(parsed.country),
     };
   } catch (e) {
     console.error("[geo/ai-parse] AI call failed:", e);
