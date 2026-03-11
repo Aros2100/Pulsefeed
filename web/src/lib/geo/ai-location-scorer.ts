@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { aiParseAffiliation, type AIParsedLocation } from "./ai-location-parser";
 import { lookupCountry } from "./country-map";
 import { getRegion } from "./continent-map";
+import { buildLocationSummary } from "./article-location-summary";
 
 type AuthorEntry = {
   affiliation?: string | null;
@@ -202,6 +203,13 @@ export async function runAILocationParsing(
       failed++;
     }
 
+    const firstRegionAI = getRegion(firstCheck.fields.country ?? "") ?? null;
+    const lastRegionAI = getRegion(lastCheck.fields.country ?? "") ?? null;
+    const summaryAI = buildLocationSummary(
+      { region: firstRegionAI, country: firstCheck.fields.country, city: firstCheck.fields.city, institution: firstCheck.fields.institution },
+      { region: lastRegionAI, country: lastCheck.fields.country, city: lastCheck.fields.city, institution: lastCheck.fields.institution },
+    );
+
     updates.push({
       id: article.id,
       fields: {
@@ -209,12 +217,13 @@ export async function runAILocationParsing(
         first_author_institution: firstCheck.fields.institution,
         first_author_city: firstCheck.fields.city,
         first_author_country: firstCheck.fields.country,
-        first_author_region: getRegion(firstCheck.fields.country ?? "") ?? null,
+        first_author_region: firstRegionAI,
         last_author_department: lastCheck.fields.department,
         last_author_institution: lastCheck.fields.institution,
         last_author_city: lastCheck.fields.city,
         last_author_country: lastCheck.fields.country,
-        last_author_region: getRegion(lastCheck.fields.country ?? "") ?? null,
+        last_author_region: lastRegionAI,
+        ...summaryAI,
         location_confidence: newConfidence,
         location_parsed_at: new Date().toISOString(),
         ai_location_attempted: true,
