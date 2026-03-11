@@ -173,7 +173,7 @@ export async function runLocationParsing(limit = 500): Promise<{
  * One-time re-parse of previously low-confidence articles.
  * Call after parser improvements to upgrade results. Not meant for loops.
  */
-export async function reparseLowConfidence(limit = 500): Promise<{
+export async function reparseLowConfidence(cutoffDate: string, limit = 500): Promise<{
   parsed: number;
   highConfidence: number;
   lowConfidence: number;
@@ -186,7 +186,7 @@ export async function reparseLowConfidence(limit = 500): Promise<{
     .from("articles")
     .select("id, authors")
     .eq("location_confidence", "low")
-    .not("location_parsed_at", "is", null)
+    .lt("location_parsed_at", cutoffDate)
     .not("authors", "is", null)
     .limit(limit);
 
