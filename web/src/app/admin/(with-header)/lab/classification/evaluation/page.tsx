@@ -4,7 +4,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 import VersionSelector from "../../specialty-tag/evaluation/VersionSelector";
 import PromptDrawer, { type ModelVersion } from "@/components/lab/PromptDrawer";
-import { versionSegments } from "@/lib/lab/classification-version";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -12,16 +11,6 @@ function fmtDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
-
-// ─── Tabs ────────────────────────────────────────────────────────────────────
-
-const TABS = [
-  { key: "subspecialty",  label: "Subspecialty",  module: "classification_subspecialty" },
-  { key: "article_type",  label: "Article Type",  module: "classification_article_type" },
-  { key: "study_design",  label: "Study Design",  module: "classification_study_design" },
-] as const;
-
-type TabKey = (typeof TABS)[number]["key"];
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
@@ -110,15 +99,11 @@ function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDe
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 interface Props {
-  searchParams: Promise<{ tab?: string; version?: string }>;
+  searchParams: Promise<{ version?: string }>;
 }
 
 export default async function ClassificationEvaluationPage({ searchParams }: Props) {
-  const { tab: tabParam, version: versionParam } = await searchParams;
-  const activeTab: TabKey = TABS.some((t) => t.key === tabParam)
-    ? (tabParam as TabKey)
-    : "subspecialty";
-  const activeModule = TABS.find((t) => t.key === activeTab)!.module;
+  const { version: versionParam } = await searchParams;
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -147,12 +132,12 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
   const activeModelVersion = modelVersions.find((v) => v.active)?.version ?? null;
   const selectedVersion = versionParam ?? activeModelVersion;
 
-  // Fetch all decisions for selected module + optional version filter
+  // Fetch all decisions for subspecialty module + optional version filter
   const baseQuery = admin
     .from("lab_decisions")
     .select("article_id, decision, decided_at, ai_decision, ai_confidence, disagreement_reason")
     .eq("specialty", specialty)
-    .eq("module", activeModule)
+    .eq("module", "classification_subspecialty")
     .not("ai_decision", "is", null)
     .order("decided_at", { ascending: false });
 
@@ -176,7 +161,7 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
     admin.from("lab_decisions")
       .select("model_version, ai_decision, decision")
       .eq("specialty", specialty)
-      .eq("module", activeModule)
+      .eq("module", "classification_subspecialty")
       .not("ai_decision", "is", null)
       .limit(10000),
   ]);
@@ -217,14 +202,6 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
   const totalDisagree  = disagreements.length;
   const agreementRate  = total > 0 ? Math.round(((total - totalDisagree) / total) * 100) : null;
   const correctedCount = disagreements.filter((d) => d.disagreement_reason === "corrected").length;
-
-  // Version segments for tab labels
-  const segments = selectedVersion ? versionSegments(selectedVersion) : null;
-  const dimIndex: Record<TabKey, keyof ReturnType<typeof versionSegments>> = {
-    subspecialty: "subspecialty",
-    article_type: "article_type",
-    study_design: "study_design",
-  };
 
   // Data sufficiency
   const hasSufficientData = totalDisagree >= 50;
@@ -269,42 +246,6 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
           </p>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display: "flex", gap: "4px", marginBottom: "20px" }}>
-          {TABS.map((t) => {
-            const isActive = t.key === activeTab;
-            return (
-              <Link
-                key={t.key}
-                href={`/admin/lab/classification/evaluation?tab=${t.key}${selectedVersion ? `&version=${selectedVersion}` : ""}`}
-                style={{
-                  fontSize: "13px",
-                  fontWeight: isActive ? 700 : 500,
-                  color: isActive ? "#7c3aed" : "#5a6a85",
-                  background: isActive ? "#f3f0ff" : "#fff",
-                  border: `1px solid ${isActive ? "#ddd6fe" : "#e5e7eb"}`,
-                  borderRadius: "6px",
-                  padding: "7px 16px",
-                  textDecoration: "none",
-                  transition: "all 0.15s",
-                }}
-              >
-                {t.label}
-                {segments && (
-                  <span style={{ marginLeft: "4px", fontSize: "11px", color: isActive ? "#7c3aed" : "#aaa", fontWeight: 600 }}>
-                    ({t.key === "subspecialty"
-                      ? <><span style={{ fontWeight: 800 }}>{segments.subspecialty}</span>.x.x</>
-                      : t.key === "article_type"
-                      ? <>x.<span style={{ fontWeight: 800 }}>{segments.article_type}</span>.x</>
-                      : <>x.x.<span style={{ fontWeight: 800 }}>{segments.study_design}</span></>
-                    })
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </div>
-
         {/* Data sufficiency banner */}
         <div style={{ background: dataBanner.bg, border: `1px solid ${dataBanner.border}`, borderRadius: "8px", padding: "10px 16px", marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -313,7 +254,7 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
           </div>
           {hasSufficientData ? (
             <Link
-              href={`/admin/lab/classification/optimize?tab=${activeTab}`}
+              href="/admin/lab/classification/optimize"
               style={{ flexShrink: 0, fontSize: "13px", fontWeight: 700, background: "#1a1a1a", color: "#fff", borderRadius: "7px", padding: "7px 16px", textDecoration: "none", whiteSpace: "nowrap" }}
             >
               Optimize model →
@@ -333,7 +274,7 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
           <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
-                Summary — {TABS.find((t) => t.key === activeTab)!.label}
+                Summary — Subspecialty
               </span>
               {selectedVersion && (
                 <span style={{ fontSize: "11px", color: "#888" }}>
@@ -362,7 +303,7 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
 
         {/* Disagreements list */}
         <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700, marginBottom: "12px" }}>
-          Korrektioner — {TABS.find((t) => t.key === activeTab)!.label}
+          Korrektioner — Subspecialty
         </div>
         <div style={card}>
           <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>

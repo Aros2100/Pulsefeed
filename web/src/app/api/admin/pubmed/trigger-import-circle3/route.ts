@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { runImportCircle3 } from "@/lib/pubmed/importer-circle3";
 import { runCitationFetch } from "@/lib/pubmed/fetch-citations";
 import { runLocationParsing } from "@/lib/geo/location-scorer";
+import { runPublicationTypeMapping } from "@/lib/tagging/publication-type-mapper";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const maxDuration = 300;
@@ -52,6 +53,10 @@ export async function POST() {
 
   after(() => {
     runLocationParsing(200).then(r => console.log("[geo/auto-parse]", r)).catch(e => console.error("[geo/auto-parse] error:", e));
+  });
+
+  after(() => {
+    runPublicationTypeMapping(200).then(r => console.log("[pubtype-map]", r)).catch(e => console.error("[pubtype-map] error:", e));
   });
 
   return NextResponse.json({ ok: true });

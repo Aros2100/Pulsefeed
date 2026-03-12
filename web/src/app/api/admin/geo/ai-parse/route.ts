@@ -9,8 +9,24 @@ export async function POST() {
 
   after(async () => {
     try {
-      const result = await runAILocationParsing(100);
-      console.log("[geo/ai-parse]", result);
+      let totalProcessed = 0;
+      let totalUpgraded = 0;
+      let totalConflicted = 0;
+      let totalFailed = 0;
+
+      while (true) {
+        const result = await runAILocationParsing(100);
+        totalProcessed += result.processed;
+        totalUpgraded += result.upgraded;
+        totalConflicted += result.conflicted;
+        totalFailed += result.failed;
+
+        console.log("[geo/ai-parse] batch done:", result);
+
+        if (result.processed === 0) break;
+      }
+
+      console.log("[geo/ai-parse] ALL DONE:", { totalProcessed, totalUpgraded, totalConflicted, totalFailed });
     } catch (e) {
       console.error("[geo/ai-parse] failed:", e);
     }

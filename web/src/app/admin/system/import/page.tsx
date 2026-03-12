@@ -326,6 +326,15 @@ export default async function ImportDashboardPage() {
           </div>
         </div>
 
+        <div style={sectionCard}>
+          <div style={sectionHeader}>
+            <span style={headerLabel}>Geo-location</span>
+          </div>
+          <div style={{ padding: "20px 24px" }}>
+            <ImportDashboardActions specialtySlugs={[]} subset="geo" />
+          </div>
+        </div>
+
       </div>
     </div>
   );

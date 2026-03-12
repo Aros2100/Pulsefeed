@@ -23,6 +23,9 @@ pulsefeed/
 ├── web/
 │   ├── src/
 │   │   ├── app/                  # Next.js App Router
+│   │   │   ├── geo/              # Geo drill-down (4 niveauer)
+│   │   │   │   ├── page.tsx            # Server comp — henter data for aktivt niveau
+│   │   │   │   └── GeoExplorer.tsx     # Client comp — breadcrumb + bar chart + artikelliste
 │   │   │   ├── admin/            # Admin-sider
 │   │   │   │   ├── (with-header)/        # Route group — har global Header + AlertBanner
 │   │   │   │   │   ├── articles/         # Artikel-administration
@@ -126,6 +129,7 @@ pulsefeed/
 │   │       ├── ScoreBadge.tsx
 │   │       ├── AuthorSearch.tsx
 │   │       └── RelativeTime.tsx
+│   │   # SLETTET: GeoDrilldown.tsx (erstattet af /geo page)
 │   └── supabase/
 │       └── migrations/           # 0020–0065 SQL-migrationer
 ├── supabase/
@@ -446,6 +450,25 @@ Split i to uafhængige valideringsmoduler:
 | `/admin/authors/[id]` | Forfatter-profil med author_score badge + articles |
 | `/admin/authors/merge` | Forfatter-merge: duplikat-grupper → kort → bekræft |
 
+## User dashboard (`/`)
+
+- Greeting + geo summary card + Quick Access grid + My Publications
+- **Geo summary card**: Totalt artikelantal (stor rød), top-5 regioner som klikbare badges → `/geo?region=X`, "+N more" badge, "Se alle →" link
+- **Quick Access**: Newsletters, Search, Explore (→ `/geo`), Saved, History, Authors, Following, My Profile
+- KPI-kortet er fjernet (var tomt uden specialty-konfiguration)
+
+## Geo drill-down (`/geo`)
+
+4-niveau drill-down via searchParams:
+1. **Regioner** (`/geo`) — røde bars (#E83B2A), klik → `/geo?region=X`
+2. **Lande** (`/geo?region=X`) — lyserøde bars (#F4A5A0), klik → `&country=Y`
+3. **Byer** (`/geo?region=X&country=Y`) — svage bars (#FADBD8), klik → `&city=Z`
+4. **Artikler** (`/geo?region=X&country=Y&city=Z`) — titel + journal + dato, link til `/articles/[id]`
+
+Breadcrumb øverst + "← Tilbage"-knap. URL er source of truth (ingen client state).
+
+RPCs brugt: `get_geo_regions_week`, `get_geo_countries_week`, `get_geo_cities_week`, `get_geo_articles_week`.
+
 ## Geo-location modul
 
 Automatisk parsing af forfatter-affiliations til strukturerede lokationsfelter. To-trins pipeline: deterministisk parser → AI fallback.
@@ -550,6 +573,8 @@ NEXT_PUBLIC_SITE_URL
 | `0042` | `ai_location_attempted` BOOLEAN kolonne på articles |
 | `0043` | `first_author_region`, `last_author_region` TEXT kolonner + indexes |
 | `0044` | `article_regions`, `article_countries`, `article_cities`, `article_institutions` TEXT[] kolonner + GIN indexes |
+| `0045` | `get_geo_regions_week(p_since)` + `get_geo_countries_week(p_since)` RPCs |
+| `0046` | `get_geo_cities_week(p_since, p_country)` + `get_geo_articles_week(p_since, p_city)` RPCs |
 
 Ældre migrationer (0046–0064 i `web/supabase/`) er renummereret/sammenlagt — de nuværende 0001–0065 er den aktive migration-serie.
 

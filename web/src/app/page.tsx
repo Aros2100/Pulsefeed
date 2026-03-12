@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { SPECIALTIES } from "@/lib/auth/specialties";
 import Header from "@/components/Header";
 import ScoreBadge from "@/components/ScoreBadge";
+import KPIOverview from "@/components/KPIOverview";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -34,57 +34,6 @@ export default async function DashboardPage() {
     .single();
 
   const firstName = profile?.name?.split(" ")[0] ?? "there";
-  const specialtySlugs: string[] = profile?.specialty_slugs ?? [];
-  const specialtyLabel = specialtySlugs
-    .map((s) => SPECIALTIES.find((sp) => sp.slug === s)?.label)
-    .filter(Boolean)
-    .join(", ") || "all specialties";
-
-  const now = new Date();
-  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString();
-
-  // All metrics default to 0 when no specialty is configured
-  let thisWeekCount = 0;
-  let lastWeekCount = 0;
-  let aiCount = 0;
-  let practiceCount = 0;
-  let lastWeekPracticeCount = 0;
-  let avgNewsValue: string | null = null;
-
-  if (specialtySlugs.length > 0) {
-    const [
-      { count: thisWeek },
-      { count: lastWeek },
-      { count: aiEnriched },
-      { count: practiceChanging },
-      { count: lastWeekPractice },
-      { data: newsValueRows },
-    ] = await Promise.all([
-      supabase.from("articles").select("*", { count: "exact", head: true }).eq("status", "approved").contains("specialty_tags", specialtySlugs).gte("imported_at", weekAgo),
-      supabase.from("articles").select("*", { count: "exact", head: true }).eq("status", "approved").contains("specialty_tags", specialtySlugs).gte("imported_at", twoWeeksAgo).lt("imported_at", weekAgo),
-      supabase.from("articles").select("*", { count: "exact", head: true }).eq("status", "approved").contains("specialty_tags", specialtySlugs).gte("imported_at", weekAgo).not("enriched_at", "is", null),
-      supabase.from("articles").select("*", { count: "exact", head: true }).eq("status", "approved").contains("specialty_tags", specialtySlugs).gte("imported_at", weekAgo).ilike("clinical_relevance", "%practice%"),
-      supabase.from("articles").select("*", { count: "exact", head: true }).eq("status", "approved").contains("specialty_tags", specialtySlugs).gte("imported_at", twoWeeksAgo).lt("imported_at", weekAgo).ilike("clinical_relevance", "%practice%"),
-      supabase.from("articles").select("news_value").eq("status", "approved").contains("specialty_tags", specialtySlugs).gte("imported_at", weekAgo).not("news_value", "is", null),
-    ]);
-
-    thisWeekCount = thisWeek ?? 0;
-    lastWeekCount = lastWeek ?? 0;
-    aiCount = aiEnriched ?? 0;
-    practiceCount = practiceChanging ?? 0;
-    lastWeekPracticeCount = lastWeekPractice ?? 0;
-
-    if (newsValueRows && newsValueRows.length > 0) {
-      avgNewsValue = (
-        newsValueRows.reduce((sum: number, r: { news_value: number | null }) => sum + (r.news_value ?? 0), 0) /
-        newsValueRows.length
-      ).toFixed(1);
-    }
-  }
-
-  const thisWeekDelta = thisWeekCount - lastWeekCount;
-  const practiceDelta = practiceCount - lastWeekPracticeCount;
 
   // Fetch publications if user has linked an author profile
   type ArticleRow = {
@@ -118,52 +67,15 @@ export default async function DashboardPage() {
     }
   }
 
-  const kpis = [
-    {
-      value: String(thisWeekCount),
-      color: "#E83B2A" as string | undefined,
-      label: "New articles",
-      delta: `${thisWeekDelta >= 0 ? "↑" : "↓"} ${Math.abs(thisWeekDelta)} vs last week`,
-      deltaColor: thisWeekDelta >= 0 ? "#2d7a2d" : "#E83B2A",
-    },
-    {
-      value: String(aiCount),
-      color: undefined,
-      label: "AI enriched",
-      delta: `of ${thisWeekCount} new`,
-      deltaColor: "#aaa",
-    },
-    {
-      value: String(practiceCount),
-      color: "#2d7a2d" as string | undefined,
-      label: "Practice changing",
-      delta: `${practiceDelta >= 0 ? "↑" : "↓"} ${Math.abs(practiceDelta)} vs last week`,
-      deltaColor: practiceDelta >= 0 ? "#2d7a2d" : "#E83B2A",
-    },
-    {
-      value: avgNewsValue ?? "—",
-      color: undefined,
-      label: "Avg. news value",
-      delta: "out of 5",
-      deltaColor: "#aaa",
-    },
-    {
-      value: "—",
-      color: undefined,
-      label: "Last newsletter",
-      delta: "Not yet sent",
-      deltaColor: "#aaa",
-    },
-  ];
-
   const quickLinks = [
-    { icon: "✉️", title: "Newsletters",    desc: "View your previous digests",    href: "/newsletters" },
-    { icon: "🔍", title: "Search",         desc: "Search across all articles",    href: "/search" },
-    { icon: "🔖", title: "Saved",          desc: "Articles you bookmarked",       href: "/saved" },
-    { icon: "📖", title: "History",        desc: "Recently read articles",        href: "/history" },
-    { icon: "👤", title: "Authors",        desc: "Browse and follow researchers", href: "/authors" },
-    { icon: "👥", title: "Following",      desc: "Authors you follow",            href: "/following" },
-    { icon: "⚙️", title: "My Profile",    desc: "Account and preferences",       href: "/profile" },
+    { icon: "✉️", title: "Newsletters",    desc: "View your previous digests",       href: "/newsletters" },
+    { icon: "🔍", title: "Search",         desc: "Search across all articles",       href: "/search" },
+    { icon: "🌍", title: "Explore",        desc: "Geo distribution of articles",     href: "/geo" },
+    { icon: "🔖", title: "Saved",          desc: "Articles you bookmarked",          href: "/saved" },
+    { icon: "📖", title: "History",        desc: "Recently read articles",           href: "/history" },
+    { icon: "👤", title: "Authors",        desc: "Browse and follow researchers",    href: "/authors" },
+    { icon: "👥", title: "Following",      desc: "Authors you follow",               href: "/following" },
+    { icon: "⚙️", title: "My Profile",    desc: "Account and preferences",          href: "/profile" },
   ];
 
   return (
@@ -175,36 +87,10 @@ export default async function DashboardPage() {
         {/* Greeting */}
         <div style={{ marginBottom: "28px" }}>
           <div style={{ fontSize: "26px", fontWeight: 700 }}>{greeting()}, {firstName}</div>
-          <div style={{ fontSize: "14px", color: "#888", marginTop: "4px" }}>
-            Showing content for <strong style={{ color: "#1a1a1a" }}>{specialtyLabel}</strong>
-          </div>
         </div>
 
-        {/* KPI card */}
-        <div style={{
-          background: "#fff",
-          borderRadius: "10px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
-          overflow: "hidden",
-          marginBottom: "12px",
-        }}>
-          <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
-            <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
-              This week · {specialtyLabel}
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)" }}>
-            {kpis.map((kpi, i) => (
-              <div key={i} style={{ padding: "20px 24px", borderRight: i < 4 ? "1px solid #f0f0f0" : undefined }}>
-                <div style={{ fontSize: "28px", fontWeight: 700, lineHeight: 1, color: kpi.color ?? "#1a1a1a" }}>
-                  {kpi.value}
-                </div>
-                <div style={{ fontSize: "12px", color: "#888", marginTop: "6px" }}>{kpi.label}</div>
-                <div style={{ fontSize: "11px", marginTop: "4px", color: kpi.deltaColor }}>{kpi.delta}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* KPI Overview */}
+        <KPIOverview />
 
         {/* Quick access */}
         <div style={{
@@ -237,7 +123,7 @@ export default async function DashboardPage() {
           ))}
         </div>
 
-        {/* My Publications or link-author prompt */}
+        {/* My Publications */}
         {profile?.author_id && (
           <div id="publications" style={{ marginTop: "28px" }}>
             <div style={{

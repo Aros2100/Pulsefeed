@@ -18,7 +18,6 @@ const navCards = [
 
 export default async function AdminDashboard() {
   const weekNumber = getISOWeek(new Date());
-
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 80px" }}>

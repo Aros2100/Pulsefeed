@@ -5,30 +5,18 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { logArticleEvent } from "@/lib/article-events";
 
-const verdictFieldSchema = z.object({
-  decision:    z.string(),
-  ai_decision: z.string(),
-  corrected:   z.boolean(),
-});
-
 const schema = z.object({
   specialty: z.string().refine(
     (v) => (SPECIALTY_SLUGS as readonly string[]).includes(v),
     { message: "Invalid specialty" }
   ),
   verdicts: z.array(z.object({
-    article_id:   z.string().uuid(),
-    subspecialty:  verdictFieldSchema,
-    article_type:  verdictFieldSchema,
-    study_design:  verdictFieldSchema,
+    article_id:  z.string().uuid(),
+    decision:    z.string(),
+    ai_decision: z.string(),
+    corrected:   z.boolean(),
   })).min(1),
 });
-
-const MODULES = [
-  { key: "subspecialty",  module: "classification_subspecialty" },
-  { key: "article_type",  module: "classification_article_type" },
-  { key: "study_design",  module: "classification_study_design" },
-] as const;
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
@@ -79,23 +67,18 @@ export async function POST(request: NextRequest) {
 
   const sessionId = session.id as string;
 
-  // 2. Insert 3 lab_decisions per verdict (one per classification field)
-  const decisionRows = verdicts.flatMap((v) =>
-    MODULES.map(({ key, module }) => {
-      const field = v[key];
-      return {
-        session_id:          sessionId,
-        article_id:          v.article_id,
-        specialty,
-        module,
-        decision:            field.decision,
-        ai_decision:         field.ai_decision,
-        ai_confidence:       null,
-        disagreement_reason: field.corrected ? "corrected" : null,
-        model_version:       modelVersion,
-      };
-    })
-  );
+  // 2. Insert 1 lab_decision per verdict
+  const decisionRows = verdicts.map((v) => ({
+    session_id:          sessionId,
+    article_id:          v.article_id,
+    specialty,
+    module:              "classification_subspecialty",
+    decision:            v.decision,
+    ai_decision:         v.ai_decision,
+    ai_confidence:       null,
+    disagreement_reason: v.corrected ? "corrected" : null,
+    model_version:       modelVersion,
+  }));
 
   const { error: decisionsError } = await admin.from("lab_decisions").insert(decisionRows);
   if (decisionsError) {
@@ -108,9 +91,7 @@ export async function POST(request: NextRequest) {
     verdicts.map((v) =>
       logArticleEvent(v.article_id, "lab_decision", {
         module: "classification",
-        subspecialty:  v.subspecialty.decision,
-        article_type:  v.article_type.decision,
-        study_design:  v.study_design.decision,
+        subspecialty: v.decision,
       })
     )
   );

@@ -2,11 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import {
-  SUBSPECIALTY_OPTIONS,
-  ARTICLE_TYPE_OPTIONS,
-  STUDY_DESIGN_OPTIONS,
-} from "@/lib/lab/classification-options";
+import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,26 +15,37 @@ interface ClassificationArticle {
   abstract: string | null;
   pubmed_id: string | null;
   authors: unknown;
-  subspecialty_ai: string | null;
-  article_type_ai: string | null;
-  study_design_ai: string | null;
+  subspecialty_ai: string | string[] | null;
   classification_reason: string | null;
   circle: number | null;
 }
 
-interface FieldVerdict {
-  decision: string;
-  ai_decision: string;
+interface ArticleVerdict {
+  decision: string[];
+  ai_decision: string[];
   corrected: boolean;
 }
 
-interface ArticleVerdicts {
-  subspecialty: FieldVerdict | null;
-  article_type: FieldVerdict | null;
-  study_design: FieldVerdict | null;
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function parseAiTags(raw: string | string[] | null): string[] {
+  if (!raw) return [];
+  // Supabase returns TEXT[] as a JS array directly
+  if (Array.isArray(raw)) return raw.filter((s): s is string => typeof s === "string");
+  // PostgreSQL array literal: {"Spine surgery","Neurotraumatology"}
+  if (raw.startsWith("{") && raw.endsWith("}")) {
+    return raw.slice(1, -1).split(",").map((s) => s.replace(/^"|"$/g, "").trim()).filter(Boolean);
+  }
+  // JSON string
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.filter((s): s is string => typeof s === "string");
+    if (typeof parsed === "string") return [parsed];
+  } catch {
+    if (raw.trim()) return [raw.trim()];
+  }
+  return [];
+}
 
 function firstAuthor(authors: unknown): string {
   if (!Array.isArray(authors) || authors.length === 0) return "";
@@ -89,92 +96,11 @@ function Spinner({ size = 12 }: { size?: number }) {
   );
 }
 
-// ─── Compact Field Card ──────────────────────────────────────────────────────
-
-function FieldCard({
-  label,
-  aiValue,
-  options,
-  verdict,
-  onApprove,
-  onCorrect,
-}: {
-  label: string;
-  aiValue: string | null;
-  options: readonly string[];
-  verdict: FieldVerdict | null;
-  onApprove: () => void;
-  onCorrect: (value: string) => void;
-}) {
-  const isApproved = verdict && !verdict.corrected;
-  const isCorrected = verdict?.corrected;
-
-  return (
-    <div style={{
-      background: isApproved ? "#f0fdf4" : isCorrected ? "#fffbeb" : "#fff",
-      border: `1px solid ${isApproved ? "#bbf7d0" : isCorrected ? "#fde68a" : "#e2e8f0"}`,
-      borderRadius: "6px",
-      padding: "14px 16px",
-    }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "10px" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-          <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#5a6a85" }}>
-            {label}
-          </span>
-          <span style={{
-            fontSize: "13px", fontWeight: 700, color: "#7c3aed",
-            background: "#f5f3ff", border: "1px solid #ddd6fe",
-            borderRadius: "5px", padding: "4px 10px",
-            display: "inline-block", width: "fit-content",
-          }}>
-            {aiValue ?? "—"}
-          </span>
-        </div>
-        {isApproved && <span style={{ fontSize: "10px", fontWeight: 700, color: "#15803d" }}>Godkendt</span>}
-        {isCorrected && <span style={{ fontSize: "10px", fontWeight: 700, color: "#d97706" }}>Korrigeret → {verdict.decision}</span>}
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-        <button
-          onClick={onApprove}
-          style={{
-            borderRadius: "5px",
-            padding: "4px 12px",
-            fontSize: "11px",
-            fontWeight: 600,
-            background: isApproved ? "#15803d" : "#fff",
-            border: `1px solid ${isApproved ? "#15803d" : "#bbf7d0"}`,
-            color: isApproved ? "#fff" : "#15803d",
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-          }}
-        >
-          ✓ Godkend
-        </button>
-        <select
-          value={isCorrected ? verdict.decision : ""}
-          onChange={(e) => { if (e.target.value) onCorrect(e.target.value); }}
-          style={{
-            fontSize: "11px",
-            padding: "4px 8px",
-            borderRadius: "5px",
-            border: `1px solid ${isCorrected ? "#fde68a" : "#e2e8f0"}`,
-            background: isCorrected ? "#fffbeb" : "#fff",
-            color: isCorrected ? "#92400e" : "#5a6a85",
-            cursor: "pointer",
-            outline: "none",
-            flex: 1,
-            minWidth: 0,
-          }}
-        >
-          <option value="">Korriger…</option>
-          {options.map((o) => (
-            <option key={o} value={o}>{o}</option>
-          ))}
-        </select>
-      </div>
-    </div>
-  );
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sorted1 = [...a].sort();
+  const sorted2 = [...b].sort();
+  return sorted1.every((v, i) => v === sorted2[i]);
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -192,14 +118,20 @@ export default function ClassificationClient({ specialty, label }: Props) {
   const [loading, setLoading]                 = useState(true);
   const [selectedId, setSelectedId]           = useState<string | null>(null);
 
-  const [verdicts, setVerdicts]               = useState<Record<string, ArticleVerdicts>>({});
+  const [verdicts, setVerdicts]               = useState<Record<string, ArticleVerdict>>({});
+  const [checkedSubs, setCheckedSubs]         = useState<string[]>([]);
   const [scoring, setScoring]                 = useState(false);
-  const [scoringProgress, setScoringProgress] = useState<{ scored: number; total: number } | null>(null);
+  const [scoringProgress, setScoringProgress] = useState<{ scored: number; failed: number; total: number } | null>(null);
   const [saving, setSaving]                   = useState(false);
   const [toast, setToast]                     = useState<string | null>(null);
   const [pendingHref, setPendingHref]         = useState<string | null>(null);
 
   const hasUnsavedRef = useRef(false);
+
+  // Reset checkboxes when article changes
+  useEffect(() => {
+    setCheckedSubs([]);
+  }, [selectedId]);
 
   // ── Load articles (with pre-scoring if needed) ────────────────────────────
 
@@ -249,11 +181,11 @@ export default function ClassificationClient({ specialty, label }: Props) {
               if (!line.startsWith("data: ")) continue;
               try {
                 const data = JSON.parse(line.slice(6)) as {
-                  scored?: number; total?: number; done?: boolean;
+                  scored?: number; failed?: number; total?: number; done?: boolean;
                 };
                 if (data.done) break outer;
                 if (data.scored !== undefined && data.total !== undefined) {
-                  setScoringProgress({ scored: data.scored, total: data.total });
+                  setScoringProgress({ scored: data.scored, failed: data.failed ?? 0, total: data.total });
                 }
               } catch { /* ignore malformed events */ }
             }
@@ -334,39 +266,33 @@ export default function ClassificationClient({ specialty, label }: Props) {
 
   // ── Verdict handling ────────────────────────────────────────────────────
 
-  function setFieldVerdict(articleId: string, field: keyof ArticleVerdicts, verdict: FieldVerdict) {
+  function approveAi(articleId: string, aiTags: string[]) {
     setVerdicts((prev) => ({
       ...prev,
       [articleId]: {
-        subspecialty: prev[articleId]?.subspecialty ?? null,
-        article_type: prev[articleId]?.article_type ?? null,
-        study_design: prev[articleId]?.study_design ?? null,
-        [field]: verdict,
+        decision: aiTags,
+        ai_decision: aiTags,
+        corrected: false,
       },
     }));
   }
 
-  function approveField(articleId: string, field: keyof ArticleVerdicts, aiValue: string) {
-    setFieldVerdict(articleId, field, {
-      decision: aiValue,
-      ai_decision: aiValue,
-      corrected: false,
-    });
+  function correctArticle(articleId: string, aiTags: string[], editorTags: string[]) {
+    const corrected = !arraysEqual(editorTags, aiTags);
+    setVerdicts((prev) => ({
+      ...prev,
+      [articleId]: {
+        decision: editorTags,
+        ai_decision: aiTags,
+        corrected,
+      },
+    }));
   }
 
-  function correctField(articleId: string, field: keyof ArticleVerdicts, aiValue: string, newValue: string) {
-    setFieldVerdict(articleId, field, {
-      decision: newValue,
-      ai_decision: aiValue,
-      corrected: true,
-    });
-  }
-
-  // ── Auto-advance when all 3 fields done ─────────────────────────────────
+  // ── Auto-advance when verdict set ─────────────────────────────────────
 
   function isArticleComplete(articleId: string): boolean {
-    const v = verdicts[articleId];
-    return v != null && v.subspecialty != null && v.article_type != null && v.study_design != null;
+    return verdicts[articleId] != null;
   }
 
   useEffect(() => {
@@ -386,10 +312,10 @@ export default function ClassificationClient({ specialty, label }: Props) {
     const toSave = articles
       .filter((a) => isArticleComplete(a.id))
       .map((a) => ({
-        article_id:   a.id,
-        subspecialty:  verdicts[a.id].subspecialty!,
-        article_type:  verdicts[a.id].article_type!,
-        study_design:  verdicts[a.id].study_design!,
+        article_id:  a.id,
+        decision:    JSON.stringify(verdicts[a.id].decision),
+        ai_decision: JSON.stringify(verdicts[a.id].ai_decision),
+        corrected:   verdicts[a.id].corrected,
       }));
 
     if (toSave.length === 0) return;
@@ -420,6 +346,16 @@ export default function ClassificationClient({ specialty, label }: Props) {
     }
   }
 
+  // ── Checkbox handling ─────────────────────────────────────────────────────
+
+  function toggleCheckbox(option: string) {
+    setCheckedSubs((prev) => {
+      if (prev.includes(option)) return prev.filter((s) => s !== option);
+      if (prev.length >= 2) return prev; // max 2
+      return [...prev, option];
+    });
+  }
+
   // ── Navigation helpers ────────────────────────────────────────────────────
 
   function goTo(dir: -1 | 1) {
@@ -431,7 +367,7 @@ export default function ClassificationClient({ specialty, label }: Props) {
   // ── Derived state ───────────────────────────────────────────────────────
 
   const currentArticle   = articles.find((a) => a.id === selectedId) ?? null;
-  const currentVerdicts  = currentArticle ? (verdicts[currentArticle.id] ?? { subspecialty: null, article_type: null, study_design: null }) : null;
+  const currentVerdict   = currentArticle ? (verdicts[currentArticle.id] ?? null) : null;
   const reviewedCount    = articles.filter((a) => isArticleComplete(a.id)).length;
   const hasAnyVerdict    = reviewedCount > 0;
   hasUnsavedRef.current  = hasAnyVerdict;
@@ -440,6 +376,8 @@ export default function ClassificationClient({ specialty, label }: Props) {
   const isFirst          = visibleIdx <= 0;
   const isLast           = visibleIdx >= articles.length - 1;
   const currentComplete  = currentArticle ? isArticleComplete(currentArticle.id) : false;
+
+  const aiTags = currentArticle ? parseAiTags(currentArticle.subspecialty_ai) : [];
 
   // ── Loading / empty states ──────────────────────────────────────────────
 
@@ -458,7 +396,7 @@ export default function ClassificationClient({ specialty, label }: Props) {
         <div style={{ fontSize: "16px", fontWeight: 600, color: "#1a1a1a" }}>Klassificerer artikler med AI…</div>
         <div style={{ fontSize: "13px", color: "#888" }}>
           {scoringProgress
-            ? `${scoringProgress.scored} / ${scoringProgress.total} artikler klassificeret…`
+            ? `${scoringProgress.scored} / ${scoringProgress.total} artikler klassificeret${scoringProgress.failed > 0 ? ` (${scoringProgress.failed} fejlet)` : ""}…`
             : `Forbereder klassificering…`}
         </div>
       </div>
@@ -595,46 +533,124 @@ export default function ClassificationClient({ specialty, label }: Props) {
           </div>
 
           {/* RIGHT — Classification */}
-          <div style={{ width: "380px", flexShrink: 0, display: "flex", flexDirection: "column", background: "#fafbfc" }}>
+          <div style={{ width: "440px", flexShrink: 0, display: "flex", flexDirection: "column", background: "#fafbfc" }}>
             <div style={{ flex: 1, padding: "28px 24px 24px", display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto" }}>
 
-              {/* AI Reason (compact) */}
+              {/* AI Subspecialty badges */}
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#7c3aed", marginBottom: "8px" }}>
+                  AI Subspecialty
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {aiTags.length > 0 ? aiTags.map((tag) => (
+                    <span key={tag} style={{
+                      fontSize: "13px", fontWeight: 700, color: "#7c3aed",
+                      background: "#f5f3ff", border: "1px solid #ddd6fe",
+                      borderRadius: "5px", padding: "4px 10px",
+                    }}>
+                      {tag}
+                    </span>
+                  )) : (
+                    <span style={{ fontSize: "13px", color: "#999" }}>—</span>
+                  )}
+                  {currentVerdict && !currentVerdict.corrected && (
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: "#15803d", alignSelf: "center", marginLeft: "4px" }}>✓ Godkendt</span>
+                  )}
+                  {currentVerdict?.corrected && (
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: "#dc2626", alignSelf: "center", marginLeft: "4px" }}>Korrigeret → {currentVerdict.decision.join(", ")}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* AI Begrundelse — full text */}
               {currentArticle.classification_reason && (
                 <div style={{ background: "#f3f0ff", border: "1px solid #e9e0ff", borderRadius: "8px", padding: "12px 14px" }}>
-                  <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#7c3aed", marginBottom: "3px" }}>
+                  <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#7c3aed", marginBottom: "4px" }}>
                     AI Begrundelse
                   </div>
-                  <div style={{ fontSize: "12px", color: "#4a4a4a", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                  <div style={{ fontSize: "12px", color: "#4a4a4a", lineHeight: 1.6 }}>
                     {currentArticle.classification_reason}
                   </div>
                 </div>
               )}
 
-              {/* 3 Field cards */}
-              <FieldCard
-                label="Subspecialty"
-                aiValue={currentArticle.subspecialty_ai}
-                options={SUBSPECIALTY_OPTIONS}
-                verdict={currentVerdicts?.subspecialty ?? null}
-                onApprove={() => approveField(currentArticle.id, "subspecialty", currentArticle.subspecialty_ai ?? "Unknown")}
-                onCorrect={(v) => correctField(currentArticle.id, "subspecialty", currentArticle.subspecialty_ai ?? "Unknown", v)}
-              />
-              <FieldCard
-                label="Article Type"
-                aiValue={currentArticle.article_type_ai}
-                options={ARTICLE_TYPE_OPTIONS}
-                verdict={currentVerdicts?.article_type ?? null}
-                onApprove={() => approveField(currentArticle.id, "article_type", currentArticle.article_type_ai ?? "Unknown")}
-                onCorrect={(v) => correctField(currentArticle.id, "article_type", currentArticle.article_type_ai ?? "Unknown", v)}
-              />
-              <FieldCard
-                label="Study Design"
-                aiValue={currentArticle.study_design_ai}
-                options={STUDY_DESIGN_OPTIONS}
-                verdict={currentVerdicts?.study_design ?? null}
-                onApprove={() => approveField(currentArticle.id, "study_design", currentArticle.study_design_ai ?? "Unknown")}
-                onCorrect={(v) => correctField(currentArticle.id, "study_design", currentArticle.study_design_ai ?? "Unknown", v)}
-              />
+              {/* Godkend AI button — green, full width */}
+              <button
+                onClick={() => approveAi(currentArticle.id, aiTags.length > 0 ? aiTags : ["Unknown"])}
+                style={{
+                  borderRadius: "6px",
+                  padding: "9px 14px",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  background: currentVerdict && !currentVerdict.corrected ? "#15803d" : "#16a34a",
+                  border: "none",
+                  color: "#fff",
+                  cursor: "pointer",
+                  width: "100%",
+                }}
+              >
+                ✓ Godkend AI
+              </button>
+
+              {/* Korrektion — two-column checkboxes */}
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#5a6a85", marginBottom: "8px" }}>
+                  Korriger (vælg 1–2)
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1px 12px" }}>
+                  {SUBSPECIALTY_OPTIONS.map((option) => {
+                    const isChecked = checkedSubs.includes(option);
+                    const isDisabled = !isChecked && checkedSubs.length >= 2;
+                    return (
+                      <label
+                        key={option}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "5px",
+                          padding: "3px 4px",
+                          borderRadius: "3px",
+                          cursor: isDisabled ? "not-allowed" : "pointer",
+                          background: isChecked ? "#fef2f2" : "transparent",
+                          opacity: isDisabled ? 0.35 : 1,
+                          fontSize: "12px",
+                          color: isChecked ? "#dc2626" : "#1a1a1a",
+                          fontWeight: isChecked ? 600 : 400,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={isDisabled}
+                          onChange={() => toggleCheckbox(option)}
+                          style={{ accentColor: "#dc2626", cursor: isDisabled ? "not-allowed" : "pointer", width: "13px", height: "13px" }}
+                        />
+                        {option}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Godkend korrektion button — red, full width */}
+              {checkedSubs.length > 0 && (
+                <button
+                  onClick={() => correctArticle(currentArticle.id, aiTags.length > 0 ? aiTags : ["Unknown"], checkedSubs)}
+                  style={{
+                    borderRadius: "6px",
+                    padding: "9px 14px",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    background: "#dc2626",
+                    border: "none",
+                    color: "#fff",
+                    cursor: "pointer",
+                    width: "100%",
+                  }}
+                >
+                  Godkend korrektion ({checkedSubs.length})
+                </button>
+              )}
             </div>
           </div>
         </div>

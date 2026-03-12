@@ -4,6 +4,7 @@ import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { runImportCircle2 } from "@/lib/pubmed/importer-circle2";
 import { runCitationFetch } from "@/lib/pubmed/fetch-citations";
 import { runLocationParsing } from "@/lib/geo/location-scorer";
+import { runPublicationTypeMapping } from "@/lib/tagging/publication-type-mapper";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // Allow up to 5 minutes — import kan tage tid ved mange PMIDs
@@ -80,6 +81,10 @@ export async function POST(request: NextRequest) {
 
   after(() => {
     runLocationParsing(200).then(r => console.log("[geo/auto-parse]", r)).catch(e => console.error("[geo/auto-parse] error:", e));
+  });
+
+  after(() => {
+    runPublicationTypeMapping(200).then(r => console.log("[pubtype-map]", r)).catch(e => console.error("[pubtype-map] error:", e));
   });
 
   return NextResponse.json({ ok: true });

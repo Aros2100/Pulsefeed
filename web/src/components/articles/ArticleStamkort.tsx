@@ -38,8 +38,6 @@ export interface ArticleData {
   clinical_relevance: string | null;
   // Classification (AI-scored)
   subspecialty_ai: string | null;
-  article_type_ai: string | null;
-  study_design_ai: string | null;
   classification_reason: string | null;
   classification_model_version: string | null;
   classification_scored_at: string | null;

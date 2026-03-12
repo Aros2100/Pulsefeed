@@ -562,7 +562,7 @@ export default async function AdminArticleLogPage({
       </Card>
 
       {/* Klassificering */}
-      {(a.subspecialty_ai || a.article_type_ai || a.study_design_ai ||
+      {(a.subspecialty_ai ||
         a.patient_population || a.time_to_read != null || a.full_text_available != null ||
         a.trial_registration || a.geographic_region) && (() => {
         const POPULATION_COLORS: Record<string, { bg: string; color: string; border: string }> = {
@@ -585,10 +585,17 @@ export default async function AdminArticleLogPage({
           return [label, value];
         };
 
+        // subspecialty_ai is TEXT[] — Supabase may return JS array or PG literal
+        const subTags: string[] = Array.isArray(a.subspecialty_ai)
+          ? a.subspecialty_ai
+          : typeof a.subspecialty_ai === "string" && a.subspecialty_ai.startsWith("{") && a.subspecialty_ai.endsWith("}")
+            ? a.subspecialty_ai.slice(1, -1).split(",").map((s: string) => s.replace(/^"|"$/g, "").trim()).filter(Boolean)
+            : a.subspecialty_ai
+              ? [a.subspecialty_ai]
+              : [];
+
         const aiRows: ClsRow[] = [
-          clsFr("Subspecialty", a.subspecialty_ai),
-          clsFr("Article Type", a.article_type_ai),
-          clsFr("Study Design", a.study_design_ai),
+          clsFr("Subspecialty", subTags.length > 0 ? subTags.join(", ") : null),
           clsFr("Model", a.classification_model_version ? `v${a.classification_model_version}` : null),
         ].filter((r): r is ClsRow => r !== null);
 
@@ -671,6 +678,112 @@ export default async function AdminArticleLogPage({
                         <span style={{ color: "#1a1a1a" }}>{value}</span>
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+            </CardBody>
+          </Card>
+        );
+      })()}
+
+      {/* Geo-location */}
+      {(() => {
+        const geoFields = [
+          "first_author_country", "first_author_city", "first_author_institution",
+          "first_author_department", "first_author_region",
+          "last_author_country", "last_author_city", "last_author_institution",
+          "last_author_department", "last_author_region",
+          "location_confidence",
+          "article_regions", "article_countries", "article_cities", "article_institutions",
+        ] as const;
+        const hasAnyGeo = geoFields.some((f) => {
+          const v = raw[f];
+          return v != null && (!Array.isArray(v) || v.length > 0);
+        });
+        if (!hasAnyGeo) return null;
+
+        const authorRow = (label: string, value: unknown) => {
+          if (!value) return null;
+          return (
+            <div key={label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5" }}>
+              <span style={{ color: "#888" }}>{label}</span>
+              <span style={{ color: "#1a1a1a" }}>{String(value)}</span>
+            </div>
+          );
+        };
+
+        const badgeList = (items: unknown, color: string) => {
+          const arr = Array.isArray(items) ? items as string[] : [];
+          if (arr.length === 0) return null;
+          return (
+            <span style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+              {arr.map((item) => <Badge key={item} color={color}>{item}</Badge>)}
+            </span>
+          );
+        };
+
+        const conf = raw.location_confidence as string | null;
+
+        return (
+          <Card>
+            <CardHeader label="Geo-location" />
+            <CardBody>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, fontSize: "14px" }}>
+                {/* Første forfatter */}
+                <div>
+                  <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#1d4ed8", marginBottom: "8px" }}>
+                    Første forfatter
+                  </div>
+                  {authorRow("Institution", raw.first_author_institution)}
+                  {authorRow("Department", raw.first_author_department)}
+                  {authorRow("City", raw.first_author_city)}
+                  {authorRow("Country", raw.first_author_country)}
+                  {authorRow("Region", raw.first_author_region)}
+                </div>
+
+                {/* Sidste forfatter */}
+                <div style={{ borderLeft: "1px solid #f0f0f0", paddingLeft: "20px" }}>
+                  <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "8px" }}>
+                    Sidste forfatter
+                  </div>
+                  {authorRow("Institution", raw.last_author_institution)}
+                  {authorRow("Department", raw.last_author_department)}
+                  {authorRow("City", raw.last_author_city)}
+                  {authorRow("Country", raw.last_author_country)}
+                  {authorRow("Region", raw.last_author_region)}
+                </div>
+              </div>
+
+              {/* Summary arrays + confidence */}
+              <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #f0f0f0", display: "flex", flexDirection: "column", gap: "8px" }}>
+                {badgeList(raw.article_countries, "blue") && (
+                  <div style={{ display: "flex", gap: "8px", alignItems: "baseline", fontSize: "13px" }}>
+                    <span style={{ color: "#5a6a85", minWidth: "110px", flexShrink: 0 }}>Countries</span>
+                    {badgeList(raw.article_countries, "blue")}
+                  </div>
+                )}
+                {badgeList(raw.article_cities, "gray") && (
+                  <div style={{ display: "flex", gap: "8px", alignItems: "baseline", fontSize: "13px" }}>
+                    <span style={{ color: "#5a6a85", minWidth: "110px", flexShrink: 0 }}>Cities</span>
+                    {badgeList(raw.article_cities, "gray")}
+                  </div>
+                )}
+                {badgeList(raw.article_institutions, "purple") && (
+                  <div style={{ display: "flex", gap: "8px", alignItems: "baseline", fontSize: "13px" }}>
+                    <span style={{ color: "#5a6a85", minWidth: "110px", flexShrink: 0 }}>Institutions</span>
+                    {badgeList(raw.article_institutions, "purple")}
+                  </div>
+                )}
+                {badgeList(raw.article_regions, "green") && (
+                  <div style={{ display: "flex", gap: "8px", alignItems: "baseline", fontSize: "13px" }}>
+                    <span style={{ color: "#5a6a85", minWidth: "110px", flexShrink: 0 }}>Regions</span>
+                    {badgeList(raw.article_regions, "green")}
+                  </div>
+                )}
+                {conf && (
+                  <div style={{ display: "flex", gap: "8px", alignItems: "baseline", fontSize: "13px" }}>
+                    <span style={{ color: "#5a6a85", minWidth: "110px", flexShrink: 0 }}>Confidence</span>
+                    <Badge color={conf === "high" ? "green" : "orange"}>{conf}</Badge>
                   </div>
                 )}
               </div>

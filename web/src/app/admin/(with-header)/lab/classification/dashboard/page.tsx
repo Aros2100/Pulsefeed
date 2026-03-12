@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 import BenchmarkTable from "../../specialty-tag/dashboard/BenchmarkTable";
-import { changedDimension } from "@/lib/lab/classification-version";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -25,16 +24,6 @@ function accColor(v: number | null): string {
   return "#dc2626";
 }
 
-// ─── Tabs ────────────────────────────────────────────────────────────────────
-
-const TABS = [
-  { key: "subspecialty",  label: "Subspecialty",  module: "classification_subspecialty" },
-  { key: "article_type",  label: "Article Type",  module: "classification_article_type" },
-  { key: "study_design",  label: "Study Design",  module: "classification_study_design" },
-] as const;
-
-type TabKey = (typeof TABS)[number]["key"];
-
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface VersionStats {
@@ -44,8 +33,8 @@ interface VersionStats {
   deactivatedAt: string | null;
   decisions: number;
   agreements: number;
-  fp: number;   // "corrected" count
-  fn: number;   // unused for classification, kept at 0 for BenchmarkTable compat
+  fp: number;
+  fn: number;
   accuracy: number | null;
   fpRate: number | null;
   fnRate: number | null;
@@ -55,17 +44,7 @@ interface VersionStats {
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
-interface Props {
-  searchParams: Promise<{ tab?: string }>;
-}
-
-export default async function ClassificationDashboardPage({ searchParams }: Props) {
-  const { tab: tabParam } = await searchParams;
-  const activeTab: TabKey = TABS.some((t) => t.key === tabParam)
-    ? (tabParam as TabKey)
-    : "subspecialty";
-  const activeModule = TABS.find((t) => t.key === activeTab)!.module;
-
+export default async function ClassificationDashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -80,7 +59,7 @@ export default async function ClassificationDashboardPage({ searchParams }: Prop
 
   const admin = createAdminClient();
 
-  // Model versions (classification uses ONE prompt across all 3 modules)
+  // Model versions (classification uses ONE prompt)
   const versionsRes = await admin
     .from("model_versions")
     .select("version, activated_at, active")
@@ -90,7 +69,16 @@ export default async function ClassificationDashboardPage({ searchParams }: Prop
 
   const rawVersions = versionsRes.data ?? [];
 
-  // Paginate all lab_decisions for the selected module
+  // Deduplicate versions (keep first occurrence = most recent activation)
+  const seenVersions = new Set<string>();
+  const uniqueVersions = rawVersions.filter((v) => {
+    const ver = v.version as string;
+    if (seenVersions.has(ver)) return false;
+    seenVersions.add(ver);
+    return true;
+  });
+
+  // Paginate all lab_decisions for subspecialty
   type Decision = {
     model_version: string | null;
     ai_decision: string;
@@ -104,73 +92,13 @@ export default async function ClassificationDashboardPage({ searchParams }: Prop
       .from("lab_decisions")
       .select("model_version, ai_decision, decision, ai_confidence, disagreement_reason")
       .eq("specialty", specialty)
-      .eq("module", activeModule)
+      .eq("module", "classification_subspecialty")
       .not("ai_decision", "is", null)
       .range(from, from + 999);
     if (!data || data.length === 0) break;
     decisions.push(...(data as Decision[]));
     if (data.length < 1000) break;
     from += 1000;
-  }
-
-  // Fetch all 3 modules' decisions for the summary card
-  type SummaryDecision = { model_version: string | null; ai_decision: string; decision: string };
-  const allModuleDecisions: Record<string, SummaryDecision[]> = {};
-  for (const tab of TABS) {
-    const ds: SummaryDecision[] = [];
-    for (let from = 0; ; ) {
-      const { data } = await admin
-        .from("lab_decisions")
-        .select("model_version, ai_decision, decision")
-        .eq("specialty", specialty)
-        .eq("module", tab.module)
-        .not("ai_decision", "is", null)
-        .range(from, from + 999);
-      if (!data || data.length === 0) break;
-      ds.push(...(data as SummaryDecision[]));
-      if (data.length < 1000) break;
-      from += 1000;
-    }
-    allModuleDecisions[tab.key] = ds;
-  }
-
-  // Build summary rows: per version, per dimension
-  type SummaryRow = {
-    version: string;
-    active: boolean;
-    subspecialty: number | null;
-    article_type: number | null;
-    study_design: number | null;
-    average: number | null;
-    changed: string[]; // dimensions that changed vs previous version
-  };
-
-  const summaryRows: SummaryRow[] = rawVersions.map((v) => {
-    const ver = v.version as string;
-    const dimAccuracies: Record<string, number | null> = {};
-    for (const tab of TABS) {
-      const ds = allModuleDecisions[tab.key].filter((d) => d.model_version === ver);
-      dimAccuracies[tab.key] = pct(ds.filter((d) => d.ai_decision === d.decision).length, ds.length);
-    }
-    return {
-      version: ver,
-      active: v.active as boolean,
-      subspecialty: dimAccuracies["subspecialty"],
-      article_type: dimAccuracies["article_type"],
-      study_design: dimAccuracies["study_design"],
-      average: null, // computed below
-      changed: [],   // computed below
-    };
-  });
-
-  // Compute averages and changed dimensions (compare to next row since sorted DESC)
-  for (let i = 0; i < summaryRows.length; i++) {
-    const r = summaryRows[i];
-    const vals = [r.subspecialty, r.article_type, r.study_design].filter((v): v is number => v != null);
-    r.average = vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
-    if (i < summaryRows.length - 1) {
-      r.changed = changedDimension(summaryRows[i + 1].version, r.version);
-    }
   }
 
   // Group decisions by model_version
@@ -190,7 +118,7 @@ export default async function ClassificationDashboardPage({ searchParams }: Prop
   ];
 
   // Build per-version stats
-  const allVersions: VersionStats[] = rawVersions.map((v, i) => {
+  const allVersions: VersionStats[] = uniqueVersions.map((v, i) => {
     const ds = groups[v.version as string] ?? [];
     const total = ds.length;
     const correct = ds.filter((d) => d.ai_decision === d.decision).length;
@@ -222,11 +150,11 @@ export default async function ClassificationDashboardPage({ searchParams }: Prop
       version:       v.version as string,
       active:        v.active as boolean,
       activatedAt:   v.activated_at as string,
-      deactivatedAt: (v.active as boolean) ? null : (i === 0 ? null : rawVersions[i - 1].activated_at as string),
+      deactivatedAt: (v.active as boolean) ? null : (i === 0 ? null : uniqueVersions[i - 1].activated_at as string),
       decisions:     total,
       agreements:    correct,
-      fp:            corrected,  // "Corrected" maps to the FP column in BenchmarkTable
-      fn:            0,          // Not applicable for multi-class
+      fp:            corrected,
+      fn:            0,
       accuracy:      pct(correct, total),
       fpRate:        pct(corrected, total),
       fnRate:        null,
@@ -302,107 +230,16 @@ export default async function ClassificationDashboardPage({ searchParams }: Prop
             Performance
           </div>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
-            Classification Benchmark
+            Classification Benchmark — Subspecialty
           </h1>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
             Nøjagtighed og korrektionsanalyse pr. model-version
           </p>
         </div>
 
-        {/* 0 ── Cross-dimension summary */}
-        {summaryRows.length > 0 && (
-          <div style={card}>
-            <div style={cardHeader}>Versions-oversigt — alle dimensioner</div>
-            <div>
-              {/* Table header */}
-              <div style={{
-                display: "grid", gridTemplateColumns: "120px 1fr 1fr 1fr 1fr",
-                padding: "10px 24px", borderBottom: "1px solid #e8ecf1",
-                fontSize: "11px", color: "#888", fontWeight: 600,
-                textTransform: "uppercase", letterSpacing: "0.05em",
-              }}>
-                <div>Version</div>
-                <div>Subspecialty</div>
-                <div>Article Type</div>
-                <div>Study Design</div>
-                <div>Samlet</div>
-              </div>
-              {/* Table rows */}
-              {summaryRows.map((r) => {
-                const cells: { key: string; value: number | null; changed: boolean }[] = [
-                  { key: "subspecialty", value: r.subspecialty, changed: r.changed.includes("subspecialty") },
-                  { key: "article_type", value: r.article_type, changed: r.changed.includes("article_type") },
-                  { key: "study_design", value: r.study_design, changed: r.changed.includes("study_design") },
-                ];
-                return (
-                  <div key={r.version} style={{
-                    display: "grid", gridTemplateColumns: "120px 1fr 1fr 1fr 1fr",
-                    padding: "12px 24px", borderBottom: "1px solid #f0f2f5",
-                    fontSize: "13px", alignItems: "center",
-                  }}>
-                    <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
-                      {r.version}
-                      {r.active && (
-                        <span style={{ fontSize: "10px", fontWeight: 700, background: "#16a34a", color: "#fff", borderRadius: "3px", padding: "1px 6px" }}>
-                          Aktiv
-                        </span>
-                      )}
-                    </div>
-                    {cells.map((c) => (
-                      <div key={c.key} style={{
-                        fontWeight: c.changed ? 700 : 400,
-                        color: accColor(c.value),
-                        background: c.changed ? "#f3f0ff" : "transparent",
-                        borderRadius: c.changed ? "4px" : undefined,
-                        padding: c.changed ? "2px 8px" : undefined,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "4px",
-                        width: "fit-content",
-                      }}>
-                        {c.value != null ? `${c.value}%` : "—"}
-                        {c.changed && <span style={{ fontSize: "9px", color: "#7c3aed" }}>*</span>}
-                      </div>
-                    ))}
-                    <div style={{ fontWeight: 700, color: accColor(r.average) }}>
-                      {r.average != null ? `${r.average}%` : "—"}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div style={{ display: "flex", gap: "4px", marginBottom: "24px" }}>
-          {TABS.map((t) => {
-            const isActive = t.key === activeTab;
-            return (
-              <Link
-                key={t.key}
-                href={`/admin/lab/classification/dashboard?tab=${t.key}`}
-                style={{
-                  fontSize: "13px",
-                  fontWeight: isActive ? 700 : 500,
-                  color: isActive ? "#7c3aed" : "#5a6a85",
-                  background: isActive ? "#f3f0ff" : "#fff",
-                  border: `1px solid ${isActive ? "#ddd6fe" : "#e5e7eb"}`,
-                  borderRadius: "6px",
-                  padding: "7px 16px",
-                  textDecoration: "none",
-                  transition: "all 0.15s",
-                }}
-              >
-                {t.label}
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* 1 ── Vertical bar chart */}
+        {/* Vertical bar chart */}
         <div style={card}>
-          <div style={cardHeader}>Nøjagtighed pr. version — {TABS.find((t) => t.key === activeTab)!.label}</div>
+          <div style={cardHeader}>Nøjagtighed pr. version — Subspecialty</div>
           <div style={{ padding: "24px 24px 20px" }}>
             {chartVersions.length === 0 ? (
               <div style={{ height: barHeight, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa", fontSize: "13px" }}>
@@ -544,9 +381,9 @@ export default async function ClassificationDashboardPage({ searchParams }: Prop
           </div>
         </div>
 
-        {/* 2 ── Version comparison table */}
+        {/* Version comparison table */}
         <div style={card}>
-          <div style={cardHeader}>Versions-sammenligning — {TABS.find((t) => t.key === activeTab)!.label}</div>
+          <div style={cardHeader}>Versions-sammenligning — Subspecialty</div>
           {tableRows.length === 0 ? (
             <div style={{ padding: "24px", fontSize: "13px", color: "#aaa" }}>Ingen versioner endnu.</div>
           ) : (

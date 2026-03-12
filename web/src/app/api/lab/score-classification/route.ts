@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
       },
     });
     return new Response(stream, {
-      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive", "Content-Encoding": "none", "X-Accel-Buffering": "no" },
     });
   }
 
@@ -131,9 +131,7 @@ export async function POST(request: NextRequest) {
                 const { error } = await admin
                   .from("articles")
                   .update({
-                    subspecialty_ai:              cls.subspecialty,
-                    article_type_ai:              cls.article_type,
-                    study_design_ai:              cls.study_design,
+                    subspecialty_ai:              cls.subspecialty as unknown as string,
                     classification_reason:        cls.reason,
                     classification_model_version: cls.version,
                     classification_scored_at:     new Date().toISOString(),
@@ -142,10 +140,12 @@ export async function POST(request: NextRequest) {
                 if (error) throw new Error(error.message);
                 scored++;
               } catch (e) {
-                console.error(`[score-classification] failed article ${article.id}:`, e);
+                const status = (e as { status?: number })?.status;
+                const msg = (e as Error)?.message ?? String(e);
+                console.error(`[score-classification] failed article ${article.id} (status=${status}): ${msg}`);
                 failedIds.push(article.id);
               }
-              send({ scored, total: toScore.length });
+              send({ scored, failed: failedIds.length, total: toScore.length });
             })
           )
         );
@@ -162,9 +162,11 @@ export async function POST(request: NextRequest) {
 
   return new Response(stream, {
     headers: {
-      "Content-Type":  "text/event-stream",
-      "Cache-Control": "no-cache",
-      "Connection":    "keep-alive",
+      "Content-Type":       "text/event-stream",
+      "Cache-Control":      "no-cache",
+      "Connection":         "keep-alive",
+      "Content-Encoding":   "none",
+      "X-Accel-Buffering":  "no",
     },
   });
 }

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 interface Props {
   specialtySlugs: string[];
-  subset: "articles" | "linking" | "citations" | "impact-factor" | "author-score" | "cleanup";
+  subset: "articles" | "linking" | "citations" | "impact-factor" | "author-score" | "cleanup" | "geo";
 }
 
 type ActionState = "idle" | "loading" | "done" | "error";
@@ -25,6 +25,19 @@ interface IFStats {
   total:           number;
   pct:             number;
   latestFetchedAt: string | null;
+}
+
+interface GeoStats {
+  parsed:          number;
+  high_confidence: number;
+  low_confidence:  number;
+  unparsed:        number;
+  ai_attempted:    number;
+  ai_upgraded:     number;
+  ai_conflicted:   number;
+  ai_remaining:    number;
+  total:           number;
+  pct:             number;
 }
 
 function n(v: number | undefined | null) { return (v ?? 0).toLocaleString("da-DK"); }
@@ -105,6 +118,11 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
   const ifStableCount   = useRef(0);
   const ifLastWithCount = useRef<number | null>(null);
 
+  // ── Geo-location state ──────────────────────────────────────────────────────
+  const [geoState,  setGeoState]  = useState<ActionState>("idle");
+  const [geoStats,  setGeoStats]  = useState<GeoStats | null>(null);
+  const geoPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // ── Citations helpers ────────────────────────────────────────────────────────
 
   const fetchCitStats = useCallback(async () => {
@@ -169,12 +187,48 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
     }, 3000);
   }
 
+  // ── Geo helpers ─────────────────────────────────────────────────────────────
+
+  const fetchGeoStats = useCallback(async () => {
+    try {
+      const res  = await fetch("/api/admin/geo/status");
+      const data = (await res.json()) as GeoStats;
+      setGeoStats(data);
+      return data;
+    } catch { return null; }
+  }, []);
+
+  function stopGeoPolling() {
+    if (geoPollRef.current) { clearInterval(geoPollRef.current); geoPollRef.current = null; }
+  }
+
+  function startGeoPolling() {
+    stopGeoPolling();
+    let stableCount = 0;
+    let lastRemaining: number | null = null;
+    geoPollRef.current = setInterval(async () => {
+      const data = await fetchGeoStats();
+      if (!data) return;
+      if (data.ai_remaining === 0) {
+        stopGeoPolling(); setGeoState("done"); return;
+      }
+      if (data.ai_remaining === lastRemaining) {
+        stableCount++;
+        if (stableCount >= 2) { stopGeoPolling(); setGeoState("done"); }
+      } else {
+        stableCount = 0;
+        lastRemaining = data.ai_remaining;
+      }
+    }, 5000);
+  }
+
   // ── Mount effects ────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (subset === "citations")     { void fetchCitStats(); }
     if (subset === "impact-factor") { void fetchIFStats(); }
-    return () => { stopCitPolling(); stopIFPolling(); };
+    if (subset === "geo")           { void fetchGeoStats(); }
+    return () => { stopCitPolling(); stopIFPolling(); stopGeoPolling(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subset]);
 
@@ -250,6 +304,16 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
     } catch { setIfState("error"); }
   }
 
+  async function triggerGeo() {
+    setGeoState("loading");
+    try {
+      const res  = await fetch("/api/admin/geo/ai-parse", { method: "POST" });
+      const json = (await res.json()) as { ok: boolean };
+      if (!json.ok) { setGeoState("error"); return; }
+      startGeoPolling();
+    } catch { setGeoState("error"); }
+  }
+
   async function triggerCleanup() {
     setCleanupState("loading");
     setCleanupMsg(null);
@@ -275,6 +339,106 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
       setCleanupState("error");
       setCleanupMsg("Netværksfejl — prøv igen");
     }
+  }
+
+  // ── Geo subset UI ──────────────────────────────────────────────────────────
+
+  if (subset === "geo") {
+    const s = geoStats;
+    const pct = s?.pct ?? 0;
+    const barColor = pct >= 80 ? "#15803d" : pct >= 40 ? "#d97706" : "#E83B2A";
+    const running = geoState === "loading";
+    const noRemaining = (s?.ai_remaining ?? 0) === 0;
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        {/* Overall progress bar */}
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+            <span style={{ fontSize: "12px", color: "#5a6a85", fontWeight: 600 }}>
+              {s ? `${n(s.parsed)} / ${n(s.total)} artikler med geo-data` : "—"}
+            </span>
+            <span style={{ fontSize: "12px", fontWeight: 700, color: barColor }}>{pct}%</span>
+          </div>
+          <div style={{ height: "6px", borderRadius: "3px", background: "#e5e7eb", overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: "3px", transition: "width 0.6s ease" }} />
+          </div>
+        </div>
+
+        {/* Two-section breakdown */}
+        {s && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+            {/* Deterministisk parser */}
+            <div>
+              <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "8px" }}>
+                Deterministisk parser
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                <div style={{ background: "#f0fdf4", borderRadius: "6px", padding: "8px 10px", border: "1px solid #bbf7d0" }}>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: "#15803d" }}>{n(s.high_confidence)}</div>
+                  <div style={{ fontSize: "10px", color: "#5a6a85", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>High conf.</div>
+                </div>
+                <div style={{ background: "#fff7ed", borderRadius: "6px", padding: "8px 10px", border: "1px solid #fed7aa" }}>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: "#c2410c" }}>{n(s.low_confidence)}</div>
+                  <div style={{ fontSize: "10px", color: "#5a6a85", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Low conf.</div>
+                </div>
+                <div style={{ background: "#f9fafb", borderRadius: "6px", padding: "8px 10px", border: "1px solid #d1d5db" }}>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: "#374151" }}>{n(s.unparsed)}</div>
+                  <div style={{ fontSize: "10px", color: "#5a6a85", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Ikke parset</div>
+                </div>
+                <div style={{ background: "#eff6ff", borderRadius: "6px", padding: "8px 10px", border: "1px solid #bfdbfe" }}>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: "#1d4ed8" }}>{n(s.parsed)}</div>
+                  <div style={{ fontSize: "10px", color: "#5a6a85", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Parset</div>
+                </div>
+              </div>
+            </div>
+
+            {/* AI fallback */}
+            <div>
+              <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "8px" }}>
+                AI fallback
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                <div style={{ background: "#f5f3ff", borderRadius: "6px", padding: "8px 10px", border: "1px solid #ddd6fe" }}>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: "#6d28d9" }}>{n(s.ai_attempted)}</div>
+                  <div style={{ fontSize: "10px", color: "#5a6a85", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Forsøgt</div>
+                </div>
+                <div style={{ background: "#f0fdf4", borderRadius: "6px", padding: "8px 10px", border: "1px solid #bbf7d0" }}>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: "#15803d" }}>{n(s.ai_upgraded)}</div>
+                  <div style={{ fontSize: "10px", color: "#5a6a85", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Opgraderet</div>
+                </div>
+                <div style={{ background: "#fff7ed", borderRadius: "6px", padding: "8px 10px", border: "1px solid #fed7aa" }}>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: "#c2410c" }}>{n(s.ai_conflicted)}</div>
+                  <div style={{ fontSize: "10px", color: "#5a6a85", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Konflikter</div>
+                </div>
+                <div style={{ background: s.ai_remaining > 0 ? "#fef2f2" : "#f9fafb", borderRadius: "6px", padding: "8px 10px", border: `1px solid ${s.ai_remaining > 0 ? "#fecaca" : "#d1d5db"}` }}>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: s.ai_remaining > 0 ? "#b91c1c" : "#374151" }}>{n(s.ai_remaining)}</div>
+                  <div style={{ fontSize: "10px", color: "#5a6a85", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Afventer AI</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Button */}
+        <div>
+          <button
+            onClick={() => { void triggerGeo(); }}
+            disabled={running || noRemaining}
+            style={{
+              padding: "8px 16px", borderRadius: "7px", border: "none",
+              fontFamily: "inherit", fontSize: "13px", fontWeight: 600,
+              cursor: running || noRemaining ? "not-allowed" : "pointer",
+              background: running ? "#f1f3f7" : noRemaining ? "#e5e7eb" : "#1a1a1a",
+              color:      running ? "#9ca3af" : noRemaining ? "#9ca3af" : "#fff",
+              transition: "background 0.15s, color 0.15s",
+            }}
+          >
+            {running ? `Kører… (${n(s?.ai_remaining)} remaining)` : noRemaining ? "Ingen afventer AI" : "Kør AI-parse"}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // ── Cleanup subset UI ──────────────────────────────────────────────────────
