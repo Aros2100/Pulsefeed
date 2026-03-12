@@ -82,7 +82,8 @@ pulsefeed/
 │   │   │       │   ├── geo/              # Geo-location endpoints
 │   │   │       │   │   ├── run-parse/   # POST: parse unparsed articles
 │   │   │       │   │   ├── reparse-low/ # POST: re-parse low-confidence
-│   │   │       │   │   └── ai-parse/    # POST: AI parse low-confidence (loops all)
+│   │   │       │   │   ├── ai-parse/    # POST: AI parse low-confidence (loops all)
+│   │   │       │   │   └── resolve-states/ # POST: Nominatim state resolution + backfill
 │   │   │       │   ├── cleanup-stuck-jobs/     # POST: nulstil hængte jobs
 │   │   │       │   └── circle3-sources/  # GET/PUT circle_3_sources
 │   │   │       ├── alerts/       # GET (public): aktive system-alerts
@@ -141,7 +142,8 @@ pulsefeed/
 | Tabel | Formål |
 |-------|--------|
 | `articles` | Artikler fra PubMed — `pubmed_id`, `title`, `abstract`, `authors` (JSONB), `circle`, `specialty_tags`, `status`, `country`, `source_id`, `citation_count`, `impact_factor`, `journal_h_index`, `evidence_score` (generated), `approval_method`, `auto_tagged_at`, `subspecialty_ai`, `article_type_ai`, `study_design_ai`, `classification_reason`, `classification_scored_at`, `classification_model_version`, `short_headline`, `short_resume`, `bottom_line`, `pico_population`, `pico_intervention`, `pico_comparison`, `pico_outcome`, `sample_size`, `condensed_model_version`, `condensed_at`, geo-location: `first_author_department`, `first_author_institution`, `first_author_city`, `first_author_country`, `first_author_region`, `last_author_*` (same), `location_parsed_at`, `location_confidence` (high/low), `ai_location_attempted` (bool), `article_regions` (TEXT[]), `article_countries` (TEXT[]), `article_cities` (TEXT[]), `article_institutions` (TEXT[]) |
-| `authors` | Forfatter-database — `display_name`, `city`, `country`, `specialty`, `affiliations` (TEXT[]), `article_count`, `author_score`, `orcid` |
+| `authors` | Forfatter-database — `display_name`, `city`, `country`, `state`, `specialty`, `affiliations` (TEXT[]), `article_count`, `author_score`, `orcid` |
+| `geo_city_state_cache` | Cache for Nominatim city→state lookups — `city`, `country`, `state` (null = no result), `looked_up_at` |
 | `article_authors` | Many-to-many: artikler ↔ forfattere |
 | `pubmed_filters` | Circle 1 søge-konfiguration (journal-lister, query_string, specialty) |
 | `circle_2_sources` | Circle 2 affiliations (institution/region + max_results) — `articles.source_id` FK |
@@ -245,6 +247,8 @@ after(): runLocationParsing(200) ← automatisk geo-parsing efter import
 - `resolveAuthorId` returnerer `{ id, outcome }` — outcome: `"new" | "duplicate" | "rejected"`
 - Forfattere uden `lastName` OG uden `orcid` → `rejected_authors`
 - `computeMatchConfidence` threshold: **0.85**
+- State resolution: `resolveState()` i importer.ts checker `geo_city_state_cache` → `lookupState()` fallback, state inkluderes i `AuthorGeo`
+- `author-linker.ts` bruger `first?.state` med `lookupState()` som fallback for `geo_state`
 
 ### Citations (`fetch-citations.ts`)
 - API: `https://www.ebi.ac.uk/europepmc/webservices/rest/MED/{pmid}/citations?format=json&pageSize=1`
@@ -326,6 +330,10 @@ Delt komponent `CircleImportPage.tsx` med:
 /admin/lab/specialty-tag/simulate   ← Prompt-simulator (Step 3–4)
 /admin/lab/classification           ← Klassificering forside (Validering + Performance)
 /admin/lab/classification/session   ← Scoring-session (splitscreen)
+/admin/lab/classification/dashboard ← KPI-kort, kalibreringstabel
+/admin/lab/classification/evaluation← Uenigheder + VersionSelector (subspecialty badges)
+/admin/lab/classification/optimize  ← Analyse-workflow (Step 1–2)
+/admin/lab/classification/simulate  ← Prompt-simulator (Step 3–4, ClassificationSimulatorClient)
 /admin/lab/condensation             ← Kondensering forside (4 SectionCards: Tekst, PICO, Performance, Prompt)
 /admin/lab/condensation/text        ← Tekst-validering session (splitscreen)
 /admin/lab/condensation/pico        ← PICO-validering session (splitscreen)
@@ -340,6 +348,12 @@ Delt komponent `CircleImportPage.tsx` med:
 | `web/src/app/admin/(with-header)/lab/classification/page.tsx` | Klassificering forside — Validering + Performance |
 | `web/src/app/admin/(with-header)/lab/classification/session/page.tsx` | Starter ClassificationClient |
 | `web/src/app/admin/(with-header)/lab/classification/ClassificationClient.tsx` | Splitscreen: artikel venstre, 3 parameter-kort højre |
+| `web/src/app/admin/(with-header)/lab/classification/dashboard/page.tsx` | KPI-kort + kalibreringstabel |
+| `web/src/app/admin/(with-header)/lab/classification/evaluation/page.tsx` | Uenigheder med subspecialty badges (parseTags + TagBadges) |
+| `web/src/app/admin/(with-header)/lab/classification/evaluation/VersionSelector.tsx` | Lokal VersionSelector for classification |
+| `web/src/app/admin/(with-header)/lab/classification/optimize/page.tsx` | Analyse-workflow Step 1–2 (module: classification_subspecialty) |
+| `web/src/app/admin/(with-header)/lab/classification/simulate/page.tsx` | Server comp → ClassificationSimulatorClient |
+| `web/src/app/admin/(with-header)/lab/classification/simulate/ClassificationSimulatorClient.tsx` | Simulator med SubspecialtyBadges, parseTags(), arraysEqual() — purple accent (#7c3aed) |
 | `web/src/app/admin/(with-header)/lab/condensation/page.tsx` | Kondensering forside — 4 SectionCards (Tekst, PICO, Performance, Prompt) |
 | `web/src/app/admin/(with-header)/lab/condensation/text/page.tsx` | Server component → TextValidationClient |
 | `web/src/app/admin/(with-header)/lab/condensation/pico/page.tsx` | Server component → PicoValidationClient |
@@ -385,7 +399,16 @@ Delt komponent `CircleImportPage.tsx` med:
 | `get_pico_not_validated_articles(p_specialty, p_limit)` | 0041 | Hent artikler med tekst-valideret men ikke PICO-valideret |
 | `count_pico_not_validated(p_specialty)` | 0041 | Tæl dem |
 
-### Simulation (`simulate/SimulatorClient.tsx`)
+### Simulation
+**Specialty-tag** (`SimulatorClient.tsx`): Bruger `DecisionBadge` (approved/rejected), string-sammenligning.
+
+**Classification** (`ClassificationSimulatorClient.tsx`): Dedikeret klient med:
+- `SubspecialtyBadges` — viser subspecialty-tags som farvede badges (purple AI, blue human, green ny AI)
+- `parseTags()` — parser JSON arrays fra decision-felter
+- `arraysEqual()` — sorteret array-sammenligning (order-agnostisk)
+- Purple accent farve (`#7c3aed`)
+
+**Begge**:
 - **To sektioner**: Fejlrettelse (uenigheder) + Regressionstest (enigheder fra aktiv model)
 - **To sekventielle SSE-kald**: først disagreements, derefter agreement-sample
 - Kombineret fremskridtslinje over alle artikler
@@ -441,6 +464,10 @@ Split i to uafhængige valideringsmoduler:
 | `/admin/lab/specialty-tag` | Speciale-validering forside — 3 SectionCards (Validering, Performance, Prompt) |
 | `/admin/lab/classification` | Klassificering forside — Validering + Performance KPI'er |
 | `/admin/lab/classification/session` | Klassificering scoring-session (splitscreen) |
+| `/admin/lab/classification/dashboard` | KPI-kort + kalibreringstabel |
+| `/admin/lab/classification/evaluation` | Uenigheder med subspecialty badges + VersionSelector |
+| `/admin/lab/classification/optimize` | Prompt-optimering Step 1–2 (module: classification_subspecialty) |
+| `/admin/lab/classification/simulate` | Prompt-simulator Step 3–4 (ClassificationSimulatorClient) |
 | `/admin/lab/condensation` | Kondensering forside — 4 SectionCards (Tekst, PICO, Performance, Prompt) |
 | `/admin/lab/condensation/text` | Tekst-validering session (headline, resumé, bottom line) |
 | `/admin/lab/condensation/pico` | PICO-validering session (population, intervention, comparison, outcome, sample size) |
@@ -486,6 +513,7 @@ Automatisk parsing af forfatter-affiliations til strukturerede lokationsfelter. 
 | `institution-map.ts` | `lookupInstitution(segment)` — ~25 kendte institutioner med city/country (danske hospitaler, Karolinska, Mayo Clinic, Charité) |
 | `region-map.ts` | `isAdministrativeRegion(segment)` — ~150 regioner (US states, kinesiske provinser, japanske prefekturer, canadiske provinser) der IKKE er byer. `isProvinceCode(segment)` for 2-bogstavs canadiske provinskoder |
 | `continent-map.ts` | `getRegion(country)` — 200+ lande → 14 verdensregioner (Scandinavia, Western Europe, East Asia etc.) |
+| `state-map.ts` | `lookupState(city, country)` — hardcoded city→state map (US, UK, DE, CA, AU, IN, CN, BR, JP, FR, IT, ES, NL, KR, TR) |
 | `article-location-summary.ts` | `buildLocationSummary(first, last)` — deduplikerede, sorterede arrays af regions/countries/cities/institutions |
 
 ### Batch runners
@@ -494,6 +522,7 @@ Automatisk parsing af forfatter-affiliations til strukturerede lokationsfelter. 
 | `location-scorer.ts` → `runLocationParsing(limit)` | Automatisk efter import (C1/C2/C3) + manuelt via `/api/admin/geo/run-parse` | Parser uparsede artikler (`location_parsed_at IS NULL`) |
 | `location-scorer.ts` → `reparseLowConfidence(cutoffDate, limit)` | Manuelt via `/api/admin/geo/reparse-low` | Re-parser low-confidence efter parser-forbedringer |
 | `ai-location-scorer.ts` → `runAILocationParsing(limit)` | Manuelt via `/api/admin/geo/ai-parse` | AI fallback for low-confidence, loops alle batches |
+| `/api/admin/geo/resolve-states` (POST) | Manuelt via Import Dashboard button | Nominatim state resolution: cache → lookupState → Nominatim API (1.1s rate limit), backfill authors.state + articles.geo_state |
 
 ### AI parser (`ai-location-parser.ts`)
 - Model: `claude-haiku-4-5-20251001` (via `trackedCall`)
@@ -575,6 +604,7 @@ NEXT_PUBLIC_SITE_URL
 | `0044` | `article_regions`, `article_countries`, `article_cities`, `article_institutions` TEXT[] kolonner + GIN indexes |
 | `0045` | `get_geo_regions_week(p_since)` + `get_geo_countries_week(p_since)` RPCs |
 | `0046` | `get_geo_cities_week(p_since, p_country)` + `get_geo_articles_week(p_since, p_city)` RPCs |
+| `0050` | `geo_city_state_cache` tabel (city+country PK) + `authors.state` kolonne |
 
 Ældre migrationer (0046–0064 i `web/supabase/`) er renummereret/sammenlagt — de nuværende 0001–0065 er den aktive migration-serie.
 
