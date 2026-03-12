@@ -5,8 +5,9 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseAffiliation, type ParsedAffiliation } from "./affiliation-parser";
-import { getRegion } from "./continent-map";
+import { getRegion, getContinent } from "./continent-map";
 import { buildLocationSummary } from "./article-location-summary";
+import { lookupState } from "./state-map";
 
 type AuthorEntry = {
   affiliation?: string | null;
@@ -76,6 +77,16 @@ export async function runLocationParsing(limit = 500): Promise<{
     article_institutions: string[];
     location_parsed_at: string;
     location_confidence: "high" | "low" | null;
+    geo_continent: string | null;
+    geo_region: string | null;
+    geo_country: string | null;
+    geo_state: string | null;
+    geo_city: string | null;
+    geo_institution: string | null;
+    geo_country_certain: boolean | null;
+    geo_state_certain: boolean | null;
+    geo_city_certain: boolean | null;
+    geo_institution_certain: boolean | null;
   };
 
   const updates: UpdatePayload[] = [];
@@ -113,6 +124,16 @@ export async function runLocationParsing(limit = 500): Promise<{
         article_institutions: [],
         location_parsed_at: now,
         location_confidence: null,
+        geo_continent: null,
+        geo_region: null,
+        geo_country: null,
+        geo_state: null,
+        geo_city: null,
+        geo_institution: null,
+        geo_country_certain: null,
+        geo_state_certain: null,
+        geo_city_certain: null,
+        geo_institution_certain: null,
       });
       continue;
     }
@@ -141,6 +162,21 @@ export async function runLocationParsing(limit = 500): Promise<{
       { region: lastRegion, country: lastParsed?.country ?? null, city: lastParsed?.city ?? null, institution: lastParsed?.institution ?? null },
     );
 
+    // geo_* fields: always derived from first author
+    const geoCountry = firstParsed?.country ?? null;
+    const geoCity = firstParsed?.city ?? null;
+    const geoInstitution = firstParsed?.institution ?? null;
+    const geoRegion = firstRegion;
+    const geoContinent = firstRegion ? getContinent(firstRegion) : null;
+    const geoState = geoCity && geoCountry ? lookupState(geoCity, geoCountry) : null;
+
+    // Certainty: true when last author is null (single author) or matches first author
+    const hasLastAuthor = lastParsed !== null;
+    const geoCountryCertain = !hasLastAuthor || lastParsed.country == null || lastParsed.country === firstParsed?.country;
+    const geoStateCertain = geoCountryCertain;
+    const geoCityCertain = geoCountryCertain && (!hasLastAuthor || lastParsed.city == null || lastParsed.city === firstParsed?.city);
+    const geoInstitutionCertain = geoCityCertain && (!hasLastAuthor || lastParsed.institution == null || lastParsed.institution === firstParsed?.institution);
+
     updates.push({
       id: article.id,
       first_author_department: firstParsed?.department ?? null,
@@ -156,6 +192,16 @@ export async function runLocationParsing(limit = 500): Promise<{
       ...summary,
       location_parsed_at: now,
       location_confidence: overallConfidence,
+      geo_continent: geoContinent,
+      geo_region: geoRegion,
+      geo_country: geoCountry,
+      geo_state: geoState,
+      geo_city: geoCity,
+      geo_institution: geoInstitution,
+      geo_country_certain: geoCountryCertain,
+      geo_state_certain: geoStateCertain,
+      geo_city_certain: geoCityCertain,
+      geo_institution_certain: geoInstitutionCertain,
     });
   }
 
@@ -181,6 +227,16 @@ export async function runLocationParsing(limit = 500): Promise<{
       article_institutions: [],
       location_parsed_at: new Date().toISOString(),
       location_confidence: null,
+      geo_continent: null,
+      geo_region: null,
+      geo_country: null,
+      geo_state: null,
+      geo_city: null,
+      geo_institution: null,
+      geo_country_certain: null,
+      geo_state_certain: null,
+      geo_city_certain: null,
+      geo_institution_certain: null,
     });
   }
 
@@ -258,6 +314,19 @@ export async function reparseLowConfidence(cutoffDate: string, limit = 500): Pro
       { region: lastRegionR, country: lastParsed?.country ?? null, city: lastParsed?.city ?? null, institution: lastParsed?.institution ?? null },
     );
 
+    // geo_* fields: always derived from first author
+    const geoCountryR = firstParsed?.country ?? null;
+    const geoCityR = firstParsed?.city ?? null;
+    const geoInstitutionR = firstParsed?.institution ?? null;
+    const geoContinentR = firstRegionR ? getContinent(firstRegionR) : null;
+    const geoStateR = geoCityR && geoCountryR ? lookupState(geoCityR, geoCountryR) : null;
+
+    const hasLastAuthorR = lastParsed !== null;
+    const geoCountryCertainR = !hasLastAuthorR || lastParsed.country == null || lastParsed.country === firstParsed?.country;
+    const geoStateCertainR = geoCountryCertainR;
+    const geoCityCertainR = geoCountryCertainR && (!hasLastAuthorR || lastParsed.city == null || lastParsed.city === firstParsed?.city);
+    const geoInstitutionCertainR = geoCityCertainR && (!hasLastAuthorR || lastParsed.institution == null || lastParsed.institution === firstParsed?.institution);
+
     updates.push({
       id: article.id,
       fields: {
@@ -274,6 +343,16 @@ export async function reparseLowConfidence(cutoffDate: string, limit = 500): Pro
         ...summaryR,
         location_parsed_at: new Date().toISOString(),
         location_confidence: overallConfidence,
+        geo_continent: geoContinentR,
+        geo_region: firstRegionR,
+        geo_country: geoCountryR,
+        geo_state: geoStateR,
+        geo_city: geoCityR,
+        geo_institution: geoInstitutionR,
+        geo_country_certain: geoCountryCertainR,
+        geo_state_certain: geoStateCertainR,
+        geo_city_certain: geoCityCertainR,
+        geo_institution_certain: geoInstitutionCertainR,
       },
     });
   }

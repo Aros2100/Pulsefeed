@@ -20,7 +20,7 @@ export default async function OnboardingPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("first_name, last_name")
+    .select("name, first_name, last_name")
     .eq("id", user.id)
     .single();
 

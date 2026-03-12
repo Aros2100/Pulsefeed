@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import type { GeoRegion, GeoCountry, GeoCity, GeoArticle } from "./page";
+import type { GeoContinent, GeoRegion, GeoCountry, GeoCity, GeoArticle } from "./page";
 
 interface Props {
+  continent?: string;
   region?: string;
   country?: string;
   city?: string;
+  continents: GeoContinent[];
   regions: GeoRegion[];
   countries: GeoCountry[];
   cities: GeoCity[];
@@ -71,34 +73,45 @@ function BarRow({
 }
 
 export default function GeoExplorer({
+  continent,
   region,
   country,
   city,
+  continents,
   regions,
   countries,
   cities,
   articles,
 }: Props) {
   // Determine current level
-  const level = city ? 4 : country ? 3 : region ? 2 : 1;
+  const level = city ? 5 : country ? 4 : region ? 3 : continent ? 2 : 1;
 
   // Build breadcrumb segments
   const crumbs: { label: string; href: string }[] = [
-    { label: "Alle regioner", href: "/geo" },
+    { label: "Alle", href: "/geo" },
   ];
+  if (continent) {
+    crumbs.push({
+      label: continent,
+      href: `/geo?continent=${encodeURIComponent(continent)}`,
+    });
+  }
   if (region) {
-    crumbs.push({ label: region, href: `/geo?region=${encodeURIComponent(region)}` });
+    crumbs.push({
+      label: region,
+      href: `/geo?continent=${encodeURIComponent(continent!)}&region=${encodeURIComponent(region)}`,
+    });
   }
   if (country) {
     crumbs.push({
       label: country,
-      href: `/geo?region=${encodeURIComponent(region!)}&country=${encodeURIComponent(country)}`,
+      href: `/geo?continent=${encodeURIComponent(continent!)}&region=${encodeURIComponent(region!)}&country=${encodeURIComponent(country)}`,
     });
   }
   if (city) {
     crumbs.push({
       label: city,
-      href: `/geo?region=${encodeURIComponent(region!)}&country=${encodeURIComponent(country!)}&city=${encodeURIComponent(city)}`,
+      href: `/geo?continent=${encodeURIComponent(continent!)}&region=${encodeURIComponent(region!)}&country=${encodeURIComponent(country!)}&city=${encodeURIComponent(city)}`,
     });
   }
 
@@ -159,19 +172,40 @@ export default function GeoExplorer({
             textTransform: "uppercase",
             fontWeight: 700,
           }}>
-            {level === 1 && "Regioner"}
-            {level === 2 && `Lande i ${region}`}
-            {level === 3 && `Byer i ${country}`}
-            {level === 4 && `Artikler fra ${city}`}
+            {level === 1 && "Verdensdele"}
+            {level === 2 && `Regioner i ${continent}`}
+            {level === 3 && `Lande i ${region}`}
+            {level === 4 && `Byer i ${country}`}
+            {level === 5 && `Artikler fra ${city}`}
           </div>
         </div>
 
         <div style={{ padding: "16px 24px 20px" }}>
-          {/* Level 1: Regions */}
+          {/* Level 1: Continents */}
           {level === 1 && (
-            regions.length === 0 ? (
+            continents.length === 0 ? (
               <div style={{ padding: "12px 0", fontSize: "14px", color: "#888" }}>
                 Ingen geo-data denne uge.
+              </div>
+            ) : (
+              continents.map((c) => (
+                <BarRow
+                  key={c.continent}
+                  label={c.continent}
+                  count={c.count}
+                  maxCount={continents[0].count}
+                  color="#c0392b"
+                  href={`/geo?continent=${encodeURIComponent(c.continent)}`}
+                />
+              ))
+            )
+          )}
+
+          {/* Level 2: Regions */}
+          {level === 2 && (
+            regions.length === 0 ? (
+              <div style={{ padding: "12px 0", fontSize: "14px", color: "#888" }}>
+                Ingen regioner fundet for denne verdensdel.
               </div>
             ) : (
               regions.map((r) => (
@@ -181,14 +215,14 @@ export default function GeoExplorer({
                   count={r.count}
                   maxCount={regions[0].count}
                   color="#E83B2A"
-                  href={`/geo?region=${encodeURIComponent(r.region)}`}
+                  href={`/geo?continent=${encodeURIComponent(continent!)}&region=${encodeURIComponent(r.region)}`}
                 />
               ))
             )
           )}
 
-          {/* Level 2: Countries */}
-          {level === 2 && (
+          {/* Level 3: Countries */}
+          {level === 3 && (
             countries.length === 0 ? (
               <div style={{ padding: "12px 0", fontSize: "14px", color: "#888" }}>
                 Ingen lande fundet for denne region.
@@ -201,14 +235,14 @@ export default function GeoExplorer({
                   count={c.count}
                   maxCount={countries[0].count}
                   color="#F4A5A0"
-                  href={`/geo?region=${encodeURIComponent(region!)}&country=${encodeURIComponent(c.country)}`}
+                  href={`/geo?continent=${encodeURIComponent(continent!)}&region=${encodeURIComponent(region!)}&country=${encodeURIComponent(c.country)}`}
                 />
               ))
             )
           )}
 
-          {/* Level 3: Cities */}
-          {level === 3 && (
+          {/* Level 4: Cities */}
+          {level === 4 && (
             cities.length === 0 ? (
               <div style={{ padding: "12px 0", fontSize: "14px", color: "#888" }}>
                 Ingen byer fundet for dette land.
@@ -221,14 +255,14 @@ export default function GeoExplorer({
                   count={c.count}
                   maxCount={cities[0].count}
                   color="#FADBD8"
-                  href={`/geo?region=${encodeURIComponent(region!)}&country=${encodeURIComponent(country!)}&city=${encodeURIComponent(c.city)}`}
+                  href={`/geo?continent=${encodeURIComponent(continent!)}&region=${encodeURIComponent(region!)}&country=${encodeURIComponent(country!)}&city=${encodeURIComponent(c.city)}`}
                 />
               ))
             )
           )}
 
-          {/* Level 4: Articles */}
-          {level === 4 && (
+          {/* Level 5: Articles */}
+          {level === 5 && (
             articles.length === 0 ? (
               <div style={{ padding: "12px 0", fontSize: "14px", color: "#888" }}>
                 Ingen artikler fundet for denne by.

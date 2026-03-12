@@ -4,6 +4,7 @@ import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { runImportCircle2 } from "@/lib/pubmed/importer-circle2";
 import { runCitationFetch } from "@/lib/pubmed/fetch-citations";
 import { runLocationParsing } from "@/lib/geo/location-scorer";
+import { runAILocationParsing } from "@/lib/geo/ai-location-scorer";
 import { runPublicationTypeMapping } from "@/lib/tagging/publication-type-mapper";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -79,8 +80,21 @@ export async function POST(request: NextRequest) {
     await runCitationFetch(200);
   });
 
-  after(() => {
-    runLocationParsing(200).then(r => console.log("[geo/auto-parse]", r)).catch(e => console.error("[geo/auto-parse] error:", e));
+  after(async () => {
+    try {
+      const parseResult = await runLocationParsing(200);
+      console.log("[geo/auto-parse]", parseResult);
+      if (parseResult.lowConfidence > 0) {
+        try {
+          const aiResult = await runAILocationParsing(parseResult.lowConfidence);
+          console.log("[geo/ai-parse]", aiResult);
+        } catch (e) {
+          console.error("[geo/ai-parse] failed:", e);
+        }
+      }
+    } catch (e) {
+      console.error("[geo/auto-parse] error:", e);
+    }
   });
 
   after(() => {

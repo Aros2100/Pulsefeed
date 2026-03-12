@@ -9,6 +9,7 @@ interface Author {
   hospital: string | null;
   city: string | null;
   country: string | null;
+  article_count: number | null;
 }
 
 export interface AuthorMeta {
@@ -46,7 +47,7 @@ export default function AuthorSearch({
       const supabase = createClient();
       const { data } = await supabase
         .from("authors")
-        .select("id, display_name, hospital, city, country")
+        .select("id, display_name, hospital, city, country, article_count")
         .ilike("display_name", `%${query}%`)
         .limit(8);
       setResults((data as Author[]) ?? []);
@@ -69,7 +70,7 @@ export default function AuthorSearch({
             marginBottom: "6px",
           }}
         >
-          Search by name
+          Søg efter navn
         </label>
         <input
           id="author-search"
@@ -91,12 +92,12 @@ export default function AuthorSearch({
         />
         {searching && (
           <p style={{ marginTop: "6px", fontSize: "12px", color: "#888" }}>
-            Searching…
+            Søger…
           </p>
         )}
         {!searching && query.trim().length >= 2 && results.length === 0 && (
           <p style={{ marginTop: "6px", fontSize: "12px", color: "#888" }}>
-            No authors found.
+            Ingen forfattere fundet.
           </p>
         )}
       </div>
@@ -124,6 +125,11 @@ export default function AuthorSearch({
                       {[author.hospital, author.city, author.country].filter(Boolean).join(" · ")}
                     </p>
                   )}
+                  {author.article_count != null && author.article_count > 0 && (
+                    <p style={{ fontSize: "11px", color: "#64748b", margin: "2px 0 0" }}>
+                      {author.article_count} {author.article_count === 1 ? "artikel" : "artikler"}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -147,7 +153,7 @@ export default function AuthorSearch({
                     cursor: "pointer",
                   }}
                 >
-                  That&apos;s me
+                  Det er mig
                 </button>
               </div>
             </li>

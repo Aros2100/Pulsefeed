@@ -9,6 +9,7 @@ export type AIParsedLocation = {
   department: string | null;
   institution: string | null;
   city: string | null;
+  state: string | null;
   country: string | null;
 };
 
@@ -25,9 +26,19 @@ export async function aiParseAffiliation(
         {
           role: "user",
           content: `Parse this academic affiliation string into structured location fields.
-Return ONLY valid JSON with these fields: { "department", "institution", "city", "country" }
+Return ONLY valid JSON with these fields: { "department", "institution", "city", "state", "country" }
 Use null for any field you cannot confidently determine.
-Normalize country names to their common English form (e.g., "People's Republic of China" → "China", "USA" → "United States", "UK" → "United Kingdom").
+
+Rules:
+- "state" means state, province, prefecture, or equivalent administrative region (e.g., "California", "Ontario", "Guangdong", "Tokyo", "Maharashtra", "São Paulo", "Victoria")
+- Normalize country names to their common English form (e.g., "People's Republic of China" → "China", "USA" → "United States", "UK" → "United Kingdom")
+- For US affiliations, always include the state
+- For China, include the province
+- For Japan, include the prefecture
+- For Canada, include the province
+- For India, include the state
+- For Brazil, include the state
+- For Australia, include the state
 
 Affiliation: "${raw}"`,
         },
@@ -77,6 +88,7 @@ Affiliation: "${raw}"`,
       department: str(parsed.department),
       institution: str(parsed.institution),
       city: str(parsed.city),
+      state: str(parsed.state),
       country: str(parsed.country),
     };
   } catch (e) {

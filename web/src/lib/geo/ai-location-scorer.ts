@@ -6,8 +6,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { aiParseAffiliation, type AIParsedLocation } from "./ai-location-parser";
 import { lookupCountry } from "./country-map";
-import { getRegion } from "./continent-map";
+import { getRegion, getContinent } from "./continent-map";
 import { buildLocationSummary } from "./article-location-summary";
+import { lookupState } from "./state-map";
 
 type AuthorEntry = {
   affiliation?: string | null;
@@ -210,6 +211,23 @@ export async function runAILocationParsing(
       { region: lastRegionAI, country: lastCheck.fields.country, city: lastCheck.fields.city, institution: lastCheck.fields.institution },
     );
 
+    // geo_* fields: derived from first author result
+    const geoCountryAI = firstCheck.fields.country;
+    const geoCityAI = firstCheck.fields.city;
+    const geoInstitutionAI = firstCheck.fields.institution;
+    const geoRegionAI = firstRegionAI;
+    const geoContinentAI = firstRegionAI ? getContinent(firstRegionAI) : null;
+    // State: prefer AI result, fall back to state-map lookup
+    const aiFirstState = firstAI?.state ?? null;
+    const geoStateAI = aiFirstState ?? (geoCityAI && geoCountryAI ? lookupState(geoCityAI, geoCountryAI) : null);
+
+    // Certainty
+    const hasLastAuthorAI = lastCheck.result !== "skipped";
+    const geoCountryCertainAI = !hasLastAuthorAI || !lastCheck.fields.country || lastCheck.fields.country === firstCheck.fields.country;
+    const geoStateCertainAI = geoCountryCertainAI;
+    const geoCityCertainAI = geoCountryCertainAI && (!hasLastAuthorAI || !lastCheck.fields.city || lastCheck.fields.city === firstCheck.fields.city);
+    const geoInstitutionCertainAI = geoCityCertainAI && (!hasLastAuthorAI || !lastCheck.fields.institution || lastCheck.fields.institution === firstCheck.fields.institution);
+
     updates.push({
       id: article.id,
       fields: {
@@ -227,6 +245,16 @@ export async function runAILocationParsing(
         location_confidence: newConfidence,
         location_parsed_at: new Date().toISOString(),
         ai_location_attempted: true,
+        geo_continent: geoContinentAI,
+        geo_region: geoRegionAI,
+        geo_country: geoCountryAI,
+        geo_state: geoStateAI,
+        geo_city: geoCityAI,
+        geo_institution: geoInstitutionAI,
+        geo_country_certain: geoCountryCertainAI,
+        geo_state_certain: geoStateCertainAI,
+        geo_city_certain: geoCityCertainAI,
+        geo_institution_certain: geoInstitutionCertainAI,
       },
     });
   }

@@ -32,12 +32,6 @@ export const updatePasswordSchema = z
     path: ["confirmPassword"],
   });
 
-export const onboardingSchema = z.object({
-  role_type: z.enum(["clinician", "researcher", "both"]),
-  author_id: z.string().uuid().nullable().optional(),
-});
-
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type UpdatePasswordInput = z.infer<typeof updatePasswordSchema>;
-export type OnboardingInput = z.infer<typeof onboardingSchema>;

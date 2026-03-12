@@ -3,7 +3,7 @@
  * Case-insensitive lookup. Returns null for unknown countries.
  */
 
-const REGION_MAP: Record<string, string> = {
+export const REGION_MAP: Record<string, string> = {
   // Scandinavia
   "denmark": "Scandinavia",
   "sweden": "Scandinavia",
@@ -231,4 +231,27 @@ const REGION_MAP: Record<string, string> = {
 /** Case-insensitive country-to-region lookup. Returns null for unknown countries. */
 export function getRegion(country: string): string | null {
   return REGION_MAP[country.trim().toLowerCase()] ?? null;
+}
+
+const REGION_TO_CONTINENT: Record<string, string> = {
+  "Scandinavia": "Europe",
+  "Western Europe": "Europe",
+  "Southern Europe": "Europe",
+  "Eastern Europe": "Europe",
+  "North America": "North America",
+  "Central America & Caribbean": "North America",
+  "South America": "South America",
+  "East Asia": "Asia",
+  "South Asia": "Asia",
+  "Southeast Asia": "Asia",
+  "Middle East": "Asia",
+  "Russia & Central Asia": "Asia",
+  "North Africa": "Africa",
+  "Sub-Saharan Africa": "Africa",
+  "Oceania": "Oceania",
+};
+
+/** Maps a region name to its continent. Returns null for unknown regions. */
+export function getContinent(region: string): string | null {
+  return REGION_TO_CONTINENT[region] ?? null;
 }

@@ -6,6 +6,7 @@
 import { lookupCountry, CANONICAL_COUNTRIES, US_STATES } from "./country-map";
 import { lookupInstitution } from "./institution-map";
 import { isAdministrativeRegion, isProvinceCode } from "./region-map";
+import { lookupCity } from "./city-map";
 
 export type ParsedAffiliation = {
   department: string | null;
@@ -135,6 +136,11 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
 
   if (!text) return null;
 
+  // Step 3b: Reject pure department-only affiliations with no location data
+  if (/^Departments?\s+of\d?/i.test(text) && !text.includes(",")) {
+    return null;
+  }
+
   // Step 4: Split into segments
   const segments = text.split(/,\s*/).map((s) => s.trim()).filter(Boolean);
   if (segments.length === 0) return null;
@@ -195,9 +201,14 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
   let country: string | null = null;
   let confidence: "high" | "low" = "high";
   let isUS = false;
+  let cityFromCountryFallback = false;
+  let city: string | null = null;
 
   if (segments.length > 0) {
-    const lastSeg = segments[segments.length - 1].replace(/\.+$/, "").trim();
+    let lastSeg = segments[segments.length - 1].replace(/\.+$/, "").trim();
+    // Strip trailing noise: " and ...", " - "
+    lastSeg = lastSeg.replace(/\s+and\s+.*$/i, "").trim();
+    lastSeg = lastSeg.replace(/\s+-\s*$/, "").trim();
 
     const directMatch = lookupCountry(lastSeg);
     if (directMatch) {
@@ -211,23 +222,33 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
         isUS = true;
         segments.pop();
       } else {
-        const lowerLast = lastSeg.toLowerCase();
-        const found = CANONICAL_COUNTRIES.find((c) =>
-          lowerLast.includes(c.toLowerCase())
-        );
-        if (found) {
-          country = found;
-          if (found === "United States") isUS = true;
-          const countryIdx = lowerLast.lastIndexOf(found.toLowerCase());
-          const beforeCountry = lastSeg.slice(0, countryIdx).trim();
+        // City-to-country fallback: check if last segment is a known city/province
+        const cityMatch = lookupCity(lastSeg);
+        if (cityMatch) {
+          country = cityMatch.country;
+          city = cityMatch.city;
+          cityFromCountryFallback = true;
+          if (cityMatch.country === "United States") isUS = true;
           segments.pop();
-          if (beforeCountry) {
-            segments.push(beforeCountry);
-          }
         } else {
-          confidence = "low";
-          country = lastSeg;
-          segments.pop();
+          const lowerLast = lastSeg.toLowerCase();
+          const found = CANONICAL_COUNTRIES.find((c) =>
+            lowerLast.includes(c.toLowerCase())
+          );
+          if (found) {
+            country = found;
+            if (found === "United States") isUS = true;
+            const countryIdx = lowerLast.lastIndexOf(found.toLowerCase());
+            const beforeCountry = lastSeg.slice(0, countryIdx).trim();
+            segments.pop();
+            if (beforeCountry) {
+              segments.push(beforeCountry);
+            }
+          } else {
+            confidence = "low";
+            country = lastSeg;
+            segments.pop();
+          }
         }
       }
     }
@@ -253,8 +274,7 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
   }
 
   // Step 8: Extract city — walk right to left, skip administrative regions
-  let city: string | null = null;
-  if (segments.length > 0) {
+  if (!cityFromCountryFallback && segments.length > 0) {
     // Find city: skip regions/postal codes/province codes from the right
     let cityIdx = segments.length - 1;
     while (cityIdx >= 0) {
@@ -272,6 +292,11 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
       }
       // Also skip if it's a postal code that slipped through
       if (isPostalCode(candidate)) {
+        cityIdx--;
+        continue;
+      }
+      // Skip segments that are country names/aliases (e.g., "England", "Scotland", "Wales")
+      if (lookupCountry(candidate) !== null) {
         cityIdx--;
         continue;
       }
