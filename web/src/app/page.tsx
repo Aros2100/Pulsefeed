@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import Header from "@/components/Header";
 import ScoreBadge from "@/components/ScoreBadge";
 import KPIOverview from "@/components/KPIOverview";
+import ArticleFilterPanel from "@/components/ArticleFilterPanel";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -91,6 +92,11 @@ export default async function DashboardPage() {
 
         {/* KPI Overview */}
         <KPIOverview />
+
+        {/* Article Filter Panel */}
+        <div style={{ marginTop: "28px" }}>
+          <ArticleFilterPanel />
+        </div>
 
         {/* Quick access */}
         <div style={{
