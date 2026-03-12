@@ -147,18 +147,18 @@ export default function KPIOverview() {
   // Build geo button list from userGeo
   const geoButtons: { level: GeoLevel; label: string; value: number }[] = [];
   if (data) {
-    geoButtons.push({ level: "all", label: "All", value: data.geoHierarchy.all });
+    geoButtons.push({ level: "all", label: "All", value: data.geoHierarchy?.all ?? 0 });
     if (data.userGeo) {
       const geo = data.userGeo;
-      if (geo.continent) geoButtons.push({ level: "continent", label: geoLabel(geo.continent), value: data.geoHierarchy.continent });
-      if (geo.region) geoButtons.push({ level: "region", label: geoLabel(geo.region), value: data.geoHierarchy.region });
-      geoButtons.push({ level: "country", label: geoLabel(geo.country), value: data.geoHierarchy.country });
-      if (geo.city) geoButtons.push({ level: "city", label: geoLabel(geo.city), value: data.geoHierarchy.city });
+      if (geo.continent) geoButtons.push({ level: "continent", label: geoLabel(geo.continent), value: data.geoHierarchy?.continent ?? 0 });
+      if (geo.region) geoButtons.push({ level: "region", label: geoLabel(geo.region), value: data.geoHierarchy?.region ?? 0 });
+      geoButtons.push({ level: "country", label: geoLabel(geo.country), value: data.geoHierarchy?.country ?? 0 });
+      if (geo.city) geoButtons.push({ level: "city", label: geoLabel(geo.city), value: data.geoHierarchy?.city ?? 0 });
     }
   }
 
   // Central number = count at selected geo level
-  const centralNumber = data ? data.geoHierarchy[geoLevel] : 0;
+  const centralNumber = data ? (data.geoHierarchy?.[geoLevel] ?? 0) : 0;
 
   const contentOpacity = fading ? 0.2 : 1;
 
