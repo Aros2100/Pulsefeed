@@ -23,7 +23,7 @@ const fraunces = Fraunces({
 
 // ── User subspecialties ──────────────────────────────────────────────────────
 
-// TODO: Hent fra user_subspecialties tabel når den eksisterer
+// TODO: Fetch from user_subspecialties table when it exists
 const USER_SUBSPECIALTIES = [
   "Spine surgery",
   "Neurosurgical oncology and Radiosurgery",
@@ -32,8 +32,8 @@ const USER_SUBSPECIALTIES = [
 
 const SUB_LABELS: Record<string, string> = {
   "Spine surgery": "Spine",
-  "Neurosurgical oncology and Radiosurgery": "Onkologi",
-  "Vascular and Endovascular Neurosurgery": "Vaskulær",
+  "Neurosurgical oncology and Radiosurgery": "Oncology",
+  "Vascular and Endovascular Neurosurgery": "Vascular",
 };
 
 // ── Evidence levels ──────────────────────────────────────────────────────────
@@ -41,8 +41,8 @@ const SUB_LABELS: Record<string, string> = {
 const EVIDENCE_LEVELS = [
   { level: 5, label: "Meta/SR", color: "#c0392b" },
   { level: 4, label: "RCT", color: "#d35400" },
-  { level: 3, label: "Prospektiv", color: "#e67e22" },
-  { level: 2, label: "Retrospektiv", color: "#f39c12" },
+  { level: 3, label: "Prospective", color: "#e67e22" },
+  { level: 2, label: "Retrospective", color: "#f39c12" },
   { level: 1, label: "Case/Op.", color: "#bdc3c7" },
 ] as const;
 
@@ -51,7 +51,7 @@ const EVIDENCE_LEVELS = [
 const ARTICLE_TYPES = [
   "Original",
   "Syst. Review",
-  "Meta-Analyse",
+  "Meta-Analysis",
   "Case Report",
   "Review",
   "Editorial",
@@ -66,9 +66,9 @@ const ARTICLE_TYPES = [
 type Period = "week" | "month" | "year";
 
 const PERIODS: { key: Period; label: string }[] = [
-  { key: "week", label: "Uge" },
-  { key: "month", label: "Måned" },
-  { key: "year", label: "År" },
+  { key: "week", label: "Week" },
+  { key: "month", label: "Month" },
+  { key: "year", label: "Year" },
 ];
 
 // ── Actionable ───────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ type Actionable = "all" | "yes" | "no";
 
 // ── Dummy count computation ──────────────────────────────────────────────────
 
-// TODO: Erstat dummy-beregning med API-kald når classification pipeline kører
+// TODO: Replace dummy computation with API call when classification pipeline runs
 function computeCount(
   period: Period,
   sub: string | null,
@@ -90,7 +90,7 @@ function computeCount(
   if (sub !== null) c = Math.round(c * (1 / 17) * 1.2);
   const evPct: Record<number, number> = { 1: 1, 2: 0.78, 3: 0.39, 4: 0.21, 5: 0.13 };
   c = Math.round(c * (evPct[minEvidence] || 1));
-  if (types.length > 0 && types.length < 10) c = Math.round(c * (types.length / 10));
+  if (types.length > 0) c = Math.round(c * (types.length / 10));
   if (actionable === "yes") c = Math.round(c * 0.15);
   if (actionable === "no") c = Math.round(c * 0.85);
   return Math.max(0, c);
@@ -132,7 +132,7 @@ function AnimatedNumber({ value }: { value: number }) {
     return () => cancelAnimationFrame(raf);
   }, [value]);
 
-  return <>{display.toLocaleString("da-DK")}</>;
+  return <>{display.toLocaleString("en-US")}</>;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -141,29 +141,29 @@ export default function ArticleFilterPanel() {
   const [period, setPeriod] = useState<Period>("week");
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
   const [minEvidence, setMinEvidence] = useState(1);
-  const [activeTypes, setActiveTypes] = useState<string[]>([...ARTICLE_TYPES]);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [actionable, setActionable] = useState<Actionable>("all");
 
   const count = useMemo(
-    () => computeCount(period, selectedSub, minEvidence, activeTypes, actionable),
-    [period, selectedSub, minEvidence, activeTypes, actionable],
+    () => computeCount(period, selectedSub, minEvidence, selectedTypes, actionable),
+    [period, selectedSub, minEvidence, selectedTypes, actionable],
   );
 
   const hasFilters =
     selectedSub !== null ||
     minEvidence > 1 ||
-    activeTypes.length < ARTICLE_TYPES.length ||
+    selectedTypes.length > 0 ||
     actionable !== "all";
 
   function reset() {
     setSelectedSub(null);
     setMinEvidence(1);
-    setActiveTypes([...ARTICLE_TYPES]);
+    setSelectedTypes([]);
     setActionable("all");
   }
 
   function toggleType(type: string) {
-    setActiveTypes((prev) =>
+    setSelectedTypes((prev) =>
       prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type],
     );
   }
@@ -174,7 +174,7 @@ export default function ArticleFilterPanel() {
 
   // Scope buttons: "Neurokirurgi" + user subspecialties
   const scopes = [
-    { key: "all", label: "Neurokirurgi" },
+    { key: "all", label: "Neurosurgery" },
     ...USER_SUBSPECIALTIES.map((s) => ({ key: s, label: SUB_LABELS[s] ?? s })),
   ];
 
@@ -191,13 +191,13 @@ export default function ArticleFilterPanel() {
       >
         <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
           <span style={{ fontSize: "15px", fontWeight: 700, color: "#1e293b" }}>
-            Udforsk artikler
+            Explore articles
           </span>
           <span
             className={dmMono.className}
             style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 400 }}
           >
-            Filtrér efter dine præferencer
+            Filter by your preferences
           </span>
         </div>
 
@@ -268,45 +268,69 @@ export default function ArticleFilterPanel() {
                 color: "#94a3b8",
               }}
             >
-              Artikeltype
+              Article type
             </span>
-            <span
-              className={dmMono.className}
-              style={{
-                fontSize: "10px",
-                color: activeTypes.length < ARTICLE_TYPES.length ? "#c0392b" : "#94a3b8",
-                fontWeight: 500,
-              }}
-            >
-              {activeTypes.length}/{ARTICLE_TYPES.length}
-            </span>
+            {selectedTypes.length > 0 && (
+              <span
+                className={dmMono.className}
+                style={{
+                  fontSize: "10px",
+                  color: "#c0392b",
+                  fontWeight: 500,
+                }}
+              >
+                {selectedTypes.length} selected
+              </span>
+            )}
           </div>
           <div
             style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "6px",
+              display: "grid",
+              gridTemplateColumns: "repeat(5, auto)",
+              gap: "4px",
               justifyContent: "center",
+              width: "fit-content",
+              margin: "0 auto",
             }}
           >
             {ARTICLE_TYPES.map((type) => {
-              const active = activeTypes.includes(type);
+              const selected = selectedTypes.includes(type);
+              const anySelected = selectedTypes.length > 0;
+              let bg: string;
+              let color: string;
+              let shadow: string;
+              if (!anySelected) {
+                bg = "#f8fafc";
+                color = "#64748b";
+                shadow = "none";
+              } else if (selected) {
+                bg = "linear-gradient(135deg, #c0392b, #a93226)";
+                color = "#fff";
+                shadow = "0 2px 8px rgba(192, 57, 43, 0.35)";
+              } else {
+                bg = "#f8fafc";
+                color = "#64748b";
+                shadow = "none";
+              }
               return (
                 <button
                   key={type}
                   onClick={() => toggleType(type)}
                   style={{
-                    padding: "4px 10px",
-                    fontSize: "10.5px",
-                    fontWeight: active ? 600 : 500,
-                    color: active ? "#fff" : "#64748b",
-                    background: active ? "#2c3e50" : "#f1f5f9",
+                    padding: "6px 14px",
+                    fontSize: "11.5px",
+                    fontWeight: 500,
+                    color,
+                    background: bg,
+                    boxShadow: shadow,
                     border: "none",
-                    borderRadius: "999px",
+                    borderRadius: "8px",
                     cursor: "pointer",
                     transition: "all 0.15s ease",
                     fontFamily: "inherit",
                     whiteSpace: "nowrap",
+                    minWidth: "110px",
+                    textAlign: "center",
                   }}
                 >
                   {type}
@@ -344,7 +368,7 @@ export default function ArticleFilterPanel() {
                 marginBottom: "12px",
               }}
             >
-              Evidensniveau
+              Evidence level
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {EVIDENCE_LEVELS.map((ev) => {
@@ -413,8 +437,8 @@ export default function ArticleFilterPanel() {
             <div
               className={fraunces.className}
               style={{
-                fontSize: "64px",
-                fontWeight: 900,
+                fontSize: "52px",
+                fontWeight: 800,
                 color: "#1e293b",
                 lineHeight: 1,
                 letterSpacing: "-0.02em",
@@ -430,7 +454,7 @@ export default function ArticleFilterPanel() {
                 fontWeight: 500,
               }}
             >
-              artikler
+              articles
             </div>
             {hasFilters && (
               <button
@@ -448,7 +472,7 @@ export default function ArticleFilterPanel() {
                   padding: 0,
                 }}
               >
-                Nulstil
+                Reset
               </button>
             )}
           </div>
@@ -467,18 +491,6 @@ export default function ArticleFilterPanel() {
           >
             {scopes.map((s) => {
               const isActive = s.key === "all" ? selectedSub === null : selectedSub === s.key;
-              const isAll = s.key === "all";
-              const activeStyle = isAll
-                ? {
-                    background: "linear-gradient(135deg, #c0392b, #a93226)",
-                    color: "#fff",
-                    boxShadow: "0 2px 8px rgba(192, 57, 43, 0.35)",
-                  }
-                : {
-                    background: "linear-gradient(135deg, #2c3e50, #34495e)",
-                    color: "#fff",
-                    boxShadow: "0 2px 8px rgba(44, 62, 80, 0.3)",
-                  };
 
               return (
                 <button
@@ -498,7 +510,11 @@ export default function ArticleFilterPanel() {
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     ...(isActive
-                      ? activeStyle
+                      ? {
+                          background: "linear-gradient(135deg, #c0392b, #a93226)",
+                          color: "#fff",
+                          boxShadow: "0 2px 8px rgba(192, 57, 43, 0.35)",
+                        }
                       : {
                           background: "#f8fafc",
                           color: "#64748b",
@@ -525,39 +541,37 @@ export default function ArticleFilterPanel() {
         {/* BOTTOM: Klinisk handlingsbar toggle */}
         <div
           style={{
-            padding: "12px 24px 16px",
+            padding: "10px 24px",
             borderTop: "1px solid #f1f5f9",
             display: "flex",
-            flexDirection: "column",
             alignItems: "center",
-            gap: "8px",
+            justifyContent: "center",
+            gap: "10px",
           }}
         >
           <span
             style={{
-              fontSize: "10px",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
+              fontSize: "11px",
+              fontWeight: 600,
               color: "#94a3b8",
             }}
           >
-            Klinisk handlingsbar
+            Vital significance:
           </span>
           <div
             style={{
               display: "flex",
               gap: "2px",
               background: "#f1f5f9",
-              borderRadius: "10px",
-              padding: "3px",
+              borderRadius: "8px",
+              padding: "2px",
             }}
           >
             {(
               [
-                { key: "all", label: "Alle" },
-                { key: "yes", label: "Ja" },
-                { key: "no", label: "Nej" },
+                { key: "all", label: "All" },
+                { key: "yes", label: "Yes" },
+                { key: "no", label: "No" },
               ] as { key: Actionable; label: string }[]
             ).map((opt) => {
               const active = actionable === opt.key;
@@ -567,13 +581,13 @@ export default function ArticleFilterPanel() {
                   key={opt.key}
                   onClick={() => setActionable(opt.key)}
                   style={{
-                    padding: "5px 20px",
-                    fontSize: "12px",
+                    padding: "4px 14px",
+                    fontSize: "11px",
                     fontWeight: active ? 600 : 400,
                     color: isYes ? "#c0392b" : active ? "#1e293b" : "#64748b",
                     background: active ? "#fff" : "transparent",
                     border: "none",
-                    borderRadius: "8px",
+                    borderRadius: "6px",
                     cursor: "pointer",
                     boxShadow: active ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
                     transition: "all 0.15s ease",

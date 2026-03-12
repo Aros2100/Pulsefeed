@@ -22,24 +22,42 @@ const fraunces = Fraunces({
   display: "swap",
 });
 
-// TODO: Hent fra user_subspecialties tabel når den eksisterer
+// TODO: Fetch from user_subspecialties table when it exists
 const USER_SUBSPECIALTIES = [
   "Spine surgery",
   "Neurosurgical oncology and Radiosurgery",
   "Vascular and Endovascular Neurosurgery",
 ];
 
-type Period = "week" | "month" | "year";
+// Geo labels: API values are already English, just pass through
+function geoLabel(value: string): string {
+  return value;
+}
 
-interface RegionItem {
-  name: string;
-  count: number;
+type Period = "week" | "month" | "year";
+type GeoLevel = "all" | "continent" | "region" | "country" | "city";
+
+interface GeoHierarchy {
+  all: number;
+  continent: number;
+  region: number;
+  country: number;
+  city: number;
+}
+
+interface UserGeo {
+  continent: string | null;
+  region: string | null;
+  country: string;
+  city: string | null;
+  hospital: string | null;
 }
 
 interface KPIData {
   totalArticles: number;
-  regions: RegionItem[];
   periodLabel: string;
+  geoHierarchy: GeoHierarchy;
+  userGeo: UserGeo | null;
 }
 
 function AnimatedNumber({ value }: { value: number }) {
@@ -76,18 +94,19 @@ function AnimatedNumber({ value }: { value: number }) {
     return () => cancelAnimationFrame(raf);
   }, [value]);
 
-  return <>{display.toLocaleString("da-DK")}</>;
+  return <>{display.toLocaleString("en-US")}</>;
 }
 
 const PERIODS: { key: Period; label: string }[] = [
-  { key: "week", label: "Uge" },
-  { key: "month", label: "Måned" },
-  { key: "year", label: "År" },
+  { key: "week", label: "Week" },
+  { key: "month", label: "Month" },
+  { key: "year", label: "Year" },
 ];
 
 export default function KPIOverview() {
   const [period, setPeriod] = useState<Period>("week");
   const [scope, setScope] = useState<string>("all");
+  const [geoLevel, setGeoLevel] = useState<GeoLevel>("all");
   const [data, setData] = useState<KPIData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fading, setFading] = useState(false);
@@ -121,9 +140,25 @@ export default function KPIOverview() {
   }, [period, scope, fetchData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const scopes = [
-    { key: "all", label: "Neurokirurgi" },
+    { key: "all", label: "Neurosurgery" },
     ...USER_SUBSPECIALTIES.map((s) => ({ key: s, label: s })),
   ];
+
+  // Build geo button list from userGeo
+  const geoButtons: { level: GeoLevel; label: string; value: number }[] = [];
+  if (data) {
+    geoButtons.push({ level: "all", label: "All", value: data.geoHierarchy.all });
+    if (data.userGeo) {
+      const geo = data.userGeo;
+      if (geo.continent) geoButtons.push({ level: "continent", label: geoLabel(geo.continent), value: data.geoHierarchy.continent });
+      if (geo.region) geoButtons.push({ level: "region", label: geoLabel(geo.region), value: data.geoHierarchy.region });
+      geoButtons.push({ level: "country", label: geoLabel(geo.country), value: data.geoHierarchy.country });
+      if (geo.city) geoButtons.push({ level: "city", label: geoLabel(geo.city), value: data.geoHierarchy.city });
+    }
+  }
+
+  // Central number = count at selected geo level
+  const centralNumber = data ? data.geoHierarchy[geoLevel] : 0;
 
   const contentOpacity = fading ? 0.2 : 1;
 
@@ -138,7 +173,7 @@ export default function KPIOverview() {
       }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
           <span style={{ fontSize: "15px", fontWeight: 700, color: "#1e293b" }}>
-            Nye artikler
+            New articles
           </span>
           <span className={dmMono.className} style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 400 }}>
             {data?.periodLabel ?? "…"}
@@ -191,11 +226,106 @@ export default function KPIOverview() {
           alignItems: "stretch",
           minHeight: "120px",
         }}>
-          {/* Left: big number */}
+          {/* Left: Geo hierarchy buttons */}
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "6px",
+            padding: "16px 20px",
+            justifyContent: "center",
+            minWidth: "220px",
+          }}>
+            {geoButtons.length > 0 ? geoButtons.map((item) => {
+              const isActive = geoLevel === item.level;
+
+              return (
+                <button
+                  key={item.level}
+                  onClick={() => setGeoLevel(item.level)}
+                  style={{
+                    padding: "8px 16px",
+                    fontSize: "12px",
+                    fontWeight: isActive ? 600 : 500,
+                    border: "none",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    transition: "all 0.15s ease",
+                    fontFamily: "inherit",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "8px",
+                    ...(isActive
+                      ? {
+                          background: "linear-gradient(135deg, #c0392b, #a93226)",
+                          color: "#fff",
+                          boxShadow: "0 2px 8px rgba(192, 57, 43, 0.35)",
+                        }
+                      : {
+                          background: "#f8fafc",
+                          color: "#64748b",
+                        }),
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.background = "#f1f5f9";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.background = "#f8fafc";
+                    }
+                  }}
+                >
+                  <span>{item.label}</span>
+                  <span className={dmMono.className} style={{
+                    fontWeight: 600,
+                    fontSize: "11px",
+                  }}>
+                    <AnimatedNumber value={item.value} />
+                  </span>
+                </button>
+              );
+            }) : (
+              <div style={{
+                padding: "8px 16px",
+                fontSize: "12px",
+                fontWeight: 500,
+                borderRadius: "8px",
+                background: "#f8fafc",
+                color: "#94a3b8",
+                textAlign: "center",
+              }}>
+                …
+              </div>
+            )}
+            {data && !data.userGeo && (
+              <Link
+                href="/profile"
+                style={{ fontSize: "11px", color: "#94a3b8", textDecoration: "none", marginTop: "2px", textAlign: "center" }}
+              >
+                Add location →
+              </Link>
+            )}
+          </div>
+
+          {/* Vertical divider */}
+          <div style={{
+            width: "1px",
+            background: "#e2e8f0",
+            margin: "16px 0",
+          }} />
+
+          {/* Center: big number */}
           <div style={{
             flex: 1,
             display: "flex",
             flexDirection: "column",
+            alignItems: "center",
             justifyContent: "center",
             padding: "28px 32px",
           }}>
@@ -206,7 +336,7 @@ export default function KPIOverview() {
               lineHeight: 1,
               letterSpacing: "-0.02em",
             }}>
-              {loading && !data ? "—" : <AnimatedNumber value={data?.totalArticles ?? 0} />}
+              {loading && !data ? "—" : <AnimatedNumber value={centralNumber} />}
             </div>
             <div style={{
               fontSize: "13px",
@@ -214,7 +344,7 @@ export default function KPIOverview() {
               marginTop: "6px",
               fontWeight: 500,
             }}>
-              artikler
+              articles
             </div>
           </div>
 
@@ -236,18 +366,6 @@ export default function KPIOverview() {
           }}>
             {scopes.map((s) => {
               const isActive = scope === s.key;
-              const isAll = s.key === "all";
-              const activeStyle = isAll
-                ? {
-                    background: "linear-gradient(135deg, #c0392b, #a93226)",
-                    color: "#fff",
-                    boxShadow: "0 2px 8px rgba(192, 57, 43, 0.35)",
-                  }
-                : {
-                    background: "linear-gradient(135deg, #2c3e50, #34495e)",
-                    color: "#fff",
-                    boxShadow: "0 2px 8px rgba(44, 62, 80, 0.3)",
-                  };
 
               return (
                 <button
@@ -267,7 +385,11 @@ export default function KPIOverview() {
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     ...(isActive
-                      ? activeStyle
+                      ? {
+                          background: "linear-gradient(135deg, #c0392b, #a93226)",
+                          color: "#fff",
+                          boxShadow: "0 2px 8px rgba(192, 57, 43, 0.35)",
+                        }
                       : {
                           background: "#f8fafc",
                           color: "#64748b",
@@ -291,80 +413,8 @@ export default function KPIOverview() {
           </div>
         </div>
 
-        {/* Regions strip */}
-        {data && data.regions.length > 0 && (
-          <div style={{
-            borderTop: "1px solid #f1f5f9",
-            padding: "14px 24px",
-            display: "flex",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "8px",
-          }}>
-            {data.regions.slice(0, 6).map((r, i) => (
-              <Link
-                key={r.name}
-                href={`/geo?region=${encodeURIComponent(r.name)}`}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  background: "#fff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "20px",
-                  padding: "5px 14px",
-                  fontSize: "12px",
-                  color: "#1e293b",
-                  textDecoration: "none",
-                  transition: "border-color 0.15s, box-shadow 0.15s",
-                  animation: `fadeIn 0.3s ease ${i * 50}ms both`,
-                }}
-              >
-                {r.name}
-                <span className={dmMono.className} style={{ fontWeight: 500, color: "#64748b" }}>
-                  {r.count}
-                </span>
-              </Link>
-            ))}
-            {data.regions.length > 6 && (
-              <Link
-                href="/geo"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  background: "#f1f5f9",
-                  borderRadius: "20px",
-                  padding: "5px 14px",
-                  fontSize: "12px",
-                  color: "#94a3b8",
-                  textDecoration: "none",
-                }}
-              >
-                +{data.regions.length - 6} more
-              </Link>
-            )}
-            <Link
-              href="/geo"
-              style={{
-                marginLeft: "auto",
-                fontSize: "12px",
-                color: "#c0392b",
-                textDecoration: "none",
-                fontWeight: 600,
-              }}
-            >
-              Se alle →
-            </Link>
-          </div>
-        )}
       </div>
 
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(4px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </div>
   );
 }

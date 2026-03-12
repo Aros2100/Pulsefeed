@@ -127,6 +127,7 @@ export default function ClassificationClient({ specialty, label }: Props) {
   const [pendingHref, setPendingHref]         = useState<string | null>(null);
 
   const hasUnsavedRef = useRef(false);
+  const justVerdictedRef = useRef<string | null>(null);
 
   // Reset checkboxes when article changes
   useEffect(() => {
@@ -267,6 +268,7 @@ export default function ClassificationClient({ specialty, label }: Props) {
   // ── Verdict handling ────────────────────────────────────────────────────
 
   function approveAi(articleId: string, aiTags: string[]) {
+    justVerdictedRef.current = articleId;
     setVerdicts((prev) => ({
       ...prev,
       [articleId]: {
@@ -278,6 +280,7 @@ export default function ClassificationClient({ specialty, label }: Props) {
   }
 
   function correctArticle(articleId: string, aiTags: string[], editorTags: string[]) {
+    justVerdictedRef.current = articleId;
     const corrected = !arraysEqual(editorTags, aiTags);
     setVerdicts((prev) => ({
       ...prev,
@@ -297,6 +300,8 @@ export default function ClassificationClient({ specialty, label }: Props) {
 
   useEffect(() => {
     if (!selectedId || !isArticleComplete(selectedId)) return;
+    if (justVerdictedRef.current !== selectedId) return; // navigated back — don't auto-advance
+    justVerdictedRef.current = null;
     const idx = articles.findIndex((a) => a.id === selectedId);
     const nextId = idx < articles.length - 1 ? articles[idx + 1].id : null;
     if (nextId) {
