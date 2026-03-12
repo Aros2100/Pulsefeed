@@ -33,9 +33,7 @@ export async function POST() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = createAdminClient() as any;
 
-  // Count uncached pairs for immediate response
-  const { data: uncachedPairs } = await db.rpc("", {}).catch(() => ({ data: null }));
-  // Simpler: just query the distinct pairs and count
+  // Query distinct (city, country) pairs without state
   const { data: pairs } = await db
     .from("authors")
     .select("city, country")

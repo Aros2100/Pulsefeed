@@ -1,6 +1,21 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import SimulatorClient, { type SimulationDisagreement, type SimulationAgreement } from "../../specialty-tag/simulate/SimulatorClient";
+import ClassificationSimulatorClient, { type SimulationDisagreement, type SimulationAgreement } from "./ClassificationSimulatorClient";
+
+function parseTags(value: string): string[] {
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed.map(String);
+  } catch { /* not JSON */ }
+  return value ? [value] : [];
+}
+
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sorted1 = [...a].sort();
+  const sorted2 = [...b].sort();
+  return sorted1.every((v, i) => v === sorted2[i]);
+}
 
 interface Props {
   searchParams: Promise<{ run_id?: string }>;
@@ -88,7 +103,7 @@ export default async function ClassificationSimulatePage({ searchParams }: Props
 
   for (const d of decisions) {
     if (
-      d.decision !== d.ai_decision &&
+      !arraysEqual(parseTags(d.decision), parseTags(d.ai_decision)) &&
       d.article_id &&
       d.articles?.title &&
       !seenIds.has(d.article_id)
@@ -112,7 +127,7 @@ export default async function ClassificationSimulatePage({ searchParams }: Props
 
   for (const d of agreementData) {
     if (
-      d.decision === d.ai_decision &&
+      arraysEqual(parseTags(d.decision), parseTags(d.ai_decision)) &&
       d.article_id &&
       d.articles?.title &&
       !seenIds.has(d.article_id)
@@ -131,7 +146,7 @@ export default async function ClassificationSimulatePage({ searchParams }: Props
   }
 
   return (
-    <SimulatorClient
+    <ClassificationSimulatorClient
       runId={run.id}
       specialty={run.specialty}
       module={run.module}
