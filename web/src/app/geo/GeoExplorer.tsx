@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import type { GeoContinent, GeoRegion, GeoCountry, GeoCity, GeoArticle } from "./page";
+import type { GeoContinent, GeoRegion, GeoCountry, GeoState, GeoCity, GeoArticle } from "./page";
 
 interface Props {
   continent?: string;
   region?: string;
   country?: string;
+  state?: string;
   city?: string;
   continents: GeoContinent[];
   regions: GeoRegion[];
   countries: GeoCountry[];
+  states: GeoState[];
   cities: GeoCity[];
   articles: GeoArticle[];
 }
@@ -76,15 +78,20 @@ export default function GeoExplorer({
   continent,
   region,
   country,
+  state,
   city,
   continents,
   regions,
   countries,
+  states,
   cities,
   articles,
 }: Props) {
   // Determine current level
-  const level = city ? 5 : country ? 4 : region ? 3 : continent ? 2 : 1;
+  // states.length > 0 means the country has state data (level 4 = states)
+  // states.length === 0 && country set means skip to cities (level 4 = cities, displayed as level 5 content)
+  const hasStates = states.length > 0;
+  const level = city ? 6 : state ? 5 : (country && hasStates) ? 4 : country ? 5 : region ? 3 : continent ? 2 : 1;
 
   // Build breadcrumb segments
   const crumbs: { label: string; href: string }[] = [
@@ -108,10 +115,19 @@ export default function GeoExplorer({
       href: `/geo?continent=${encodeURIComponent(continent!)}&region=${encodeURIComponent(region!)}&country=${encodeURIComponent(country)}`,
     });
   }
+  if (state) {
+    crumbs.push({
+      label: state,
+      href: `/geo?continent=${encodeURIComponent(continent!)}&region=${encodeURIComponent(region!)}&country=${encodeURIComponent(country!)}&state=${encodeURIComponent(state)}`,
+    });
+  }
   if (city) {
+    const cityHref = state
+      ? `/geo?continent=${encodeURIComponent(continent!)}&region=${encodeURIComponent(region!)}&country=${encodeURIComponent(country!)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}`
+      : `/geo?continent=${encodeURIComponent(continent!)}&region=${encodeURIComponent(region!)}&country=${encodeURIComponent(country!)}&city=${encodeURIComponent(city)}`;
     crumbs.push({
       label: city,
-      href: `/geo?continent=${encodeURIComponent(continent!)}&region=${encodeURIComponent(region!)}&country=${encodeURIComponent(country!)}&city=${encodeURIComponent(city)}`,
+      href: cityHref,
     });
   }
 
@@ -175,8 +191,9 @@ export default function GeoExplorer({
             {level === 1 && "Verdensdele"}
             {level === 2 && `Regioner i ${continent}`}
             {level === 3 && `Lande i ${region}`}
-            {level === 4 && `Byer i ${country}`}
-            {level === 5 && `Artikler fra ${city}`}
+            {level === 4 && `Stater i ${country}`}
+            {level === 5 && (state ? `Byer i ${state}, ${country}` : `Byer i ${country}`)}
+            {level === 6 && `Artikler fra ${city}`}
           </div>
         </div>
 
@@ -241,28 +258,53 @@ export default function GeoExplorer({
             )
           )}
 
-          {/* Level 4: Cities */}
+          {/* Level 4: States */}
           {level === 4 && (
-            cities.length === 0 ? (
+            states.length === 0 ? (
               <div style={{ padding: "12px 0", fontSize: "14px", color: "#888" }}>
-                Ingen byer fundet for dette land.
+                Ingen stater fundet for dette land.
               </div>
             ) : (
-              cities.map((c) => (
+              states.map((s) => (
                 <BarRow
-                  key={c.city}
-                  label={c.city}
-                  count={c.count}
-                  maxCount={cities[0].count}
-                  color="#FADBD8"
-                  href={`/geo?continent=${encodeURIComponent(continent!)}&region=${encodeURIComponent(region!)}&country=${encodeURIComponent(country!)}&city=${encodeURIComponent(c.city)}`}
+                  key={s.state}
+                  label={s.state}
+                  count={s.count}
+                  maxCount={states[0].count}
+                  color="#F7BCB8"
+                  href={`/geo?continent=${encodeURIComponent(continent!)}&region=${encodeURIComponent(region!)}&country=${encodeURIComponent(country!)}&state=${encodeURIComponent(s.state)}`}
                 />
               ))
             )
           )}
 
-          {/* Level 5: Articles */}
+          {/* Level 5: Cities */}
           {level === 5 && (
+            cities.length === 0 ? (
+              <div style={{ padding: "12px 0", fontSize: "14px", color: "#888" }}>
+                Ingen byer fundet.
+              </div>
+            ) : (
+              cities.map((c) => {
+                const cityHref = state
+                  ? `/geo?continent=${encodeURIComponent(continent!)}&region=${encodeURIComponent(region!)}&country=${encodeURIComponent(country!)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(c.city)}`
+                  : `/geo?continent=${encodeURIComponent(continent!)}&region=${encodeURIComponent(region!)}&country=${encodeURIComponent(country!)}&city=${encodeURIComponent(c.city)}`;
+                return (
+                  <BarRow
+                    key={c.city}
+                    label={c.city}
+                    count={c.count}
+                    maxCount={cities[0].count}
+                    color="#FADBD8"
+                    href={cityHref}
+                  />
+                );
+              })
+            )
+          )}
+
+          {/* Level 6: Articles */}
+          {level === 6 && (
             articles.length === 0 ? (
               <div style={{ padding: "12px 0", fontSize: "14px", color: "#888" }}>
                 Ingen artikler fundet for denne by.

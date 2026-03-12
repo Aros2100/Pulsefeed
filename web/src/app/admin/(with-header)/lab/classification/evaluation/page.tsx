@@ -2,17 +2,13 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
-import VersionSelector from "../../specialty-tag/evaluation/VersionSelector";
+import VersionSelector from "./VersionSelector";
 import PromptDrawer, { type ModelVersion } from "@/components/lab/PromptDrawer";
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
 
 const card: React.CSSProperties = {
   background: "#fff", borderRadius: "10px",
@@ -20,7 +16,14 @@ const card: React.CSSProperties = {
   overflow: "hidden", marginBottom: "16px",
 };
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+function CardHeader({ label, count, color }: { label: string; count: number; color: string }) {
+  return (
+    <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <span style={{ fontSize: "11px", letterSpacing: "0.08em", color, textTransform: "uppercase", fontWeight: 700 }}>{label}</span>
+      <span style={{ fontSize: "11px", fontWeight: 700, background: color, color: "#fff", borderRadius: "4px", padding: "2px 8px" }}>{count}</span>
+    </div>
+  );
+}
 
 interface DisagreementRow {
   article_id:           string | null;
@@ -32,24 +35,48 @@ interface DisagreementRow {
 }
 
 interface ArticleDetail {
-  title:       string;
-  journal_abbr: string | null;
-  abstract:    string | null;
+  title:                string;
+  journal_abbr:         string | null;
+  abstract:             string | null;
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+function parseTags(raw: string | null): string[] {
+  if (!raw) return [];
+  try { return JSON.parse(raw) as string[]; }
+  catch { return [raw]; }
+}
+
+function TagBadges({ tags, color, bg, border }: { tags: string[]; color: string; bg: string; border: string }) {
+  if (tags.length === 0) return <span style={{ fontSize: "11px", color: "#aaa" }}>—</span>;
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+      {tags.map((t, i) => (
+        <span key={i} style={{
+          fontSize: "11px", fontWeight: 600, borderRadius: "4px", padding: "2px 7px",
+          background: bg, color, border: `1px solid ${border}`, whiteSpace: "nowrap",
+        }}>
+          {t}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDetail | undefined }) {
   const title   = article?.title ?? row.article_id ?? "Unknown";
   const journal = article?.journal_abbr ?? "—";
   const abstract = article?.abstract;
 
+  const aiTags    = parseTags(row.ai_decision);
+  const humanTags = parseTags(row.decision);
+  const isCorrected = row.decision !== row.ai_decision;
+
   return (
     <div style={{ borderTop: "1px solid #f0f0f0", padding: "14px 24px" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <Link
-            href={`/admin/articles/${row.article_id}`}
+            href={`/articles/${row.article_id}`}
             style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a", textDecoration: "none", lineHeight: 1.4 }}
           >
             {title}
@@ -58,28 +85,21 @@ function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDe
             {journal} · {fmtDate(row.decided_at)}
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-          {row.ai_confidence != null && (
-            <span style={{
-              fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px",
-              background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0",
-            }}>
-              {row.ai_confidence}%
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px", flexShrink: 0 }}>
+          {isCorrected ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <TagBadges tags={aiTags} color="#7c3aed" bg="#f5f3ff" border="#ddd6fe" />
+              <span style={{ fontSize: "12px", color: "#888", fontWeight: 700 }}>→</span>
+              <TagBadges tags={humanTags} color="#1d4ed8" bg="#eff6ff" border="#bfdbfe" />
+            </div>
+          ) : (
+            <TagBadges tags={humanTags} color="#15803d" bg="#f0fdf4" border="#bbf7d0" />
+          )}
+          {row.disagreement_reason && (
+            <span style={{ fontSize: "11px", color: "#7c3aed", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "4px", padding: "2px 8px" }}>
+              {row.disagreement_reason}
             </span>
           )}
-          <span style={{
-            fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px",
-            background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca",
-          }}>
-            AI: {row.ai_decision}
-          </span>
-          <span style={{ fontSize: "11px", color: "#888" }}>→</span>
-          <span style={{
-            fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px",
-            background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0",
-          }}>
-            {row.decision}
-          </span>
         </div>
       </div>
       {abstract && (
@@ -96,8 +116,6 @@ function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDe
   );
 }
 
-// ─── Page ────────────────────────────────────────────────────────────────────
-
 interface Props {
   searchParams: Promise<{ version?: string }>;
 }
@@ -109,30 +127,34 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
   const { data: { user } } = await supabase.auth.getUser();
 
   const { data: profile } = await supabase
-    .from("users").select("specialty_slugs").eq("id", user!.id).single();
+    .from("users")
+    .select("specialty_slugs")
+    .eq("id", user!.id)
+    .single();
 
   const userSpecialties: string[] = (profile?.specialty_slugs as string[] | null) ?? [];
   const activeSpec =
     SPECIALTIES.find((s) => s.active && userSpecialties.includes(s.slug)) ??
     SPECIALTIES.find((s) => s.active);
+
   const specialty      = activeSpec?.slug  ?? "neurosurgery";
   const specialtyLabel = activeSpec?.label ?? "Neurosurgery";
 
   const admin = createAdminClient();
 
-  // Fetch model versions (module = 'classification')
+  // Fetch model versions for selector
   const { data: modelVersionsData } = await admin
     .from("model_versions")
     .select("id, version, prompt_text, notes, activated_at, active, generated_by")
     .eq("specialty", specialty)
-    .eq("module", "classification")
+    .eq("module", "classification_subspecialty")
     .order("activated_at", { ascending: false });
 
   const modelVersions = (modelVersionsData ?? []) as Array<{ version: string; active: boolean }>;
   const activeModelVersion = modelVersions.find((v) => v.active)?.version ?? null;
   const selectedVersion = versionParam ?? activeModelVersion;
 
-  // Fetch all decisions for subspecialty module + optional version filter
+  // All decisions where AI gave a verdict (filtered by selected model version)
   const baseQuery = admin
     .from("lab_decisions")
     .select("article_id, decision, decided_at, ai_decision, ai_confidence, disagreement_reason")
@@ -146,10 +168,11 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
     : await baseQuery;
 
   const allDecisions = (rawDecisions ?? []) as DisagreementRow[];
-  const disagreements = allDecisions.filter((d) => d.ai_decision !== d.decision);
+  const disagreements = allDecisions.filter((d) => d.decision !== d.ai_decision);
 
-  // Fetch article details for disagreements
+  // Fetch article details only for disagreements
   const articleIds = [...new Set(disagreements.map((d) => d.article_id).filter((id): id is string => id !== null))];
+  let articleMap: Record<string, ArticleDetail> = {};
 
   const [articlesForMap, allAccRes] = await Promise.all([
     articleIds.length > 0
@@ -157,16 +180,13 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
           .select("id, title, journal_abbr, abstract")
           .in("id", articleIds)
       : Promise.resolve({ data: null }),
-    // All decisions across versions for per-version accuracy in PromptDrawer
     admin.from("lab_decisions")
       .select("model_version, ai_decision, decision")
-      .eq("specialty", specialty)
-      .eq("module", "classification_subspecialty")
+      .eq("specialty", specialty).eq("module", "classification_subspecialty")
       .not("ai_decision", "is", null)
       .limit(10000),
   ]);
-
-  const articleMap: Record<string, ArticleDetail> = Object.fromEntries(
+  articleMap = Object.fromEntries(
     (articlesForMap.data ?? []).map((a: Record<string, unknown>) => [a.id, a])
   );
 
@@ -198,16 +218,16 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
   });
 
   // Stats
-  const total          = allDecisions.length;
-  const totalDisagree  = disagreements.length;
-  const agreementRate  = total > 0 ? Math.round(((total - totalDisagree) / total) * 100) : null;
-  const correctedCount = disagreements.filter((d) => d.disagreement_reason === "corrected").length;
+  const total           = allDecisions.length;
+  const totalDisagree   = disagreements.length;
+  const totalCorrected  = disagreements.filter((d) => d.disagreement_reason === "corrected").length;
+  const agreementRate   = total > 0 ? Math.round(((total - totalDisagree) / total) * 100) : null;
 
   // Data sufficiency
   const hasSufficientData = totalDisagree >= 50;
   const dataBanner = totalDisagree < 50
-    ? { bg: "#fef2f2", border: "#fecaca", dot: "#dc2626", text: "#b91c1c", msg: `Utilstrækkelig data — mindst 50 uenigheder nødvendige for pålidelige trends (${totalDisagree} indtil videre)` }
-    : { bg: "#f0fdf4", border: "#bbf7d0", dot: "#15803d", text: "#14532d", msg: `Tilstrækkelig data til pålidelig trendanalyse (${totalDisagree} uenigheder)` };
+    ? { bg: "#fef2f2", border: "#fecaca", dot: "#dc2626", text: "#b91c1c", msg: `Insufficient data — need at least 50 disagreements to identify reliable trends (${totalDisagree} so far)` }
+    : { bg: "#f0fdf4", border: "#bbf7d0", dot: "#15803d", text: "#14532d", msg: `Sufficient data for reliable trend analysis (${totalDisagree} disagreements)` };
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -222,13 +242,8 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
 
         {/* Heading */}
         <div style={{ marginBottom: "20px" }}>
-          <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#7c3aed", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span>Prompt Evaluation · Classification</span>
-            {selectedVersion && (
-              <span style={{ fontSize: "11px", fontWeight: 700, background: "#f3f0ff", color: "#7c3aed", borderRadius: "4px", padding: "2px 8px", border: "1px solid #ddd6fe" }}>
-                v{selectedVersion}
-              </span>
-            )}
+          <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#7c3aed", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
+            Prompt Evaluation · Classification
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
             <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
@@ -237,12 +252,12 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
             <PromptDrawer
               versions={promptVersions}
               specialty={specialty}
-              module="classification"
+              module="classification_subspecialty"
               totalDisagreements={totalDisagree}
             />
           </div>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
-            Tilfælde hvor AI og human-klassificering afveg — brug disse til at forbedre prompten
+            Cases where AI and human subspecialty classifications differed — use these to refine the prompt
           </p>
         </div>
 
@@ -261,7 +276,7 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
             </Link>
           ) : (
             <span
-              title="Mindst 50 uenigheder nødvendige"
+              title="Need at least 100 disagreements first"
               style={{ flexShrink: 0, fontSize: "13px", fontWeight: 700, background: "#e2e8f0", color: "#94a3b8", borderRadius: "7px", padding: "7px 16px", whiteSpace: "nowrap", cursor: "not-allowed" }}
             >
               Optimize model →
@@ -274,7 +289,7 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
           <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
-                Summary — Subspecialty
+                Summary
               </span>
               {selectedVersion && (
                 <span style={{ fontSize: "11px", color: "#888" }}>
@@ -288,10 +303,10 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
             {[
-              { label: "Uenigheder i alt",     value: String(totalDisagree),    color: "#7c3aed" },
-              { label: "Korrigeret af human",   value: String(correctedCount),   color: "#d97706" },
-              { label: "Agreement rate",         value: agreementRate != null ? `${agreementRate}%` : "—", color: agreementRate != null && agreementRate >= 80 ? "#15803d" : "#dc2626" },
-              { label: "Beslutninger i alt",     value: String(total),            color: "#1a1a1a" },
+              { label: "Total decisions",    value: String(total),                color: "#5a6a85" },
+              { label: "Corrected",          value: String(totalCorrected),       color: "#d97706" },
+              { label: "Corrected rate",     value: total > 0 ? `${Math.round((totalCorrected / total) * 100)}%` : "—", color: "#7c3aed" },
+              { label: "Agreement rate",     value: agreementRate != null ? `${agreementRate}%` : "—", color: agreementRate != null && agreementRate >= 80 ? "#15803d" : "#d97706" },
             ].map((kpi, i) => (
               <div key={i} style={{ padding: "20px 24px", borderRight: i < 3 ? "1px solid #f0f0f0" : undefined }}>
                 <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>{kpi.label}</div>
@@ -301,33 +316,41 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
           </div>
         </div>
 
-        {/* Disagreements list */}
+        {/* Corrected decisions */}
         <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700, marginBottom: "12px" }}>
-          Korrektioner — Subspecialty
+          Corrected — Human changed AI tags
         </div>
         <div style={card}>
-          <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#7c3aed", textTransform: "uppercase", fontWeight: 700 }}>
-              AI-værdi korrigeret af human
-            </span>
-            <span style={{ fontSize: "11px", fontWeight: 700, background: "#7c3aed", color: "#fff", borderRadius: "4px", padding: "2px 8px" }}>
-              {disagreements.length}
-            </span>
-          </div>
-          {disagreements.length === 0 ? (
-            <div style={{ padding: "24px", fontSize: "14px", color: "#888" }}>
-              Ingen uenigheder — AI og human er enige om alle klassificeringer
-            </div>
+          <CardHeader label="AI tags → Human tags" count={totalCorrected} color="#d97706" />
+          {totalCorrected === 0 ? (
+            <div style={{ padding: "24px", fontSize: "14px", color: "#888" }}>No corrections — AI matched human on all decisions</div>
           ) : (
-            disagreements.map((row) => (
-              <ArticleRow
-                key={`${row.article_id}-${row.decided_at}`}
-                row={row}
-                article={row.article_id ? articleMap[row.article_id] : undefined}
-              />
-            ))
+            disagreements
+              .filter((d) => d.disagreement_reason === "corrected")
+              .map((row) => (
+                <ArticleRow key={`${row.article_id}-${row.decided_at}`} row={row} article={row.article_id ? articleMap[row.article_id] : undefined} />
+              ))
           )}
         </div>
+
+        {/* Other disagreements (if any without "corrected" reason) */}
+        {(() => {
+          const otherDisagreements = disagreements.filter((d) => d.disagreement_reason !== "corrected");
+          if (otherDisagreements.length === 0) return null;
+          return (
+            <>
+              <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700, marginBottom: "12px" }}>
+                Other disagreements
+              </div>
+              <div style={card}>
+                <CardHeader label="AI ≠ Human" count={otherDisagreements.length} color="#7c3aed" />
+                {otherDisagreements.map((row) => (
+                  <ArticleRow key={`${row.article_id}-${row.decided_at}`} row={row} article={row.article_id ? articleMap[row.article_id] : undefined} />
+                ))}
+              </div>
+            </>
+          );
+        })()}
 
       </div>
     </div>

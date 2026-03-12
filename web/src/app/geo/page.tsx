@@ -19,6 +19,11 @@ export interface GeoCountry {
   count: number;
 }
 
+export interface GeoState {
+  state: string;
+  count: number;
+}
+
 export interface GeoCity {
   city: string;
   count: number;
@@ -36,6 +41,7 @@ interface Props {
     continent?: string;
     region?: string;
     country?: string;
+    state?: string;
     city?: string;
   }>;
 }
@@ -46,7 +52,7 @@ export default async function GeoPage({ searchParams }: Props) {
   if (!user) redirect("/login");
 
   const params = await searchParams;
-  const { continent, region, country, city } = params;
+  const { continent, region, country, state, city } = params;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
@@ -70,27 +76,38 @@ export default async function GeoPage({ searchParams }: Props) {
   let continents: GeoContinent[] = [];
   let regions: GeoRegion[] = [];
   let countries: GeoCountry[] = [];
+  let states: GeoState[] = [];
   let cities: GeoCity[] = [];
   let articles: GeoArticle[] = [];
 
-  if (!continent && !region && !country && !city) {
+  if (!continent && !region && !country && !state && !city) {
     // Level 1: continents
     const res = await admin.rpc("get_geo_continents", { p_since: since });
     continents = (res.data ?? []) as GeoContinent[];
-  } else if (continent && !region && !country && !city) {
+  } else if (continent && !region && !country && !state && !city) {
     // Level 2: regions within continent
     const res = await admin.rpc("get_geo_regions", { p_since: since, p_continent: continent });
     regions = (res.data ?? []) as GeoRegion[];
-  } else if (continent && region && !country && !city) {
+  } else if (continent && region && !country && !state && !city) {
     // Level 3: countries within region
     const res = await admin.rpc("get_geo_countries", { p_since: since, p_region: region });
     countries = (res.data ?? []) as GeoCountry[];
-  } else if (continent && region && country && !city) {
-    // Level 4: cities within country
-    const res = await admin.rpc("get_geo_cities", { p_since: since, p_country: country });
+  } else if (continent && region && country && !state && !city) {
+    // Level 4: states within country (if any), otherwise cities
+    const stateRes = await admin.rpc("get_geo_states", { p_since: since, p_country: country });
+    const stateRows = (stateRes.data ?? []) as GeoState[];
+    if (stateRows.length > 0) {
+      states = stateRows;
+    } else {
+      const cityRes = await admin.rpc("get_geo_cities", { p_since: since, p_country: country, p_state: null });
+      cities = (cityRes.data ?? []) as GeoCity[];
+    }
+  } else if (continent && region && country && state && !city) {
+    // Level 5: cities within state
+    const res = await admin.rpc("get_geo_cities", { p_since: since, p_country: country, p_state: state });
     cities = (res.data ?? []) as GeoCity[];
   } else if (city) {
-    // Level 5: articles in city
+    // Level 6: articles in city
     const res = await admin.rpc("get_geo_articles", { p_since: since, p_city: city });
     articles = (res.data ?? []) as GeoArticle[];
   }
@@ -103,10 +120,12 @@ export default async function GeoPage({ searchParams }: Props) {
           continent={continent}
           region={region}
           country={country}
+          state={state}
           city={city}
           continents={continents}
           regions={regions}
           countries={countries}
+          states={states}
           cities={cities}
           articles={articles}
         />

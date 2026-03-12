@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
 
   let activePrompt;
   try {
-    activePrompt = await getActivePrompt(specialty, "classification");
+    activePrompt = await getActivePrompt(specialty, "classification_subspecialty");
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }

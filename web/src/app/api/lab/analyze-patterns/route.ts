@@ -73,8 +73,10 @@ export async function POST(request: NextRequest) {
   const rows = ((rawData ?? []) as unknown as DisagreementRow[])
     .filter((d) => d.decision !== d.ai_decision);
 
-  const falsePositives = rows.filter((d) => d.ai_decision === "approved" && d.decision === "rejected");
-  const falseNegatives = rows.filter((d) => d.ai_decision === "rejected"  && d.decision === "approved");
+  const isClassification = module === "classification_subspecialty";
+
+  const falsePositives = isClassification ? [] : rows.filter((d) => d.ai_decision === "approved" && d.decision === "rejected");
+  const falseNegatives = isClassification ? [] : rows.filter((d) => d.ai_decision === "rejected"  && d.decision === "approved");
 
   // Fetch active prompt
   let activePrompt: { prompt: string; version: string };
@@ -84,7 +86,44 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
-  const userMessage = `You are analyzing disagreements between an AI scoring model and a human expert neurosurgeon.
+  let userMessage: string;
+
+  if (isClassification) {
+    // Classification: disagreements are subspecialty array corrections
+    const correctionList = rows.slice(0, 50).map((d, i) => {
+      const title    = d.articles?.title ?? "Unknown title";
+      const abstract = d.articles?.abstract
+        ? d.articles.abstract.slice(0, 300) + (d.articles.abstract.length > 300 ? "…" : "")
+        : "No abstract";
+      const reason   = d.disagreement_reason ? `\n  Reason: ${d.disagreement_reason}` : "";
+      return `${i + 1}. ${title}\n  AI classified as: ${d.ai_decision}\n  Human corrected to: ${d.decision}${reason}\n  Abstract: ${abstract}`;
+    }).join("\n\n");
+
+    userMessage = `You are analyzing subspecialty classification disagreements between an AI model and a human expert neurosurgeon.
+
+The AI used this prompt (version: ${activePrompt.version}):
+<current_prompt>
+${activePrompt.prompt}
+</current_prompt>
+
+CORRECTIONS — Human changed AI's subspecialty tags (${rows.length} cases):
+${correctionList}
+
+Analyze the TRENDS — not individual articles. Identify:
+1. What subspecialties does the AI over-assign? (max 5 patterns, put in false_positive_patterns)
+2. What subspecialties does the AI under-assign or miss? (max 5 patterns, put in false_negative_patterns)
+3. What specific changes to the prompt would improve classification accuracy?
+4. Write an improved prompt. Must use {{title}} and {{abstract}} as placeholders.
+
+Respond in JSON only — no markdown, no backticks:
+{
+  "false_positive_patterns": ["pattern 1", ...],
+  "false_negative_patterns": ["pattern 1", ...],
+  "recommended_changes": "...",
+  "improved_prompt": "..."
+}`;
+  } else {
+    userMessage = `You are analyzing disagreements between an AI scoring model and a human expert neurosurgeon.
 
 The AI used this prompt (version: ${activePrompt.version}):
 <current_prompt>
@@ -110,6 +149,7 @@ Respond in JSON only — no markdown, no backticks:
   "recommended_changes": "...",
   "improved_prompt": "..."
 }`;
+  }
 
   try {
     const message = await trackedCall("pattern_analysis", {
@@ -133,8 +173,8 @@ Respond in JSON only — no markdown, no backticks:
           module,
           base_version:        activePrompt.version,
           total_decisions:     rows.length,
-          fp_count:            falsePositives.length,
-          fn_count:            falseNegatives.length,
+          fp_count:            isClassification ? rows.length : falsePositives.length,
+          fn_count:            isClassification ? rows.length : falseNegatives.length,
           fp_patterns:         result.false_positive_patterns,
           fn_patterns:         result.false_negative_patterns,
           recommended_changes: result.recommended_changes,
