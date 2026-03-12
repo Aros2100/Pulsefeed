@@ -135,6 +135,10 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
   // ── Re-parse authors state ──────────────────────────────────────────────
   const [reparseAuthorsState, setReparseAuthorsState] = useState<ActionState>("idle");
 
+  // ── Resolve states state ──────────────────────────────────────────────
+  const [resolveStatesState, setResolveStatesState] = useState<ActionState>("idle");
+  const [resolveStatesMsg, setResolveStatesMsg] = useState<string | null>(null);
+
   // ── Citations helpers ────────────────────────────────────────────────────────
 
   const fetchCitStats = useCallback(async () => {
@@ -387,6 +391,25 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
     } catch { setReparseAuthorsState("error"); }
   }
 
+  async function triggerResolveStates() {
+    setResolveStatesState("loading");
+    setResolveStatesMsg(null);
+    try {
+      const res = await fetch("/api/admin/geo/resolve-states", { method: "POST" });
+      const json = (await res.json()) as { ok: boolean; pairsToLookup?: number };
+      if (json.ok) {
+        setResolveStatesState("done");
+        setResolveStatesMsg(`${json.pairsToLookup ?? 0} par sendt til Nominatim`);
+      } else {
+        setResolveStatesState("error");
+        setResolveStatesMsg("Fejl ved start");
+      }
+    } catch {
+      setResolveStatesState("error");
+      setResolveStatesMsg("Netværksfejl");
+    }
+  }
+
   async function triggerCleanup() {
     setCleanupState("loading");
     setCleanupMsg(null);
@@ -572,6 +595,32 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
               >
                 {raRunning ? "Re-parsing authors…" : reparseAuthorsState === "done" ? "Authors re-parsed ✓" : "Re-parse authors"}
               </button>
+            );
+          })()}
+          {(() => {
+            const rsRunning = resolveStatesState === "loading";
+            return (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                <button
+                  onClick={() => { void triggerResolveStates(); }}
+                  disabled={rsRunning}
+                  style={{
+                    padding: "8px 16px", borderRadius: "7px", border: "none",
+                    fontFamily: "inherit", fontSize: "13px", fontWeight: 600,
+                    cursor: rsRunning ? "not-allowed" : "pointer",
+                    background: rsRunning ? "#f1f3f7" : resolveStatesState === "done" ? "#f0fdf4" : "#15803d",
+                    color:      rsRunning ? "#9ca3af" : resolveStatesState === "done" ? "#15803d" : "#fff",
+                    transition: "background 0.15s, color 0.15s",
+                  }}
+                >
+                  {rsRunning ? "Resolving states…" : resolveStatesState === "done" ? "States resolved ✓" : "Resolve states (Nominatim)"}
+                </button>
+                {resolveStatesMsg && (
+                  <span style={{ fontSize: "11px", color: resolveStatesState === "error" ? "#b91c1c" : "#15803d" }}>
+                    {resolveStatesMsg}
+                  </span>
+                )}
+              </span>
             );
           })()}
         </div>

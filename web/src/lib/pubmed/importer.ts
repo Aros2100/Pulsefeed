@@ -2,6 +2,7 @@ import { XMLParser } from "fast-xml-parser";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractEmail, stripEmailFromAffiliation } from "@/lib/affiliations";
 import { parseAffiliation as geoParseAffiliation } from "@/lib/geo/affiliation-parser";
+import { lookupState } from "@/lib/geo/state-map";
 import { runArticleChecks } from "@/lib/pubmed/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
 
@@ -308,6 +309,30 @@ async function fetchOpenAlexId(
   }
 }
 
+async function resolveState(admin: AdminClient, city: string | null, country: string | null): Promise<string | null> {
+  if (!city || !country) return null;
+  // 1. Check cache
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: cached } = await (admin as any)
+    .from("geo_city_state_cache")
+    .select("state")
+    .eq("city", city.toLowerCase())
+    .eq("country", country)
+    .maybeSingle();
+  if (cached) return (cached.state as string | null) ?? null;
+  // 2. Fallback to hardcoded map
+  const mapState = lookupState(city, country);
+  if (mapState) {
+    // Insert into cache for future use
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (admin as any).from("geo_city_state_cache").upsert(
+      { city: city.toLowerCase(), country, state: mapState },
+      { onConflict: "city,country" }
+    );
+  }
+  return mapState;
+}
+
 async function resolveAuthorId(
   admin: AdminClient,
   author: Author
@@ -331,11 +356,13 @@ async function resolveAuthorId(
     const cleanAffiliation = author.affiliation ? stripEmailFromAffiliation(author.affiliation) : null;
     const affiliations = cleanAffiliation ? [cleanAffiliation] : [];
     const geoParsed = cleanAffiliation ? geoParseAffiliation(cleanAffiliation) : null;
+    const authorState = await resolveState(admin, geoParsed?.city ?? null, geoParsed?.country ?? null);
     const parsed = {
       department: geoParsed?.department ?? null,
       hospital: geoParsed?.institution ?? null,
       city: geoParsed?.city ?? null,
       country: geoParsed?.country ?? null,
+      state: authorState,
     };
 
     const { data: created } = await admin
@@ -391,11 +418,13 @@ async function resolveAuthorId(
   const cleanAffiliation = author.affiliation ? stripEmailFromAffiliation(author.affiliation) : null;
   const affiliations = cleanAffiliation ? [cleanAffiliation] : [];
   const geoParsed = cleanAffiliation ? geoParseAffiliation(cleanAffiliation) : null;
+  const authorState = await resolveState(admin, geoParsed?.city ?? null, geoParsed?.country ?? null);
   const parsed = {
     department: geoParsed?.department ?? null,
     hospital: geoParsed?.institution ?? null,
     city: geoParsed?.city ?? null,
     country: geoParsed?.country ?? null,
+    state: authorState,
   };
 
   const { data: created } = await admin
@@ -419,6 +448,7 @@ export type AuthorGeo = {
   institution: string | null;
   city: string | null;
   country: string | null;
+  state: string | null;
   confidence: "high" | "low";
 };
 
@@ -442,13 +472,12 @@ export async function linkAuthorsToArticle(
   for (let i = 0; i < authors.length; i++) {
     const author = authors[i];
 
-    // Parse affiliation for geo data
-    const geoParsed = author.affiliation ? geoParseAffiliation(author.affiliation) : null;
-    if (i === 0) firstAuthorGeo = geoParsed;
-    if (i === authors.length - 1 && authors.length > 1) lastAuthorGeo = geoParsed;
-
     // Reject authors with no name and no ORCID — cannot be resolved
     if (!author.lastName && !author.orcid) {
+      // Still capture geo for position tracking
+      const geoParsed = author.affiliation ? geoParseAffiliation(author.affiliation) : null;
+      if (i === 0 && geoParsed) firstAuthorGeo = { ...geoParsed, state: null };
+      if (i === authors.length - 1 && authors.length > 1 && geoParsed) lastAuthorGeo = { ...geoParsed, state: null };
       rejectedCount++;
       continue;
     }
@@ -457,6 +486,23 @@ export async function linkAuthorsToArticle(
     const tResolve = Date.now();
     const { id: authorId, outcome } = await resolveAuthorId(admin, author);
     console.log(`[import] resolveAuthorId "${authorName}": ${Date.now() - tResolve}ms`);
+
+    // Capture geo data including state from the resolved author
+    if (i === 0 || (i === authors.length - 1 && authors.length > 1)) {
+      const geoParsed = author.affiliation ? geoParseAffiliation(author.affiliation) : null;
+      if (geoParsed) {
+        // Fetch author's state from DB (set during resolveAuthorId)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: authorRow } = await (admin as any)
+          .from("authors")
+          .select("state")
+          .eq("id", authorId)
+          .maybeSingle();
+        const geoWithState: AuthorGeo = { ...geoParsed, state: (authorRow?.state as string | null) ?? null };
+        if (i === 0) firstAuthorGeo = geoWithState;
+        if (i === authors.length - 1 && authors.length > 1) lastAuthorGeo = geoWithState;
+      }
+    }
 
     const { error } = await admin.from("article_authors").insert({
       article_id: articleId,

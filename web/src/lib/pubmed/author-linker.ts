@@ -84,7 +84,7 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
                 const firstRegion = first?.country ? getRegion(first.country) : null;
                 const lastRegion = last?.country ? getRegion(last.country) : null;
                 const firstContinent = firstRegion ? getContinent(firstRegion) : null;
-                const firstState = first?.city && first?.country ? lookupState(first.city, first.country) : null;
+                const firstState = first?.state ?? (first?.city && first?.country ? lookupState(first.city, first.country) : null);
 
                 const geoCountryCertain = !last || !last.country || last.country === first?.country;
                 const geoCityCertain = geoCountryCertain && (!last || !last.city || last.city === first?.city);
