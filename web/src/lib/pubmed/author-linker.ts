@@ -3,6 +3,8 @@ import { linkAuthorsToArticle, decodeHtmlEntities, type Author } from "@/lib/pub
 import { runLinkingChecks } from "@/lib/pubmed/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
 import { notifyFollowedAuthorPublications } from "@/lib/notifications/followedAuthorNotify";
+import { getRegion, getContinent } from "@/lib/geo/continent-map";
+import { lookupState } from "@/lib/geo/state-map";
 import pLimit from "p-limit";
 
 const BATCH_SIZE = 10;
@@ -73,6 +75,48 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
               rejected    += result.rejected;
               authorsLinked += result.new + result.duplicates;
               console.log(`[author-linker] linked PMID ${article.pubmed_id} — new=${result.new} dup=${result.duplicates} rejected=${result.rejected}`);
+
+              // Populate article geo fields from first/last author affiliation
+              if (result.firstAuthorGeo || result.lastAuthorGeo) {
+                const first = result.firstAuthorGeo;
+                const last = result.lastAuthorGeo;
+
+                const firstRegion = first?.country ? getRegion(first.country) : null;
+                const lastRegion = last?.country ? getRegion(last.country) : null;
+                const firstContinent = firstRegion ? getContinent(firstRegion) : null;
+                const firstState = first?.city && first?.country ? lookupState(first.city, first.country) : null;
+
+                const geoCountryCertain = !last || !last.country || last.country === first?.country;
+                const geoCityCertain = geoCountryCertain && (!last || !last.city || last.city === first?.city);
+                const geoInstitutionCertain = geoCityCertain && (!last || !last.institution || last.institution === first?.institution);
+
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const db = admin as any;
+                await db.from("articles").update({
+                  first_author_department: first?.department ?? null,
+                  first_author_institution: first?.institution ?? null,
+                  first_author_city: first?.city ?? null,
+                  first_author_country: first?.country ?? null,
+                  first_author_region: firstRegion,
+                  last_author_department: last?.department ?? null,
+                  last_author_institution: last?.institution ?? null,
+                  last_author_city: last?.city ?? null,
+                  last_author_country: last?.country ?? null,
+                  last_author_region: lastRegion,
+                  geo_continent: firstContinent,
+                  geo_region: firstRegion,
+                  geo_country: first?.country ?? null,
+                  geo_state: firstState,
+                  geo_city: first?.city ?? null,
+                  geo_institution: first?.institution ?? null,
+                  geo_country_certain: geoCountryCertain,
+                  geo_state_certain: geoCountryCertain,
+                  geo_city_certain: geoCityCertain,
+                  geo_institution_certain: geoInstitutionCertain,
+                  location_parsed_at: new Date().toISOString(),
+                  location_confidence: first?.confidence ?? (last?.confidence ?? null),
+                }).eq("id", article.id);
+              }
 
               if (rejectedAuthors.length > 0) {
                 const rejects = rejectedAuthors.map((a, idx) => ({

@@ -1,6 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { parseAffiliation, extractEmail, stripEmailFromAffiliation } from "@/lib/affiliations";
+import { extractEmail, stripEmailFromAffiliation } from "@/lib/affiliations";
+import { parseAffiliation as geoParseAffiliation } from "@/lib/geo/affiliation-parser";
 import { runArticleChecks } from "@/lib/pubmed/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
 
@@ -203,10 +204,13 @@ function normalizeNameStr(name: string): string {
 
 function computeMatchConfidence(
   author: Author,
-  candidate: { display_name: string; affiliations: string[] }
+  candidate: { display_name: string; affiliations: string[]; country?: string | null; city?: string | null },
+  parsedGeo?: { country: string | null; city: string | null; institution: string | null },
 ): number {
   const authorFull = normalizeNameStr(`${author.foreName} ${author.lastName}`);
   const candidateFull = normalizeNameStr(candidate.display_name);
+
+  let score = 0;
 
   if (authorFull === candidateFull) {
     if (author.affiliation && candidate.affiliations.length > 0) {
@@ -215,48 +219,61 @@ function computeMatchConfidence(
         const al = a.toLowerCase();
         return al.includes(affLower.slice(0, 20)) || affLower.includes(al.slice(0, 20));
       });
-      return matched ? 0.95 : 0.85;
+      score = matched ? 0.95 : 0.85;
+    } else {
+      score = 0.85;
     }
-    return 0.85;
+  } else {
+    const authorLast = normalizeNameStr(author.lastName);
+    const authorFirstFull = normalizeNameStr(author.foreName);
+    const authorFirstInitial = authorFirstFull.charAt(0);
+    const parts = candidateFull.split(" ");
+    const lastMatch = parts.some((p) => p === authorLast);
+    const firstInitialMatch = authorFirstInitial && parts.some((p) => p.charAt(0) === authorFirstInitial);
+
+    // Full first name match scores higher than initial-only match
+    const firstFullMatch = authorFirstFull.length > 1 && parts.some((p) => p === authorFirstFull);
+
+    if (lastMatch && firstFullMatch) {
+      // Full name match — high confidence
+      if (author.affiliation && candidate.affiliations.length > 0) {
+        const affLower = author.affiliation.toLowerCase();
+        const matched = candidate.affiliations.some((a) => {
+          const al = a.toLowerCase();
+          return al.includes(affLower.slice(0, 20)) || affLower.includes(al.slice(0, 20));
+        });
+        score = matched ? 0.90 : 0.80;
+      } else {
+        score = 0.80;
+      }
+    } else if (lastMatch && firstInitialMatch) {
+      // Initial-only match — lower confidence, below threshold
+      if (author.affiliation && candidate.affiliations.length > 0) {
+        const affLower = author.affiliation.toLowerCase();
+        const matched = candidate.affiliations.some((a) => {
+          const al = a.toLowerCase();
+          return al.includes(affLower.slice(0, 20)) || affLower.includes(al.slice(0, 20));
+        });
+        score = matched ? 0.80 : 0.60;
+      } else {
+        score = 0.60;
+      }
+    } else {
+      return 0;
+    }
   }
 
-  const authorLast = normalizeNameStr(author.lastName);
-  const authorFirstFull = normalizeNameStr(author.foreName);
-  const authorFirstInitial = authorFirstFull.charAt(0);
-  const parts = candidateFull.split(" ");
-  const lastMatch = parts.some((p) => p === authorLast);
-  const firstInitialMatch = authorFirstInitial && parts.some((p) => p.charAt(0) === authorFirstInitial);
-
-  // Full first name match scores higher than initial-only match
-  const firstFullMatch = authorFirstFull.length > 1 && parts.some((p) => p === authorFirstFull);
-
-  if (lastMatch && firstFullMatch) {
-    // Full name match — high confidence
-    if (author.affiliation && candidate.affiliations.length > 0) {
-      const affLower = author.affiliation.toLowerCase();
-      const matched = candidate.affiliations.some((a) => {
-        const al = a.toLowerCase();
-        return al.includes(affLower.slice(0, 20)) || affLower.includes(al.slice(0, 20));
-      });
-      return matched ? 0.90 : 0.80;
+  // Geo boost
+  if (parsedGeo?.country && candidate.country) {
+    const countryMatch = parsedGeo.country.toLowerCase() === candidate.country.toLowerCase();
+    if (countryMatch && score >= 0.80) score = Math.min(score + 0.05, 0.98);
+    if (parsedGeo.city && candidate.city) {
+      const cityMatch = parsedGeo.city.toLowerCase() === candidate.city.toLowerCase();
+      if (cityMatch && score >= 0.80) score = Math.min(score + 0.05, 0.98);
     }
-    return 0.80;
   }
 
-  if (lastMatch && firstInitialMatch) {
-    // Initial-only match — lower confidence, below threshold
-    if (author.affiliation && candidate.affiliations.length > 0) {
-      const affLower = author.affiliation.toLowerCase();
-      const matched = candidate.affiliations.some((a) => {
-        const al = a.toLowerCase();
-        return al.includes(affLower.slice(0, 20)) || affLower.includes(al.slice(0, 20));
-      });
-      return matched ? 0.80 : 0.60;
-    }
-    return 0.60;
-  }
-
-  return 0;
+  return score;
 }
 
 async function fetchOpenAlexId(
@@ -313,7 +330,13 @@ async function resolveAuthorId(
     const email = author.affiliation ? extractEmail(author.affiliation) : null;
     const cleanAffiliation = author.affiliation ? stripEmailFromAffiliation(author.affiliation) : null;
     const affiliations = cleanAffiliation ? [cleanAffiliation] : [];
-    const parsed = parseAffiliation(affiliations);
+    const geoParsed = cleanAffiliation ? geoParseAffiliation(cleanAffiliation) : null;
+    const parsed = {
+      department: geoParsed?.department ?? null,
+      hospital: geoParsed?.institution ?? null,
+      city: geoParsed?.city ?? null,
+      country: geoParsed?.country ?? null,
+    };
 
     const { data: created } = await admin
       .from("authors")
@@ -336,9 +359,12 @@ async function resolveAuthorId(
   if (author.lastName) {
     const { data: candidates } = await admin
       .from("authors")
-      .select("id, display_name, affiliations")
+      .select("id, display_name, affiliations, country, city")
       .ilike("display_name", `%${author.lastName}%`)
       .limit(50);
+
+    const fuzzyGeoParsed = author.affiliation ? geoParseAffiliation(author.affiliation) : null;
+    const fuzzyGeo = fuzzyGeoParsed ? { country: fuzzyGeoParsed.country, city: fuzzyGeoParsed.city, institution: fuzzyGeoParsed.institution } : undefined;
 
     let bestId: string | null = null;
     let bestScore = 0;
@@ -346,7 +372,9 @@ async function resolveAuthorId(
       const score = computeMatchConfidence(author, {
         display_name: c.display_name,
         affiliations: (c.affiliations as string[]) ?? [],
-      });
+        country: c.country,
+        city: c.city,
+      }, fuzzyGeo);
       if (score > bestScore) {
         bestScore = score;
         bestId = c.id;
@@ -362,7 +390,13 @@ async function resolveAuthorId(
   const email = author.affiliation ? extractEmail(author.affiliation) : null;
   const cleanAffiliation = author.affiliation ? stripEmailFromAffiliation(author.affiliation) : null;
   const affiliations = cleanAffiliation ? [cleanAffiliation] : [];
-  const parsed = await parseAffiliation(affiliations);
+  const geoParsed = cleanAffiliation ? geoParseAffiliation(cleanAffiliation) : null;
+  const parsed = {
+    department: geoParsed?.department ?? null,
+    hospital: geoParsed?.institution ?? null,
+    city: geoParsed?.city ?? null,
+    country: geoParsed?.country ?? null,
+  };
 
   const { data: created } = await admin
     .from("authors")
@@ -380,17 +414,38 @@ async function resolveAuthorId(
   return { id: created!.id, outcome: "new" };
 }
 
+export type AuthorGeo = {
+  department: string | null;
+  institution: string | null;
+  city: string | null;
+  country: string | null;
+  confidence: "high" | "low";
+};
+
 export async function linkAuthorsToArticle(
   admin: AdminClient,
   articleId: string,
   authors: Author[]
-): Promise<{ new: number; duplicates: number; rejected: number }> {
+): Promise<{
+  new: number;
+  duplicates: number;
+  rejected: number;
+  firstAuthorGeo: AuthorGeo | null;
+  lastAuthorGeo: AuthorGeo | null;
+}> {
   let newCount = 0;
   let dupCount = 0;
   let rejectedCount = 0;
+  let firstAuthorGeo: AuthorGeo | null = null;
+  let lastAuthorGeo: AuthorGeo | null = null;
 
   for (let i = 0; i < authors.length; i++) {
     const author = authors[i];
+
+    // Parse affiliation for geo data
+    const geoParsed = author.affiliation ? geoParseAffiliation(author.affiliation) : null;
+    if (i === 0) firstAuthorGeo = geoParsed;
+    if (i === authors.length - 1 && authors.length > 1) lastAuthorGeo = geoParsed;
 
     // Reject authors with no name and no ORCID — cannot be resolved
     if (!author.lastName && !author.orcid) {
@@ -423,7 +478,7 @@ export async function linkAuthorsToArticle(
     }
   }
 
-  return { new: newCount, duplicates: dupCount, rejected: rejectedCount };
+  return { new: newCount, duplicates: dupCount, rejected: rejectedCount, firstAuthorGeo, lastAuthorGeo };
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────────
