@@ -132,6 +132,9 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
   const [backfillStatesState, setBackfillStatesState] = useState<ActionState>("idle");
   const [backfillStatesMsg, setBackfillStatesMsg] = useState<string | null>(null);
 
+  // ── Re-parse authors state ──────────────────────────────────────────────
+  const [reparseAuthorsState, setReparseAuthorsState] = useState<ActionState>("idle");
+
   // ── Citations helpers ────────────────────────────────────────────────────────
 
   const fetchCitStats = useCallback(async () => {
@@ -375,6 +378,15 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
     }
   }
 
+  async function triggerReparseAuthors() {
+    setReparseAuthorsState("loading");
+    try {
+      const res = await fetch("/api/admin/geo/reparse-authors", { method: "POST" });
+      const json = (await res.json()) as { ok: boolean };
+      setReparseAuthorsState(json.ok ? "done" : "error");
+    } catch { setReparseAuthorsState("error"); }
+  }
+
   async function triggerCleanup() {
     setCleanupState("loading");
     setCleanupMsg(null);
@@ -541,6 +553,25 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
                   </span>
                 )}
               </span>
+            );
+          })()}
+          {(() => {
+            const raRunning = reparseAuthorsState === "loading";
+            return (
+              <button
+                onClick={() => { void triggerReparseAuthors(); }}
+                disabled={raRunning}
+                style={{
+                  padding: "8px 16px", borderRadius: "7px", border: "none",
+                  fontFamily: "inherit", fontSize: "13px", fontWeight: 600,
+                  cursor: raRunning ? "not-allowed" : "pointer",
+                  background: raRunning ? "#f1f3f7" : reparseAuthorsState === "done" ? "#f0fdf4" : "#7c3aed",
+                  color:      raRunning ? "#9ca3af" : reparseAuthorsState === "done" ? "#15803d" : "#fff",
+                  transition: "background 0.15s, color 0.15s",
+                }}
+              >
+                {raRunning ? "Re-parsing authors…" : reparseAuthorsState === "done" ? "Authors re-parsed ✓" : "Re-parse authors"}
+              </button>
             );
           })()}
         </div>
