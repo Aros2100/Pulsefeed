@@ -53,11 +53,11 @@ function parseTags(raw: string | null): string[] {
 function TagBadges({ tags, color, bg, border }: { tags: string[]; color: string; bg: string; border: string }) {
   if (tags.length === 0) return <span style={{ fontSize: "11px", color: "#aaa" }}>—</span>;
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
       {tags.map((t, i) => (
         <span key={i} style={{
           fontSize: "11px", fontWeight: 600, borderRadius: "4px", padding: "2px 7px",
-          background: bg, color, border: `1px solid ${border}`, whiteSpace: "nowrap",
+          background: bg, color, border: `1px solid ${border}`, whiteSpace: "nowrap", width: "fit-content",
         }}>
           {t}
         </span>
