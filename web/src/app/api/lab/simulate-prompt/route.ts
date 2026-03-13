@@ -19,7 +19,7 @@ const schema = z.object({
 type Article = { id: string; title: string; abstract: string | null };
 
 type ScoreResult = {
-  ai_decision: "approved" | "rejected";
+  ai_decision: string;
   confidence: number;
   reason: string | null;
 };
@@ -45,17 +45,24 @@ async function scoreWithPrompt(
   try {
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as {
-      decision?: string;
+      decision?: unknown;
       confidence?: number;
       reason?: string;
     };
-    const confidence  = Math.min(100, Math.max(0, Math.round(Number(parsed.confidence ?? 50))));
-    const ai_decision: "approved" | "rejected" = parsed.decision === "approved" ? "approved" : "rejected";
+    const confidence = Math.min(100, Math.max(0, Math.round(Number(parsed.confidence ?? 50))));
+
+    // Return decision as-is — string for specialty-tag, array for classification
+    let ai_decision: string;
+    if (Array.isArray(parsed.decision)) {
+      ai_decision = JSON.stringify(parsed.decision);
+    } else {
+      ai_decision = String(parsed.decision ?? "rejected");
+    }
+
     return { ai_decision, confidence, reason: parsed.reason ?? null };
   } catch {
-    const match = raw.match(/\d+/);
-    const confidence = match ? Math.min(100, Math.max(0, parseInt(match[0], 10))) : 50;
-    return { ai_decision: confidence >= 50 ? "approved" : "rejected", confidence, reason: null };
+    // Fallback: return raw text
+    return { ai_decision: raw, confidence: 50, reason: null };
   }
 }
 

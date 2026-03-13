@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     .from("model_versions")
     .select("version")
     .eq("specialty", specialty)
-    .eq("module", "classification")
+    .eq("module", "classification_subspecialty")
     .eq("active", true)
     .limit(1)
     .maybeSingle();
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     .from("lab_sessions")
     .insert({
       specialty,
-      module: "classification",
+      module: "classification_subspecialty",
       user_id: null,
       completed_at: new Date().toISOString(),
       articles_reviewed: verdicts.length,
