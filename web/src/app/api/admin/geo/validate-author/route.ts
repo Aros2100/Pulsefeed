@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { author_id, action, city, country, hospital, department, state } = body as {
     author_id: string;
-    action: "approve" | "correct" | "insufficient_data";
+    action: "approve" | "correct" | "insufficient_data" | "duplicate";
     city?: string | null;
     country?: string | null;
     hospital?: string | null;
@@ -115,13 +115,13 @@ export async function POST(request: NextRequest) {
 
   const oldData = { city: oldAuthor.city, country: oldAuthor.country, hospital: oldAuthor.hospital, department: oldAuthor.department, state: oldAuthor.state };
 
-  if (action === "insufficient_data") {
+  if (action === "insufficient_data" || action === "duplicate") {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (admin as any).from("lab_decisions").insert({
       article_id: author_id,
       module: "author_geo",
       specialty: "neurosurgery",
-      decision: "insufficient_data",
+      decision: action,
       ai_decision: JSON.stringify(oldData),
       disagreement_reason: null,
     });
