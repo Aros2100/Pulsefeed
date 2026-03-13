@@ -87,26 +87,27 @@ export default function AuthorGeoClient() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  async function handleSave() {
+  async function postAction(action: "approve" | "correct" | "insufficient_data") {
     if (!author) return;
     setSaving(true);
     try {
+      const payload: Record<string, unknown> = { author_id: author.id, action };
+      if (action !== "insufficient_data") {
+        payload.city = fields.city || null;
+        payload.country = fields.country || null;
+        payload.hospital = fields.hospital || null;
+        payload.department = fields.department || null;
+        payload.state = fields.state || null;
+      }
       const res = await fetch("/api/admin/geo/validate-author", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          author_id: author.id,
-          city: fields.city || null,
-          country: fields.country || null,
-          hospital: fields.hospital || null,
-          department: fields.department || null,
-          state: fields.state || null,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.ok) {
         setValidated((v) => v + 1);
-        setToast("Gemt");
+        setToast(action === "insufficient_data" ? "Markeret som utilstrækkelig" : "Gemt");
         void loadNext();
       } else {
         setToast("Fejl: " + (data.error ?? "Ukendt"));
@@ -115,6 +116,14 @@ export default function AuthorGeoClient() {
       setToast("Netværksfejl");
     }
     setSaving(false);
+  }
+
+  function handleSave() {
+    void postAction(isChanged ? "correct" : "approve");
+  }
+
+  function handleInsufficientData() {
+    void postAction("insufficient_data");
   }
 
   function handleSkip() {
@@ -323,7 +332,7 @@ export default function AuthorGeoClient() {
             ))}
 
             {/* Buttons */}
-            <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+            <div style={{ display: "flex", gap: "10px", marginTop: "8px", flexWrap: "wrap" }}>
               <button
                 onClick={handleSave}
                 disabled={saving}
@@ -339,6 +348,20 @@ export default function AuthorGeoClient() {
                 }}
               >
                 {saving ? "Gemmer…" : isChanged ? "Korriger og gem" : "Godkend"}
+              </button>
+              <button
+                onClick={handleInsufficientData}
+                disabled={saving}
+                style={{
+                  padding: "10px 16px", borderRadius: "7px", border: "none",
+                  fontFamily: "inherit", fontSize: "13px", fontWeight: 600,
+                  cursor: saving ? "not-allowed" : "pointer",
+                  background: saving ? "#f1f3f7" : "#d97706",
+                  color: saving ? "#9ca3af" : "#fff",
+                  transition: "background 0.15s",
+                }}
+              >
+                Utilstrækkelig data
               </button>
               <button
                 onClick={handleSkip}

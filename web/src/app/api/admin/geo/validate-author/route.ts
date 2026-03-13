@@ -85,17 +85,18 @@ export async function POST(request: NextRequest) {
   if (!auth.ok) return auth.response;
 
   const body = await request.json();
-  const { author_id, city, country, hospital, department, state } = body as {
+  const { author_id, action, city, country, hospital, department, state } = body as {
     author_id: string;
-    city: string | null;
-    country: string | null;
-    hospital: string | null;
-    department: string | null;
-    state: string | null;
+    action: "approve" | "correct" | "insufficient_data";
+    city?: string | null;
+    country?: string | null;
+    hospital?: string | null;
+    department?: string | null;
+    state?: string | null;
   };
 
-  if (!author_id) {
-    return NextResponse.json({ ok: false, error: "Missing author_id" }, { status: 400 });
+  if (!author_id || !action) {
+    return NextResponse.json({ ok: false, error: "Missing author_id or action" }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -113,7 +114,28 @@ export async function POST(request: NextRequest) {
   }
 
   const oldData = { city: oldAuthor.city, country: oldAuthor.country, hospital: oldAuthor.hospital, department: oldAuthor.department, state: oldAuthor.state };
-  const newData = { city, country, hospital, department, state };
+
+  if (action === "insufficient_data") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (admin as any).from("lab_decisions").insert({
+      article_id: author_id,
+      module: "author_geo",
+      specialty: "neurosurgery",
+      decision: "insufficient_data",
+      ai_decision: JSON.stringify(oldData),
+      disagreement_reason: null,
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  // approve or correct
+  const newData = {
+    city: city ?? null,
+    country: country ?? null,
+    hospital: hospital ?? null,
+    department: department ?? null,
+    state: state ?? null,
+  };
 
   const changed = JSON.stringify(oldData) !== JSON.stringify(newData);
 
@@ -132,11 +154,11 @@ export async function POST(request: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (admin as any)
     .from("authors")
-    .update({ city, country, hospital, department, state })
+    .update({ city: newData.city, country: newData.country, hospital: newData.hospital, department: newData.department, state: newData.state })
     .eq("id", author_id);
 
   // If city was changed and old city matched institution keywords → create override
-  if (changed && oldAuthor.city && city !== oldAuthor.city) {
+  if (changed && oldAuthor.city && newData.city !== oldAuthor.city) {
     const oldCityLower = (oldAuthor.city as string).toLowerCase();
     const isInstitutionCity = INST_KEYWORDS.some((kw) => oldCityLower.includes(kw));
     if (isInstitutionCity) {
@@ -145,8 +167,8 @@ export async function POST(request: NextRequest) {
         .from("geo_institution_overrides")
         .upsert({
           raw_segment: oldAuthor.city,
-          city: city,
-          country: country,
+          city: newData.city,
+          country: newData.country,
           institution: oldAuthor.city,
         }, { onConflict: "raw_segment" });
     }
