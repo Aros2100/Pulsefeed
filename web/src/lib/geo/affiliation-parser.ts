@@ -245,9 +245,9 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
               segments.push(beforeCountry);
             }
           } else {
+            // Last segment is not a recognized country — don't use it as country
             confidence = "low";
-            country = lastSeg;
-            segments.pop();
+            // Don't pop — leave segment for dept/inst extraction
           }
         }
       }
