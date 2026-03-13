@@ -104,14 +104,12 @@ export default function AuthorGeoClient() {
             }
           : {}),
       };
-      console.log("[author-geo] POST payload:", payload);
       const res = await fetch("/api/admin/geo/validate-author", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      console.log("[author-geo] POST response:", data);
       if (data.ok) {
         setValidated((v) => v + 1);
         setToast(actionType === "insufficient_data" ? "Markeret som utilstrækkelig" : actionType === "duplicate" ? "Markeret som dublet" : "Gemt");
@@ -119,8 +117,7 @@ export default function AuthorGeoClient() {
       } else {
         setToast("Fejl: " + (data.error ?? "Ukendt"));
       }
-    } catch (e) {
-      console.error("[author-geo] POST error:", e);
+    } catch {
       setToast("Netværksfejl");
     }
     setSaving(false);
