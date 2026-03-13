@@ -163,6 +163,19 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
 
   if (segments.length === 0) return null;
 
+  // Step 5b: Strip author-name parentheses from segments
+  // Matches: "(Docherty, Shabalin, Coon)", "(A.K.)", "(J.I., S. M.)"
+  for (let i = 0; i < segments.length; i++) {
+    segments[i] = segments[i]
+      .replace(/\s*\([A-Za-z][A-Za-z.\-,\s]*\)\s*/g, "")
+      .trim();
+  }
+  for (let i = segments.length - 1; i >= 0; i--) {
+    if (!segments[i]) segments.splice(i, 1);
+  }
+
+  if (segments.length === 0) return null;
+
   // Step 6: Check for known institution as last segment (early return)
   for (let i = segments.length - 1; i >= Math.max(0, segments.length - 2); i--) {
     const instInfo = lookupInstitution(segments[i]);
