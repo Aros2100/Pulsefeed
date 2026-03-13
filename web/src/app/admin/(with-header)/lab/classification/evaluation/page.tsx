@@ -87,9 +87,9 @@ function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDe
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px", flexShrink: 0 }}>
           {isCorrected ? (
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
               <TagBadges tags={aiTags} color="#7c3aed" bg="#f5f3ff" border="#ddd6fe" />
-              <span style={{ fontSize: "12px", color: "#888", fontWeight: 700 }}>→</span>
+              <span style={{ fontSize: "11px", color: "#888", fontWeight: 700 }}>↓</span>
               <TagBadges tags={humanTags} color="#1d4ed8" bg="#eff6ff" border="#bfdbfe" />
             </div>
           ) : (
