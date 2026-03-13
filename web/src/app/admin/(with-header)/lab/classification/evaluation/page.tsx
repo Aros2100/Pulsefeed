@@ -73,7 +73,7 @@ function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDe
 
   return (
     <div style={{ borderTop: "1px solid #f0f0f0", padding: "14px 24px" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", marginBottom: isCorrected ? "10px" : 0 }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <Link
             href={`/articles/${row.article_id}`}
@@ -85,28 +85,29 @@ function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDe
             {journal} · {fmtDate(row.decided_at)}
           </div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px", flexShrink: 0 }}>
-          {isCorrected ? (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ fontSize: "10px", fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.05em" }}>AI</span>
-                <TagBadges tags={aiTags} color="#7c3aed" bg="#f5f3ff" border="#ddd6fe" />
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ fontSize: "10px", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.05em" }}>Human</span>
-                <TagBadges tags={humanTags} color="#1d4ed8" bg="#eff6ff" border="#bfdbfe" />
-              </div>
-            </div>
-          ) : (
+        {!isCorrected && (
+          <div style={{ flexShrink: 0 }}>
             <TagBadges tags={humanTags} color="#15803d" bg="#f0fdf4" border="#bbf7d0" />
-          )}
-          {row.disagreement_reason && (
-            <span style={{ fontSize: "11px", color: "#7c3aed", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "4px", padding: "2px 8px" }}>
-              {row.disagreement_reason}
-            </span>
-          )}
-        </div>
+          </div>
+        )}
+        {row.disagreement_reason && (
+          <span style={{ fontSize: "11px", color: "#7c3aed", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "4px", padding: "2px 8px", flexShrink: 0, alignSelf: "center" }}>
+            {row.disagreement_reason}
+          </span>
+        )}
       </div>
+      {isCorrected && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+          <div>
+            <div style={{ fontSize: "10px", fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "5px" }}>AI</div>
+            <TagBadges tags={aiTags} color="#7c3aed" bg="#f5f3ff" border="#ddd6fe" />
+          </div>
+          <div>
+            <div style={{ fontSize: "10px", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "5px" }}>Human</div>
+            <TagBadges tags={humanTags} color="#1d4ed8" bg="#eff6ff" border="#bfdbfe" />
+          </div>
+        </div>
+      )}
       {abstract && (
         <details style={{ marginTop: "8px" }}>
           <summary style={{ fontSize: "12px", color: "#5a6a85", cursor: "pointer", userSelect: "none", listStyle: "none" }}>
