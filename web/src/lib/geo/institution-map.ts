@@ -37,19 +37,68 @@ const RAW_INSTITUTIONS: [string, InstitutionInfo][] = [
   ["aarhus university", { institution: "Aarhus University", city: "Aarhus", country: "Denmark" }],
   ["aalborg university", { institution: "Aalborg University", city: "Aalborg", country: "Denmark" }],
 
-  // Other frequently seen
-  ["helsinki university hospital", { institution: "Helsinki University Hospital", city: "Helsinki", country: "Finland" }],
+  // US institutions (frequently mis-parsed as city)
+  ["icahn school of medicine at mount sinai", { institution: "Icahn School of Medicine at Mount Sinai", city: "New York", country: "United States" }],
+  ["icahn school of medicine", { institution: "Icahn School of Medicine at Mount Sinai", city: "New York", country: "United States" }],
+  ["mount sinai hospital", { institution: "Mount Sinai Hospital", city: "New York", country: "United States" }],
+  ["memorial sloan kettering cancer center", { institution: "Memorial Sloan Kettering Cancer Center", city: "New York", country: "United States" }],
+  ["memorial sloan kettering", { institution: "Memorial Sloan Kettering Cancer Center", city: "New York", country: "United States" }],
+  ["nyu grossman school of medicine", { institution: "NYU Grossman School of Medicine", city: "New York", country: "United States" }],
+  ["nyu langone health", { institution: "NYU Langone Health", city: "New York", country: "United States" }],
+  ["nyu langone", { institution: "NYU Langone Health", city: "New York", country: "United States" }],
+  ["weill cornell medical college", { institution: "Weill Cornell Medical College", city: "New York", country: "United States" }],
+  ["weill cornell", { institution: "Weill Cornell Medical College", city: "New York", country: "United States" }],
+  ["columbia university irving medical center", { institution: "Columbia University Irving Medical Center", city: "New York", country: "United States" }],
+  ["columbia university", { institution: "Columbia University", city: "New York", country: "United States" }],
+  ["medstar georgetown university hospital", { institution: "MedStar Georgetown University Hospital", city: "Washington", country: "United States" }],
+  ["georgetown university school of medicine", { institution: "Georgetown University School of Medicine", city: "Washington", country: "United States" }],
+  ["children's national hospital", { institution: "Children's National Hospital", city: "Washington", country: "United States" }],
+  ["boston medical center", { institution: "Boston Medical Center", city: "Boston", country: "United States" }],
+  ["massachusetts general hospital", { institution: "Massachusetts General Hospital", city: "Boston", country: "United States" }],
+  ["hospital for special surgery", { institution: "Hospital for Special Surgery", city: "New York", country: "United States" }],
+
+  // Other US
   ["thomas jefferson university", { institution: "Thomas Jefferson University", city: "Philadelphia", country: "United States" }],
   ["jefferson hospital for neuroscience", { institution: "Jefferson Hospital for Neuroscience", city: "Philadelphia", country: "United States" }],
+  ["mayo clinic", { institution: "Mayo Clinic", city: "Rochester", country: "United States" }],
+
+  // Japan (frequently mis-parsed as city)
+  ["kyoto university graduate school of medicine", { institution: "Kyoto University", city: "Kyoto", country: "Japan" }],
+  ["kyoto university", { institution: "Kyoto University", city: "Kyoto", country: "Japan" }],
+  ["kyushu university", { institution: "Kyushu University", city: "Fukuoka", country: "Japan" }],
+  ["gifu university graduate school of medicine", { institution: "Gifu University", city: "Gifu", country: "Japan" }],
+  ["gifu university", { institution: "Gifu University", city: "Gifu", country: "Japan" }],
+  ["the university of tokyo", { institution: "The University of Tokyo", city: "Tokyo", country: "Japan" }],
+  ["university of tokyo", { institution: "The University of Tokyo", city: "Tokyo", country: "Japan" }],
+  ["chiba university", { institution: "Chiba University", city: "Chiba", country: "Japan" }],
+
+  // Germany
   ["helios horst schmidt hospital wiesbaden", { institution: "Helios Horst Schmidt Hospital Wiesbaden", city: "Wiesbaden", country: "Germany" }],
   ["helios horst schmidt kliniken wiesbaden", { institution: "Helios Horst Schmidt Kliniken Wiesbaden", city: "Wiesbaden", country: "Germany" }],
   ["heinrich-heine university düsseldorf", { institution: "Heinrich-Heine University Düsseldorf", city: "Düsseldorf", country: "Germany" }],
   ["heinrich-heine university dusseldorf", { institution: "Heinrich-Heine University Düsseldorf", city: "Düsseldorf", country: "Germany" }],
   ["heinrich-heine university", { institution: "Heinrich-Heine University Düsseldorf", city: "Düsseldorf", country: "Germany" }],
-  ["mayo clinic", { institution: "Mayo Clinic", city: "Rochester", country: "United States" }],
-  ["karolinska", { institution: "Karolinska Institutet", city: "Stockholm", country: "Sweden" }],
   ["charité", { institution: "Charité – Universitätsmedizin Berlin", city: "Berlin", country: "Germany" }],
   ["charite", { institution: "Charité – Universitätsmedizin Berlin", city: "Berlin", country: "Germany" }],
+
+  // Finland
+  ["helsinki university hospital", { institution: "Helsinki University Hospital", city: "Helsinki", country: "Finland" }],
+
+  // Sweden
+  ["karolinska", { institution: "Karolinska Institutet", city: "Stockholm", country: "Sweden" }],
+
+  // Singapore
+  ["national neuroscience institute", { institution: "National Neuroscience Institute", city: "Singapore", country: "Singapore" }],
+
+  // Canada
+  ["university of toronto", { institution: "University of Toronto", city: "Toronto", country: "Canada" }],
+
+  // China
+  ["capital medical university", { institution: "Capital Medical University", city: "Beijing", country: "China" }],
+
+  // France
+  ["université paris cité", { institution: "Université Paris Cité", city: "Paris", country: "France" }],
+  ["universite paris cite", { institution: "Université Paris Cité", city: "Paris", country: "France" }],
 ];
 
 /**
