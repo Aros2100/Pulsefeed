@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
-import BenchmarkTable from "../../specialty-tag/dashboard/BenchmarkTable";
+import BenchmarkTable from "./BenchmarkTable";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -387,7 +387,7 @@ export default async function ClassificationDashboardPage() {
           {tableRows.length === 0 ? (
             <div style={{ padding: "24px", fontSize: "13px", color: "#aaa" }}>Ingen versioner endnu.</div>
           ) : (
-            <BenchmarkTable versions={tableRows} variant="classification" />
+            <BenchmarkTable versions={tableRows} />
           )}
         </div>
 

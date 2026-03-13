@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
-import PatternAnalysis, { type OptimizationRun } from "../../specialty-tag/dashboard/PatternAnalysis";
+import PatternAnalysis, { type OptimizationRun } from "../dashboard/PatternAnalysis";
 
 export default async function ClassificationOptimizePage() {
   const supabase = await createClient();

@@ -234,7 +234,7 @@ export default function PatternAnalysis({ specialty, module, initialRun, disable
         padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <div>
-          <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase" as const, fontWeight: 700 }}>
+          <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#7c3aed", textTransform: "uppercase" as const, fontWeight: 700 }}>
             AI Mønsteranalyse · Step 2
           </span>
           {savedRun && (
@@ -384,7 +384,7 @@ export default function PatternAnalysis({ specialty, module, initialRun, disable
             {runId && (
               <div style={{ paddingTop: "4px", borderTop: "1px solid #f0f2f5" }}>
                 <Link
-                  href={`/admin/lab/specialty-tag/simulate?run_id=${runId}`}
+                  href={`/admin/lab/classification/simulate?run_id=${runId}`}
                   style={{
                     display: "inline-flex", alignItems: "center", gap: "6px",
                     fontSize: "13px", fontWeight: 700,
