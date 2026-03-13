@@ -7,6 +7,7 @@ import { lookupCountry, CANONICAL_COUNTRIES, US_STATES } from "./country-map";
 import { lookupInstitution } from "./institution-map";
 import { isAdministrativeRegion, isProvinceCode } from "./region-map";
 import { lookupCity } from "./city-map";
+import { CITY_NAMES } from "./city-set";
 
 export type ParsedAffiliation = {
   department: string | null;
@@ -327,9 +328,9 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
             city = instInfo.city;
             // Don't remove this segment — it will be picked up as institution in step 9
           } else {
-            confidence = "low";
-            city = rawCity;
-            segments.splice(cityIdx, 1);
+            // Has institution keywords but not in institution-map → treat as institution, not city
+            city = null;
+            // Don't splice — leave for Step 9 to pick up as institution
           }
         } else {
           // Also try institution-map even if keywords don't match (e.g. "Kliniken")
@@ -337,7 +338,17 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
           if (instInfo2) {
             city = instInfo2.city;
             // Don't remove — will be picked up as institution in step 9
+          } else if (CITY_NAMES.has(rawCity.toLowerCase())) {
+            // Validated against GeoNames city set
+            city = rawCity;
+            segments.splice(cityIdx, 1);
+          } else if (rawCity.length >= 30) {
+            // Long unknown string — almost certainly an institution, not a city
+            city = null;
+            // Don't splice — leave for Step 9 to pick up as institution
           } else {
+            // Short unknown — could be a small city not in GeoNames
+            confidence = "low";
             city = rawCity;
             segments.splice(cityIdx, 1);
           }
