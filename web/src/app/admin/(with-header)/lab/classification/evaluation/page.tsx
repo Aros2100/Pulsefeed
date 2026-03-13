@@ -18,9 +18,13 @@ const card: React.CSSProperties = {
 
 function CardHeader({ label, count, color }: { label: string; count: number; color: string }) {
   return (
-    <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <span style={{ fontSize: "11px", letterSpacing: "0.08em", color, textTransform: "uppercase", fontWeight: 700 }}>{label}</span>
-      <span style={{ fontSize: "11px", fontWeight: 700, background: color, color: "#fff", borderRadius: "4px", padding: "2px 8px" }}>{count}</span>
+    <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "grid", gridTemplateColumns: "1fr auto auto", gap: "16px", alignItems: "center" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <span style={{ fontSize: "11px", letterSpacing: "0.08em", color, textTransform: "uppercase", fontWeight: 700 }}>{label}</span>
+        <span style={{ fontSize: "11px", fontWeight: 700, background: color, color: "#fff", borderRadius: "4px", padding: "2px 8px" }}>{count}</span>
+      </div>
+      <span style={{ fontSize: "10px", fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.05em", minWidth: "160px" }}>AI</span>
+      <span style={{ fontSize: "10px", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.05em", minWidth: "160px" }}>Human</span>
     </div>
   );
 }
@@ -72,52 +76,39 @@ function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDe
   const isCorrected = row.decision !== row.ai_decision;
 
   return (
-    <div style={{ borderTop: "1px solid #f0f0f0", padding: "14px 24px" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", marginBottom: isCorrected ? "10px" : 0 }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <Link
-            href={`/articles/${row.article_id}`}
-            style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a", textDecoration: "none", lineHeight: 1.4 }}
-          >
-            {title}
-          </Link>
-          <div style={{ fontSize: "12px", color: "#888", marginTop: "3px" }}>
-            {journal} · {fmtDate(row.decided_at)}
-          </div>
+    <div style={{ borderTop: "1px solid #f0f0f0", padding: "14px 24px", display: "grid", gridTemplateColumns: "1fr auto auto", gap: "16px", alignItems: "start" }}>
+      <div style={{ minWidth: 0 }}>
+        <Link
+          href={`/articles/${row.article_id}`}
+          style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a", textDecoration: "none", lineHeight: 1.4 }}
+        >
+          {title}
+        </Link>
+        <div style={{ fontSize: "12px", color: "#888", marginTop: "3px" }}>
+          {journal} · {fmtDate(row.decided_at)}
+          {row.disagreement_reason && (
+            <span style={{ marginLeft: "8px", fontSize: "11px", color: "#7c3aed", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "4px", padding: "1px 6px" }}>
+              {row.disagreement_reason}
+            </span>
+          )}
         </div>
-        {!isCorrected && (
-          <div style={{ flexShrink: 0 }}>
-            <TagBadges tags={humanTags} color="#15803d" bg="#f0fdf4" border="#bbf7d0" />
-          </div>
-        )}
-        {row.disagreement_reason && (
-          <span style={{ fontSize: "11px", color: "#7c3aed", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "4px", padding: "2px 8px", flexShrink: 0, alignSelf: "center" }}>
-            {row.disagreement_reason}
-          </span>
+        {abstract && (
+          <details style={{ marginTop: "6px" }}>
+            <summary style={{ fontSize: "12px", color: "#5a6a85", cursor: "pointer", userSelect: "none", listStyle: "none" }}>
+              ▶ Show abstract
+            </summary>
+            <div style={{ marginTop: "8px", fontSize: "13px", color: "#444", lineHeight: 1.6, padding: "10px 12px", background: "#f9fafb", borderRadius: "6px", borderLeft: "3px solid #dde3ed" }}>
+              {abstract}
+            </div>
+          </details>
         )}
       </div>
-      {isCorrected && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-          <div>
-            <div style={{ fontSize: "10px", fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "5px" }}>AI</div>
-            <TagBadges tags={aiTags} color="#7c3aed" bg="#f5f3ff" border="#ddd6fe" />
-          </div>
-          <div>
-            <div style={{ fontSize: "10px", fontWeight: 700, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "5px" }}>Human</div>
-            <TagBadges tags={humanTags} color="#1d4ed8" bg="#eff6ff" border="#bfdbfe" />
-          </div>
-        </div>
-      )}
-      {abstract && (
-        <details style={{ marginTop: "8px" }}>
-          <summary style={{ fontSize: "12px", color: "#5a6a85", cursor: "pointer", userSelect: "none", listStyle: "none" }}>
-            ▶ Show abstract
-          </summary>
-          <div style={{ marginTop: "8px", fontSize: "13px", color: "#444", lineHeight: 1.6, padding: "10px 12px", background: "#f9fafb", borderRadius: "6px", borderLeft: "3px solid #dde3ed" }}>
-            {abstract}
-          </div>
-        </details>
-      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "160px" }}>
+        <TagBadges tags={aiTags} color="#7c3aed" bg="#f5f3ff" border="#ddd6fe" />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "160px" }}>
+        <TagBadges tags={humanTags} color="#1d4ed8" bg="#eff6ff" border="#bfdbfe" />
+      </div>
     </div>
   );
 }
