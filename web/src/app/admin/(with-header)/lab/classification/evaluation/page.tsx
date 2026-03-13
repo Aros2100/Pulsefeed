@@ -86,7 +86,7 @@ function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDe
         </Link>
         <div style={{ fontSize: "12px", color: "#888", marginTop: "3px" }}>
           {journal} · {fmtDate(row.decided_at)}
-          {row.disagreement_reason && (
+          {row.disagreement_reason && row.disagreement_reason !== "corrected" && (
             <span style={{ marginLeft: "8px", fontSize: "11px", color: "#7c3aed", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "4px", padding: "1px 6px" }}>
               {row.disagreement_reason}
             </span>
