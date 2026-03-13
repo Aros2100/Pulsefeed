@@ -46,17 +46,25 @@ async function scoreWithPrompt(
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as {
       decision?: unknown;
+      subspecialty?: unknown;
       confidence?: number;
       reason?: string;
     };
-    const confidence = Math.min(100, Math.max(0, Math.round(Number(parsed.confidence ?? 50))));
+    const confidence = Math.min(100, Math.max(0, Math.round(Number(parsed.confidence ?? 80))));
 
-    // Return decision as-is — string for specialty-tag, array for classification
     let ai_decision: string;
-    if (Array.isArray(parsed.decision)) {
-      ai_decision = JSON.stringify(parsed.decision);
+    if (parsed.decision !== undefined) {
+      // Specialty-tag format: { decision: "approved"/"rejected", confidence, reason }
+      ai_decision = Array.isArray(parsed.decision)
+        ? JSON.stringify(parsed.decision)
+        : String(parsed.decision);
+    } else if (parsed.subspecialty !== undefined) {
+      // Classification format: { subspecialty: ["..."], reason: "..." }
+      ai_decision = Array.isArray(parsed.subspecialty)
+        ? JSON.stringify(parsed.subspecialty)
+        : JSON.stringify([String(parsed.subspecialty)]);
     } else {
-      ai_decision = String(parsed.decision ?? "rejected");
+      ai_decision = "rejected";
     }
 
     return { ai_decision, confidence, reason: parsed.reason ?? null };
