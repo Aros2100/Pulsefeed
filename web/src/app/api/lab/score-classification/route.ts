@@ -16,6 +16,7 @@ const schema = z.object({
     (v) => (SPECIALTY_SLUGS as readonly string[]).includes(v),
     { message: "Invalid specialty" }
   ),
+  scoreAll: z.boolean().optional().default(false),
 });
 
 type Article = { id: string; title: string; abstract: string | null };
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
   }
 
-  const { specialty } = result.data;
+  const { specialty, scoreAll } = result.data;
   const admin = createAdminClient();
 
   let activePrompt;
@@ -75,35 +76,54 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
-  // Count how many scored-but-not-validated articles already exist.
-  const { data: alreadyScoredCount } = await admin.rpc(
-    "count_classification_not_validated" as never,
-    { p_specialty: specialty } as never,
-  );
-  const existing = Number(alreadyScoredCount ?? 0);
-  const remaining = Math.max(0, BATCH_LIMIT - existing);
+  let articles: Article[] | null;
+  let fetchError: { message: string } | null;
 
-  if (remaining === 0) {
-    const stream = new ReadableStream({
-      start(controller) {
-        const encoder = new TextEncoder();
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, scored: 0, failed: 0, total: 0 })}\n\n`));
-        controller.close();
-      },
-    });
-    return new Response(stream, {
-      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive", "Content-Encoding": "none", "X-Accel-Buffering": "no" },
-    });
+  if (scoreAll) {
+    // Re-score articles with outdated or missing classification_model_version
+    const res = await admin
+      .from("articles")
+      .select("id, title, abstract")
+      .eq("status", "approved")
+      .not("abstract", "is", null)
+      .contains("specialty_tags", [specialty])
+      .or(`classification_scored_at.is.null,classification_model_version.is.null,classification_model_version.neq.${activePrompt.version}`)
+      .order("classification_scored_at", { ascending: true, nullsFirst: true })
+      .limit(500);
+    articles = res.data as Article[] | null;
+    fetchError = res.error;
+  } else {
+    // Normal Lab-scoring: fill up to BATCH_LIMIT
+    const { data: alreadyScoredCount } = await admin.rpc(
+      "count_classification_not_validated" as never,
+      { p_specialty: specialty } as never,
+    );
+    const existing = Number(alreadyScoredCount ?? 0);
+    const remaining = Math.max(0, BATCH_LIMIT - existing);
+
+    if (remaining === 0) {
+      const stream = new ReadableStream({
+        start(controller) {
+          const encoder = new TextEncoder();
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, scored: 0, failed: 0, total: 0 })}\n\n`));
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive", "Content-Encoding": "none", "X-Accel-Buffering": "no" },
+      });
+    }
+
+    const res = await applyUnscoredFilters(
+      admin.from("articles").select("id, title, abstract"),
+      "classification",
+      specialty,
+    )
+      .order("circle", { ascending: false, nullsFirst: false })
+      .limit(remaining);
+    articles = res.data as Article[] | null;
+    fetchError = res.error;
   }
-
-  // Eligible: approved C3, not yet classification-scored, has abstract
-  const { data: articles, error: fetchError } = await applyUnscoredFilters(
-    admin.from("articles").select("id, title, abstract"),
-    "classification",
-    specialty,
-  )
-    .order("circle", { ascending: false, nullsFirst: false })
-    .limit(remaining);
 
   if (fetchError) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });

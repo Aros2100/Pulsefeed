@@ -284,7 +284,7 @@ export default function ClassificationSimulatorClient({
     setRescoreProgress({ scored: 0, total: 0 });
     try {
       await consumeSSE(
-        "/api/lab/score-batch",
+        "/api/lab/score-classification",
         { specialty, scoreAll: true },
         (data) => {
           if (data.scored !== undefined) {
