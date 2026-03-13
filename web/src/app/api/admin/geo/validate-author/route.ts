@@ -39,11 +39,11 @@ export async function GET() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: decisions } = await (admin as any)
     .from("lab_decisions")
-    .select("article_id")
+    .select("author_id")
     .eq("module", "author_geo")
-    .in("article_id", authorIds);
+    .in("author_id", authorIds);
 
-  const decidedSet = new Set((decisions ?? []).map((d: { article_id: string }) => d.article_id));
+  const decidedSet = new Set((decisions ?? []).map((d: { author_id: string }) => d.author_id));
   const filtered = author.filter((a: { id: string }) => !decidedSet.has(a.id));
 
   if (filtered.length === 0) {
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
   if (action === "insufficient_data" || action === "duplicate") {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: insertData, error: insertError } = await (admin as any).from("lab_decisions").insert({
-      article_id: author_id,
+      author_id: author_id,
       module: "author_geo",
       specialty: "neurosurgery",
       decision: action,
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
   // Save lab_decision
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: insertData, error: insertError } = await (admin as any).from("lab_decisions").insert({
-    article_id: author_id,
+    author_id: author_id,
     module: "author_geo",
     specialty: "neurosurgery",
     decision: JSON.stringify(newData),
