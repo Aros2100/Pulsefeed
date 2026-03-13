@@ -139,6 +139,10 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
   const [resolveStatesState, setResolveStatesState] = useState<ActionState>("idle");
   const [resolveStatesMsg, setResolveStatesMsg] = useState<string | null>(null);
 
+  // ── AI parse authors state ──────────────────────────────────────────
+  const [aiParseAuthorsState, setAiParseAuthorsState] = useState<ActionState>("idle");
+  const [aiParseAuthorsMsg, setAiParseAuthorsMsg] = useState<string | null>(null);
+
   // ── Citations helpers ────────────────────────────────────────────────────────
 
   const fetchCitStats = useCallback(async () => {
@@ -410,6 +414,25 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
     }
   }
 
+  async function triggerAiParseAuthors() {
+    setAiParseAuthorsState("loading");
+    setAiParseAuthorsMsg(null);
+    try {
+      const res = await fetch("/api/admin/geo/ai-parse-authors", { method: "POST" });
+      const json = (await res.json()) as { ok: boolean; queued?: number };
+      if (json.ok) {
+        setAiParseAuthorsState("done");
+        setAiParseAuthorsMsg(`${json.queued ?? 0} forfattere sendt til AI-parse`);
+      } else {
+        setAiParseAuthorsState("error");
+        setAiParseAuthorsMsg("Fejl ved start");
+      }
+    } catch {
+      setAiParseAuthorsState("error");
+      setAiParseAuthorsMsg("Netværksfejl");
+    }
+  }
+
   async function triggerCleanup() {
     setCleanupState("loading");
     setCleanupMsg(null);
@@ -618,6 +641,32 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
                 {resolveStatesMsg && (
                   <span style={{ fontSize: "11px", color: resolveStatesState === "error" ? "#b91c1c" : "#15803d" }}>
                     {resolveStatesMsg}
+                  </span>
+                )}
+              </span>
+            );
+          })()}
+          {(() => {
+            const apRunning = aiParseAuthorsState === "loading";
+            return (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                <button
+                  onClick={() => { void triggerAiParseAuthors(); }}
+                  disabled={apRunning}
+                  style={{
+                    padding: "8px 16px", borderRadius: "7px", border: "none",
+                    fontFamily: "inherit", fontSize: "13px", fontWeight: 600,
+                    cursor: apRunning ? "not-allowed" : "pointer",
+                    background: apRunning ? "#f1f3f7" : aiParseAuthorsState === "done" ? "#f0fdf4" : "#2563eb",
+                    color:      apRunning ? "#9ca3af" : aiParseAuthorsState === "done" ? "#15803d" : "#fff",
+                    transition: "background 0.15s, color 0.15s",
+                  }}
+                >
+                  {apRunning ? "AI-parsing authors…" : aiParseAuthorsState === "done" ? "AI-parse done ✓" : "AI-parse authors"}
+                </button>
+                {aiParseAuthorsMsg && (
+                  <span style={{ fontSize: "11px", color: aiParseAuthorsState === "error" ? "#b91c1c" : "#15803d" }}>
+                    {aiParseAuthorsMsg}
                   </span>
                 )}
               </span>
