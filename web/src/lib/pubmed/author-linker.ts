@@ -59,7 +59,9 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
           const authors: Author[] = rawAuthors.map((a) => ({
             lastName:    decodeHtmlEntities(String(a.lastName ?? "")),
             foreName:    decodeHtmlEntities(String(a.foreName ?? "")),
-            affiliation: a.affiliation != null ? String(a.affiliation) : null,
+            affiliations: Array.isArray(a.affiliations)
+              ? (a.affiliations as string[])
+              : a.affiliation != null ? [String(a.affiliation)] : [],
             orcid:       a.orcid != null ? String(a.orcid) : null,
           }));
 

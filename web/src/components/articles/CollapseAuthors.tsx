@@ -9,6 +9,7 @@ interface Author {
   lastName?: string;
   foreName?: string;
   affiliation?: string | null;
+  affiliations?: string[] | null;
   orcid?: string | null;
   author_score?: number | null;
 }
@@ -56,8 +57,9 @@ export default function CollapseAuthors({ authors }: { authors: Author[] }) {
                   ORCID: {a.orcid}
                 </a>
               )}
-              {a.affiliation && (() => {
-                const parsed = parseAffiliation([a.affiliation!]);
+              {(a.affiliations?.[0] ?? a.affiliation) && (() => {
+                const affStr = a.affiliations?.[0] ?? a.affiliation!;
+                const parsed = parseAffiliation([affStr]);
                 const badges = [
                   parsed.department && { label: "Dept", value: parsed.department },
                   parsed.hospital   && { label: "Hospital", value: parsed.hospital },
@@ -67,7 +69,7 @@ export default function CollapseAuthors({ authors }: { authors: Author[] }) {
                 return (
                   <div style={{ marginTop: "4px" }}>
                     <p style={{ fontSize: "12px", color: "#9ca3af", margin: "0 0 4px 0", lineHeight: 1.4 }}>
-                      {a.affiliation}
+                      {affStr}
                     </p>
                     {badges.length > 0 && (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>

@@ -110,7 +110,7 @@ export function decodeHtmlEntities(str: string): string {
 export interface Author {
   lastName: string;
   foreName: string;
-  affiliation: string | null;
+  affiliations: string[];
   orcid: string | null;
 }
 
@@ -124,11 +124,9 @@ function parseAuthors(authorList: unknown): Author[] {
     const foreName = decodeHtmlEntities(getText(r.ForeName) || getText(r.Initials));
 
     const affiliationInfos = toArray(r.AffiliationInfo);
-    const affiliation =
-      affiliationInfos
-        .map((ai) => decodeHtmlEntities(getText((ai as Record<string, unknown>).Affiliation)))
-        .filter(Boolean)
-        .join("; ") || null;
+    const affiliations = affiliationInfos
+      .map((ai) => decodeHtmlEntities(getText((ai as Record<string, unknown>).Affiliation)))
+      .filter(Boolean);
 
     const identifiers = toArray(r.Identifier);
     const orcidEntry = identifiers.find(
@@ -136,7 +134,7 @@ function parseAuthors(authorList: unknown): Author[] {
     );
     const orcid = orcidEntry ? getText(orcidEntry) || null : null;
 
-    return { lastName, foreName, affiliation, orcid };
+    return { lastName, foreName, affiliations, orcid };
   });
 }
 
@@ -213,9 +211,11 @@ function computeMatchConfidence(
 
   let score = 0;
 
+  const primaryAff = author.affiliations[0] ?? null;
+
   if (authorFull === candidateFull) {
-    if (author.affiliation && candidate.affiliations.length > 0) {
-      const affLower = author.affiliation.toLowerCase();
+    if (primaryAff && candidate.affiliations.length > 0) {
+      const affLower = primaryAff.toLowerCase();
       const matched = candidate.affiliations.some((a) => {
         const al = a.toLowerCase();
         return al.includes(affLower.slice(0, 20)) || affLower.includes(al.slice(0, 20));
@@ -237,8 +237,8 @@ function computeMatchConfidence(
 
     if (lastMatch && firstFullMatch) {
       // Full name match — high confidence
-      if (author.affiliation && candidate.affiliations.length > 0) {
-        const affLower = author.affiliation.toLowerCase();
+      if (primaryAff && candidate.affiliations.length > 0) {
+        const affLower = primaryAff.toLowerCase();
         const matched = candidate.affiliations.some((a) => {
           const al = a.toLowerCase();
           return al.includes(affLower.slice(0, 20)) || affLower.includes(al.slice(0, 20));
@@ -249,8 +249,8 @@ function computeMatchConfidence(
       }
     } else if (lastMatch && firstInitialMatch) {
       // Initial-only match — lower confidence, below threshold
-      if (author.affiliation && candidate.affiliations.length > 0) {
-        const affLower = author.affiliation.toLowerCase();
+      if (primaryAff && candidate.affiliations.length > 0) {
+        const affLower = primaryAff.toLowerCase();
         const matched = candidate.affiliations.some((a) => {
           const al = a.toLowerCase();
           return al.includes(affLower.slice(0, 20)) || affLower.includes(al.slice(0, 20));
@@ -351,10 +351,13 @@ async function resolveAuthorId(
     if (existing) return { id: existing.id, outcome: "duplicate" };
 
     await sleep(150); // polite rate limit for OpenAlex
-    const openalexId = await fetchOpenAlexId(orcid, displayName, author.affiliation);
-    const email = author.affiliation ? extractEmail(author.affiliation) : null;
-    const cleanAffiliation = author.affiliation ? stripEmailFromAffiliation(author.affiliation) : null;
-    const affiliations = cleanAffiliation ? [cleanAffiliation] : [];
+    const primaryAff = author.affiliations[0] ?? null;
+    const openalexId = await fetchOpenAlexId(orcid, displayName, primaryAff);
+    const email = primaryAff ? extractEmail(primaryAff) : null;
+    const affiliations = author.affiliations
+      .map(a => stripEmailFromAffiliation(a))
+      .filter((a): a is string => Boolean(a));
+    const cleanAffiliation = affiliations[0] ?? null;
     const geoParsed = cleanAffiliation ? geoParseAffiliation(cleanAffiliation) : null;
     const authorState = await resolveState(admin, geoParsed?.city ?? null, geoParsed?.country ?? null);
     const parsed = {
@@ -390,7 +393,8 @@ async function resolveAuthorId(
       .ilike("display_name", `%${author.lastName}%`)
       .limit(50);
 
-    const fuzzyGeoParsed = author.affiliation ? geoParseAffiliation(author.affiliation) : null;
+    const fuzzyPrimaryAff = author.affiliations[0] ?? null;
+    const fuzzyGeoParsed = fuzzyPrimaryAff ? geoParseAffiliation(fuzzyPrimaryAff) : null;
     const fuzzyGeo = fuzzyGeoParsed ? { country: fuzzyGeoParsed.country, city: fuzzyGeoParsed.city, institution: fuzzyGeoParsed.institution } : undefined;
 
     let bestId: string | null = null;
@@ -413,10 +417,13 @@ async function resolveAuthorId(
 
   // 3. No match — create new author
   await sleep(150);
-  const openalexId = await fetchOpenAlexId(null, displayName, author.affiliation);
-  const email = author.affiliation ? extractEmail(author.affiliation) : null;
-  const cleanAffiliation = author.affiliation ? stripEmailFromAffiliation(author.affiliation) : null;
-  const affiliations = cleanAffiliation ? [cleanAffiliation] : [];
+  const newPrimaryAff = author.affiliations[0] ?? null;
+  const openalexId = await fetchOpenAlexId(null, displayName, newPrimaryAff);
+  const email = newPrimaryAff ? extractEmail(newPrimaryAff) : null;
+  const affiliations = author.affiliations
+    .map(a => stripEmailFromAffiliation(a))
+    .filter((a): a is string => Boolean(a));
+  const cleanAffiliation = affiliations[0] ?? null;
   const geoParsed = cleanAffiliation ? geoParseAffiliation(cleanAffiliation) : null;
   const authorState = await resolveState(admin, geoParsed?.city ?? null, geoParsed?.country ?? null);
   const parsed = {
@@ -475,7 +482,8 @@ export async function linkAuthorsToArticle(
     // Reject authors with no name and no ORCID — cannot be resolved
     if (!author.lastName && !author.orcid) {
       // Still capture geo for position tracking
-      const geoParsed = author.affiliation ? geoParseAffiliation(author.affiliation) : null;
+      const rejPrimaryAff = author.affiliations[0] ?? null;
+      const geoParsed = rejPrimaryAff ? geoParseAffiliation(rejPrimaryAff) : null;
       if (i === 0 && geoParsed) firstAuthorGeo = { ...geoParsed, state: null };
       if (i === authors.length - 1 && authors.length > 1 && geoParsed) lastAuthorGeo = { ...geoParsed, state: null };
       rejectedCount++;
@@ -489,7 +497,8 @@ export async function linkAuthorsToArticle(
 
     // Capture geo data including state from the resolved author
     if (i === 0 || (i === authors.length - 1 && authors.length > 1)) {
-      const geoParsed = author.affiliation ? geoParseAffiliation(author.affiliation) : null;
+      const linkPrimaryAff = author.affiliations[0] ?? null;
+      const geoParsed = linkPrimaryAff ? geoParseAffiliation(linkPrimaryAff) : null;
       if (geoParsed) {
         // Fetch author's state from DB (set during resolveAuthorId)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

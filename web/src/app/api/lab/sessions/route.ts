@@ -204,7 +204,9 @@ export async function POST(request: NextRequest) {
           const authors: Author[] = rawAuthors.map((a) => ({
             lastName:    String(a.lastName ?? ""),
             foreName:    String(a.foreName ?? ""),
-            affiliation: a.affiliation != null ? String(a.affiliation) : null,
+            affiliations: Array.isArray(a.affiliations)
+              ? (a.affiliations as string[])
+              : a.affiliation != null ? [String(a.affiliation)] : [],
             orcid:       a.orcid != null ? String(a.orcid) : null,
           }));
 

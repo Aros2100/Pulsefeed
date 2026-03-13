@@ -62,7 +62,7 @@ export interface ArticleData {
 
 // ── Internal types ────────────────────────────────────────────────────────────
 
-interface Author   { lastName?: string; foreName?: string; affiliation?: string | null; orcid?: string | null }
+interface Author   { lastName?: string; foreName?: string; affiliation?: string | null; affiliations?: string[] | null; orcid?: string | null }
 interface MeshTerm { descriptor?: string; major?: boolean; qualifiers?: string[] }
 interface Grant    { grantId?: string | null; agency?: string | null }
 function cast<T>(v: unknown): T[] {
@@ -173,7 +173,7 @@ export default function ArticleStamkort({ article, authorIdByPosition, authorSco
       : null,
     article.article_number ? fr("Article number", article.article_number) : null,
     authors.length
-      ? fr("Authors", `${[authors[0].foreName, authors[0].lastName].filter(Boolean).join(" ")}${authors.length > 1 ? " et al." : ""}${authors[0].affiliation ? ` · ${authors[0].affiliation}` : ""}`)
+      ? fr("Authors", `${[authors[0].foreName, authors[0].lastName].filter(Boolean).join(" ")}${authors.length > 1 ? " et al." : ""}${(authors[0].affiliations?.[0] ?? authors[0].affiliation) ? ` · ${authors[0].affiliations?.[0] ?? authors[0].affiliation}` : ""}`)
       : null,
   ].filter((r): r is FactRow => r !== null);
 
@@ -290,7 +290,7 @@ export default function ArticleStamkort({ article, authorIdByPosition, authorSco
           <CardBody>
             <CollapseAuthors authors={authors.map((a, i) => ({
               ...a,
-              affiliation: a.affiliation ? decodeHtml(a.affiliation) : a.affiliation,
+              affiliation: (a.affiliations?.[0] ?? a.affiliation) ? decodeHtml(a.affiliations?.[0] ?? a.affiliation!) : null,
               id: authorIdByPosition?.get(i + 1) ?? undefined,
               author_score: authorScoreByPosition?.get(i + 1) ?? undefined,
             }))} />

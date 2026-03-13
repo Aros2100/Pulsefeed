@@ -145,10 +145,10 @@ export async function runImportCircle3(
         );
         const articles: typeof fetched = [];
         for (const a of fetched) {
-          const authors = a.authors as Array<{ affiliation?: string | null }>;
+          const authors = a.authors as Array<{ affiliations?: string[]; affiliation?: string | null }>;
           const match = authors.some((au) => {
-            const aff = au.affiliation ?? "";
-            return /neurosurg/i.test(aff) && danishPattern.test(aff);
+            const affs = au.affiliations ?? (au.affiliation ? [au.affiliation] : []);
+            return affs.some(aff => /neurosurg/i.test(aff) && danishPattern.test(aff));
           });
           if (match) {
             articles.push(a);
