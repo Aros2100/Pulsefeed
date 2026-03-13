@@ -115,3 +115,38 @@ export function lookupInstitution(segment: string): InstitutionInfo | null {
   }
   return null;
 }
+
+// ── Override cache (loaded from geo_institution_overrides table) ──────────────
+
+let overrideCache: Map<string, InstitutionInfo> | null = null;
+let overrideCacheTime = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 min
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function loadInstitutionOverrides(admin: any): Promise<Map<string, InstitutionInfo>> {
+  if (overrideCache && Date.now() - overrideCacheTime < CACHE_TTL) return overrideCache;
+  const { data } = await admin
+    .from("geo_institution_overrides")
+    .select("raw_segment, city, country, institution");
+  const map = new Map<string, InstitutionInfo>();
+  for (const row of data ?? []) {
+    map.set((row.raw_segment as string).toLowerCase(), {
+      institution: (row.institution as string) ?? (row.raw_segment as string),
+      city: (row.city as string) ?? "",
+      country: (row.country as string) ?? "",
+    });
+  }
+  overrideCache = map;
+  overrideCacheTime = Date.now();
+  return map;
+}
+
+export function lookupInstitutionWithOverrides(
+  segment: string,
+  overrides: Map<string, InstitutionInfo>,
+): InstitutionInfo | null {
+  const lower = segment.toLowerCase();
+  const override = overrides.get(lower);
+  if (override) return override;
+  return lookupInstitution(segment);
+}
