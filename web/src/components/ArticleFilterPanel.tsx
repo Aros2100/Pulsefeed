@@ -87,6 +87,7 @@ type Actionable = "all" | "yes" | "no";
 interface Props {
   userSubspecialties: string[] | null;
   topSubspecialties: { tag: string; count: number }[];
+  userRegion: string | null;
 }
 
 // ── AnimatedNumber ───────────────────────────────────────────────────────────
@@ -130,7 +131,7 @@ function AnimatedNumber({ value }: { value: number }) {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function ArticleFilterPanel({ userSubspecialties, topSubspecialties }: Props) {
+export default function ArticleFilterPanel({ userSubspecialties, topSubspecialties, userRegion }: Props) {
   const [period, setPeriod] = useState<Period>("week");
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
   const [minEvidence, setMinEvidence] = useState(1);
@@ -143,12 +144,13 @@ export default function ArticleFilterPanel({ userSubspecialties, topSubspecialti
     const params = new URLSearchParams();
     params.set("period", period);
     if (selectedSub) params.set("subspecialty", selectedSub);
+    if (userRegion) params.set("region", userRegion);
 
     fetch(`/api/articles/count?${params}`)
       .then((r) => r.json())
       .then((data) => setCount((data as { count: number }).count ?? 0))
       .catch(() => setCount(0));
-  }, [period, selectedSub]);
+  }, [period, selectedSub, userRegion]);
 
   const hasFilters =
     selectedSub !== null ||
@@ -204,6 +206,18 @@ export default function ArticleFilterPanel({ userSubspecialties, topSubspecialti
           >
             Filter by your preferences
           </span>
+          {userRegion && (
+            <span style={{
+              fontSize: "11px",
+              fontWeight: 500,
+              color: "#64748b",
+              background: "#f1f5f9",
+              borderRadius: "6px",
+              padding: "3px 10px",
+            }}>
+              {userRegion}
+            </span>
+          )}
         </div>
 
         {/* Period toggle */}

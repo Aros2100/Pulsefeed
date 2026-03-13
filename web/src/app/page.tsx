@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import ScoreBadge from "@/components/ScoreBadge";
 import KPIOverview from "@/components/KPIOverview";
 import ArticleFilterPanel from "@/components/ArticleFilterPanel";
+import { getRegion } from "@/lib/geo/continent-map";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -30,12 +31,14 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("name, specialty_slugs, author_id, subspecialties")
+    .select("name, specialty_slugs, author_id, subspecialties, country")
     .eq("id", user.id)
     .single();
 
   const firstName = profile?.name?.split(" ")[0] ?? "there";
   const userSubspecialties = (profile?.subspecialties as string[] | null) ?? null;
+  const userCountry = (profile?.country as string | null) ?? null;
+  const userRegion = userCountry ? getRegion(userCountry) : null;
 
   // Fetch top subspecialties from DB
   const { data: topSubsData } = await supabase.rpc(
@@ -106,6 +109,7 @@ export default async function DashboardPage() {
           <ArticleFilterPanel
             userSubspecialties={userSubspecialties}
             topSubspecialties={topSubspecialties}
+            userRegion={userRegion}
           />
         </div>
 

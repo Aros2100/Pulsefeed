@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const period = params.get("period") ?? "week";
   const subspecialty = params.get("subspecialty");
+  const region = params.get("region");
 
   // Compute date boundary
   const now = new Date();
@@ -27,6 +28,10 @@ export async function GET(request: NextRequest) {
 
   if (subspecialty) {
     query = query.contains("subspecialty_ai", [subspecialty]);
+  }
+
+  if (region) {
+    query = query.contains("article_regions", [region]);
   }
 
   const { count, error } = await query;
