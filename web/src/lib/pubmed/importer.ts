@@ -348,7 +348,32 @@ async function resolveAuthorId(
       .eq("orcid", orcid)
       .maybeSingle();
 
-    if (existing) return { id: existing.id, outcome: "duplicate" };
+    if (existing) {
+      // Check if new affiliation provides better geo data
+      const dupAff = author.affiliations[0] ?? null;
+      if (dupAff) {
+        const newGeo = geoParseAffiliation(dupAff);
+        if (newGeo) {
+          const { data: current } = await admin
+            .from("authors")
+            .select("city, country, hospital, department")
+            .eq("id", existing.id)
+            .single();
+          if (current) {
+            const updates: Record<string, string | null> = {};
+            const cityIsInst = current.city && /hospital|university|institute|medical|clinic|school|college|center|centre|department|health/i.test(current.city as string);
+            if ((!current.city || cityIsInst) && newGeo.city) updates.city = newGeo.city;
+            if (!current.country && newGeo.country) updates.country = newGeo.country;
+            if (!current.hospital && newGeo.institution) updates.hospital = newGeo.institution;
+            if (!current.department && newGeo.department) updates.department = newGeo.department;
+            if (Object.keys(updates).length > 0) {
+              await admin.from("authors").update(updates).eq("id", existing.id);
+            }
+          }
+        }
+      }
+      return { id: existing.id, outcome: "duplicate" };
+    }
 
     await sleep(150); // polite rate limit for OpenAlex
     const primaryAff = author.affiliations[0] ?? null;
@@ -412,7 +437,28 @@ async function resolveAuthorId(
       }
     }
 
-    if (bestScore >= 0.85 && bestId) return { id: bestId, outcome: "duplicate" };
+    if (bestScore >= 0.85 && bestId) {
+      // Check if new affiliation provides better geo data
+      if (fuzzyGeoParsed) {
+        const { data: current } = await admin
+          .from("authors")
+          .select("city, country, hospital, department")
+          .eq("id", bestId)
+          .single();
+        if (current) {
+          const updates: Record<string, string | null> = {};
+          const cityIsInst = current.city && /hospital|university|institute|medical|clinic|school|college|center|centre|department|health/i.test(current.city as string);
+          if ((!current.city || cityIsInst) && fuzzyGeoParsed.city) updates.city = fuzzyGeoParsed.city;
+          if (!current.country && fuzzyGeoParsed.country) updates.country = fuzzyGeoParsed.country;
+          if (!current.hospital && fuzzyGeoParsed.institution) updates.hospital = fuzzyGeoParsed.institution;
+          if (!current.department && fuzzyGeoParsed.department) updates.department = fuzzyGeoParsed.department;
+          if (Object.keys(updates).length > 0) {
+            await admin.from("authors").update(updates).eq("id", bestId);
+          }
+        }
+      }
+      return { id: bestId, outcome: "duplicate" };
+    }
   }
 
   // 3. No match — create new author
