@@ -64,7 +64,7 @@ export default async function ClassificationDashboardPage() {
     .from("model_versions")
     .select("version, activated_at, active")
     .eq("specialty", specialty)
-    .eq("module", "classification")
+    .eq("module", "classification_subspecialty")
     .order("activated_at", { ascending: false });
 
   const rawVersions = versionsRes.data ?? [];

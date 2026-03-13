@@ -384,7 +384,7 @@ export default function PatternAnalysis({ specialty, module, initialRun, disable
             {runId && (
               <div style={{ paddingTop: "4px", borderTop: "1px solid #f0f2f5" }}>
                 <Link
-                  href={`/admin/lab/specialty-tag/simulate?run_id=${runId}`}
+                  href={`/admin/lab/${module === "classification_subspecialty" ? "classification" : "specialty-tag"}/simulate?run_id=${runId}`}
                   style={{
                     display: "inline-flex", alignItems: "center", gap: "6px",
                     fontSize: "13px", fontWeight: 700,
