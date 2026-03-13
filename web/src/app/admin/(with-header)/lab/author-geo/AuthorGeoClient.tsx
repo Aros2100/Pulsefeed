@@ -118,22 +118,6 @@ export default function AuthorGeoClient() {
     setSaving(false);
   }
 
-  function handleSave() {
-    void postAction(isChanged ? "correct" : "approve");
-  }
-
-  function handleInsufficientData() {
-    void postAction("insufficient_data");
-  }
-
-  function handleDuplicate() {
-    void postAction("duplicate");
-  }
-
-  function handleSkip() {
-    void loadNext();
-  }
-
   function updateField(key: keyof GeoFields, value: string) {
     setFields((prev) => ({ ...prev, [key]: value }));
   }
@@ -338,7 +322,8 @@ export default function AuthorGeoClient() {
             {/* Buttons */}
             <div style={{ display: "flex", gap: "10px", marginTop: "8px", flexWrap: "wrap" }}>
               <button
-                onClick={handleSave}
+                type="button"
+                onClick={() => { void postAction(isChanged ? "correct" : "approve"); }}
                 disabled={saving}
                 style={{
                   flex: 1, padding: "10px 16px", borderRadius: "7px", border: "none",
@@ -354,7 +339,8 @@ export default function AuthorGeoClient() {
                 {saving ? "Gemmer…" : isChanged ? "Korriger og gem" : "Godkend"}
               </button>
               <button
-                onClick={handleInsufficientData}
+                type="button"
+                onClick={() => { void postAction("insufficient_data"); }}
                 disabled={saving}
                 style={{
                   padding: "10px 16px", borderRadius: "7px", border: "none",
@@ -368,7 +354,8 @@ export default function AuthorGeoClient() {
                 Utilstrækkelig data
               </button>
               <button
-                onClick={handleDuplicate}
+                type="button"
+                onClick={() => { void postAction("duplicate"); }}
                 disabled={saving}
                 style={{
                   padding: "10px 16px", borderRadius: "7px", border: "none",
@@ -382,7 +369,8 @@ export default function AuthorGeoClient() {
                 Dublet
               </button>
               <button
-                onClick={handleSkip}
+                type="button"
+                onClick={() => { void loadNext(); }}
                 disabled={saving}
                 style={{
                   padding: "10px 16px", borderRadius: "7px", border: "1px solid #e5e7eb",
