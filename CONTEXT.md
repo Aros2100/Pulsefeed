@@ -33,13 +33,16 @@ pulsefeed/
 │   │   │   │   │   │   ├── [id]/         # Forfatter-profil
 │   │   │   │   │   │   └── merge/        # Forfatter-merge UI (MergeClient.tsx)
 │   │   │   │   │   ├── lab/              # AI-træning — modul-index + undersider
-│   │   │   │   │   │   ├── page.tsx             # Modul-oversigt (3 kort: specialty-tag, classification, condensation)
+│   │   │   │   │   │   ├── page.tsx             # Modul-oversigt (4 kort: specialty-tag, classification, condensation, author-geo)
 │   │   │   │   │   │   ├── SectionCard.tsx      # Delt KPI-kort komponent
 │   │   │   │   │   │   ├── specialty-tag/       # Speciale-validering forside (3 SectionCards)
 │   │   │   │   │   │   ├── classification/      # Klassificering
 │   │   │   │   │   │   │   ├── page.tsx             # Forside med KPI'er (Validering + Performance)
 │   │   │   │   │   │   │   ├── session/page.tsx     # Scoring-session (ClassificationClient)
 │   │   │   │   │   │   │   └── ClassificationClient.tsx  # Splitscreen validerings-UI
+│   │   │   │   │   │   ├── author-geo/          # Author Geo Validator
+│   │   │   │   │   │   │   ├── page.tsx             # Server comp → AuthorGeoClient
+│   │   │   │   │   │   │   └── AuthorGeoClient.tsx  # Splitscreen: author info + editable geo fields
 │   │   │   │   │   │   └── condensation/        # Kondensering (tekst + PICO)
 │   │   │   │   │   │       ├── page.tsx             # Forside med 4 SectionCards
 │   │   │   │   │   │       ├── TextValidationClient.tsx  # Splitscreen tekst-validering
@@ -80,10 +83,15 @@ pulsefeed/
 │   │   │       │   ├── impact-factor/    # fetch + status
 │   │   │       │   ├── alerts/           # GET/POST/PATCH/DELETE system_alerts
 │   │   │       │   ├── geo/              # Geo-location endpoints
-│   │   │       │   │   ├── run-parse/   # POST: parse unparsed articles
-│   │   │       │   │   ├── reparse-low/ # POST: re-parse low-confidence
-│   │   │       │   │   ├── ai-parse/    # POST: AI parse low-confidence (loops all)
-│   │   │       │   │   └── resolve-states/ # POST: Nominatim state resolution + backfill
+│   │   │       │   │   ├── run-parse/        # POST: parse unparsed articles
+│   │   │       │   │   ├── reparse-low/      # POST: re-parse low-confidence
+│   │   │       │   │   ├── ai-parse/         # POST: AI parse low-confidence (loops all)
+│   │   │       │   │   ├── ai-parse-authors/ # POST: AI parse author affiliations (fire-and-forget)
+│   │   │       │   │   ├── reparse-authors/  # POST: re-parse author affiliations
+│   │   │       │   │   ├── resolve-states/   # POST: Nominatim state resolution + backfill
+│   │   │       │   │   ├── backfill-states/  # POST: backfill authors.state from cache
+│   │   │       │   │   ├── status/           # GET: geo parsing stats
+│   │   │       │   │   └── validate-author/  # GET: next author for validation, POST: save validation
 │   │   │       │   ├── cleanup-stuck-jobs/     # POST: nulstil hængte jobs
 │   │   │       │   └── circle3-sources/  # GET/PUT circle_3_sources
 │   │   │       ├── alerts/       # GET (public): aktive system-alerts
@@ -142,8 +150,10 @@ pulsefeed/
 | Tabel | Formål |
 |-------|--------|
 | `articles` | Artikler fra PubMed — `pubmed_id`, `title`, `abstract`, `authors` (JSONB), `circle`, `specialty_tags`, `status`, `country`, `source_id`, `citation_count`, `impact_factor`, `journal_h_index`, `evidence_score` (generated), `approval_method`, `auto_tagged_at`, `subspecialty_ai`, `article_type_ai`, `study_design_ai`, `classification_reason`, `classification_scored_at`, `classification_model_version`, `short_headline`, `short_resume`, `bottom_line`, `pico_population`, `pico_intervention`, `pico_comparison`, `pico_outcome`, `sample_size`, `condensed_model_version`, `condensed_at`, geo-location: `first_author_department`, `first_author_institution`, `first_author_city`, `first_author_country`, `first_author_region`, `last_author_*` (same), `location_parsed_at`, `location_confidence` (high/low), `ai_location_attempted` (bool), `article_regions` (TEXT[]), `article_countries` (TEXT[]), `article_cities` (TEXT[]), `article_institutions` (TEXT[]) |
-| `authors` | Forfatter-database — `display_name`, `city`, `country`, `state`, `specialty`, `affiliations` (TEXT[]), `article_count`, `author_score`, `orcid` |
+| `authors` | Forfatter-database — `display_name`, `city`, `country`, `state`, `hospital`, `department`, `specialty`, `affiliations` (TEXT[]), `article_count`, `author_score`, `orcid`, `ai_geo_parsed` (bool) |
 | `geo_city_state_cache` | Cache for Nominatim city→state lookups — `city`, `country`, `state` (null = no result), `looked_up_at` |
+| `geo_institution_overrides` | Human-korrektioner fra Author Geo validator — `raw_segment` (UNIQUE), `city`, `country`, `institution`. Auto-oprettes ved city→institution korrektioner |
+| `geo_cities` | GeoNames cities (pop >= 1000) — `geonameid` PK, `name`, `country_code`, `admin1_code`, `state`, `population` |
 | `article_authors` | Many-to-many: artikler ↔ forfattere |
 | `pubmed_filters` | Circle 1 søge-konfiguration (journal-lister, query_string, specialty) |
 | `circle_2_sources` | Circle 2 affiliations (institution/region + max_results) — `articles.source_id` FK |
@@ -153,7 +163,7 @@ pulsefeed/
 | `author_linking_logs` | Log pr. forfatter-linking-kørsel — `new_authors`, `duplicates`, `rejected` |
 | `rejected_authors` | Forfattere der ikke kunne linkes |
 | `system_alerts` | System-beskeder til brugere — `title`, `message`, `type`, `active`, `expires_at` |
-| `lab_decisions` | Trænings-verdicts: `decision`, `ai_decision`, `ai_confidence`, `model_version`, `disagreement_reason`. Moduler: `specialty_tag`, `classification_subspecialty`, `classification_article_type`, `classification_study_design`, `condensation_text`, `condensation_pico` |
+| `lab_decisions` | Trænings-verdicts: `decision`, `ai_decision`, `ai_confidence`, `model_version`, `disagreement_reason`, `author_id` (nullable FK). Moduler: `specialty_tag`, `classification_subspecialty`, `classification_article_type`, `classification_study_design`, `condensation_text`, `condensation_pico`, `author_geo` |
 | `lab_sessions` | Samlet session pr. træningskørsel |
 | `model_versions` | Aktive model-versioner pr. specialty+module — `version`, `active`, `prompt` |
 | `model_optimization_runs` | AI-optimeringsanalyse — `improved_prompt`, `fp_count`, `fn_count`, `refinement_iterations` (JSONB) |
@@ -322,7 +332,7 @@ Delt komponent `CircleImportPage.tsx` med:
 
 ### Navigation
 ```
-/admin/lab                          ← Modul-index (3 kort: specialty-tag, classification, condensation)
+/admin/lab                          ← Modul-index (4 kort: specialty-tag, classification, condensation, author-geo)
 /admin/lab/specialty-tag            ← Speciale-validering forside (3 SectionCards)
 /admin/lab/specialty-tag/dashboard  ← KPI-kort, kalibreringstabel
 /admin/lab/specialty-tag/evaluation ← Uenigheder + VersionSelector
@@ -337,12 +347,13 @@ Delt komponent `CircleImportPage.tsx` med:
 /admin/lab/condensation             ← Kondensering forside (4 SectionCards: Tekst, PICO, Performance, Prompt)
 /admin/lab/condensation/text        ← Tekst-validering session (splitscreen)
 /admin/lab/condensation/pico        ← PICO-validering session (splitscreen)
+/admin/lab/author-geo               ← Author Geo Validator (splitscreen: info + editable fields)
 ```
 
 ### Filer
 | Fil | Formål |
 |-----|--------|
-| `web/src/app/admin/(with-header)/lab/page.tsx` | Modul-index — viser 3 kort med kø-counts via RPC |
+| `web/src/app/admin/(with-header)/lab/page.tsx` | Modul-index — viser 4 kort med kø-counts via RPC |
 | `web/src/app/admin/(with-header)/lab/SectionCard.tsx` | Delt KPI-kort komponent |
 | `web/src/app/admin/(with-header)/lab/specialty-tag/page.tsx` | Speciale-validering forside — 3 SectionCards |
 | `web/src/app/admin/(with-header)/lab/classification/page.tsx` | Klassificering forside — Validering + Performance |
@@ -365,6 +376,9 @@ Delt komponent `CircleImportPage.tsx` med:
 | `web/src/app/api/lab/classification-sessions/` | Gem klassificerings-session (3 lab_decisions per artikel) |
 | `web/src/app/api/lab/condensation-sessions/` | Gem kondenserings-session (1 lab_decision per artikel per modul) |
 | `web/src/app/api/admin/training/condensation-pico-articles/` | GET: artikler med tekst-valideret men ikke PICO-valideret |
+| `web/src/app/admin/(with-header)/lab/author-geo/page.tsx` | Server comp → AuthorGeoClient |
+| `web/src/app/admin/(with-header)/lab/author-geo/AuthorGeoClient.tsx` | Splitscreen: author info + 5 editable geo fields (city, country, hospital, department, state). Actions: approve, correct, insufficient_data, duplicate, skip |
+| `web/src/app/api/admin/geo/validate-author/route.ts` | GET: next author with bad geo data (prioritized by article_count). POST: save validation with action type, auto-create institution overrides |
 | `web/src/app/api/lab/simulate-prompt/` | SSE-scoring mod specifik prompt |
 | `web/src/app/api/lab/analyze-patterns/` | AI-analyse af FP/FN-mønstre |
 | `web/src/app/api/lab/refine-prompt/` | Iterativ prompt-forfining med ekspert-feedback |
@@ -434,6 +448,28 @@ Split i to uafhængige valideringsmoduler:
 - Single-module schema: `{ specialty, module: 'condensation_text' | 'condensation_pico', decisions: [{ article_id, decision, comment }] }`
 - Opretter 1 `lab_decisions` row per artikel for det angivne modul
 
+### Author Geo Validator
+
+Splitscreen validering af forfatter-lokationer fra affiliation-parsing.
+
+**Venstre side**: Forfatter-navn, rå affiliations (nummereret), article count badge, artikelliste (max 5)
+**Højre side**: 5 editable felter (City, Country, Hospital, Department, State). Orange border på city-felter der ligner institutioner.
+
+**Actions** (5 knapper):
+| Knap | Farve | Action | Lab decision | Opdaterer author |
+|------|-------|--------|-------------|-----------------|
+| Godkend | Grøn `#15803d` | `approve` | decision = geo JSON | Ja |
+| Korriger og gem | Blå `#2563eb` | `correct` | decision = ny JSON, disagreement_reason = 'corrected' | Ja |
+| Utilstrækkelig data | Orange `#d97706` | `insufficient_data` | decision = 'insufficient_data' | Nej |
+| Dublet | Lilla `#7c3aed` | `duplicate` | decision = 'duplicate' | Nej |
+| Skip | Grå | — | Ingen | Nej (kan genbesøges) |
+
+**Auto institution overrides**: Når city korrigeres fra institution-keyword (hospital, university etc.) → auto-insert i `geo_institution_overrides` for fremtidig parser-forbedring.
+
+**lab_decisions**: Bruger `author_id` (ikke `article_id`), module = `author_geo`.
+
+**Duplicate author geo upgrade** (`importer.ts`): Ved ORCID- eller fuzzy-match, parser ny affiliation og opgraderer eksisterende forfatter hvis ny data er bedre (manglende felter eller institution-keyword i city).
+
 ### Rejection reasons med TAG_REMAP
 | Reason | → tag |
 |--------|-------|
@@ -460,7 +496,7 @@ Split i to uafhængige valideringsmoduler:
 | `/admin/system/tagging` | MeSH auto-tagging rules management |
 | `/admin/system/layers/[specialty]` | C1 filter + C2/C3 affiliation management |
 | `/admin/system/author-linking` | Forfatter-linking dashboard |
-| `/admin/lab` | Modul-index — 3 kort (Speciale-validering, Klassificering, Kondensering) med kø-counts |
+| `/admin/lab` | Modul-index — 4 kort (Speciale-validering, Klassificering, Kondensering, Author Geo) med kø-counts |
 | `/admin/lab/specialty-tag` | Speciale-validering forside — 3 SectionCards (Validering, Performance, Prompt) |
 | `/admin/lab/classification` | Klassificering forside — Validering + Performance KPI'er |
 | `/admin/lab/classification/session` | Klassificering scoring-session (splitscreen) |
@@ -471,6 +507,7 @@ Split i to uafhængige valideringsmoduler:
 | `/admin/lab/condensation` | Kondensering forside — 4 SectionCards (Tekst, PICO, Performance, Prompt) |
 | `/admin/lab/condensation/text` | Tekst-validering session (headline, resumé, bottom line) |
 | `/admin/lab/condensation/pico` | PICO-validering session (population, intervention, comparison, outcome, sample size) |
+| `/admin/lab/author-geo` | Author Geo Validator — splitscreen validering af forfatter-lokationer |
 | `/admin/articles` | Artikel-liste med filter + evidence_score badge |
 | `/admin/articles/[id]` | Artikel-stamkort: historik + redigerbare tags/status. Berigelse-tab har Kondensering-kort med headline, resumé, bottom line, PICO, sample size, første/sidste forfatter |
 | `/admin/authors` | Forfatter-liste sorteret på author_score DESC NULLS LAST |
@@ -502,7 +539,8 @@ Automatisk parsing af forfatter-affiliations til strukturerede lokationsfelter. 
 
 ### Deterministisk parser (`affiliation-parser.ts`)
 - Ren string-parsing — ingen AI, ingen eksterne API'er
-- Processing: strip initials → first affiliation → clean → split → remove postal/phone → institution lookup → country → city (right-to-left, skip regions) → dept/inst → confidence
+- Processing: strip initials → first affiliation → clean → split → remove postal/phone → strip author-name parentheses → institution lookup → country → city (right-to-left, skip regions, validate vs CITY_NAMES) → dept/inst → confidence
+- `extractCityFromSegment()`: Extracts embedded city names from institution segments (e.g. "Yale New Haven Hospital" → "New Haven") by checking word pairs and single words against CITY_NAMES
 - `cleanCity()`: Stripper DK-prefix, SE-prefix, postcodes, UK postcodes, Nordic district-bogstaver (Ø, Ö, Ü, Æ, Å), US state-navne
 - Confidence: `high` når country+city+institution alle er fundet, ellers `low`
 
@@ -510,7 +548,9 @@ Automatisk parsing af forfatter-affiliations til strukturerede lokationsfelter. 
 | Fil | Formål |
 |-----|--------|
 | `country-map.ts` | `lookupCountry(raw)` — ~180 country aliases + US state names → canonical form |
-| `institution-map.ts` | `lookupInstitution(segment)` — ~25 kendte institutioner med city/country (danske hospitaler, Karolinska, Mayo Clinic, Charité) |
+| `institution-map.ts` | `lookupInstitution(segment)` — ~50 kendte institutioner med city/country (danske hospitaler, Karolinska, Mayo Clinic, Charité). `loadInstitutionOverrides(admin)` — async loader med 5-min cache fra `geo_institution_overrides`. `lookupInstitutionWithOverrides(segment, overrides)` — overrides first, then hardcoded |
+| `city-set.ts` | Auto-genereret Set med ~62k unikke bynavne (lowercased) fra `geo_cities`. Re-generér: `npx tsx scripts/generate-city-set.ts` |
+| `city-map.ts` | `lookupCity(name)` — city→country fallback lookup |
 | `region-map.ts` | `isAdministrativeRegion(segment)` — ~150 regioner (US states, kinesiske provinser, japanske prefekturer, canadiske provinser) der IKKE er byer. `isProvinceCode(segment)` for 2-bogstavs canadiske provinskoder |
 | `continent-map.ts` | `getRegion(country)` — 200+ lande → 14 verdensregioner (Scandinavia, Western Europe, East Asia etc.) |
 | `state-map.ts` | `lookupState(city, country)` — hardcoded city→state map (US, UK, DE, CA, AU, IN, CN, BR, JP, FR, IT, ES, NL, KR, TR) |
@@ -523,6 +563,8 @@ Automatisk parsing af forfatter-affiliations til strukturerede lokationsfelter. 
 | `location-scorer.ts` → `reparseLowConfidence(cutoffDate, limit)` | Manuelt via `/api/admin/geo/reparse-low` | Re-parser low-confidence efter parser-forbedringer |
 | `ai-location-scorer.ts` → `runAILocationParsing(limit)` | Manuelt via `/api/admin/geo/ai-parse` | AI fallback for low-confidence, loops alle batches |
 | `/api/admin/geo/resolve-states` (POST) | Manuelt via Import Dashboard button | Nominatim state resolution: cache → lookupState → Nominatim API (1.1s rate limit), backfill authors.state + articles.geo_state |
+| `/api/admin/geo/ai-parse-authors` (POST) | Manuelt via Import Dashboard button | AI parse author affiliations where deterministic parser failed (ai_geo_parsed=false, bad city data) |
+| `/api/admin/geo/validate-author` (GET/POST) | Author Geo Validator UI | GET: next author with bad geo. POST: save validation (approve/correct/insufficient_data/duplicate) |
 
 ### AI parser (`ai-location-parser.ts`)
 - Model: `claude-haiku-4-5-20251001` (via `trackedCall`)
@@ -605,6 +647,10 @@ NEXT_PUBLIC_SITE_URL
 | `0045` | `get_geo_regions_week(p_since)` + `get_geo_countries_week(p_since)` RPCs |
 | `0046` | `get_geo_cities_week(p_since, p_country)` + `get_geo_articles_week(p_since, p_city)` RPCs |
 | `0050` | `geo_city_state_cache` tabel (city+country PK) + `authors.state` kolonne |
+| `0052` | `geo_cities` tabel (GeoNames import, pop >= 1000) |
+| — | `geo_institution_overrides` tabel (human-korrektioner fra Author Geo validator) |
+| — | `authors.ai_geo_parsed` BOOLEAN kolonne |
+| — | `lab_decisions.author_id` UUID kolonne (FK til authors, for author_geo module) |
 
 Ældre migrationer (0046–0064 i `web/supabase/`) er renummereret/sammenlagt — de nuværende 0001–0065 er den aktive migration-serie.
 
