@@ -247,7 +247,7 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
             <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
-              AI/Human Disagreements · Subspecialty
+              AI/Human Disagreements · Subspeciality
             </h1>
             <PromptDrawer
               versions={promptVersions}
