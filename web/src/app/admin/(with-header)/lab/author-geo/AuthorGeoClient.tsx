@@ -87,32 +87,40 @@ export default function AuthorGeoClient() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  async function postAction(action: "approve" | "correct" | "insufficient_data" | "duplicate") {
+  async function postAction(actionType: "approve" | "correct" | "insufficient_data" | "duplicate") {
     if (!author) return;
     setSaving(true);
     try {
-      const payload: Record<string, unknown> = { author_id: author.id, action };
-      if (action !== "insufficient_data" && action !== "duplicate") {
-        payload.city = fields.city || null;
-        payload.country = fields.country || null;
-        payload.hospital = fields.hospital || null;
-        payload.department = fields.department || null;
-        payload.state = fields.state || null;
-      }
+      const payload = {
+        author_id: author.id,
+        action: actionType,
+        ...(actionType !== "insufficient_data" && actionType !== "duplicate"
+          ? {
+              city: fields.city || null,
+              country: fields.country || null,
+              hospital: fields.hospital || null,
+              department: fields.department || null,
+              state: fields.state || null,
+            }
+          : {}),
+      };
+      console.log("[author-geo] POST payload:", payload);
       const res = await fetch("/api/admin/geo/validate-author", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const data = await res.json();
+      console.log("[author-geo] POST response:", data);
       if (data.ok) {
         setValidated((v) => v + 1);
-        setToast(action === "insufficient_data" ? "Markeret som utilstrækkelig" : action === "duplicate" ? "Markeret som dublet" : "Gemt");
-        void loadNext();
+        setToast(actionType === "insufficient_data" ? "Markeret som utilstrækkelig" : actionType === "duplicate" ? "Markeret som dublet" : "Gemt");
+        await loadNext();
       } else {
         setToast("Fejl: " + (data.error ?? "Ukendt"));
       }
-    } catch {
+    } catch (e) {
+      console.error("[author-geo] POST error:", e);
       setToast("Netværksfejl");
     }
     setSaving(false);
