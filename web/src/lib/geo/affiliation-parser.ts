@@ -80,6 +80,21 @@ function looksLikeInstitution(segment: string): boolean {
   return instWords.some((w) => lower.includes(w.toLowerCase()));
 }
 
+/** Try to extract a city name embedded in an institution segment */
+function extractCityFromSegment(segment: string): string | null {
+  const words = segment.split(/\s+/);
+  // Check pairs of words first (longer match = better, e.g. "New Haven", "Hong Kong")
+  for (let i = 0; i < words.length - 1; i++) {
+    const pair = words[i] + " " + words[i + 1];
+    if (CITY_NAMES.has(pair.toLowerCase())) return pair;
+  }
+  // Then single words (skip short generic words)
+  for (const word of words) {
+    if (word.length >= 4 && CITY_NAMES.has(word.toLowerCase())) return word;
+  }
+  return null;
+}
+
 /** Clean city string: strip DK-prefix, postal codes, district suffixes, UK postcodes */
 function cleanCity(raw: string): string {
   let city = raw;
@@ -328,8 +343,9 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
             city = instInfo.city;
             // Don't remove this segment — it will be picked up as institution in step 9
           } else {
-            // Has institution keywords but not in institution-map → treat as institution, not city
-            city = null;
+            // Has institution keywords but not in institution-map → try extracting city from segment
+            const extracted = extractCityFromSegment(segments[cityIdx]);
+            city = extracted;
             // Don't splice — leave for Step 9 to pick up as institution
           }
         } else {
