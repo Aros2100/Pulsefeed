@@ -30,11 +30,19 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("name, specialty_slugs, author_id")
+    .select("name, specialty_slugs, author_id, subspecialties")
     .eq("id", user.id)
     .single();
 
   const firstName = profile?.name?.split(" ")[0] ?? "there";
+  const userSubspecialties = (profile?.subspecialties as string[] | null) ?? null;
+
+  // Fetch top subspecialties from DB
+  const { data: topSubsData } = await supabase.rpc(
+    "get_top_subspecialties" as never,
+    { p_limit: 3 } as never,
+  );
+  const topSubspecialties = (topSubsData ?? []) as { tag: string; count: number }[];
 
   // Fetch publications if user has linked an author profile
   type ArticleRow = {
@@ -95,7 +103,10 @@ export default async function DashboardPage() {
 
         {/* Article Filter Panel */}
         <div style={{ marginTop: "28px" }}>
-          <ArticleFilterPanel />
+          <ArticleFilterPanel
+            userSubspecialties={userSubspecialties}
+            topSubspecialties={topSubspecialties}
+          />
         </div>
 
         {/* Quick access */}

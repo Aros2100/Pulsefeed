@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { DM_Sans, DM_Mono, Fraunces } from "next/font/google";
 
 const dmSans = DM_Sans({
@@ -21,19 +21,26 @@ const fraunces = Fraunces({
   display: "swap",
 });
 
-// ── User subspecialties ──────────────────────────────────────────────────────
+// ── Short labels for subspecialties ──────────────────────────────────────────
 
-// TODO: Fetch from user_subspecialties table when it exists
-const USER_SUBSPECIALTIES = [
-  "Spine surgery",
-  "Neurosurgical oncology and Radiosurgery",
-  "Vascular and Endovascular Neurosurgery",
-];
-
-const SUB_LABELS: Record<string, string> = {
+const SUB_SHORT_LABELS: Record<string, string> = {
   "Spine surgery": "Spine",
   "Neurosurgical oncology and Radiosurgery": "Oncology",
   "Vascular and Endovascular Neurosurgery": "Vascular",
+  "Functional, pain and epilepsy surgery": "Functional",
+  "Pediatric and foetal neurosurgery": "Pediatric",
+  "Neurotraumatology": "Trauma",
+  "Peripheral nerve surgery": "Peripheral nerve",
+  "Skull base and pituitary surgery": "Skull base",
+  "Craniofacial and reconstruction surgery": "Craniofacial",
+  "Geriatric Neurosurgery": "Geriatric",
+  "Hydrocephalus and CSF Disorders": "Hydrocephalus",
+  "Neurointensive care and Neuroinfection": "Neurointensive",
+  "Neurorehabilitation": "Neurorehab",
+  "Surgical Technique and Technology": "Surgical Tech",
+  "Basic and Translational Research": "Basic Research",
+  "Ethics, Education and Socioeconomics": "Ethics/Education",
+  "Digital Health, Robotics, and Innovation": "Digital Health",
 };
 
 // ── Evidence levels ──────────────────────────────────────────────────────────
@@ -75,25 +82,11 @@ const PERIODS: { key: Period; label: string }[] = [
 
 type Actionable = "all" | "yes" | "no";
 
-// ── Dummy count computation ──────────────────────────────────────────────────
+// ── Props ────────────────────────────────────────────────────────────────────
 
-// TODO: Replace dummy computation with API call when classification pipeline runs
-function computeCount(
-  period: Period,
-  sub: string | null,
-  minEvidence: number,
-  types: string[],
-  actionable: Actionable,
-): number {
-  const base: Record<Period, number> = { week: 487, month: 2838, year: 2838 };
-  let c = base[period] || 487;
-  if (sub !== null) c = Math.round(c * (1 / 17) * 1.2);
-  const evPct: Record<number, number> = { 1: 1, 2: 0.78, 3: 0.39, 4: 0.21, 5: 0.13 };
-  c = Math.round(c * (evPct[minEvidence] || 1));
-  if (types.length > 0) c = Math.round(c * (types.length / 10));
-  if (actionable === "yes") c = Math.round(c * 0.15);
-  if (actionable === "no") c = Math.round(c * 0.85);
-  return Math.max(0, c);
+interface Props {
+  userSubspecialties: string[] | null;
+  topSubspecialties: { tag: string; count: number }[];
 }
 
 // ── AnimatedNumber ───────────────────────────────────────────────────────────
@@ -137,17 +130,25 @@ function AnimatedNumber({ value }: { value: number }) {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function ArticleFilterPanel() {
+export default function ArticleFilterPanel({ userSubspecialties, topSubspecialties }: Props) {
   const [period, setPeriod] = useState<Period>("week");
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
   const [minEvidence, setMinEvidence] = useState(1);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [actionable, setActionable] = useState<Actionable>("all");
 
-  const count = useMemo(
-    () => computeCount(period, selectedSub, minEvidence, selectedTypes, actionable),
-    [period, selectedSub, minEvidence, selectedTypes, actionable],
-  );
+  const [count, setCount] = useState<number>(0);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set("period", period);
+    if (selectedSub) params.set("subspecialty", selectedSub);
+
+    fetch(`/api/articles/count?${params}`)
+      .then((r) => r.json())
+      .then((data) => setCount((data as { count: number }).count ?? 0))
+      .catch(() => setCount(0));
+  }, [period, selectedSub]);
 
   const hasFilters =
     selectedSub !== null ||
@@ -172,10 +173,14 @@ export default function ArticleFilterPanel() {
     setMinEvidence((prev) => (prev === level ? 1 : level));
   }
 
-  // Scope buttons: "Neurokirurgi" + user subspecialties
+  // Scope buttons: "Neurosurgery" + user subspecialties or top from DB
+  const displaySubs = userSubspecialties && userSubspecialties.length > 0
+    ? userSubspecialties
+    : topSubspecialties.slice(0, 3).map((s) => s.tag);
+
   const scopes = [
     { key: "all", label: "Neurosurgery" },
-    ...USER_SUBSPECIALTIES.map((s) => ({ key: s, label: SUB_LABELS[s] ?? s })),
+    ...displaySubs.map((s) => ({ key: s, label: SUB_SHORT_LABELS[s] ?? s })),
   ];
 
   return (
