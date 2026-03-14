@@ -60,7 +60,18 @@ const RAW_INSTITUTIONS: [string, InstitutionInfo][] = [
   // Other US
   ["thomas jefferson university", { institution: "Thomas Jefferson University", city: "Philadelphia", country: "United States" }],
   ["jefferson hospital for neuroscience", { institution: "Jefferson Hospital for Neuroscience", city: "Philadelphia", country: "United States" }],
+  ["cleveland clinic abu dhabi", { institution: "Cleveland Clinic Abu Dhabi", city: "Abu Dhabi", country: "United Arab Emirates" }],
+  ["cleveland clinic", { institution: "Cleveland Clinic", city: "Cleveland", country: "United States" }],
+  ["carilion clinic", { institution: "Carilion Clinic", city: "Roanoke", country: "United States" }],
   ["mayo clinic", { institution: "Mayo Clinic", city: "Rochester", country: "United States" }],
+  ["northwell health", { institution: "Northwell Health", city: "New York", country: "United States" }],
+  ["sword health", { institution: "Sword Health", city: "New York", country: "United States" }],
+  ["uthealth houston", { institution: "UTHealth Houston", city: "Houston", country: "United States" }],
+  ["clinical neurosciences center", { institution: "Clinical Neurosciences Center", city: "Salt Lake City", country: "United States" }],
+  ["umass chan medical school", { institution: "UMass Chan Medical School", city: "Worcester", country: "United States" }],
+
+  // Japan
+  ["ohnishi neurological center", { institution: "Ohnishi Neurological Center", city: "Akashi", country: "Japan" }],
 
   // Japan (frequently mis-parsed as city)
   ["kyoto university graduate school of medicine", { institution: "Kyoto University", city: "Kyoto", country: "Japan" }],
@@ -73,6 +84,7 @@ const RAW_INSTITUTIONS: [string, InstitutionInfo][] = [
   ["chiba university", { institution: "Chiba University", city: "Chiba", country: "Japan" }],
 
   // Germany
+  ["hannover medical school", { institution: "Hannover Medical School", city: "Hannover", country: "Germany" }],
   ["helios horst schmidt hospital wiesbaden", { institution: "Helios Horst Schmidt Hospital Wiesbaden", city: "Wiesbaden", country: "Germany" }],
   ["helios horst schmidt kliniken wiesbaden", { institution: "Helios Horst Schmidt Kliniken Wiesbaden", city: "Wiesbaden", country: "Germany" }],
   ["heinrich-heine university düsseldorf", { institution: "Heinrich-Heine University Düsseldorf", city: "Düsseldorf", country: "Germany" }],
@@ -88,6 +100,7 @@ const RAW_INSTITUTIONS: [string, InstitutionInfo][] = [
   ["karolinska", { institution: "Karolinska Institutet", city: "Stockholm", country: "Sweden" }],
 
   // Singapore
+  ["duke-nus medical school", { institution: "Duke-NUS Medical School", city: "Singapore", country: "Singapore" }],
   ["national neuroscience institute", { institution: "National Neuroscience Institute", city: "Singapore", country: "Singapore" }],
 
   // Canada
@@ -95,6 +108,9 @@ const RAW_INSTITUTIONS: [string, InstitutionInfo][] = [
 
   // China
   ["capital medical university", { institution: "Capital Medical University", city: "Beijing", country: "China" }],
+
+  // Brazil
+  ["botucatu medical school", { institution: "Botucatu Medical School", city: "Botucatu", country: "Brazil" }],
 
   // France
   ["université paris cité", { institution: "Université Paris Cité", city: "Paris", country: "France" }],

@@ -10,7 +10,7 @@ export async function POST() {
   after(async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = createAdminClient() as any;
-    let offset = 0;
+    let lastId = "00000000-0000-0000-0000-000000000000";
     let updated = 0;
     let processed = 0;
     const BATCH = 200;
@@ -20,26 +20,27 @@ export async function POST() {
         .from("authors")
         .select("id, affiliations")
         .not("affiliations", "eq", "{}")
-        .range(offset, offset + BATCH - 1);
+        .gt("id", lastId)
+        .order("id", { ascending: true })
+        .limit(BATCH);
 
       if (!data || data.length === 0) break;
 
       for (const author of data) {
         const raw = (author.affiliations as string[])?.[0] ?? null;
         const parsed = raw ? geoParseAffiliation(raw) : null;
-        if (!parsed) continue;
 
         await db.from("authors").update({
-          country: parsed.country,
-          city: parsed.city,
-          hospital: parsed.institution,
-          department: parsed.department,
+          country: parsed?.country ?? null,
+          city: parsed?.city ?? null,
+          hospital: parsed?.institution ?? null,
+          department: parsed?.department ?? null,
         }).eq("id", author.id);
         updated++;
       }
 
+      lastId = data[data.length - 1].id;
       processed += data.length;
-      offset += BATCH;
 
       if (processed % 1000 < BATCH) {
         console.log(`[reparse-authors] ${processed} processed, ${updated} updated`);

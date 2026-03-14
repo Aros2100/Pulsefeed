@@ -11,73 +11,97 @@ export async function GET() {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
 
-  const admin = createAdminClient();
-
-  const cityFilters = INST_KEYWORDS.map((kw) => `city.ilike.%${kw}%`).join(",");
-  const orFilter = `city.is.null,country.is.null,${cityFilters}`;
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: author, error } = await (admin as any)
+  const admin = createAdminClient() as any;
+  const SELECT = "id, display_name, affiliations, city, country, hospital, department, state, article_count";
+
+  // Priority 1: Institution keywords in city field (parser errors)
+  const instFilter = INST_KEYWORDS.map((kw) => `city.ilike.%${kw}%`).join(",");
+  const { data: p1 } = await admin
     .from("authors")
-    .select("id, display_name, affiliations, city, country, hospital, department, state, article_count")
+    .select(SELECT)
     .not("affiliations", "is", null)
     .neq("affiliations", "{}")
-    .or(orFilter)
-    .order("article_count", { ascending: false, nullsFirst: true })
+    .or(instFilter)
+    .order("article_count", { ascending: false })
     .limit(50);
 
-  if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  // Priority 2: City not in GeoNames (RPC handles lab_decisions filtering)
+  const { data: p2 } = await admin.rpc("get_authors_city_not_in_geonames", { p_limit: 50 });
+
+  // Priority 3: Country is null despite having affiliations
+  const { data: p3 } = await admin
+    .from("authors")
+    .select(SELECT)
+    .not("affiliations", "is", null)
+    .neq("affiliations", "{}")
+    .is("country", null)
+    .order("article_count", { ascending: false })
+    .limit(50);
+
+  // Priority 4: High article count (fallback)
+  const { data: p4 } = await admin
+    .from("authors")
+    .select(SELECT)
+    .not("affiliations", "is", null)
+    .neq("affiliations", "{}")
+    .order("article_count", { ascending: false })
+    .limit(50);
+
+  // Try each priority in order
+  const pools = [p1, p2, p3, p4];
+  for (let pi = 0; pi < pools.length; pi++) {
+    const candidates = pools[pi];
+    if (!candidates || candidates.length === 0) continue;
+
+    // P2 already filters lab_decisions in the RPC
+    let filtered: typeof candidates;
+    if (pi === 1) {
+      filtered = candidates;
+    } else {
+      const authorIds = candidates.map((a: { id: string }) => a.id);
+      const { data: decisions } = await admin
+        .from("lab_decisions")
+        .select("author_id")
+        .eq("module", "author_geo")
+        .in("author_id", authorIds);
+
+      const decidedSet = new Set((decisions ?? []).map((d: { author_id: string }) => d.author_id));
+      filtered = candidates.filter((a: { id: string }) => !decidedSet.has(a.id));
+    }
+
+    if (filtered.length === 0) continue;
+
+    const chosen = filtered[0];
+
+    // Fetch articles for this author
+    const { data: articleLinks } = await admin
+      .from("article_authors")
+      .select("article_id")
+      .eq("author_id", chosen.id)
+      .order("position", { ascending: true })
+      .limit(5);
+
+    let articles: { id: string; title: string; journal_title: string | null }[] = [];
+    if (articleLinks && articleLinks.length > 0) {
+      const articleIds = articleLinks.map((l: { article_id: string }) => l.article_id);
+      const { data: arts } = await admin
+        .from("articles")
+        .select("id, title, journal_title")
+        .in("id", articleIds);
+      articles = arts ?? [];
+    }
+
+    return NextResponse.json({
+      ok: true,
+      author: chosen,
+      articles,
+      remaining: filtered.length,
+      priority: pi + 1,
+    });
   }
 
-  if (!author || author.length === 0) {
-    return NextResponse.json({ ok: true, author: null, remaining: 0 });
-  }
-
-  // Filter out authors that already have a lab_decision for author_geo
-  const authorIds = author.map((a: { id: string }) => a.id);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: decisions } = await (admin as any)
-    .from("lab_decisions")
-    .select("author_id")
-    .eq("module", "author_geo")
-    .in("author_id", authorIds);
-
-  const decidedSet = new Set((decisions ?? []).map((d: { author_id: string }) => d.author_id));
-  const filtered = author.filter((a: { id: string }) => !decidedSet.has(a.id));
-
-  if (filtered.length === 0) {
-    return NextResponse.json({ ok: true, author: null, remaining: 0 });
-  }
-
-  const chosen = filtered[0];
-
-  // Fetch articles for this author
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: articleLinks } = await (admin as any)
-    .from("article_authors")
-    .select("article_id")
-    .eq("author_id", chosen.id)
-    .order("position", { ascending: true })
-    .limit(5);
-
-  let articles: { id: string; title: string; journal_title: string | null }[] = [];
-  if (articleLinks && articleLinks.length > 0) {
-    const articleIds = articleLinks.map((l: { article_id: string }) => l.article_id);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: arts } = await (admin as any)
-      .from("articles")
-      .select("id, title, journal_title")
-      .in("id", articleIds);
-    articles = arts ?? [];
-  }
-
-  return NextResponse.json({
-    ok: true,
-    author: chosen,
-    articles,
-    remaining: filtered.length,
-  });
+  return NextResponse.json({ ok: true, author: null, remaining: 0 });
 }
 
 export async function POST(request: NextRequest) {
@@ -88,7 +112,7 @@ export async function POST(request: NextRequest) {
   console.log("[validate-author] body:", JSON.stringify(body));
   const { author_id, action, city, country, hospital, department, state } = body as {
     author_id: string;
-    action: "approve" | "correct" | "insufficient_data" | "duplicate";
+    action: "approve" | "correct" | "insufficient_data" | "duplicate" | "audit_flagged";
     city?: string | null;
     country?: string | null;
     hospital?: string | null;
@@ -116,7 +140,7 @@ export async function POST(request: NextRequest) {
 
   const oldData = { city: oldAuthor.city, country: oldAuthor.country, hospital: oldAuthor.hospital, department: oldAuthor.department, state: oldAuthor.state };
 
-  if (action === "insufficient_data" || action === "duplicate") {
+  if (action === "insufficient_data" || action === "duplicate" || action === "audit_flagged") {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: insertData, error: insertError } = await (admin as any).from("lab_decisions").insert({
       author_id: author_id,

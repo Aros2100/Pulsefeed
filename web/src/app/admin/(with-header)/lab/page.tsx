@@ -142,6 +142,14 @@ export default async function LabPage() {
                   <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>
                     {m.description}
                   </p>
+                  {m.href === "/admin/lab/author-geo" && (
+                    <Link
+                      href="/admin/lab/author-geo/audit"
+                      style={{ fontSize: "11px", fontWeight: 600, color: "#E83B2A", textDecoration: "none", marginTop: "6px", display: "inline-block" }}
+                    >
+                      Quick Audit →
+                    </Link>
+                  )}
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "16px", flexShrink: 0 }}>

@@ -38,12 +38,36 @@ const INST_KEYWORDS = [
   "Academy",
   "Charité",
   "Karolinska",
+  "Clinic",
   "Mayo Clinic",
   "Paracelsus",
   "Institut",
   "Institute",
   "Foundation",
   "College",
+  "Hospices",
+  "Fondazione",
+  "IRCCS",
+  "Kantonsspital",
+  "Universität",
+  "Università",
+  "Université",
+  "Universidad",
+  "Universidade",
+  "Instituto",
+  "Istituto",
+  "Health System",
+  "Guideline Group",
+  "Policlinico",
+  "Klinikum",
+  "Kliniken",
+  "Hôpital",
+  "Hôpitaux",
+  "Sjukhus",
+  "Sygehus",
+  "Ziekenhuis",
+  "Krankenhaus",
+  "Red Cross",
 ];
 
 function matchesKeywords(segment: string, keywords: string[]): boolean {
@@ -72,13 +96,19 @@ function isPhoneNumber(segment: string): boolean {
 
 /** Check if segment looks like an institution name (not a city) */
 function looksLikeInstitution(segment: string): boolean {
-  const instWords = [
-    "University", "Hospital", "Institute", "Medical Center", "Medical Centre",
-    "College", "School", "Foundation", "Clinic", "Academy",
-  ];
-  const lower = segment.toLowerCase();
-  return instWords.some((w) => lower.includes(w.toLowerCase()));
+  return matchesKeywords(segment, INST_KEYWORDS);
 }
+
+const CITY_EXTRACT_BLOCKLIST = new Set([
+  'university', 'hospital', 'institute', 'college', 'school',
+  'center', 'centre', 'clinic', 'academy', 'laboratory',
+  'medical', 'research', 'foundation', 'faculty', 'department',
+  'division', 'section', 'unit', 'surgery', 'sciences',
+  'national', 'general', 'central', 'regional', 'memorial',
+  'children', 'veterans', 'military', 'naval', 'royal',
+  'health', 'system', 'ministry', 'guideline', 'network',
+  'reference', 'member', 'corporate', 'fondazione',
+]);
 
 /** Try to extract a city name embedded in an institution segment */
 function extractCityFromSegment(segment: string): string | null {
@@ -86,17 +116,22 @@ function extractCityFromSegment(segment: string): string | null {
   // Check pairs of words first (longer match = better, e.g. "New Haven", "Hong Kong")
   for (let i = 0; i < words.length - 1; i++) {
     const pair = words[i] + " " + words[i + 1];
+    const w1blocked = CITY_EXTRACT_BLOCKLIST.has(words[i].toLowerCase());
+    const w2blocked = CITY_EXTRACT_BLOCKLIST.has(words[i + 1].toLowerCase());
+    if (w1blocked && w2blocked) continue;
     if (CITY_NAMES.has(pair.toLowerCase())) return pair;
   }
   // Then single words (skip short generic words)
   for (const word of words) {
-    if (word.length >= 4 && CITY_NAMES.has(word.toLowerCase())) return word;
+    if (word.length >= 4 && !CITY_EXTRACT_BLOCKLIST.has(word.toLowerCase()) && CITY_NAMES.has(word.toLowerCase())) return word;
   }
   return null;
 }
 
 /** Clean city string: strip DK-prefix, postal codes, district suffixes, UK postcodes */
 function cleanCity(raw: string): string {
+  // If entire string is a UK postcode, return empty
+  if (/^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i.test(raw.trim())) return "";
   let city = raw;
   // Strip leading "DK-NNNN " or "DK " prefix
   city = city.replace(/^DK[-\s]?\d{0,4}\s*/i, "").trim();
@@ -123,6 +158,15 @@ function cleanCity(raw: string): string {
     const maybeState = city.slice(lastSpaceIdx + 1);
     if (lookupCountry(maybeState) === "United States") {
       city = city.slice(0, lastSpaceIdx).trim();
+    }
+  }
+  // Strip " - State of ..." suffix (Brazilian cities: "São Paulo - State of São Paulo")
+  city = city.replace(/\s+-\s+State\s+of\s+.*$/i, "").trim();
+  // Strip trailing "City" if the base name is a known city (e.g. "Mexico City" → "Mexico" only if "Mexico" is in CITY_NAMES)
+  if (city.endsWith(" City")) {
+    const base = city.slice(0, -5).trim();
+    if (base && CITY_NAMES.has(base.toLowerCase())) {
+      city = base;
     }
   }
   // Strip trailing dots/whitespace
@@ -152,10 +196,28 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
 
   if (!text) return null;
 
-  // Step 3b: Reject pure department-only affiliations with no location data
-  if (/^Departments?\s+of\d?/i.test(text) && !text.includes(",")) {
+  // Step 3b: Reject department/division-only affiliations with no location data
+  if (/^(Departments?|Divisions?|Sections?|Units?|Clinics?)\s+of\s*/i.test(text) && !text.includes(",")) {
     return null;
   }
+  // Too long — multi-institution monster strings that parser can't handle
+  if (text.length > 350) {
+    return null;
+  }
+  // Reject "and ..." fragments (partial author lists leaking through)
+  if (/^and\s+/i.test(text)) return null;
+  // Reject "contributed equally" notes
+  if (/contributed equally/i.test(text)) return null;
+  // Reject author initial fragments like "J.I." or "S. M."
+  if (/^[A-Z]\.\s?[A-Z]\.?$/.test(text.trim())) return null;
+  // Reject "Full Member of" / "Corporate Member of" lines
+  if (/^(Full|Corporate)\s+Member\s+of\b/i.test(text)) return null;
+  // Reject "Ministry of" lines
+  if (/^Ministry\s+of\b/i.test(text)) return null;
+  // Reject "Republic of" fragments
+  if (/^Republic\s+of\b/i.test(text) && !text.includes(",")) return null;
+  // Reject "P. R" / "P.R." — People's Republic abbreviation
+  if (/^P\.\s*R\.?$/i.test(text.trim())) return null;
 
   // Step 4: Split into segments
   const segments = text.split(/,\s*/).map((s) => s.trim()).filter(Boolean);
@@ -188,6 +250,12 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
   }
   for (let i = segments.length - 1; i >= 0; i--) {
     if (!segments[i]) segments.splice(i, 1);
+  }
+  // Strip orphan closing parenthesis segments: "Coon)" → remove
+  for (let i = segments.length - 1; i >= 0; i--) {
+    if (segments[i].includes(")") && !segments[i].includes("(")) {
+      segments.splice(i, 1);
+    }
   }
 
   if (segments.length === 0) return null;
@@ -314,8 +382,8 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
         cityIdx--;
         continue;
       }
-      // Skip 2-letter province/state codes: ON, QC, BC, CA, TX, etc.
-      if (candidate.length === 2 && (US_STATES[candidate.toUpperCase()] || isProvinceCode(candidate))) {
+      // Skip 2-3 letter province/state codes: ON, QC, BC, CA, TX, NSW, VIC, etc.
+      if (candidate.length <= 3 && (US_STATES[candidate.toUpperCase()] || isProvinceCode(candidate))) {
         cityIdx--;
         continue;
       }
@@ -329,13 +397,24 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
         cityIdx--;
         continue;
       }
+      // Skip segments that look like department names (not cities)
+      if (matchesKeywords(candidate, DEPT_KEYWORDS)) {
+        cityIdx--;
+        continue;
+      }
       break;
     }
 
     if (cityIdx >= 0) {
       const rawCity = cleanCity(segments[cityIdx]);
 
-      if (rawCity) {
+      // Check if cleaned city is actually a country name (e.g. "Rwanda")
+      // but allow names that are also known cities (e.g. "Singapore")
+      if (rawCity && lookupCountry(rawCity) !== null && !CITY_NAMES.has(rawCity.toLowerCase())) {
+        segments.splice(cityIdx, 1);
+        cityIdx = -1;
+      }
+      if (cityIdx >= 0 && rawCity) {
         // Check if the "city" actually looks like an institution
         if (looksLikeInstitution(rawCity)) {
           const instInfo = lookupInstitution(segments[cityIdx]);
@@ -369,7 +448,7 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
             segments.splice(cityIdx, 1);
           }
         }
-      } else {
+      } else if (cityIdx >= 0) {
         confidence = "low";
         segments.splice(cityIdx, 1);
       }
@@ -381,7 +460,7 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
       const segCleaned = seg.replace(/\s+\d{4,6}$/, "").trim();
       if (isAdministrativeRegion(seg) || isAdministrativeRegion(segCleaned)) {
         segments.splice(i, 1);
-      } else if (seg.length === 2 && (US_STATES[seg.toUpperCase()] || isProvinceCode(seg))) {
+      } else if (seg.length <= 3 && (US_STATES[seg.toUpperCase()] || isProvinceCode(seg))) {
         segments.splice(i, 1);
       }
     }

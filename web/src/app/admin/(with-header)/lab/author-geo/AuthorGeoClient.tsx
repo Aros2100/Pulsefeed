@@ -43,6 +43,7 @@ export default function AuthorGeoClient() {
   const [author, setAuthor] = useState<AuthorData | null>(null);
   const [articles, setArticles] = useState<ArticleData[]>([]);
   const [remaining, setRemaining] = useState(0);
+  const [priority, setPriority] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -61,6 +62,7 @@ export default function AuthorGeoClient() {
         setAuthor(data.author);
         setArticles(data.articles ?? []);
         setRemaining(data.remaining ?? 0);
+        setPriority(data.priority ?? 0);
         setFields({
           city: data.author.city ?? "",
           country: data.author.country ?? "",
@@ -220,8 +222,26 @@ export default function AuthorGeoClient() {
 
           {/* LEFT: Author info */}
           <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e7eb", padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
-            {/* Name + article count */}
+            {/* Priority badge + Name + article count */}
             <div>
+              {priority > 0 && (() => {
+                const cfg: Record<number, { label: string; bg: string; color: string }> = {
+                  1: { label: "Institution som by", bg: "#fff7ed", color: "#c2410c" },
+                  2: { label: "By ikke i GeoNames", bg: "#fefce8", color: "#a16207" },
+                  3: { label: "Mangler land", bg: "#fef2f2", color: "#b91c1c" },
+                  4: { label: "Standard", bg: "#f3f4f6", color: "#6b7280" },
+                };
+                const c = cfg[priority] ?? cfg[4];
+                return (
+                  <span style={{
+                    display: "inline-block", fontSize: "10px", fontWeight: 700,
+                    background: c.bg, color: c.color, borderRadius: "4px",
+                    padding: "2px 8px", marginBottom: "6px",
+                  }}>
+                    P{priority}: {c.label}
+                  </span>
+                );
+              })()}
               <h2 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 6px" }}>
                 {author.display_name ?? "Ukendt"}
               </h2>
