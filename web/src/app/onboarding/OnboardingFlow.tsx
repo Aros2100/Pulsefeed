@@ -26,7 +26,7 @@ const REGIONS = [
   "Oceania",
 ] as const;
 
-const MANDATORY_SUBSPECIALTY = "Neurosurgical oncology and Radiosurgery";
+const MANDATORY_SUBSPECIALTY = "Neurosurgery";
 const MAX_SUBSPECIALTIES = 3;
 
 function Spinner() {
@@ -431,18 +431,6 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
             </div>
 
             <div style={{ marginBottom: "16px" }}>
-              <label htmlFor="onb-city" style={labelStyle}>By</label>
-              <input
-                id="onb-city"
-                type="text"
-                placeholder="f.eks. København"
-                value={authorGeo.city}
-                onChange={(e) => setAuthorGeo((g) => ({ ...g, city: e.target.value }))}
-                style={inputStyle}
-              />
-            </div>
-
-            <div style={{ marginBottom: "16px" }}>
               <label htmlFor="onb-state" style={labelStyle}>Stat / Region (valgfri)</label>
               <input
                 id="onb-state"
@@ -450,6 +438,18 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
                 placeholder="f.eks. California"
                 value={authorGeo.state}
                 onChange={(e) => setAuthorGeo((g) => ({ ...g, state: e.target.value }))}
+                style={inputStyle}
+              />
+            </div>
+
+            <div style={{ marginBottom: "16px" }}>
+              <label htmlFor="onb-city" style={labelStyle}>By</label>
+              <input
+                id="onb-city"
+                type="text"
+                placeholder="f.eks. København"
+                value={authorGeo.city}
+                onChange={(e) => setAuthorGeo((g) => ({ ...g, city: e.target.value }))}
                 style={inputStyle}
               />
             </div>
@@ -616,22 +616,37 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
           <div>
             {/* Mandatory badge — separate, not a checkbox */}
             <div style={{
-              display: "inline-flex",
+              display: "flex",
               alignItems: "center",
-              gap: "6px",
-              padding: "6px 12px",
-              borderRadius: "8px",
-              background: "#f1f5f9",
-              border: "1px solid #cbd5e1",
-              marginBottom: "12px",
-              fontSize: "13px",
-              color: "#64748b",
-              fontWeight: 500,
+              gap: "10px",
+              padding: "12px 16px",
+              borderRadius: "10px",
+              background: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              marginBottom: "20px",
             }}>
-              <svg width="14" height="14" viewBox="0 0 10 8" fill="none">
-                <path d="M1 4L3.5 6.5L9 1" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              {MANDATORY_SUBSPECIALTY}
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "28px",
+                height: "28px",
+                borderRadius: "50%",
+                background: "#22c55e",
+                flexShrink: 0,
+              }}>
+                <svg width="14" height="11" viewBox="0 0 10 8" fill="none">
+                  <path d="M1 4L3.5 6.5L9 1" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div>
+                <p style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", margin: 0 }}>
+                  {MANDATORY_SUBSPECIALTY}
+                </p>
+                <p style={{ fontSize: "12px", color: "#888", margin: "2px 0 0" }}>
+                  Dit hovedspeciale
+                </p>
+              </div>
             </div>
 
             <div style={{
@@ -640,7 +655,7 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
               gap: "8px",
               marginBottom: "12px",
             }}>
-              {SUBSPECIALTY_OPTIONS.filter((s) => s !== MANDATORY_SUBSPECIALTY).map((s) => {
+              {SUBSPECIALTY_OPTIONS.map((s) => {
                 const checked = selectedSubspecialties.includes(s);
                 const atMax = selectedSubspecialties.length >= MAX_SUBSPECIALTIES && !checked;
                 return (
