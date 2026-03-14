@@ -29,16 +29,13 @@ export async function POST() {
         const parsed = raw ? geoParseAffiliation(raw) : null;
         if (!parsed) continue;
 
-        const update: Record<string, string | null> = {};
-        if (parsed.country) update.country = parsed.country;
-        if (parsed.city) update.city = parsed.city;
-        if (parsed.institution) update.hospital = parsed.institution;
-        if (parsed.department) update.department = parsed.department;
-
-        if (Object.keys(update).length > 0) {
-          await db.from("authors").update(update).eq("id", author.id);
-          updated++;
-        }
+        await db.from("authors").update({
+          country: parsed.country,
+          city: parsed.city,
+          hospital: parsed.institution,
+          department: parsed.department,
+        }).eq("id", author.id);
+        updated++;
       }
 
       processed += data.length;
