@@ -8,23 +8,7 @@ import { COUNTRY_LIST } from "@/lib/geo/country-list";
 
 const TOTAL_STEPS = 3;
 
-const REGIONS = [
-  "Scandinavia",
-  "Western Europe",
-  "Southern Europe",
-  "Eastern Europe",
-  "Russia & Central Asia",
-  "North America",
-  "Central America & Caribbean",
-  "South America",
-  "Middle East",
-  "North Africa",
-  "Sub-Saharan Africa",
-  "South Asia",
-  "East Asia",
-  "Southeast Asia",
-  "Oceania",
-] as const;
+const CONTINENTS = ["Europe", "Asia", "Americas", "Africa", "Oceania"] as const;
 
 const MANDATORY_SUBSPECIALTY = "Neurosurgery";
 const MAX_SUBSPECIALTIES = 3;
@@ -93,13 +77,15 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
   });
 
   // Step 2 — geo drill-down (not author-linked)
-  const [continent, setContinent] = useState("");
-  const [country, setCountry] = useState("");
+  const [geoContinent, setGeoContinent] = useState("");
+  const [geoRegion, setGeoRegion] = useState("");
+  const [geoCountry, setGeoCountry] = useState("");
   const [geoState, setGeoState] = useState("");
-  const [city, setCity] = useState("");
-  const [hospital, setHospital] = useState("");
+  const [geoCity, setGeoCity] = useState("");
+  const [geoHospital, setGeoHospital] = useState("");
 
   // Cascading dropdown data
+  const [regionOptions, setRegionOptions] = useState<string[]>([]);
   const [countryOptions, setCountryOptions] = useState<string[]>([]);
   const [stateOptions, setStateOptions] = useState<string[]>([]);
   const [cityOptions, setCityOptions] = useState<string[]>([]);
@@ -114,57 +100,66 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
 
   // ── Cascading fetches ──
 
+  // Continent → fetch regions
   useEffect(() => {
-    if (!continent) { setCountryOptions([]); setCountry(""); return; }
+    if (!geoContinent) { setRegionOptions([]); setGeoRegion(""); setCountryOptions([]); setGeoCountry(""); setStateOptions([]); setGeoState(""); setCityOptions([]); setGeoCity(""); return; }
     setLoadingGeo(true);
-    fetch(`/api/geo/countries?continent=${encodeURIComponent(continent)}`)
+    fetch(`/api/geo/regions?continent=${encodeURIComponent(geoContinent)}`)
+      .then((r) => r.json())
+      .then((d: { regions: string[] }) => setRegionOptions(d.regions))
+      .catch(() => setRegionOptions([]))
+      .finally(() => setLoadingGeo(false));
+    setGeoRegion(""); setCountryOptions([]); setGeoCountry(""); setStateOptions([]); setGeoState(""); setCityOptions([]); setGeoCity("");
+  }, [geoContinent]);
+
+  // Region → fetch countries
+  useEffect(() => {
+    if (!geoRegion) { setCountryOptions([]); setGeoCountry(""); setStateOptions([]); setGeoState(""); setCityOptions([]); setGeoCity(""); return; }
+    setLoadingGeo(true);
+    fetch(`/api/geo/countries?region=${encodeURIComponent(geoRegion)}`)
       .then((r) => r.json())
       .then((d: { countries: string[] }) => setCountryOptions(d.countries))
       .catch(() => setCountryOptions([]))
       .finally(() => setLoadingGeo(false));
-    setCountry("");
-    setGeoState("");
-    setCity("");
-    setStateOptions([]);
-    setCityOptions([]);
-  }, [continent]);
+    setGeoCountry(""); setStateOptions([]); setGeoState(""); setCityOptions([]); setGeoCity("");
+  }, [geoRegion]);
 
+  // Country → fetch states + cities
   useEffect(() => {
-    if (!country) { setStateOptions([]); setGeoState(""); setCityOptions([]); setCity(""); return; }
+    if (!geoCountry) { setStateOptions([]); setGeoState(""); setCityOptions([]); setGeoCity(""); return; }
     setLoadingGeo(true);
-    fetch(`/api/geo/states?country=${encodeURIComponent(country)}`)
+    fetch(`/api/geo/states?country=${encodeURIComponent(geoCountry)}`)
       .then((r) => r.json())
       .then((d: { states: string[] }) => setStateOptions(d.states))
       .catch(() => setStateOptions([]))
       .finally(() => setLoadingGeo(false));
-    setGeoState("");
-    setCity("");
-    setCityOptions([]);
-    // Also fetch cities (no state filter)
-    fetch(`/api/geo/cities?country=${encodeURIComponent(country)}`)
+    setGeoState(""); setGeoCity("");
+    // Also fetch cities without state filter
+    fetch(`/api/geo/cities?country=${encodeURIComponent(geoCountry)}`)
       .then((r) => r.json())
       .then((d: { cities: string[] }) => setCityOptions(d.cities))
       .catch(() => setCityOptions([]));
-  }, [country]);
+  }, [geoCountry]);
 
+  // State → fetch cities (with state filter)
   useEffect(() => {
-    if (!country) return;
+    if (!geoCountry) return;
     if (!geoState) {
       // Re-fetch cities without state filter
-      fetch(`/api/geo/cities?country=${encodeURIComponent(country)}`)
+      fetch(`/api/geo/cities?country=${encodeURIComponent(geoCountry)}`)
         .then((r) => r.json())
         .then((d: { cities: string[] }) => setCityOptions(d.cities))
         .catch(() => setCityOptions([]));
       return;
     }
-    setCity("");
+    setGeoCity("");
     setLoadingGeo(true);
-    fetch(`/api/geo/cities?country=${encodeURIComponent(country)}&state=${encodeURIComponent(geoState)}`)
+    fetch(`/api/geo/cities?country=${encodeURIComponent(geoCountry)}&state=${encodeURIComponent(geoState)}`)
       .then((r) => r.json())
       .then((d: { cities: string[] }) => setCityOptions(d.cities))
       .catch(() => setCityOptions([]))
       .finally(() => setLoadingGeo(false));
-  }, [geoState, country]);
+  }, [geoState, geoCountry]);
 
   async function callApi(body: Record<string, unknown>) {
     setLoading(true);
@@ -236,10 +231,10 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
   async function handleGeoSubmit() {
     const ok = await callApi({
       step: "geo",
-      country: country || null,
-      city: city || null,
+      country: geoCountry || null,
+      city: geoCity || null,
       state: geoState || null,
-      hospital: hospital.trim() || null,
+      hospital: geoHospital.trim() || null,
     });
     if (ok) setCurrentStep(3);
   }
@@ -505,28 +500,47 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
           <div>
             {/* Continent */}
             <div style={{ marginBottom: "16px" }}>
-              <label htmlFor="onb-continent" style={labelStyle}>Region</label>
+              <label htmlFor="onb-continent" style={labelStyle}>Verdensdel</label>
               <select
                 id="onb-continent"
-                value={continent}
-                onChange={(e) => setContinent(e.target.value)}
+                value={geoContinent}
+                onChange={(e) => setGeoContinent(e.target.value)}
                 style={{ ...inputStyle, appearance: "auto" }}
               >
-                <option value="">Vælg region…</option>
-                {REGIONS.map((r) => (
-                  <option key={r} value={r}>{r}</option>
+                <option value="">Vælg verdensdel…</option>
+                {CONTINENTS.map((c) => (
+                  <option key={c} value={c}>{c}</option>
                 ))}
               </select>
             </div>
 
+            {/* Region */}
+            {geoContinent && (
+              <div style={{ marginBottom: "16px" }}>
+                <label htmlFor="onb-region" style={labelStyle}>Region</label>
+                <select
+                  id="onb-region"
+                  value={geoRegion}
+                  onChange={(e) => setGeoRegion(e.target.value)}
+                  disabled={loadingGeo && regionOptions.length === 0}
+                  style={{ ...inputStyle, appearance: "auto" }}
+                >
+                  <option value="">Vælg region…</option>
+                  {regionOptions.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Country */}
-            {continent && (
+            {geoRegion && (
               <div style={{ marginBottom: "16px" }}>
                 <label htmlFor="onb-country2" style={labelStyle}>Land</label>
                 <select
                   id="onb-country2"
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
+                  value={geoCountry}
+                  onChange={(e) => setGeoCountry(e.target.value)}
                   disabled={loadingGeo && countryOptions.length === 0}
                   style={{ ...inputStyle, appearance: "auto" }}
                 >
@@ -538,17 +552,17 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
               </div>
             )}
 
-            {/* State (only if states exist) */}
-            {country && stateOptions.length > 0 && (
+            {/* State — hidden (not just disabled) if no states */}
+            {geoCountry && stateOptions.length > 0 && (
               <div style={{ marginBottom: "16px" }}>
-                <label htmlFor="onb-state2" style={labelStyle}>Stat / Region</label>
+                <label htmlFor="onb-state2" style={labelStyle}>Stat / Provins</label>
                 <select
                   id="onb-state2"
                   value={geoState}
                   onChange={(e) => setGeoState(e.target.value)}
                   style={{ ...inputStyle, appearance: "auto" }}
                 >
-                  <option value="">Alle…</option>
+                  <option value="">Vælg stat/provins…</option>
                   {stateOptions.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}
@@ -557,13 +571,13 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
             )}
 
             {/* City */}
-            {country && cityOptions.length > 0 && (
+            {geoCountry && cityOptions.length > 0 && (
               <div style={{ marginBottom: "16px" }}>
                 <label htmlFor="onb-city2" style={labelStyle}>By</label>
                 <select
                   id="onb-city2"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
+                  value={geoCity}
+                  onChange={(e) => setGeoCity(e.target.value)}
                   style={{ ...inputStyle, appearance: "auto" }}
                 >
                   <option value="">Vælg by…</option>
@@ -575,15 +589,15 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
             )}
 
             {/* Hospital (free text) */}
-            {country && (
+            {geoCountry && (
               <div style={{ marginBottom: "24px" }}>
                 <label htmlFor="onb-hospital2" style={labelStyle}>Hospital / Institution (valgfri)</label>
                 <input
                   id="onb-hospital2"
                   type="text"
                   placeholder="f.eks. Rigshospitalet"
-                  value={hospital}
-                  onChange={(e) => setHospital(e.target.value)}
+                  value={geoHospital}
+                  onChange={(e) => setGeoHospital(e.target.value)}
                   style={inputStyle}
                 />
               </div>
@@ -601,8 +615,8 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
               <button
                 type="button"
                 onClick={() => void handleGeoSubmit()}
-                disabled={loading || !country}
-                style={{ ...btnPrimary, flex: 1, width: "auto", opacity: loading || !country ? 0.6 : 1 }}
+                disabled={loading || !geoCountry}
+                style={{ ...btnPrimary, flex: 1, width: "auto", opacity: loading || !geoCountry ? 0.6 : 1 }}
               >
                 {loading ? <Spinner /> : null}
                 {loading ? "Gemmer…" : "Næste"}

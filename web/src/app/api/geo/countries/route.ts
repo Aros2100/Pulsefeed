@@ -16,11 +16,11 @@ for (const arr of Object.values(regionToCountries)) {
 }
 
 export async function GET(request: NextRequest) {
-  const continent = request.nextUrl.searchParams.get("continent");
-  if (!continent) {
-    return NextResponse.json({ error: "continent required" }, { status: 400 });
+  const region = request.nextUrl.searchParams.get("region");
+  if (!region) {
+    return NextResponse.json({ error: "region required" }, { status: 400 });
   }
 
-  const countries = regionToCountries[continent] ?? [];
+  const countries = regionToCountries[region] ?? [];
   return NextResponse.json({ countries });
 }
