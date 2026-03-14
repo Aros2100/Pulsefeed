@@ -951,6 +951,7 @@ export type Database = {
           role_type: string | null
           source: string
           specialty_slugs: string[]
+          state: string | null
           status: string
           subscribed_at: string
           subspecialties: Json
@@ -985,6 +986,7 @@ export type Database = {
           role_type?: string | null
           source?: string
           specialty_slugs?: string[]
+          state?: string | null
           status?: string
           subscribed_at?: string
           subspecialties?: Json
@@ -1019,6 +1021,7 @@ export type Database = {
           role_type?: string | null
           source?: string
           specialty_slugs?: string[]
+          state?: string | null
           status?: string
           subscribed_at?: string
           subspecialties?: Json

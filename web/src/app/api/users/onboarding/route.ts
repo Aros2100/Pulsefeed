@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function PATCH(request: NextRequest) {
   let body: Record<string, unknown>;
@@ -52,15 +53,47 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  // ── Step: author-geo (profile review after author link) ──
+  if (step === "author-geo") {
+    const country = (body.country as string) || null;
+    const city = (body.city as string) || null;
+    const state = (body.state as string) || null;
+    const hospital = (body.hospital as string) || null;
+    const department = (body.department as string) || null;
+    const authorId = body.authorId as string | null;
+
+    // Update user record
+    const { error } = await supabase
+      .from("users")
+      .update({ country, city, state, hospital, department })
+      .eq("id", user.id);
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    // Also update the author record if linked
+    if (authorId) {
+      const admin = createAdminClient();
+      await (admin as any)
+        .from("authors")
+        .update({ country, city, hospital, department })
+        .eq("id", authorId);
+    }
+
+    return NextResponse.json({ ok: true });
+  }
+
   // ── Step: geo ──
   if (step === "geo") {
     const country = (body.country as string) || null;
     const city = (body.city as string) || null;
+    const state = (body.state as string) || null;
     const hospital = (body.hospital as string) || null;
 
     const { error } = await supabase
       .from("users")
-      .update({ country, city, hospital })
+      .update({ country, city, state, hospital })
       .eq("id", user.id);
 
     if (error) {
@@ -72,6 +105,11 @@ export async function PATCH(request: NextRequest) {
   // ── Step: complete ──
   if (step === "complete") {
     const subspecialties = body.subspecialties as string[] | undefined;
+
+    // Validate max 3 subspecialties
+    if (subspecialties && subspecialties.length > 3) {
+      return NextResponse.json({ ok: false, error: "Max 3 subspecialties allowed" }, { status: 400 });
+    }
 
     // Sync name from auth metadata if not already set
     const metaName = (user.user_metadata?.name as string | undefined) ?? null;

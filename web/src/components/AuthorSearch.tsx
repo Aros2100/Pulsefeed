@@ -9,6 +9,7 @@ interface Author {
   hospital: string | null;
   city: string | null;
   country: string | null;
+  department: string | null;
   article_count: number | null;
 }
 
@@ -17,6 +18,8 @@ export interface AuthorMeta {
   hospital: string | null;
   city: string | null;
   country: string | null;
+  state: string | null;
+  department: string | null;
 }
 
 interface Props {
@@ -47,7 +50,7 @@ export default function AuthorSearch({
       const supabase = createClient();
       const { data } = await supabase
         .from("authors")
-        .select("id, display_name, hospital, city, country, article_count")
+        .select("id, display_name, hospital, city, country, department, article_count")
         .ilike("display_name", `%${query}%`)
         .limit(8);
       setResults((data as Author[]) ?? []);
@@ -139,6 +142,8 @@ export default function AuthorSearch({
                       hospital: author.hospital,
                       city: author.city,
                       country: author.country,
+                      state: null,
+                      department: author.department,
                     })
                   }
                   style={{
