@@ -116,7 +116,10 @@ export async function scoreClassification(
       : typeof rawSub === "string"
         ? [rawSub]
         : [];
-    const subspecialty = subArr.filter((s) => subspecialtySet.has(s)).slice(0, 2);
+    const PEDIATRIC = "Pediatric and foetal neurosurgery";
+    const filtered = subArr.filter((s) => subspecialtySet.has(s));
+    const maxSubs = filtered.includes(PEDIATRIC) ? 3 : 2;
+    const subspecialty = filtered.slice(0, maxSubs);
     if (subspecialty.length === 0) subspecialty.push("Unknown");
 
     const reason = typeof parsed.reason === "string" ? parsed.reason.slice(0, 500) : "";

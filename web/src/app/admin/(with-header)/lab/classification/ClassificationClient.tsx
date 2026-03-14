@@ -353,10 +353,14 @@ export default function ClassificationClient({ specialty, label }: Props) {
 
   // ── Checkbox handling ─────────────────────────────────────────────────────
 
+  const PEDIATRIC = "Pediatric and foetal neurosurgery";
+  const maxCorrections = checkedSubs.includes(PEDIATRIC) ? 3 : 2;
+
   function toggleCheckbox(option: string) {
     setCheckedSubs((prev) => {
       if (prev.includes(option)) return prev.filter((s) => s !== option);
-      if (prev.length >= 2) return prev; // max 2
+      const nextMax = option === PEDIATRIC ? 3 : prev.includes(PEDIATRIC) ? 3 : 2;
+      if (prev.length >= nextMax) return prev;
       return [...prev, option];
     });
   }
@@ -600,12 +604,12 @@ export default function ClassificationClient({ specialty, label }: Props) {
               {/* Korrektion — two-column checkboxes */}
               <div>
                 <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#5a6a85", marginBottom: "8px" }}>
-                  Korriger (vælg 1–2)
+                  Korriger (vælg 1–{maxCorrections}) — {checkedSubs.length} af {maxCorrections} valgt
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1px 12px" }}>
                   {SUBSPECIALTY_OPTIONS.map((option) => {
                     const isChecked = checkedSubs.includes(option);
-                    const isDisabled = !isChecked && checkedSubs.length >= 2;
+                    const isDisabled = !isChecked && checkedSubs.length >= maxCorrections;
                     return (
                       <label
                         key={option}
