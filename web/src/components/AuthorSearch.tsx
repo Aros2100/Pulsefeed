@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 interface Author {
@@ -38,26 +38,20 @@ export default function AuthorSearch({
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<Author[]>([]);
   const [searching, setSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
-  useEffect(() => {
-    if (query.trim().length < 2) {
-      setResults([]);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      setSearching(true);
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("authors")
-        .select("id, display_name, hospital, city, country, department, article_count")
-        .ilike("display_name", `%${query}%`)
-        .limit(8);
-      setResults((data as Author[]) ?? []);
-      setSearching(false);
-    }, 300);
-
-    return () => clearTimeout(timer);
+  const doSearch = useCallback(async () => {
+    if (query.trim().length < 2) return;
+    setSearching(true);
+    setHasSearched(true);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("authors")
+      .select("id, display_name, hospital, city, country, department, article_count")
+      .ilike("display_name", `%${query}%`)
+      .limit(8);
+    setResults((data as Author[]) ?? []);
+    setSearching(false);
   }, [query]);
 
   return (
@@ -75,30 +69,48 @@ export default function AuthorSearch({
         >
           Søg efter navn
         </label>
-        <input
-          id="author-search"
-          type="text"
-          placeholder="e.g. John Smith…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          style={{
-            width: "100%",
-            boxSizing: "border-box",
-            border: "1px solid #d1d5db",
-            borderRadius: "7px",
-            padding: "10px 14px",
-            fontSize: "14px",
-            color: "#1a1a1a",
-            outline: "none",
-            background: "#fff",
-          }}
-        />
-        {searching && (
-          <p style={{ marginTop: "6px", fontSize: "12px", color: "#888" }}>
-            Søger…
-          </p>
-        )}
-        {!searching && query.trim().length >= 2 && results.length === 0 && (
+        <div style={{ display: "flex", gap: "8px" }}>
+          <input
+            id="author-search"
+            type="text"
+            placeholder="e.g. John Smith…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") void doSearch(); }}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              boxSizing: "border-box",
+              border: "1px solid #d1d5db",
+              borderRadius: "7px",
+              padding: "10px 14px",
+              fontSize: "14px",
+              color: "#1a1a1a",
+              outline: "none",
+              background: "#fff",
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => void doSearch()}
+            disabled={searching || query.trim().length < 2}
+            style={{
+              flexShrink: 0,
+              background: "#1a1a1a",
+              color: "#fff",
+              border: "none",
+              borderRadius: "7px",
+              padding: "0 18px",
+              fontSize: "13px",
+              fontWeight: 600,
+              cursor: query.trim().length < 2 ? "not-allowed" : "pointer",
+              opacity: query.trim().length < 2 ? 0.5 : 1,
+            }}
+          >
+            {searching ? "Søger…" : "Søg"}
+          </button>
+        </div>
+        {hasSearched && !searching && results.length === 0 && (
           <p style={{ marginTop: "6px", fontSize: "12px", color: "#888" }}>
             Ingen forfattere fundet.
           </p>

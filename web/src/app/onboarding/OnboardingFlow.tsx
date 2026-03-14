@@ -105,8 +105,8 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
   const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [loadingGeo, setLoadingGeo] = useState(false);
 
-  // Step 3
-  const [selectedSubspecialties, setSelectedSubspecialties] = useState<string[]>([MANDATORY_SUBSPECIALTY]);
+  // Step 3 — user selections only, no auto-added items
+  const [selectedSubspecialties, setSelectedSubspecialties] = useState<string[]>([]);
 
   // Submission
   const [loading, setLoading] = useState(false);
@@ -244,17 +244,16 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
     if (ok) setCurrentStep(3);
   }
 
-  // Step 3 handler
+  // Step 3 handler — always include mandatory subspecialty
   async function handleComplete() {
     const ok = await callApi({
       step: "complete",
-      subspecialties: selectedSubspecialties,
+      subspecialties: [MANDATORY_SUBSPECIALTY, ...selectedSubspecialties],
     });
     if (ok) router.replace("/");
   }
 
   function toggleSubspecialty(s: string) {
-    if (s === MANDATORY_SUBSPECIALTY) return; // Cannot remove mandatory
     setSelectedSubspecialties((prev) =>
       prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
     );
@@ -374,9 +373,9 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
                   <p style={{ fontSize: "16px", fontWeight: 700, color: "#1a1a1a", margin: "0 0 4px" }}>
                     {selectedAuthor.meta.name}
                   </p>
-                  {[selectedAuthor.meta.hospital, selectedAuthor.meta.city, selectedAuthor.meta.country].some(Boolean) && (
+                  {[selectedAuthor.meta.hospital, selectedAuthor.meta.city, selectedAuthor.meta.state, selectedAuthor.meta.country].some(Boolean) && (
                     <p style={{ fontSize: "13px", color: "#555", margin: 0 }}>
-                      {[selectedAuthor.meta.hospital, selectedAuthor.meta.city, selectedAuthor.meta.country].filter(Boolean).join(" · ")}
+                      {[selectedAuthor.meta.hospital, selectedAuthor.meta.city, selectedAuthor.meta.state, selectedAuthor.meta.country].filter(Boolean).join(" · ")}
                     </p>
                   )}
                 </div>
@@ -439,6 +438,18 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
                 placeholder="f.eks. København"
                 value={authorGeo.city}
                 onChange={(e) => setAuthorGeo((g) => ({ ...g, city: e.target.value }))}
+                style={inputStyle}
+              />
+            </div>
+
+            <div style={{ marginBottom: "16px" }}>
+              <label htmlFor="onb-state" style={labelStyle}>Stat / Region (valgfri)</label>
+              <input
+                id="onb-state"
+                type="text"
+                placeholder="f.eks. California"
+                value={authorGeo.state}
+                onChange={(e) => setAuthorGeo((g) => ({ ...g, state: e.target.value }))}
                 style={inputStyle}
               />
             </div>
@@ -530,9 +541,9 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
             {/* State (only if states exist) */}
             {country && stateOptions.length > 0 && (
               <div style={{ marginBottom: "16px" }}>
-                <label htmlFor="onb-state" style={labelStyle}>Stat / Region</label>
+                <label htmlFor="onb-state2" style={labelStyle}>Stat / Region</label>
                 <select
-                  id="onb-state"
+                  id="onb-state2"
                   value={geoState}
                   onChange={(e) => setGeoState(e.target.value)}
                   style={{ ...inputStyle, appearance: "auto" }}
@@ -603,12 +614,7 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
         {/* ── Step 3: Subspecialer ── */}
         {currentStep === 3 && (
           <div>
-            {/* Counter */}
-            <p style={{ fontSize: "13px", color: "#555", margin: "0 0 12px", fontWeight: 500 }}>
-              {selectedSubspecialties.length} af {MAX_SUBSPECIALTIES} valgt
-            </p>
-
-            {/* Mandatory badge */}
+            {/* Mandatory badge — separate, not a checkbox */}
             <div style={{
               display: "inline-flex",
               alignItems: "center",
@@ -632,7 +638,7 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
               display: "grid",
               gridTemplateColumns: "repeat(2, 1fr)",
               gap: "8px",
-              marginBottom: "24px",
+              marginBottom: "12px",
             }}>
               {SUBSPECIALTY_OPTIONS.filter((s) => s !== MANDATORY_SUBSPECIALTY).map((s) => {
                 const checked = selectedSubspecialties.includes(s);
@@ -646,13 +652,24 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
                       gap: "10px",
                       padding: "10px 12px",
                       borderRadius: "8px",
-                      border: checked ? "1.5px solid #c0392b" : "1px solid #e2e6ea",
-                      background: checked ? "#fff8f7" : "#fff",
+                      border: checked
+                        ? "1.5px solid #2563eb"
+                        : atMax
+                          ? "1px solid #e2e6ea"
+                          : "1px solid #e2e6ea",
+                      background: checked
+                        ? "#eff6ff"
+                        : atMax
+                          ? "#f5f7fa"
+                          : "#fff",
                       cursor: atMax ? "not-allowed" : "pointer",
-                      opacity: atMax ? 0.5 : 1,
-                      transition: "border-color 0.15s, background 0.15s",
+                      transition: "border-color 0.15s ease, background 0.15s ease, color 0.15s ease",
                       fontSize: "13px",
-                      color: checked ? "#c0392b" : "#1a1a1a",
+                      color: checked
+                        ? "#2563eb"
+                        : atMax
+                          ? "#aaa"
+                          : "#1a1a1a",
                       fontWeight: checked ? 600 : 400,
                     }}
                   >
@@ -670,8 +687,12 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
                       width: "18px",
                       height: "18px",
                       borderRadius: "4px",
-                      border: checked ? "2px solid #c0392b" : "2px solid #d1d5db",
-                      background: checked ? "#c0392b" : "#fff",
+                      border: checked
+                        ? "2px solid #2563eb"
+                        : atMax
+                          ? "2px solid #d1d5db"
+                          : "2px solid #d1d5db",
+                      background: checked ? "#2563eb" : "#fff",
                       flexShrink: 0,
                       transition: "all 0.15s ease",
                     }}>
@@ -686,6 +707,11 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
                 );
               })}
             </div>
+
+            {/* Counter below grid */}
+            <p style={{ fontSize: "13px", color: "#555", margin: "0 0 24px", fontWeight: 500 }}>
+              {selectedSubspecialties.length} af {MAX_SUBSPECIALTIES} valgt
+            </p>
 
             <div style={{ display: "flex", gap: "10px" }}>
               <button
