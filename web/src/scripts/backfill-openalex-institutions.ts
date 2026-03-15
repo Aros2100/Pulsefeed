@@ -33,6 +33,7 @@ interface AuthorRow {
   display_name: string;
   openalex_id: string;
   ror_id: string | null;
+  country: string | null;
 }
 
 interface OAAffiliation {
@@ -108,7 +109,7 @@ async function main() {
 
     const { data: authors, error } = await admin
       .from("authors")
-      .select("id, display_name, openalex_id, ror_id")
+      .select("id, display_name, openalex_id, ror_id, country")
       .not("openalex_id", "is", null)
       .or("hospital.is.null,country.is.null")
       .order("created_at", { ascending: true })
