@@ -144,6 +144,7 @@ async function main() {
         // openalex_id
         if (!author.openalex_id && oaAuthorship.author.id) {
           updates.openalex_id = oaAuthorship.author.id;
+          updates.openalex_enriched_at = new Date().toISOString();
           updates.geo_source = "openalex";
           batchAuthorsOaId++;
           didSomething = true;
@@ -153,6 +154,7 @@ async function main() {
         const primaryInst = oaAuthorship.institutions[0];
         if (!author.ror_id && primaryInst?.ror) {
           updates.ror_id = primaryInst.ror;
+          updates.ror_enriched_at = new Date().toISOString();
           updates.institution_type = primaryInst.type || null;
           batchAuthorsRor++;
           didSomething = true;
@@ -161,6 +163,7 @@ async function main() {
         // orcid
         if (!author.orcid && oaAuthorship.author.orcid) {
           updates.orcid = oaAuthorship.author.orcid;
+          updates.orcid_enriched_at = new Date().toISOString();
           batchAuthorsOrcid++;
           didSomething = true;
         }

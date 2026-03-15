@@ -1,6 +1,9 @@
-import { notFound } from "next/navigation";
+"use client";
+
+import { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/client";
 import { parseAffiliation } from "@/lib/affiliations";
 
 function Card({ children }: { children: React.ReactNode }) {
@@ -41,39 +44,13 @@ function CardBody({ children }: { children: React.ReactNode }) {
 function FactRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{
-      display: "grid", gridTemplateColumns: "140px 1fr",
+      display: "grid", gridTemplateColumns: "160px 1fr",
       padding: "8px 0", borderBottom: "1px solid #f5f5f5", fontSize: "14px",
     }}>
       <span style={{ color: "#888" }}>{label}</span>
       <span style={{ color: "#1a1a1a" }}>{value}</span>
     </div>
   );
-}
-
-interface AuthorRow {
-  id: string;
-  display_name: string | null;
-  article_count: number | null;
-  orcid: string | null;
-  match_confidence: number | null;
-  department: string | null;
-  hospital: string | null;
-  city: string | null;
-  country: string | null;
-  affiliations: string[] | null;
-  author_score: number | null;
-}
-
-interface ArticleRow {
-  position: number | null;
-  articles: {
-    id: string;
-    title: string;
-    journal_abbr: string | null;
-    published_date: string | null;
-    news_value: number | null;
-    evidence_score: number | null;
-  };
 }
 
 function AuthorScoreBadge({ score }: { score: number }) {
@@ -96,38 +73,141 @@ function EvidenceScoreBadge({ score }: { score: number }) {
   );
 }
 
-export default async function AdminAuthorDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const admin = createAdminClient();
+interface AuthorRow {
+  id: string;
+  display_name: string | null;
+  article_count: number | null;
+  orcid: string | null;
+  openalex_id: string | null;
+  ror_id: string | null;
+  openalex_enriched_at: string | null;
+  orcid_enriched_at: string | null;
+  ror_enriched_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  department: string | null;
+  hospital: string | null;
+  city: string | null;
+  country: string | null;
+  affiliations: string[] | null;
+  author_score: number | null;
+}
 
-  const { data: author } = await admin
-    .from("authors")
-    .select("id, display_name, article_count, orcid, match_confidence, department, hospital, city, country, affiliations, author_score")
-    .eq("id", id)
-    .single();
+interface ArticleItem {
+  id: string;
+  title: string;
+  journal_abbr: string | null;
+  published_date: string | null;
+  news_value: number | null;
+  evidence_score: number | null;
+}
 
-  if (!author) notFound();
-  const typedAuthor = author as unknown as AuthorRow;
+type Tab = "profil" | "openalex" | "log";
 
-  const { data: articleRows } = await admin
-    .from("article_authors")
-    .select("position, articles(id, title, journal_abbr, published_date, news_value, evidence_score)")
-    .eq("author_id", id)
-    .order("position", { ascending: true })
-    .limit(100);
+function formatDanishDate(ts: string | null): string {
+  if (!ts) return "–";
+  return new Date(ts).toLocaleString("da-DK", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
-  const articles = ((articleRows ?? []) as unknown as ArticleRow[])
-    .map((r) => r.articles)
-    .sort((a, b) => (b.published_date ?? "").localeCompare(a.published_date ?? ""));
+const TABS: { key: Tab; label: string }[] = [
+  { key: "profil",   label: "Profil"   },
+  { key: "openalex", label: "OpenAlex" },
+  { key: "log",      label: "Log"      },
+];
 
-  const count       = typedAuthor.article_count ?? articles.length;
-  const authorScore = (count >= 3 && typedAuthor.author_score != null)
-    ? Number(typedAuthor.author_score)
-    : null;
+function TabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
+  return (
+    <div style={{ display: "flex", borderBottom: "1px solid #e5e7eb", padding: "0 24px" }}>
+      {TABS.map(t => (
+        <button
+          key={t.key}
+          onClick={() => onChange(t.key)}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: "10px 16px",
+            fontSize: "13px",
+            fontWeight: active === t.key ? 600 : 400,
+            color: active === t.key ? "#1a6eb5" : "#888",
+            borderBottom: active === t.key ? "2px solid #1a6eb5" : "2px solid transparent",
+            marginBottom: "-1px",
+          }}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export default function AdminAuthorDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const [author, setAuthor] = useState<AuthorRow | null>(null);
+  const [articles, setArticles] = useState<ArticleItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<Tab>("profil");
+
+  useEffect(() => {
+    if (!id) return;
+    const supabase = createClient();
+
+    async function load() {
+      const { data: authorData } = await supabase
+        .from("authors")
+        .select(`id, display_name, article_count, orcid, openalex_id, ror_id,
+                 openalex_enriched_at, orcid_enriched_at, ror_enriched_at,
+                 created_at, updated_at,
+                 department, hospital, city, country, affiliations, author_score`)
+        .eq("id", id)
+        .single();
+
+      if (authorData) setAuthor(authorData as unknown as AuthorRow);
+
+      const { data: articleRows } = await supabase
+        .from("article_authors")
+        .select("position, articles(id, title, journal_abbr, published_date, news_value, evidence_score)")
+        .eq("author_id", id)
+        .order("position", { ascending: true })
+        .limit(100);
+
+      const sorted = ((articleRows ?? []) as unknown as Array<{ articles: ArticleItem }>)
+        .map(r => r.articles)
+        .sort((a, b) => (b.published_date ?? "").localeCompare(a.published_date ?? ""));
+
+      setArticles(sorted);
+      setLoading(false);
+    }
+
+    load();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ color: "#888", fontSize: "14px" }}>Indlæser...</span>
+      </div>
+    );
+  }
+
+  if (!author) {
+    return (
+      <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", minHeight: "100vh", padding: "32px 24px" }}>
+        <Link href="/admin/authors" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>← Forfattere</Link>
+        <p style={{ color: "#888", marginTop: "24px", fontSize: "14px" }}>Forfatter ikke fundet.</p>
+      </div>
+    );
+  }
+
+  const count       = author.article_count ?? articles.length;
+  const authorScore = (count >= 3 && author.author_score != null) ? Number(author.author_score) : null;
+  const parsed      = parseAffiliation(author.affiliations ?? null);
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -140,70 +220,91 @@ export default async function AdminAuthorDetailPage({
           </Link>
         </div>
 
-        {/* Name / header card */}
+        {/* Header card */}
         <Card>
           <CardHeader label="Author" />
           <CardBody>
             <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>
-              {typedAuthor.display_name}
+              {author.display_name}
             </h1>
             <div style={{ fontSize: "13px", color: "#888", marginBottom: authorScore != null ? "10px" : 0 }}>
               {count} article{count !== 1 ? "s" : ""} indexed
             </div>
-            {authorScore != null && (
-              <AuthorScoreBadge score={authorScore} />
-            )}
+            {authorScore != null && <AuthorScoreBadge score={authorScore} />}
           </CardBody>
         </Card>
 
-        {/* Facts card */}
+        {/* Tabbed profile card */}
         <Card>
           <CardHeader label="Profile" />
-          <CardBody>
-            <FactRow label="Name" value={typedAuthor.display_name} />
-            {(() => {
-              const rawAffiliations = typedAuthor.affiliations;
-              const rawText = rawAffiliations?.[0] ?? null;
-              const parsed = parseAffiliation(rawAffiliations ?? null);
-              return (
-                <>
-                  {rawText      && <FactRow label="Rå affiliation" value={rawText} />}
-                  {parsed.department && <FactRow label="Afdeling"  value={parsed.department} />}
-                  {parsed.hospital   && <FactRow label="Hospital"  value={parsed.hospital} />}
-                  {parsed.city       && <FactRow label="By"        value={parsed.city} />}
-                  {parsed.country    && <FactRow label="Land"      value={parsed.country} />}
-                </>
-              );
-            })()}
-            {typedAuthor.orcid && (
+          <TabBar active={activeTab} onChange={setActiveTab} />
+
+          {activeTab === "profil" && (
+            <CardBody>
+              <FactRow label="Name" value={author.display_name} />
+              {parsed.department && <FactRow label="Afdeling"  value={parsed.department} />}
+              {parsed.hospital   && <FactRow label="Hospital"  value={parsed.hospital} />}
+              {parsed.city       && <FactRow label="By"        value={parsed.city} />}
+              {parsed.country    && <FactRow label="Land"      value={parsed.country} />}
+              {author.orcid && (
+                <FactRow
+                  label="ORCID"
+                  value={
+                    <a href={`https://orcid.org/${author.orcid}`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
+                      {author.orcid} ↗
+                    </a>
+                  }
+                />
+              )}
+            </CardBody>
+          )}
+
+          {activeTab === "openalex" && (
+            <CardBody>
+              {author.openalex_id ? (
+                <FactRow
+                  label="OpenAlex ID"
+                  value={
+                    <a href={`https://openalex.org/authors/${author.openalex_id}`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
+                      {author.openalex_id} ↗
+                    </a>
+                  }
+                />
+              ) : (
+                <FactRow label="OpenAlex ID" value={<span style={{ color: "#bbb" }}>–</span>} />
+              )}
+              {author.ror_id ? (
+                <FactRow
+                  label="ROR ID"
+                  value={
+                    <a href={`https://ror.org/${author.ror_id}`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
+                      {author.ror_id} ↗
+                    </a>
+                  }
+                />
+              ) : (
+                <FactRow label="ROR ID" value={<span style={{ color: "#bbb" }}>–</span>} />
+              )}
               <FactRow
-                label="ORCID"
-                value={
-                  <a
-                    href={`https://orcid.org/${typedAuthor.orcid}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: "#1a6eb5", textDecoration: "none" }}
-                  >
-                    {typedAuthor.orcid} ↗
-                  </a>
-                }
+                label="Author score"
+                value={authorScore != null ? <AuthorScoreBadge score={authorScore} /> : <span style={{ color: "#bbb" }}>–</span>}
               />
-            )}
-            {typedAuthor.match_confidence !== null && typedAuthor.match_confidence !== undefined && (
-              <FactRow
-                label="Match"
-                value={
-                  typedAuthor.match_confidence >= 1.0
-                    ? <span style={{ color: "#2d7a2d", fontWeight: 600 }}>Verified</span>
-                    : <span style={{ color: "#888" }}>Auto-matched</span>
-                }
-              />
-            )}
-          </CardBody>
+              <FactRow label="Articles" value={String(count)} />
+            </CardBody>
+          )}
+
+          {activeTab === "log" && (
+            <CardBody>
+              <FactRow label="Oprettet"          value={formatDanishDate(author.created_at)} />
+              <FactRow label="Sidst opdateret"   value={formatDanishDate(author.updated_at)} />
+              <FactRow label="OpenAlex beriget"  value={formatDanishDate(author.openalex_enriched_at)} />
+              <FactRow label="ORCID beriget"     value={formatDanishDate(author.orcid_enriched_at)} />
+              <FactRow label="ROR beriget"       value={formatDanishDate(author.ror_enriched_at)} />
+            </CardBody>
+          )}
         </Card>
 
-        {/* Articles */}
+        {/* Articles card — always visible */}
         <Card>
           <CardHeader label={`Articles · ${count}`} />
           {articles.length === 0 ? (
