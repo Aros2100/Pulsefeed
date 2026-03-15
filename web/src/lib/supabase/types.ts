@@ -135,6 +135,8 @@ export type Database = {
           classification_model_version: string | null
           substances: Json
           title: string
+          fwci: number | null
+          openalex_work_id: string | null
           verified: boolean | null
           volume: string | null
         }
@@ -187,6 +189,8 @@ export type Database = {
           classification_reason?: string | null
           classification_scored_at?: string | null
           classification_model_version?: string | null
+          fwci?: number | null
+          openalex_work_id?: string | null
           substances?: Json
           title: string
           verified?: boolean | null
@@ -241,6 +245,8 @@ export type Database = {
           classification_reason?: string | null
           classification_scored_at?: string | null
           classification_model_version?: string | null
+          fwci?: number | null
+          openalex_work_id?: string | null
           substances?: Json
           title?: string
           verified?: boolean | null
