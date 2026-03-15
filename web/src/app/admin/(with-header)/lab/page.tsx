@@ -22,23 +22,15 @@ export default async function LabPage() {
 
   const admin = createAdminClient();
 
-  const [specQueueResult, clsQueueResult, cndQueueResult, geoQueueResult] = await Promise.all([
+  const [specQueueResult, clsQueueResult, cndQueueResult] = await Promise.all([
     admin.rpc("count_scored_not_validated" as never, { p_specialty: specialty } as never),
     admin.rpc("count_classification_not_validated" as never, { p_specialty: specialty } as never),
     admin.rpc("count_condensation_not_validated" as never, { p_specialty: specialty } as never),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (admin as any)
-      .from("authors")
-      .select("id", { count: "exact", head: true })
-      .not("affiliations", "is", null)
-      .neq("affiliations", "{}")
-      .or("city.is.null,country.is.null,city.ilike.%hospital%,city.ilike.%university%,city.ilike.%institute%,city.ilike.%medical%,city.ilike.%clinic%"),
   ]);
 
   const specQueueCount = (specQueueResult.data as number | null) ?? 0;
   const clsQueueCount = (clsQueueResult.data as number | null) ?? 0;
   const cndQueueCount = (cndQueueResult.data as number | null) ?? 0;
-  const geoQueueCount = geoQueueResult.count ?? 0;
 
   const modules = [
     {
@@ -61,14 +53,6 @@ export default async function LabPage() {
       queue: cndQueueCount,
       href: "/admin/lab/condensation",
       color: "#059669",
-      badge: "Ny",
-    },
-    {
-      title: "Author Geo",
-      description: "Validér forfatter-lokationer fra affiliation-parsing",
-      queue: geoQueueCount,
-      href: "/admin/lab/author-geo",
-      color: "#E83B2A",
       badge: "Ny",
     },
   ];
@@ -142,14 +126,6 @@ export default async function LabPage() {
                   <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>
                     {m.description}
                   </p>
-                  {m.href === "/admin/lab/author-geo" && (
-                    <Link
-                      href="/admin/lab/author-geo/audit"
-                      style={{ fontSize: "11px", fontWeight: 600, color: "#E83B2A", textDecoration: "none", marginTop: "6px", display: "inline-block" }}
-                    >
-                      Quick Audit →
-                    </Link>
-                  )}
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "16px", flexShrink: 0 }}>

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
 
 interface ArticleRow {
   id: string;
@@ -25,7 +26,7 @@ interface Filters {
   mesh_term: string;
   circle: string;
   status: string;
-  specialty: string;
+  subspecialty: string;
   approval_method: string;
   has_abstract: string;
   date_from: string;
@@ -81,48 +82,66 @@ function SelectFilter({ value, onChange, options, placeholder }: {
   );
 }
 
+const SORT_FIELDS = ["title", "journal_abbr", "published_date", "imported_at", "circle", "status", "evidence_score"] as const;
+
+function filtersFromParams(sp: URLSearchParams): Filters {
+  const sortBy = sp.get("sort_by") ?? "imported_at";
+  const sortDir = sp.get("sort_dir") ?? "desc";
+  return {
+    search:          sp.get("search")          ?? "",
+    mesh_term:       sp.get("mesh_term")       ?? "",
+    circle:          sp.get("circle")          ?? "",
+    status:          sp.get("status")          ?? "",
+    subspecialty:    sp.get("subspecialty")    ?? "",
+    approval_method: sp.get("approval_method") ?? "",
+    has_abstract:    sp.get("has_abstract")    ?? "",
+    date_from:       sp.get("date_from")       ?? "",
+    date_to:         sp.get("date_to")         ?? "",
+    sort_by:         (SORT_FIELDS as readonly string[]).includes(sortBy) ? sortBy as SortField : "imported_at",
+    sort_dir:        sortDir === "asc" ? "asc" : "desc",
+    page:            Math.max(1, parseInt(sp.get("page") ?? "1", 10)),
+  };
+}
+
+function filtersToParams(f: Filters): URLSearchParams {
+  const p = new URLSearchParams();
+  if (f.search)          p.set("search",          f.search);
+  if (f.mesh_term)       p.set("mesh_term",       f.mesh_term);
+  if (f.circle)          p.set("circle",          f.circle);
+  if (f.status)          p.set("status",          f.status);
+  if (f.subspecialty)    p.set("subspecialty",    f.subspecialty);
+  if (f.approval_method) p.set("approval_method", f.approval_method);
+  if (f.has_abstract)    p.set("has_abstract",    f.has_abstract);
+  if (f.date_from)       p.set("date_from",       f.date_from);
+  if (f.date_to)         p.set("date_to",         f.date_to);
+  if (f.sort_by !== "imported_at") p.set("sort_by", f.sort_by);
+  if (f.sort_dir !== "desc")       p.set("sort_dir", f.sort_dir);
+  if (f.page > 1)                  p.set("page", String(f.page));
+  return p;
+}
+
 export default function AdminArticleListClient() {
   const searchParams = useSearchParams();
-  const initialMesh = searchParams.get("mesh_term") ?? "";
+  const router = useRouter();
 
-  const [filters, setFilters] = useState<Filters>({
-    search: "", mesh_term: initialMesh, circle: "", status: "", specialty: "",
-    approval_method: "", has_abstract: "", date_from: "", date_to: "",
-    sort_by: "imported_at", sort_dir: "desc", page: 1,
-  });
+  const [filters, setFilters] = useState<Filters>(() => filtersFromParams(searchParams));
   const [rows, setRows] = useState<ArticleRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [specialtyTags, setSpecialtyTags] = useState<string[]>([]);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const meshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [searchInput, setSearchInput] = useState("");
-  const [meshInput, setMeshInput] = useState(initialMesh);
-
-  useEffect(() => {
-    void fetch("/api/admin/articles/specialty-tags")
-      .then((r) => r.json() as Promise<{ ok: boolean; tags: string[] }>)
-      .then((j) => { if (j.ok) setSpecialtyTags(j.tags); });
-  }, []);
+  const [searchInput, setSearchInput] = useState(() => searchParams.get("search") ?? "");
+  const [meshInput, setMeshInput] = useState(() => searchParams.get("mesh_term") ?? "");
 
   const fetchArticles = useCallback(async (f: Filters) => {
     setLoading(true);
     setError(null);
-    const params = new URLSearchParams();
+    const params = filtersToParams(f);
     params.set("page", String(f.page));
     params.set("limit", String(PAGE_SIZE));
     params.set("sort_by", f.sort_by);
     params.set("sort_dir", f.sort_dir);
-    if (f.search)      params.set("search", f.search);
-    if (f.mesh_term)   params.set("mesh_term", f.mesh_term);
-    if (f.circle)      params.set("circle", f.circle);
-    if (f.status)      params.set("status", f.status);
-    if (f.specialty)   params.set("specialty", f.specialty);
-    if (f.approval_method) params.set("approval_method", f.approval_method);
-    if (f.has_abstract) params.set("has_abstract", f.has_abstract);
-    if (f.date_from)   params.set("date_from", f.date_from);
-    if (f.date_to)     params.set("date_to", f.date_to);
 
     try {
       const res = await fetch(`/api/admin/articles?${params.toString()}`);
@@ -142,7 +161,9 @@ export default function AdminArticleListClient() {
 
   useEffect(() => {
     void fetchArticles(filters);
-  }, [filters, fetchArticles]);
+    const qs = filtersToParams(filters).toString();
+    router.replace(`?${qs}`, { scroll: false });
+  }, [filters, fetchArticles, router]);
 
   function setFilter<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters((prev) => ({ ...prev, [key]: value, page: key !== "page" ? 1 : (value as number) }));
@@ -184,11 +205,12 @@ export default function AdminArticleListClient() {
   };
 
   const columns: { key: SortField; label: string; sortable?: boolean }[] = [
-    { key: "title",          label: "Titel",       sortable: true },
-    { key: "journal_abbr",   label: "Tidsskrift",  sortable: true },
-    { key: "published_date", label: "Publiceret",  sortable: true },
-    { key: "status",         label: "Status",         sortable: true },
-    { key: "evidence_score", label: "Evidence",       sortable: true },
+    { key: "title",          label: "Titel",        sortable: true },
+    { key: "journal_abbr",   label: "Tidsskrift",   sortable: true },
+    { key: "published_date", label: "Publiceret",   sortable: true },
+    { key: "status",         label: "Status",       sortable: true },
+    { key: "evidence_score", label: "Evidence",     sortable: true },
+    { key: "imported_at",    label: "Importeret",   sortable: true },
   ];
 
   return (
@@ -255,10 +277,10 @@ export default function AdminArticleListClient() {
             ]}
           />
           <SelectFilter
-            value={filters.specialty}
-            onChange={(v) => setFilter("specialty", v)}
-            placeholder="Specialty: Alle"
-            options={specialtyTags.map((t) => ({ value: t, label: t }))}
+            value={filters.subspecialty}
+            onChange={(v) => setFilter("subspecialty", v)}
+            placeholder="Subspecialitet: Alle"
+            options={SUBSPECIALTY_OPTIONS.map((t) => ({ value: t, label: t }))}
           />
           <SelectFilter
             value={filters.approval_method}
@@ -281,6 +303,7 @@ export default function AdminArticleListClient() {
             ]}
           />
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ fontSize: "12px", color: "#888" }}>Importeret:</span>
             <span style={{ fontSize: "12px", color: "#888" }}>Fra</span>
             <input
               type="date"
@@ -296,12 +319,12 @@ export default function AdminArticleListClient() {
               style={{ padding: "5px 8px", fontSize: "12px", border: "1px solid #dde3ed", borderRadius: "6px", outline: "none" }}
             />
           </div>
-          {(filters.circle || filters.status || filters.specialty || filters.approval_method || filters.has_abstract || filters.date_from || filters.date_to || filters.search || filters.mesh_term) && (
+          {(filters.circle || filters.status || filters.subspecialty || filters.approval_method || filters.has_abstract || filters.date_from || filters.date_to || filters.search || filters.mesh_term) && (
             <button
               onClick={() => {
                 setSearchInput("");
                 setMeshInput("");
-                setFilters({ search: "", mesh_term: "", circle: "", status: "", specialty: "", approval_method: "", has_abstract: "", date_from: "", date_to: "", sort_by: "imported_at", sort_dir: "desc", page: 1 });
+                setFilters({ search: "", mesh_term: "", circle: "", status: "", subspecialty: "", approval_method: "", has_abstract: "", date_from: "", date_to: "", sort_by: "imported_at", sort_dir: "desc", page: 1 });
               }}
               style={{ fontSize: "12px", color: "#E83B2A", background: "none", border: "none", cursor: "pointer", padding: "5px 0", textDecoration: "underline" }}
             >
@@ -407,6 +430,10 @@ export default function AdminArticleListClient() {
                         ) : (
                           <span style={{ color: "#ccc", fontSize: "12px" }}>—</span>
                         )}
+                      </td>
+                      {/* Imported */}
+                      <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", fontSize: "12px", color: "#5a6a85", whiteSpace: "nowrap" }}>
+                        {fmt(a.imported_at)}
                       </td>
                     </tr>
                   );

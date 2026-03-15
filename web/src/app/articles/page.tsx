@@ -4,7 +4,22 @@ import { SPECIALTIES } from "@/lib/auth/specialties";
 import Header from "@/components/Header";
 import ArticleListClient from "./ArticleListClient";
 
-export default async function ArticlesPage() {
+function periodSince(period: string): string {
+  const now = Date.now();
+  switch (period) {
+    case "month": return new Date(now - 30  * 24 * 60 * 60 * 1000).toISOString();
+    case "year":  return new Date(now - 365 * 24 * 60 * 60 * 1000).toISOString();
+    default:      return new Date(now - 7   * 24 * 60 * 60 * 1000).toISOString();
+  }
+}
+
+export default async function ArticlesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string; subspecialty?: string }>;
+}) {
+  const { period, subspecialty } = await searchParams;
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -23,6 +38,14 @@ export default async function ArticlesPage() {
 
   if (specialtySlugs.length > 0) {
     articlesQuery = articlesQuery.contains("specialty_tags", specialtySlugs);
+  }
+
+  if (period) {
+    articlesQuery = articlesQuery.gte("imported_at", periodSince(period));
+  }
+
+  if (subspecialty) {
+    articlesQuery = articlesQuery.contains("subspecialty_ai", [subspecialty]);
   }
 
   const [{ data: articles }, { data: savedRows }, { data: projectRows }] = await Promise.all([
@@ -50,6 +73,8 @@ export default async function ArticlesPage() {
         specialtyLabel={specialtyLabel}
         savedMap={savedMap}
         projects={(projectRows ?? []) as { id: string; name: string }[]}
+        activePeriod={period ?? null}
+        activeSubspecialty={subspecialty ?? null}
       />
     </div>
   );

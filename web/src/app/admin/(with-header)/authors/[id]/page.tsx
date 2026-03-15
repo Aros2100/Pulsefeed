@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { parseAffiliation } from "@/lib/affiliations";
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
@@ -88,9 +87,17 @@ interface AuthorRow {
   department: string | null;
   hospital: string | null;
   city: string | null;
+  state: string | null;
   country: string | null;
   affiliations: string[] | null;
   author_score: number | null;
+}
+
+interface AuthorEvent {
+  id: string;
+  event_type: string;
+  payload: Record<string, unknown>;
+  created_at: string;
 }
 
 interface ArticleItem {
@@ -113,6 +120,29 @@ function formatDanishDate(ts: string | null): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+const EVENT_COLORS: Record<string, { dot: string; border: string; bg: string; label: string }> = {
+  created:           { dot: "#3b82f6", border: "#bfdbfe", bg: "#eff6ff", label: "Oprettet" },
+  openalex_enriched: { dot: "#8b5cf6", border: "#ddd6fe", bg: "#f5f3ff", label: "OpenAlex Beriget" },
+  geo_updated:       { dot: "#f97316", border: "#fed7aa", bg: "#fff7ed", label: "Geo Opdateret" },
+  merged:            { dot: "#ef4444", border: "#fecaca", bg: "#fef2f2", label: "Flettet" },
+};
+const FALLBACK_EVENT_COLOR = { dot: "#6b7280", border: "#d1d5db", bg: "#f9fafb", label: "Hændelse" };
+
+function PayloadRows({ payload }: { payload: Record<string, unknown> }) {
+  const entries = Object.entries(payload).filter(([, v]) => v != null && v !== "");
+  if (entries.length === 0) return null;
+  return (
+    <div>
+      {entries.map(([k, v]) => (
+        <div key={k} style={{ display: "grid", gridTemplateColumns: "150px 1fr", fontSize: "13px", padding: "4px 0", borderBottom: "1px solid #f5f5f5" }}>
+          <span style={{ color: "#888" }}>{k}</span>
+          <span style={{ color: "#1a1a1a", wordBreak: "break-all" }}>{String(v)}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 const TABS: { key: Tab; label: string }[] = [
@@ -151,6 +181,7 @@ export default function AdminAuthorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [author, setAuthor] = useState<AuthorRow | null>(null);
   const [articles, setArticles] = useState<ArticleItem[]>([]);
+  const [events, setEvents] = useState<AuthorEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("profil");
 
@@ -164,7 +195,7 @@ export default function AdminAuthorDetailPage() {
         .select(`id, display_name, article_count, orcid, openalex_id, ror_id,
                  openalex_enriched_at, orcid_enriched_at, ror_enriched_at,
                  created_at, updated_at,
-                 department, hospital, city, country, affiliations, author_score`)
+                 department, hospital, city, state, country, affiliations, author_score`)
         .eq("id", id)
         .single();
 
@@ -182,6 +213,15 @@ export default function AdminAuthorDetailPage() {
         .sort((a, b) => (b.published_date ?? "").localeCompare(a.published_date ?? ""));
 
       setArticles(sorted);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: eventRows } = await (supabase as any)
+        .from("author_events")
+        .select("id, event_type, payload, created_at")
+        .eq("author_id", id)
+        .order("created_at", { ascending: false });
+      setEvents((eventRows as AuthorEvent[] | null) ?? []);
+
       setLoading(false);
     }
 
@@ -207,7 +247,6 @@ export default function AdminAuthorDetailPage() {
 
   const count       = author.article_count ?? articles.length;
   const authorScore = (count >= 3 && author.author_score != null) ? Number(author.author_score) : null;
-  const parsed      = parseAffiliation(author.affiliations ?? null);
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -242,10 +281,11 @@ export default function AdminAuthorDetailPage() {
           {activeTab === "profil" && (
             <CardBody>
               <FactRow label="Name" value={author.display_name} />
-              {parsed.department && <FactRow label="Afdeling"  value={parsed.department} />}
-              {parsed.hospital   && <FactRow label="Hospital"  value={parsed.hospital} />}
-              {parsed.city       && <FactRow label="By"        value={parsed.city} />}
-              {parsed.country    && <FactRow label="Land"      value={parsed.country} />}
+              {author.department && <FactRow label="Afdeling"  value={author.department} />}
+              {author.hospital   && <FactRow label="Hospital"  value={author.hospital} />}
+              {author.city       && <FactRow label="By"        value={author.city} />}
+              {author.state      && <FactRow label="Stat/Region" value={author.state} />}
+              {author.country    && <FactRow label="Land"      value={author.country} />}
               {author.orcid && (
                 <FactRow
                   label="ORCID"
@@ -295,11 +335,34 @@ export default function AdminAuthorDetailPage() {
 
           {activeTab === "log" && (
             <CardBody>
-              <FactRow label="Oprettet"          value={formatDanishDate(author.created_at)} />
-              <FactRow label="Sidst opdateret"   value={formatDanishDate(author.updated_at)} />
-              <FactRow label="OpenAlex beriget"  value={formatDanishDate(author.openalex_enriched_at)} />
-              <FactRow label="ORCID beriget"     value={formatDanishDate(author.orcid_enriched_at)} />
-              <FactRow label="ROR beriget"       value={formatDanishDate(author.ror_enriched_at)} />
+              {events.length === 0 ? (
+                <div style={{ fontSize: "14px", color: "#888", textAlign: "center", padding: "16px 0" }}>
+                  Ingen hændelser registreret
+                </div>
+              ) : (
+                <div style={{ position: "relative" }}>
+                  <div style={{ position: "absolute", left: "15px", top: "8px", bottom: "8px", width: "2px", background: "#e5e7eb" }} />
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    {events.map((ev) => {
+                      const c = EVENT_COLORS[ev.event_type] ?? FALLBACK_EVENT_COLOR;
+                      return (
+                        <div key={ev.id} style={{ display: "flex", gap: "20px", alignItems: "flex-start", paddingBottom: "20px" }}>
+                          <div style={{ flexShrink: 0, width: "32px", height: "32px", borderRadius: "50%", background: c.bg, border: `2px solid ${c.border}`, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1, position: "relative" }}>
+                            <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: c.dot }} />
+                          </div>
+                          <div style={{ flex: 1, background: "#fff", borderRadius: "8px", border: `1px solid ${c.border}`, padding: "12px 14px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                              <span style={{ fontSize: "12px", fontWeight: 700, color: c.dot, textTransform: "uppercase", letterSpacing: "0.06em" }}>{c.label}</span>
+                              <span style={{ fontSize: "11px", color: "#9ca3af" }}>{formatDanishDate(ev.created_at)}</span>
+                            </div>
+                            <PayloadRows payload={ev.payload} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </CardBody>
           )}
         </Card>

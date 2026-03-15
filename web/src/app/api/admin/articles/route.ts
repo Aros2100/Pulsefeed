@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const limit   = Math.min(100, Math.max(10, parseInt(searchParams.get("limit") ?? "50", 10)));
   const circle  = searchParams.get("circle");
   const status  = searchParams.get("status");
-  const specialty = searchParams.get("specialty");
+  const subspecialty = searchParams.get("subspecialty");
   const verified        = searchParams.get("verified");
   const approvalMethod  = searchParams.get("approval_method");
   const hasAbstract     = searchParams.get("has_abstract");
@@ -36,15 +36,15 @@ export async function GET(request: Request) {
 
   if (circle)    query = query.eq("circle", parseInt(circle, 10));
   if (status)    query = query.eq("status", status);
-  if (specialty) query = query.contains("specialty_tags", [specialty]);
+  if (subspecialty) query = query.contains("specialty_tags", [subspecialty]);
   if (verified === "true")  query = query.eq("verified", true);
   if (verified === "false") query = query.eq("verified", false);
   if (approvalMethod === "null")  query = query.is("approval_method" as never, null as never);
   else if (approvalMethod)        query = query.eq("approval_method" as never, approvalMethod as never);
   if (hasAbstract === "true")  query = query.not("abstract", "is", null);
   if (hasAbstract === "false") query = query.is("abstract", null);
-  if (dateFrom) query = query.gte("published_date", dateFrom);
-  if (dateTo)   query = query.lte("published_date", dateTo);
+  if (dateFrom) query = query.gte("imported_at", dateFrom);
+  if (dateTo)   query = query.lte("imported_at", dateTo);
   if (meshTerm) query = query.ilike("mesh_terms_text" as never, `%${meshTerm}%` as never);
   if (search)   query = query.or(`title.ilike.%${search}%,journal_abbr.ilike.%${search}%`);
 

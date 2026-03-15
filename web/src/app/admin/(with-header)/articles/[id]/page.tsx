@@ -409,7 +409,7 @@ export default async function AdminArticleLogPage({
   const [articleResult, eventsResult, authorLinksResult] = await Promise.all([
     admin.from("articles").select("*").eq("id", id).maybeSingle(),
     admin.from("article_events" as never).select("*").eq("article_id", id).order("created_at", { ascending: true }),
-    admin.from("article_authors").select("author_id, position, authors(author_score)").eq("article_id", id),
+    admin.from("article_authors").select("author_id, position, authors(author_score, department, hospital, city, state, country, verified_by)").eq("article_id", id),
   ]);
 
   const article = articleResult.data;
@@ -425,10 +425,19 @@ export default async function AdminArticleLogPage({
   const authorIdByPosition = new Map(
     (authorLinksResult.data ?? []).map((r) => [r.position as number, r.author_id as string])
   );
+  type AuthorGeo = { department: string | null; hospital: string | null; city: string | null; state: string | null; country: string | null; verified_by: string | null };
+  type LinkedAuthorRow = { position: number; author_id: string; authors: { author_score: number | null } & AuthorGeo | null };
+
   const authorScoreByPosition = new Map(
     (authorLinksResult.data ?? [])
-      .filter((r) => (r as { authors?: { author_score?: number | null } | null }).authors?.author_score != null)
-      .map((r) => [r.position as number, (r as unknown as { authors: { author_score: number } }).authors.author_score])
+      .filter((r) => (r as unknown as LinkedAuthorRow).authors?.author_score != null)
+      .map((r) => [r.position as number, (r as unknown as LinkedAuthorRow).authors!.author_score as number])
+  );
+  const authorGeoByPosition = new Map(
+    (authorLinksResult.data ?? []).map((r) => [
+      r.position as number,
+      (r as unknown as LinkedAuthorRow).authors ?? null,
+    ])
   );
 
   const events = (eventsResult.data ?? []) as {
@@ -442,7 +451,7 @@ export default async function AdminArticleLogPage({
 
   const pubmedTab = (
     <div style={{ padding: "4px 0 80px" }}>
-      <ArticleStamkort article={a} authorIdByPosition={authorIdByPosition} authorScoreByPosition={authorScoreByPosition} />
+      <ArticleStamkort article={a} authorIdByPosition={authorIdByPosition} authorScoreByPosition={authorScoreByPosition} authorGeoByPosition={authorGeoByPosition} />
     </div>
   );
 
@@ -559,6 +568,19 @@ export default async function AdminArticleLogPage({
               ? fmt(raw.specialty_scored_at as string)
               : "—"
           } />
+        </CardBody>
+      </Card>
+
+      {/* Redigering */}
+      <Card>
+        <CardHeader label="Redigering" />
+        <CardBody>
+          <ArticleEditableFields
+            articleId={id}
+            initialTags={(a.specialty_tags as string[] | null) ?? []}
+            initialStatus={(raw.status as string | null) ?? "pending"}
+            initialSubspecialties={(Array.isArray(a.subspecialty_ai) ? a.subspecialty_ai : []) as string[]}
+          />
         </CardBody>
       </Card>
 
@@ -872,18 +894,6 @@ export default async function AdminArticleLogPage({
             return <span style={{ color: "#9ca3af" }}>Pending</span>;
           })()} />
           <CardKVRow label="Source ID" value={(raw.source_id as string | null) ?? "—"} />
-        </CardBody>
-      </Card>
-
-      {/* Editable fields */}
-      <Card>
-        <CardHeader label="Redigering" />
-        <CardBody>
-          <ArticleEditableFields
-            articleId={id}
-            initialTags={(a.specialty_tags as string[] | null) ?? []}
-            initialStatus={(raw.status as string | null) ?? "pending"}
-          />
         </CardBody>
       </Card>
 

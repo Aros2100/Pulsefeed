@@ -132,7 +132,9 @@ function CardBody({ children }: { children: React.ReactNode }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function ArticleStamkort({ article, authorIdByPosition, authorScoreByPosition }: { article: ArticleData; authorIdByPosition?: Map<number, string>; authorScoreByPosition?: Map<number, number> }) {
+type AuthorGeo = { department: string | null; hospital: string | null; city: string | null; state: string | null; country: string | null; verified_by: string | null };
+
+export default function ArticleStamkort({ article, authorIdByPosition, authorScoreByPosition, authorGeoByPosition }: { article: ArticleData; authorIdByPosition?: Map<number, string>; authorScoreByPosition?: Map<number, number>; authorGeoByPosition?: Map<number, AuthorGeo | null> }) {
   const authors   = cast<Author>(article.authors);
   const meshTerms = cast<MeshTerm>(article.mesh_terms);
   const grants    = cast<Grant>(article.grants);
@@ -290,9 +292,10 @@ export default function ArticleStamkort({ article, authorIdByPosition, authorSco
           <CardBody>
             <CollapseAuthors authors={authors.map((a, i) => ({
               ...a,
-              affiliation: (a.affiliations?.[0] ?? a.affiliation) ? decodeHtml(a.affiliations?.[0] ?? a.affiliation!) : null,
+              affiliation: null,
               id: authorIdByPosition?.get(i + 1) ?? undefined,
               author_score: authorScoreByPosition?.get(i + 1) ?? undefined,
+              geo: authorGeoByPosition?.get(i + 1) ?? null,
             }))} />
           </CardBody>
         </Card>

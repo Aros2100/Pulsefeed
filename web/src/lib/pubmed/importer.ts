@@ -8,6 +8,7 @@ import { runArticleChecks } from "@/lib/pubmed/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
 import type { OpenAlexWork, OpenAlexAuthorship } from "@/lib/openalex/client";
 import { matchPubMedToOpenAlex } from "@/lib/openalex/match-authors";
+import { logAuthorEvent } from "@/lib/author-events";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -45,6 +46,46 @@ const BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+// Hent by/stat/land fra ROR geonames_details for et givet ROR-id (uden prefix)
+async function fetchRorGeo(
+  rorId: string
+): Promise<{ city: string | null; state: string | null; country: string | null }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+  try {
+    const res = await fetch(`https://api.ror.org/organizations/${rorId}`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return { city: null, state: null, country: null };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = (await res.json()) as any;
+    const geo = data.locations?.[0]?.geonames_details;
+    return {
+      city:    geo?.name                     ?? null,
+      state:   geo?.country_subdivision_name ?? null,
+      country: geo?.country_name             ?? null,
+    };
+  } catch {
+    clearTimeout(timeout);
+    return { city: null, state: null, country: null };
+  }
+}
+
+const DEPT_KEYWORDS = ["department", "division", "section", "unit", "laboratory", "lab "];
+
+function isDepartment(name: string): boolean {
+  const lower = name.toLowerCase();
+  return DEPT_KEYWORDS.some(kw => lower.startsWith(kw));
+}
+
+function splitInstitutionAndDepartment(displayName: string): { hospital: string | null; department: string | null } {
+  if (isDepartment(displayName)) {
+    return { hospital: null, department: displayName };
+  }
+  return { hospital: displayName, department: null };
 }
 
 function apiKey(): string {
@@ -307,6 +348,7 @@ async function mergeAuthor(
   parsed: { city: string | null; country: string | null; institution: string | null; department: string | null },
   newOrcid: string | null,
   displayName: string,
+  reason: "orcid" | "geo" = "geo",
 ): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const update: Record<string, any> = {};
@@ -319,6 +361,7 @@ async function mergeAuthor(
   if (newOrcid && !existing.orcid) update.orcid = newOrcid;
   update.display_name_normalized = normalizeAuthorName(displayName);
   await admin.from("authors").update(update).eq("id", existingId);
+  void logAuthorEvent(existingId, "merged", { reason, merged_into_id: existingId });
 }
 
 function countryCodeToName(code: string): string | null {
@@ -329,6 +372,7 @@ async function resolveAuthorFromOpenAlex(
   admin: AdminClient,
   pubmedAuthor: Author,
   oaAuthorship: OpenAlexAuthorship,
+  articleId?: string | null,
 ): Promise<{ id: string; outcome: AuthorOutcome }> {
   const oaId = oaAuthorship.author.id;
   const oaOrcid = oaAuthorship.author.orcid;
@@ -371,14 +415,27 @@ async function resolveAuthorFromOpenAlex(
 
     if (orcidMatch) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const upgrades: Record<string, any> = { openalex_id: oaId, geo_source: "openalex" };
+      const upgrades: Record<string, any> = { openalex_id: oaId, geo_source: "openalex", openalex_enriched_at: new Date().toISOString() };
       if (countryName) upgrades.country = countryName;
       if (primaryInst) {
-        upgrades.hospital = primaryInst.displayName;
+        const { hospital, department } = splitInstitutionAndDepartment(primaryInst.displayName);
+        if (hospital)    upgrades.hospital    = hospital;
+        if (department)  upgrades.department  = department;
         upgrades.ror_id = primaryInst.ror;
         upgrades.institution_type = primaryInst.type;
+        if (primaryInst.ror) {
+          const rorGeo = await fetchRorGeo(primaryInst.ror);
+          if (rorGeo.city)                      upgrades.city    = rorGeo.city;
+          if (rorGeo.state)                     upgrades.state   = rorGeo.state;
+          if (rorGeo.country && !countryName)   upgrades.country = rorGeo.country;
+        }
       }
       await admin.from("authors").update(upgrades).eq("id", orcidMatch.id);
+      void logAuthorEvent(orcidMatch.id, "openalex_enriched", {
+        openalex_id: oaId,
+        ror_id: primaryInst?.ror ?? null,
+        institution_type: primaryInst?.type ?? null,
+      });
       return { id: orcidMatch.id, outcome: "duplicate" };
     }
   }
@@ -397,41 +454,74 @@ async function resolveAuthorFromOpenAlex(
 
     if (nameMatch && !(newOrcid && nameMatch.orcid && newOrcid !== nameMatch.orcid)) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { hospital: instHospital, department: instDept } = primaryInst?.displayName
+        ? splitInstitutionAndDepartment(primaryInst.displayName)
+        : { hospital: null, department: null };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const upgrades: Record<string, any> = {
         openalex_id: oaId,
         orcid: newOrcid || nameMatch.orcid,
-        hospital: primaryInst?.displayName ?? null,
+        hospital: instHospital ?? null,
         ror_id: primaryInst?.ror ?? null,
         institution_type: primaryInst?.type ?? null,
         country: countryName,
         geo_source: "openalex",
+        openalex_enriched_at: new Date().toISOString(),
         display_name: displayName,
         display_name_normalized: normalized,
       };
+      if (instDept) upgrades.department = instDept;
+      if (primaryInst?.ror) {
+        const rorGeo = await fetchRorGeo(primaryInst.ror);
+        if (rorGeo.city)                    upgrades.city  = rorGeo.city;
+        if (rorGeo.state)                   upgrades.state = rorGeo.state;
+        if (rorGeo.country && !countryName) upgrades.country = rorGeo.country;
+      }
       await admin.from("authors").update(upgrades).eq("id", nameMatch.id);
+      void logAuthorEvent(nameMatch.id, "openalex_enriched", {
+        openalex_id: oaId,
+        ror_id: primaryInst?.ror ?? null,
+        institution_type: primaryInst?.type ?? null,
+      });
       return { id: nameMatch.id, outcome: "duplicate" };
     }
   }
 
   // 4. Fallback: run standard resolveAuthorId (handles name-based dedup, initial matching, etc.)
   // But enrich the result with OpenAlex data afterwards
-  const result = await resolveAuthorId(admin, pubmedAuthor);
+  const result = await resolveAuthorId(admin, pubmedAuthor, articleId);
 
   // Enrich the resolved author with OpenAlex metadata if it's missing
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: resolved } = await (admin as any)
     .from("authors")
-    .select("openalex_id, ror_id, geo_source")
+    .select("openalex_id, ror_id, geo_source, department")
     .eq("id", result.id)
     .maybeSingle();
 
   if (resolved && !resolved.openalex_id) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const enrichment: Record<string, any> = { openalex_id: oaId };
-    if (primaryInst?.ror && !resolved.ror_id) enrichment.ror_id = primaryInst.ror;
+    const enrichment: Record<string, any> = { openalex_id: oaId, openalex_enriched_at: new Date().toISOString() };
+    if (primaryInst?.displayName) {
+      const { hospital, department } = splitInstitutionAndDepartment(primaryInst.displayName);
+      if (hospital)                          enrichment.hospital    = hospital;
+      if (department && !resolved.department) enrichment.department = department;
+    }
+    if (primaryInst?.ror && !resolved.ror_id) {
+      enrichment.ror_id = primaryInst.ror;
+      const rorGeo = await fetchRorGeo(primaryInst.ror);
+      if (rorGeo.city)    enrichment.city    = rorGeo.city;
+      if (rorGeo.state)   enrichment.state   = rorGeo.state;
+      if (rorGeo.country) enrichment.country = rorGeo.country;
+    }
     if (primaryInst?.type) enrichment.institution_type = primaryInst.type;
     if (resolved.geo_source !== "manual") enrichment.geo_source = "openalex";
     await admin.from("authors").update(enrichment).eq("id", result.id);
+    void logAuthorEvent(result.id, "openalex_enriched", {
+      openalex_id: oaId,
+      ror_id: enrichment.ror_id ?? null,
+      institution_type: enrichment.institution_type ?? null,
+    });
   }
 
   return result;
@@ -439,7 +529,8 @@ async function resolveAuthorFromOpenAlex(
 
 async function resolveAuthorId(
   admin: AdminClient,
-  author: Author
+  author: Author,
+  articleId?: string | null,
 ): Promise<{ id: string; outcome: AuthorOutcome }> {
   const displayName = [author.foreName, author.lastName].filter(Boolean).join(" ").trim();
   const normalized = normalizeAuthorName(displayName || "Unknown");
@@ -468,9 +559,36 @@ async function resolveAuthorId(
       .maybeSingle();
 
     if (orcidMatch) {
-      await mergeAuthor(admin, orcidMatch.id, orcidMatch, parsed, newOrcid, displayName);
+      await mergeAuthor(admin, orcidMatch.id, orcidMatch, parsed, newOrcid, displayName, "orcid");
       return { id: orcidMatch.id, outcome: "duplicate" };
     }
+  }
+
+  // ── 1.5. OpenAlex lookup ──────────────────────────────────────────────────
+  const openAlexId = await fetchOpenAlexId(newOrcid, displayName, primaryAff);
+  if (openAlexId) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: oaMatch } = await (admin as any)
+      .from("authors")
+      .select("id, orcid, display_name")
+      .eq("openalex_id", openAlexId)
+      .maybeSingle();
+
+    if (oaMatch) {
+      // Existing record found via OpenAlex — merge and return
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const updates: Record<string, any> = {};
+      if (!oaMatch.orcid && newOrcid) updates.orcid = newOrcid;
+      if (displayName.length > (oaMatch.display_name?.length ?? 0)) {
+        updates.display_name = displayName;
+        updates.display_name_normalized = normalized;
+      }
+      if (Object.keys(updates).length > 0) {
+        await admin.from("authors").update(updates).eq("id", oaMatch.id);
+      }
+      return { id: oaMatch.id, outcome: "duplicate" };
+    }
+    // No existing record — fall through to name matching, carry openAlexId forward
   }
 
   // ── 2. Name-based matching ─────────────────────────────────────────────────
@@ -486,21 +604,21 @@ async function resolveAuthorId(
     if (newOrcid) {
       const orcidMatch = candidates.find(c => c.orcid === newOrcid);
       if (orcidMatch) {
-        await mergeAuthor(admin, orcidMatch.id, orcidMatch, parsed, newOrcid, displayName);
+        await mergeAuthor(admin, orcidMatch.id, orcidMatch, parsed, newOrcid, displayName, "orcid");
         return { id: orcidMatch.id, outcome: "duplicate" };
       }
       // All candidates with a different ORCID → skip them, create new
       const withoutOrcidConflict = candidates.filter(c => !c.orcid);
       if (withoutOrcidConflict.length === 0) {
         // Every candidate has a different ORCID — create new author
-        return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed);
+        return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId);
       }
       // Continue matching only against candidates without ORCID
-      return await matchByGeo(admin, withoutOrcidConflict, displayName, normalized, newOrcid, primaryAff, affiliations, parsed);
+      return await matchByGeo(admin, withoutOrcidConflict, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId);
     }
 
     // No ORCID on new author — filter out candidates where ORCID conflict is impossible
-    return await matchByGeo(admin, candidates, displayName, normalized, newOrcid, primaryAff, affiliations, parsed);
+    return await matchByGeo(admin, candidates, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId);
   }
 
   // ── 2.5. Initial-match: "J Sørensen" → "Jens Sørensen" ─────────────────────
@@ -602,7 +720,7 @@ async function resolveAuthorId(
   }
 
   // ── 3. No candidates — create new author ───────────────────────────────────
-  return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed);
+  return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId);
 }
 
 async function matchByGeo(
@@ -614,6 +732,8 @@ async function matchByGeo(
   primaryAff: string | null,
   affiliations: string[],
   parsed: { city: string | null; country: string | null; institution: string | null; department: string | null },
+  openAlexId: string | null,
+  articleId?: string | null,
 ): Promise<{ id: string; outcome: AuthorOutcome }> {
   // 2b. Same name + same city + same country
   if (parsed.city && parsed.country) {
@@ -661,7 +781,7 @@ async function matchByGeo(
   }
 
   // 2e. No match — create new author
-  return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed);
+  return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId);
 }
 
 async function createNewAuthor(
@@ -672,11 +792,14 @@ async function createNewAuthor(
   primaryAff: string | null,
   affiliations: string[],
   parsed: { city: string | null; country: string | null; institution: string | null; department: string | null },
+  resolvedOpenAlexId?: string | null,
+  articleId?: string | null,
 ): Promise<{ id: string; outcome: AuthorOutcome }> {
   await sleep(150);
-  const openalexId = await fetchOpenAlexId(orcid, displayName, primaryAff);
+  const openalexId = resolvedOpenAlexId ?? await fetchOpenAlexId(orcid, displayName, primaryAff);
   const email = primaryAff ? extractEmail(primaryAff) : null;
   const authorState = await resolveState(admin, parsed.city, parsed.country);
+  const matchConfidence = orcid ? 1.0 : 0.8;
 
   const { data: created } = await admin
     .from("authors")
@@ -685,9 +808,12 @@ async function createNewAuthor(
       display_name_normalized: normalized,
       orcid,
       openalex_id: openalexId,
+      openalex_enriched_at: openalexId ? new Date().toISOString() : null,
+      geo_source: openalexId ? "openalex" : "parser",
+      verified_by: openalexId ? "openalex" : "uverificeret",
       email,
       affiliations,
-      match_confidence: orcid ? 1.0 : 0.8,
+      match_confidence: matchConfidence,
       department: parsed.department,
       hospital: parsed.institution,
       city: parsed.city,
@@ -696,6 +822,14 @@ async function createNewAuthor(
     })
     .select("id")
     .single();
+
+  void logAuthorEvent(created!.id, "created", {
+    source: openalexId ? "openalex" : "parser",
+    verified_by: openalexId ? "openalex" : "uverificeret",
+    match_confidence: matchConfidence,
+    geo_source: openalexId ? "openalex" : "parser",
+    ...(articleId ? { article_id: articleId } : {}),
+  });
 
   return { id: created!.id, outcome: "new" };
 }
@@ -753,8 +887,8 @@ export async function linkAuthorsToArticle(
     const tResolve = Date.now();
     const oaAuthorship = oaMatchMap.get(i) ?? null;
     const { id: authorId, outcome } = oaAuthorship
-      ? await resolveAuthorFromOpenAlex(admin, author, oaAuthorship)
-      : await resolveAuthorId(admin, author);
+      ? await resolveAuthorFromOpenAlex(admin, author, oaAuthorship, articleId)
+      : await resolveAuthorId(admin, author, articleId);
     console.log(`[import] resolve "${authorName}": ${Date.now() - tResolve}ms (${oaAuthorship ? "openalex" : "parser"})`);
 
     // Capture geo data including state from the resolved author

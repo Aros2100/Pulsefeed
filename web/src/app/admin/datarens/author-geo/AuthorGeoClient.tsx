@@ -162,8 +162,8 @@ export default function AuthorGeoClient() {
               {validated} valideret i denne session
             </p>
           )}
-          <Link href="/admin/lab" style={{ display: "inline-block", marginTop: "24px", fontSize: "13px", color: "#E83B2A", textDecoration: "none", fontWeight: 600 }}>
-            ← Tilbage til Lab
+          <Link href="/admin/datarens" style={{ display: "inline-block", marginTop: "24px", fontSize: "13px", color: "#E83B2A", textDecoration: "none", fontWeight: 600 }}>
+            ← Tilbage til Datarens
           </Link>
         </div>
       </div>
@@ -200,7 +200,7 @@ export default function AuthorGeoClient() {
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "28px" }}>
           <div>
-            <Link href="/admin/lab" style={{ fontSize: "12px", color: "#888", textDecoration: "none" }}>← Lab</Link>
+            <Link href="/admin/datarens" style={{ fontSize: "12px", color: "#888", textDecoration: "none" }}>← Datarens</Link>
             <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase" as const, fontWeight: 700, marginTop: "8px", marginBottom: "4px" }}>
               Author Geo Validator
             </div>

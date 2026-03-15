@@ -5,9 +5,10 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { logArticleEvent } from "@/lib/article-events";
 
 const schema = z.object({
-  specialty_tags: z.array(z.string()).optional(),
-  status:         z.enum(["pending", "approved", "rejected"]).optional(),
-}).refine((d) => d.specialty_tags !== undefined || d.status !== undefined, {
+  specialty_tags:  z.array(z.string()).optional(),
+  status:          z.enum(["pending", "approved", "rejected"]).optional(),
+  subspecialty_ai: z.array(z.string()).optional(),
+}).refine((d) => d.specialty_tags !== undefined || d.status !== undefined || d.subspecialty_ai !== undefined, {
   message: "At least one field must be provided",
 });
 
@@ -29,7 +30,7 @@ export async function PUT(
     return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
   }
 
-  const { specialty_tags, status } = result.data;
+  const { specialty_tags, status, subspecialty_ai } = result.data;
   const admin = createAdminClient();
 
   // Fetch current article values for logging and for RPC args
@@ -60,6 +61,14 @@ export async function PUT(
       to:         specialty_tags,
       changed_by: auth.userId,
     });
+  }
+
+  // Update subspecialty_ai
+  if (subspecialty_ai !== undefined) {
+    const { error } = await admin.from("articles").update({ subspecialty_ai } as never).eq("id", articleId);
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
   }
 
   // Update status

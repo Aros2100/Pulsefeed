@@ -22,13 +22,6 @@ const fraunces = Fraunces({
   display: "swap",
 });
 
-// TODO: Fetch from user_subspecialties table when it exists
-const USER_SUBSPECIALTIES = [
-  "Spine surgery",
-  "Neurosurgical oncology and Radiosurgery",
-  "Vascular and Endovascular Neurosurgery",
-];
-
 // Geo labels: API values are already English, just pass through
 function geoLabel(value: string): string {
   return value;
@@ -103,7 +96,11 @@ const PERIODS: { key: Period; label: string }[] = [
   { key: "year", label: "Year" },
 ];
 
-export default function KPIOverview() {
+interface KPIOverviewProps {
+  userSubspecialties: string[] | null;
+}
+
+export default function KPIOverview({ userSubspecialties }: KPIOverviewProps) {
   const [period, setPeriod] = useState<Period>("week");
   const [scope, setScope] = useState<string>("all");
   const [geoLevel, setGeoLevel] = useState<GeoLevel>("all");
@@ -141,7 +138,7 @@ export default function KPIOverview() {
 
   const scopes = [
     { key: "all", label: "Neurosurgery" },
-    ...USER_SUBSPECIALTIES.map((s) => ({ key: s, label: s })),
+    ...(userSubspecialties ?? []).filter((s) => s !== "Neurosurgery").slice(0, 3).map((s) => ({ key: s, label: s })),
   ];
 
   // Build geo button list from userGeo
@@ -321,14 +318,19 @@ export default function KPIOverview() {
           }} />
 
           {/* Center: big number */}
-          <div style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "28px 32px",
-          }}>
+          <Link
+            href={`/articles?period=${period}${scope !== "all" ? `&subspecialty=${encodeURIComponent(scope)}` : ""}`}
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "28px 32px",
+              textDecoration: "none",
+              cursor: "pointer",
+            }}
+          >
             <div className={fraunces.className} style={{
               fontSize: "52px",
               fontWeight: 800,
@@ -344,9 +346,9 @@ export default function KPIOverview() {
               marginTop: "6px",
               fontWeight: 500,
             }}>
-              articles
+              articles →
             </div>
-          </div>
+          </Link>
 
           {/* Vertical divider */}
           <div style={{

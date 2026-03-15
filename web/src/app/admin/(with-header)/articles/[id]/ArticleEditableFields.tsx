@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { SPECIALTIES } from "@/lib/auth/specialties";
+import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
 
 const EXTRA_TAGS: { slug: string; label: string }[] = [
   { slug: "neuroscience",       label: "Neuroscience" },
@@ -19,23 +20,27 @@ const TAG_LABEL: Record<string, string> = Object.fromEntries(ALL_TAGS.map((t) =>
 function tagLabel(slug: string) { return TAG_LABEL[slug] ?? slug; }
 
 interface Props {
-  articleId:       string;
-  initialTags:     string[];
-  initialStatus:   string;
+  articleId:             string;
+  initialTags:           string[];
+  initialStatus:         string;
+  initialSubspecialties: string[];
 }
 
 export default function ArticleEditableFields({
   articleId,
   initialTags,
   initialStatus,
+  initialSubspecialties,
 }: Props) {
-  const [tags,     setTags]     = useState<string[]>(initialTags);
-  const [status,   setStatus]   = useState(initialStatus);
-  const [input,    setInput]    = useState("");
-  const [saving,   setSaving]   = useState<string | null>(null);
-  const [error,    setError]    = useState<string | null>(null);
+  const [tags,           setTags]           = useState<string[]>(initialTags);
+  const [subspecialties, setSubspecialties] = useState<string[]>(initialSubspecialties);
+  const [status,         setStatus]         = useState(initialStatus);
+  const [input,          setInput]          = useState("");
+  const [subInput,       setSubInput]       = useState("");
+  const [saving,         setSaving]         = useState<string | null>(null);
+  const [error,          setError]          = useState<string | null>(null);
 
-  async function save(patch: { specialty_tags?: string[]; status?: string }, key: string) {
+  async function save(patch: { specialty_tags?: string[]; status?: string; subspecialty_ai?: string[] }, key: string) {
     setSaving(key);
     setError(null);
     try {
@@ -68,13 +73,28 @@ export default function ArticleEditableFields({
     void save({ specialty_tags: newTags }, "tags");
   }
 
+  function addSubspecialty(raw: string) {
+    const val = raw.trim();
+    if (!val || subspecialties.includes(val)) { setSubInput(""); return; }
+    const next = [...subspecialties, val];
+    setSubspecialties(next);
+    setSubInput("");
+    void save({ subspecialty_ai: next }, "subspecialty");
+  }
+
+  function removeSubspecialty(val: string) {
+    const next = subspecialties.filter((s) => s !== val);
+    setSubspecialties(next);
+    void save({ subspecialty_ai: next }, "subspecialty");
+  }
+
   function handleStatusChange(newStatus: string) {
     setStatus(newStatus);
     void save({ status: newStatus }, "status");
   }
 
-  const statusBg    = status === "approved" ? "#f0fdf4" : status === "rejected" ? "#fef2f2" : "#fffbeb";
-  const statusColor = status === "approved" ? "#15803d" : status === "rejected" ? "#b91c1c" : "#92400e";
+  const statusBg     = status === "approved" ? "#f0fdf4" : status === "rejected" ? "#fef2f2" : "#fffbeb";
+  const statusColor  = status === "approved" ? "#15803d" : status === "rejected" ? "#b91c1c" : "#92400e";
   const statusBorder = status === "approved" ? "#bbf7d0" : status === "rejected" ? "#fecaca" : "#fde68a";
 
   return (
@@ -101,8 +121,6 @@ export default function ArticleEditableFields({
           {tags.length === 0 && (
             <span style={{ fontSize: "12px", color: "#9ca3af" }}>Ingen tags</span>
           )}
-
-          {/* Input */}
           <input
             list="tag-suggestions"
             value={input}
@@ -115,6 +133,44 @@ export default function ArticleEditableFields({
           <datalist id="tag-suggestions">
             {ALL_TAGS.filter((t) => !tags.includes(t.slug)).map((t) => (
               <option key={t.slug} value={t.slug}>{t.label}</option>
+            ))}
+          </datalist>
+        </div>
+      </div>
+
+      {/* Subspecialer */}
+      <div>
+        <div style={{ fontSize: "11px", fontWeight: 600, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>
+          Subspecialer{saving === "subspecialty" && <span style={{ color: "#9ca3af", fontWeight: 400, marginLeft: "6px" }}>gemmer…</span>}
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
+          {subspecialties.map((val) => (
+            <span key={val} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: 600, borderRadius: "999px", padding: "3px 6px 3px 10px", border: "1px solid #bfdbfe", background: "#eff6ff", color: "#1d4ed8" }}>
+              {val}
+              <button
+                onClick={() => removeSubspecialty(val)}
+                title="Fjern subspeciale"
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "16px", height: "16px", borderRadius: "50%", background: "rgba(29,78,216,0.12)", border: "none", cursor: "pointer", color: "#1d4ed8", fontSize: "11px", lineHeight: 1, padding: 0, flexShrink: 0 }}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          {subspecialties.length === 0 && (
+            <span style={{ fontSize: "12px", color: "#9ca3af" }}>Ingen subspecialer</span>
+          )}
+          <input
+            list="subspecialty-suggestions"
+            value={subInput}
+            onChange={(e) => setSubInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubspecialty(subInput); } }}
+            onBlur={() => { if (subInput.trim()) addSubspecialty(subInput); }}
+            placeholder="+ tilføj subspeciale"
+            style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "999px", border: "1px dashed #bfdbfe", background: "#f8fbff", color: "#1d4ed8", outline: "none", minWidth: "140px" }}
+          />
+          <datalist id="subspecialty-suggestions">
+            {SUBSPECIALTY_OPTIONS.filter((o) => !subspecialties.includes(o)).map((o) => (
+              <option key={o} value={o}>{o}</option>
             ))}
           </datalist>
         </div>

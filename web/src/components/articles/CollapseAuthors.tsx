@@ -2,16 +2,20 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { parseAffiliation } from "@/lib/affiliations";
 
 interface Author {
   id?: string;
   lastName?: string;
   foreName?: string;
-  affiliation?: string | null;
-  affiliations?: string[] | null;
-  orcid?: string | null;
   author_score?: number | null;
+  geo?: {
+    department: string | null;
+    hospital: string | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    verified_by: string | null;
+  } | null;
 }
 
 const INITIAL_COUNT = 3;
@@ -47,43 +51,32 @@ export default function CollapseAuthors({ authors }: { authors: Author[] }) {
                   </span>
                 )}
               </div>
-              {a.orcid && (
-                <a
-                  href={`https://orcid.org/${a.orcid}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: "12px", color: "#E83B2A", textDecoration: "none" }}
-                >
-                  ORCID: {a.orcid}
-                </a>
-              )}
-              {(a.affiliations?.[0] ?? a.affiliation) && (() => {
-                const affStr = a.affiliations?.[0] ?? a.affiliation!;
-                const parsed = parseAffiliation([affStr]);
-                const badges = [
-                  parsed.department && { label: "Dept", value: parsed.department },
-                  parsed.hospital   && { label: "Hospital", value: parsed.hospital },
-                  parsed.city       && { label: "City", value: parsed.city },
-                  parsed.country    && { label: "Country", value: parsed.country },
-                ].filter(Boolean) as { label: string; value: string }[];
+              {(() => {
+                const geo = a.geo;
+                if (!geo) return null;
+
+                const geoStr = [geo.department, geo.hospital, geo.city, geo.state, geo.country]
+                  .filter(Boolean).join(", ");
+
+                const verifiedBy = geo.verified_by;
+                const verifiedBadge = verifiedBy === "openalex"
+                  ? { label: "OpenAlex",     bg: "#f0fdf4", color: "#15803d" }
+                  : verifiedBy === "human"
+                  ? { label: "Verificeret",  bg: "#eff6ff", color: "#1d4ed8" }
+                  : { label: "Uverificeret", bg: "#EEF2F7", color: "#5a6a85" };
+
                 return (
-                  <div style={{ marginTop: "4px" }}>
-                    <p style={{ fontSize: "12px", color: "#9ca3af", margin: "0 0 4px 0", lineHeight: 1.4 }}>
-                      {affStr}
-                    </p>
-                    {badges.length > 0 && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-                        {badges.map((b) => (
-                          <span key={b.label} style={{
-                            fontSize: "11px", color: "#5a6a85",
-                            background: "#EEF2F7", borderRadius: "4px",
-                            padding: "2px 6px", lineHeight: 1.4,
-                          }}>
-                            {b.label}: {b.value}
-                          </span>
-                        ))}
-                      </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "3px", flexWrap: "wrap" }}>
+                    {geoStr && (
+                      <span style={{ fontSize: "12px", color: "#6b7280" }}>{geoStr}</span>
                     )}
+                    <span style={{
+                      fontSize: "11px", fontWeight: 600, borderRadius: "4px",
+                      padding: "2px 6px", lineHeight: 1.4,
+                      background: verifiedBadge.bg, color: verifiedBadge.color,
+                    }}>
+                      {verifiedBadge.label}
+                    </span>
                   </div>
                 );
               })()}

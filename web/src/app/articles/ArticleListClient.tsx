@@ -20,10 +20,12 @@ interface Article {
 interface Project { id: string; name: string }
 
 interface Props {
-  articles:      Article[];
-  specialtyLabel: string;
-  savedMap:      Record<string, string | null>;   // articleId → projectId | null
-  projects:      Project[];
+  articles:           Article[];
+  specialtyLabel:     string;
+  savedMap:           Record<string, string | null>;   // articleId → projectId | null
+  projects:           Project[];
+  activePeriod:       string | null;
+  activeSubspecialty: string | null;
 }
 
 type Filter = "all" | "clinical_trials" | "high_impact" | "this_week";
@@ -82,7 +84,9 @@ function applyFilter(articles: Article[], filter: Filter): Article[] {
   }
 }
 
-export default function ArticleListClient({ articles, specialtyLabel, savedMap, projects }: Props) {
+const PERIOD_LABELS: Record<string, string> = { week: "This week", month: "This month", year: "This year" };
+
+export default function ArticleListClient({ articles, specialtyLabel, savedMap, projects, activePeriod, activeSubspecialty }: Props) {
   const [filter, setFilter]     = useState<Filter>("all");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const router = useRouter();
@@ -130,7 +134,19 @@ export default function ArticleListClient({ articles, specialtyLabel, savedMap, 
           }}>
             <div>
               <div style={{ fontSize: "20px", fontWeight: 700 }}>Articles</div>
-              <div style={{ fontSize: "13px", color: "#999" }}>{filtered.length} articles</div>
+              <div style={{ fontSize: "13px", color: "#999", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                {filtered.length} articles
+                {activePeriod && (
+                  <span style={{ background: "#f1f5f9", color: "#475569", borderRadius: "4px", padding: "1px 7px", fontSize: "11px", fontWeight: 600 }}>
+                    {PERIOD_LABELS[activePeriod] ?? activePeriod}
+                  </span>
+                )}
+                {activeSubspecialty && (
+                  <span style={{ background: "#fff0ee", color: "#E83B2A", borderRadius: "4px", padding: "1px 7px", fontSize: "11px", fontWeight: 600 }}>
+                    {activeSubspecialty}
+                  </span>
+                )}
+              </div>
             </div>
             <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
               {filters.map((f) => (

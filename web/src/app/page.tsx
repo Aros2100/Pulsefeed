@@ -102,7 +102,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* KPI Overview */}
-        <KPIOverview />
+        <KPIOverview userSubspecialties={userSubspecialties} />
 
         {/* Article Filter Panel */}
         <div style={{ marginTop: "28px" }}>
