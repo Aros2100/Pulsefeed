@@ -83,8 +83,9 @@ const REGIONS = new Set([
 
 /** Province/state abbreviations: Canada, Brazil, Australia, India */
 const PROVINCE_CODES = new Set([
-  // Canadian
+  // Canadian (2-letter + longer abbreviations)
   "ON", "QC", "BC", "AB", "MB", "SK", "NS", "NB", "NL", "PE", "NT", "NU", "YT",
+  "ONT", "QUE", "SASK", "MAN", "ALTA",
   // Brazilian
   "SP", "RJ", "MG", "RS", "PR", "SC", "BA", "CE", "PE", "GO", "PA", "MA", "MT", "MS", "AM", "ES", "PB", "RN", "AL", "SE", "PI", "DF",
   // Australian

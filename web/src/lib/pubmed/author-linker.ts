@@ -5,6 +5,7 @@ import { logArticleEvent } from "@/lib/article-events";
 import { notifyFollowedAuthorPublications } from "@/lib/notifications/followedAuthorNotify";
 import { getRegion, getContinent } from "@/lib/geo/continent-map";
 import { lookupState } from "@/lib/geo/state-map";
+import { fetchWorksByDois, type OpenAlexWork } from "@/lib/openalex/client";
 import pLimit from "p-limit";
 
 const BATCH_SIZE = 10;
@@ -31,10 +32,11 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
     while (true) {
       // Always fetch at offset 0 — linked articles are removed from the unlinked
       // set by the NOT IN clause, so the result shrinks as we process each batch.
-      const { data: articles, error } = await admin.rpc(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: articles, error } = await (admin as any).rpc(
         "fetch_unlinked_articles",
         { p_offset: 0, p_limit: BATCH_SIZE }
-      );
+      ) as { data: Array<{ id: string; pubmed_id: string; doi: string | null; authors: unknown }> | null; error: { message: string } | null };
 
       if (error) {
         console.error(`[author-linker] RPC error:`, error.message);
@@ -45,6 +47,21 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
       const batch = articles ?? [];
       console.log(`[author-linker] RPC returned ${batch.length} articles (data type: ${typeof articles}, isArray: ${Array.isArray(articles)})`);
       if (batch.length === 0) break;
+
+      // Batch DOI → OpenAlex works lookup
+      const doisInBatch = batch
+        .map(a => ({ id: a.id, doi: a.doi as string | null }))
+        .filter((a): a is { id: string; doi: string } => Boolean(a.doi));
+
+      let oaWorksMap = new Map<string, OpenAlexWork>();
+      if (doisInBatch.length > 0) {
+        try {
+          oaWorksMap = await fetchWorksByDois(doisInBatch.map(a => a.doi));
+          console.log(`[author-linker] OpenAlex: ${oaWorksMap.size}/${doisInBatch.length} works found`);
+        } catch (e) {
+          console.warn(`[author-linker] OpenAlex batch failed, falling back to parser:`, e);
+        }
+      }
 
       const limiter = pLimit(LINK_CONCURRENCY);
       await Promise.all(
@@ -69,8 +86,10 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
             (a) => !a.lastName?.trim() && !a.orcid?.trim()
           );
 
-          console.log(`[author-linker] calling linkAuthorsToArticle for PMID ${article.pubmed_id} (${authors.length} authors)`);
-          await linkAuthorsToArticle(admin, article.id, authors)
+          const articleDoi = (article.doi as string | null);
+          const oaWork = articleDoi ? oaWorksMap.get(articleDoi.toLowerCase()) ?? null : null;
+          console.log(`[author-linker] calling linkAuthorsToArticle for PMID ${article.pubmed_id} (${authors.length} authors, oaWork=${oaWork ? 'yes' : 'no'})`);
+          await linkAuthorsToArticle(admin, article.id, authors, oaWork)
             .then(async (result) => {
               newAuthors  += result.new;
               duplicates  += result.duplicates;

@@ -8,6 +8,7 @@ import { lookupInstitution } from "./institution-map";
 import { isAdministrativeRegion, isProvinceCode } from "./region-map";
 import { lookupCity } from "./city-map";
 import { CITY_NAMES } from "./city-set";
+import { CITY_COUNTRY_MAP } from "./city-country-map";
 
 export type ParsedAffiliation = {
   department: string | null;
@@ -188,12 +189,20 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
   text = text.replace(/\.\s*Electronic address:.*$/i, "").trim();
   text = text.replace(/Electronic address:.*$/i, "").trim();
   text = text.replace(/\s*\S+@\S+\.[\w.]+\s*$/, "").trim();
+  // Strip trailing domain names: "iums.ac.ir"
+  text = text.replace(/\s*[\w.-]+\.(ac|edu|org|com|gov|net)\.[a-z]{2,4}\s*$/i, "").trim();
   // Remove leading number prefixes: "1Department" → "Department", "1 Department" → "Department"
   text = text.replace(/^\d+\s*([A-Z])/, "$1");
   text = text.replace(/^([a-z])\s+([A-Z])/, "$2");
   text = text.replace(/^From\s+the\s+/i, "").replace(/^From\s+/i, "").trim();
   text = text.replace(/[.\s]+$/, "").trim();
 
+  if (!text) return null;
+
+  // Step 3c: Strip parenthesized content BEFORE comma-splitting
+  // Removes author-name lists like "(Docherty, Shabalin, DiBlasi, Coon)"
+  // and single author refs like "(D.A.L.)" or "(J.D.)"
+  text = text.replace(/\s*\([A-Z][A-Za-z.\-,\s]*\)/g, "").trim();
   if (!text) return null;
 
   // Step 3b: Reject department/division-only affiliations with no location data
@@ -382,8 +391,8 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
         cityIdx--;
         continue;
       }
-      // Skip 2-3 letter province/state codes: ON, QC, BC, CA, TX, NSW, VIC, etc.
-      if (candidate.length <= 3 && (US_STATES[candidate.toUpperCase()] || isProvinceCode(candidate))) {
+      // Skip 2-4 letter province/state codes: ON, QC, BC, CA, TX, NSW, VIC, SASK, ALTA, etc.
+      if (candidate.length <= 4 && (US_STATES[candidate.toUpperCase()] || isProvinceCode(candidate))) {
         cityIdx--;
         continue;
       }
@@ -498,6 +507,17 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
   if (!institution && department) {
     institution = department;
     department = null;
+  }
+
+  // Step 11: City-to-country fallback
+  if (city && !country) {
+    const cityInfo = lookupCity(city);
+    if (cityInfo) {
+      country = cityInfo.country;
+    } else {
+      const fallback = CITY_COUNTRY_MAP.get(city.toLowerCase());
+      if (fallback) country = fallback;
+    }
   }
 
   // Step 10: Determine confidence

@@ -40,10 +40,17 @@ export default function AuditClient() {
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
-  const fetchAuthors = useCallback(async (p: number, off: number) => {
+  // Sorting — server-side across full result set
+  type SortKey = "display_name" | "department" | "hospital" | "city" | "state" | "country";
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const fetchAuthors = useCallback(async (p: number, off: number, sk?: string | null, asc?: boolean) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/geo/audit-authors?priority=${p}&offset=${off}&limit=${PAGE_SIZE}`);
+      let url = `/api/admin/geo/audit-authors?priority=${p}&offset=${off}&limit=${PAGE_SIZE}`;
+      if (sk) url += `&sort=${sk}&sortDir=${asc ? "asc" : "desc"}`;
+      const res = await fetch(url);
       const data = await res.json();
       const fetched: AuditAuthor[] = data.authors ?? [];
       setAuthors(fetched);
@@ -62,8 +69,8 @@ export default function AuditClient() {
   }, []);
 
   useEffect(() => {
-    void fetchAuthors(priority, offset);
-  }, [priority, offset, fetchAuthors]);
+    void fetchAuthors(priority, offset, sortKey, sortAsc);
+  }, [priority, offset, sortKey, sortAsc, fetchAuthors]);
 
   function handleTabClick(p: number) {
     setPriority(p);
@@ -107,8 +114,30 @@ export default function AuditClient() {
   // Show state column only if at least one author in batch has a state-relevant country
   const hasStateCol = authors.some((a) => showState(a.country));
 
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortAsc((v) => !v);
+    } else {
+      setSortKey(key);
+      setSortAsc(true);
+    }
+    setOffset(0);
+  }
+
   const page = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  const thStyle = (key: SortKey): React.CSSProperties => ({
+    textAlign: "left",
+    padding: "10px 12px",
+    fontWeight: 600,
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    color: sortKey === key ? "#1a1a1a" : "#5a6a85",
+    cursor: "pointer",
+    userSelect: "none",
+  });
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -246,14 +275,14 @@ export default function AuditClient() {
               <thead>
                 <tr style={{ borderBottom: "1px solid #e5e7eb", background: "#f9fafb", position: "sticky", top: 0, zIndex: 10 }}>
                   <th style={{ width: "36px", padding: "10px 12px" }}></th>
-                  <th style={{ textAlign: "left", padding: "10px 12px", fontWeight: 600, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.04em", color: "#5a6a85" }}>Navn</th>
-                  <th style={{ textAlign: "left", padding: "10px 12px", fontWeight: 600, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.04em", color: "#5a6a85" }}>Department</th>
-                  <th style={{ textAlign: "left", padding: "10px 12px", fontWeight: 600, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.04em", color: "#5a6a85" }}>Hospital</th>
-                  <th style={{ textAlign: "left", padding: "10px 12px", fontWeight: 600, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.04em", color: "#5a6a85" }}>City</th>
+                  <th style={thStyle("display_name")} onClick={() => handleSort("display_name")}>Navn {sortKey === "display_name" ? (sortAsc ? "↑" : "↓") : ""}</th>
+                  <th style={thStyle("department")} onClick={() => handleSort("department")}>Department {sortKey === "department" ? (sortAsc ? "↑" : "↓") : ""}</th>
+                  <th style={thStyle("hospital")} onClick={() => handleSort("hospital")}>Hospital {sortKey === "hospital" ? (sortAsc ? "↑" : "↓") : ""}</th>
+                  <th style={thStyle("city")} onClick={() => handleSort("city")}>City {sortKey === "city" ? (sortAsc ? "↑" : "↓") : ""}</th>
                   {hasStateCol && (
-                    <th style={{ textAlign: "left", padding: "10px 12px", fontWeight: 600, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.04em", color: "#5a6a85" }}>State</th>
+                    <th style={thStyle("state")} onClick={() => handleSort("state")}>State {sortKey === "state" ? (sortAsc ? "↑" : "↓") : ""}</th>
                   )}
-                  <th style={{ textAlign: "left", padding: "10px 12px", fontWeight: 600, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.04em", color: "#5a6a85" }}>Country</th>
+                  <th style={thStyle("country")} onClick={() => handleSort("country")}>Country {sortKey === "country" ? (sortAsc ? "↑" : "↓") : ""}</th>
                 </tr>
               </thead>
               <tbody>

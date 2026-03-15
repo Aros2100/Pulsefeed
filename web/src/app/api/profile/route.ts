@@ -2,13 +2,22 @@ import { NextResponse, type NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const schema = z.object({
   name:                z.string().optional(),
   specialty_slugs:     z.array(z.string()).optional(),
   is_public:           z.boolean().optional(),
   email_notifications: z.boolean().optional(),
+  subspecialties:      z.array(z.string()).max(4).optional(), // mandatory + max 3 elective
+  country:             z.string().nullable().optional(),
+  city:                z.string().nullable().optional(),
+  state:               z.string().nullable().optional(),
+  hospital:            z.string().nullable().optional(),
+  department:          z.string().nullable().optional(),
 });
+
+const GEO_FIELDS = ["country", "city", "state", "hospital", "department"] as const;
 
 export async function PATCH(request: NextRequest) {
   const supabase = await createClient();
@@ -32,17 +41,26 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "No fields provided" }, { status: 400 });
   }
 
-  console.log("updateData:", JSON.stringify(updateData));
-
   const { error, data } = await supabase
     .from("users")
     .update(updateData)
     .eq("id", user.id)
-    .select();
-
-  console.log("update result:", JSON.stringify({ error, data }));
+    .select("author_id");
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+
+  // Sync geo fields to authors table if user has a linked author
+  const authorId = data?.[0]?.author_id as string | null;
+  const hasGeoUpdate = GEO_FIELDS.some((f) => f in updateData);
+  if (authorId && hasGeoUpdate) {
+    const geoUpdate: Record<string, string | null> = {};
+    for (const f of GEO_FIELDS) {
+      if (f in updateData) geoUpdate[f] = updateData[f] as string | null;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const admin = createAdminClient() as any;
+    await admin.from("authors").update(geoUpdate).eq("id", authorId);
+  }
 
   revalidatePath("/profile");
   return NextResponse.json({ ok: true });

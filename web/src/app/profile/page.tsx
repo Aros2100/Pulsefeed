@@ -29,7 +29,7 @@ export default async function ProfilePage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("name, specialty_slugs, author_id, avatar_url, is_public, email_notifications, role_type")
+    .select("name, specialty_slugs, author_id, avatar_url, is_public, email_notifications, role_type, subspecialties, country, city, state, hospital, department")
     .eq("id", user.id)
     .single();
 
@@ -86,6 +86,13 @@ export default async function ProfilePage() {
           roleType={profile?.role_type ?? null}
           authorCity={authorCity}
           authorCountry={authorCountry}
+          initialSubspecialties={Array.isArray(profile?.subspecialties) ? (profile.subspecialties as string[]) : []}
+          initialCountry={profile?.country ?? authorCountry}
+          initialCity={profile?.city ?? authorCity}
+          initialState={profile?.state ?? null}
+          initialHospital={profile?.hospital ?? null}
+          initialDepartment={profile?.department ?? null}
+          hasAuthorId={!!profile?.author_id}
         />
 
         {/* Author Profile */}

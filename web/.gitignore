@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# GeoNames raw data (large source files, regenerate locally)
+/scripts/cities5000.txt
+/scripts/admin1CodesASCII.txt
