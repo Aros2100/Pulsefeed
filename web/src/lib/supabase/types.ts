@@ -316,46 +316,67 @@ export type Database = {
         Row: {
           affiliations: string[] | null
           article_count: number | null
+          author_score: number | null
           city: string | null
           country: string | null
           created_at: string | null
           department: string | null
           display_name: string
+          geo_source: string | null
           hospital: string | null
           id: string
+          institution_type: string | null
           match_confidence: number | null
+          openalex_enriched_at: string | null
           openalex_id: string | null
           orcid: string | null
+          orcid_enriched_at: string | null
+          ror_enriched_at: string | null
+          ror_id: string | null
           updated_at: string | null
         }
         Insert: {
           affiliations?: string[] | null
           article_count?: number | null
+          author_score?: number | null
           city?: string | null
           country?: string | null
           created_at?: string | null
           department?: string | null
           display_name: string
+          geo_source?: string | null
           hospital?: string | null
           id?: string
+          institution_type?: string | null
           match_confidence?: number | null
+          openalex_enriched_at?: string | null
           openalex_id?: string | null
           orcid?: string | null
+          orcid_enriched_at?: string | null
+          ror_enriched_at?: string | null
+          ror_id?: string | null
           updated_at?: string | null
         }
         Update: {
           affiliations?: string[] | null
           article_count?: number | null
+          author_score?: number | null
           city?: string | null
           country?: string | null
           created_at?: string | null
           department?: string | null
           display_name?: string
+          geo_source?: string | null
           hospital?: string | null
           id?: string
+          institution_type?: string | null
           match_confidence?: number | null
+          openalex_enriched_at?: string | null
           openalex_id?: string | null
           orcid?: string | null
+          orcid_enriched_at?: string | null
+          ror_enriched_at?: string | null
+          ror_id?: string | null
           updated_at?: string | null
         }
         Relationships: []
