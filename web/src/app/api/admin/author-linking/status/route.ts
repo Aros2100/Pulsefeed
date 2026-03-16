@@ -63,11 +63,11 @@ export async function GET() {
     };
   });
 
-  const totals = totalsResult.data ?? [];
-  const totalNew              = totals.reduce((s, r) => s + ((r as Record<string, number>).new_authors      ?? 0), 0);
-  const totalExisting         = totals.reduce((s, r) => s + ((r as Record<string, number>).duplicates       ?? 0), 0);
-  const totalErrors           = totals.reduce((s, r) => s + ((r as Record<string, number>).rejected         ?? 0), 0);
-  const totalAuthorsProcessed = totals.reduce((s, r) => s + ((r as Record<string, number>).authors_processed ?? 0), 0);
+  const totals = (totalsResult.data ?? []) as unknown as Record<string, number>[];
+  const totalNew              = totals.reduce((s, r) => s + (r.new_authors       ?? 0), 0);
+  const totalExisting         = totals.reduce((s, r) => s + (r.duplicates        ?? 0), 0);
+  const totalErrors           = totals.reduce((s, r) => s + (r.rejected          ?? 0), 0);
+  const totalAuthorsProcessed = totals.reduce((s, r) => s + (r.authors_processed ?? 0), 0);
 
   return NextResponse.json({
     ok: true,

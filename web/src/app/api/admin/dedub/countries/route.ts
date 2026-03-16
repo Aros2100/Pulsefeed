@@ -15,8 +15,8 @@ export async function GET() {
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   const all = [
-    ...new Set((data ?? []).map((r: { country: string }) => r.country)),
-  ].sort() as string[];
+    ...new Set((data ?? []).map((r) => r.country).filter((c): c is string => c !== null)),
+  ].sort();
 
   const PRIORITY = ["Denmark"];
   const priority = PRIORITY.filter((c) => all.includes(c));
