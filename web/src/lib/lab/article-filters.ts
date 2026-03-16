@@ -19,7 +19,7 @@ export const MODULE_FILTERS = {
   },
   classification: {
     description: "Approved C3 articles for classification",
-    filters: { status: "approved", circle: 3 },
+    filters: { status: "approved", circle: null },
     requireAbstract: true,
     nullCheck: "classification_scored_at",
   },
