@@ -371,7 +371,7 @@ export default function ClassificationSimulatorClient({
     const regressions = agreementArticles.filter((d) => {
       const sim = regResults.get(d.article_id);
       if (!sim) return false;
-      return !arraysEqual(parseTags(sim.decision), parseTags(d.human_decision));
+      return !arraysEqual(parseTags(sim.decision), parseTags(d.old_ai_decision));
     }).length;
     return { regressions, total: agreementArticles.length };
   })() : null;
@@ -386,7 +386,7 @@ export default function ClassificationSimulatorClient({
   const filteredRegRows = agreementArticles.filter((d) => {
     if (!regResults || regFilter === "all") return true;
     const sim = regResults.get(d.article_id);
-    const isRegression = sim ? !arraysEqual(parseTags(sim.decision), parseTags(d.human_decision)) : false;
+    const isRegression = sim ? !arraysEqual(parseTags(sim.decision), parseTags(d.old_ai_decision)) : false;
     return regFilter === "regression" ? isRegression : !isRegression;
   });
 
@@ -729,7 +729,7 @@ export default function ClassificationSimulatorClient({
                       const humanTags    = parseTags(d.human_decision);
                       const oldAiTags    = parseTags(d.old_ai_decision);
                       const newAiTags    = sim ? parseTags(sim.decision) : [];
-                      const isRegression = sim ? !arraysEqual(newAiTags, humanTags) : false;
+                      const isRegression = sim ? !arraysEqual(newAiTags, parseTags(d.old_ai_decision)) : false;
                       return (
                         <tr key={d.article_id} style={{ background: i % 2 === 1 ? "#fafafa" : "#fff" }}>
                           <td style={{ ...tdStyle, maxWidth: "280px" }}>

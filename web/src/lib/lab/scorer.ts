@@ -88,9 +88,10 @@ export async function scoreClassification(
   activePrompt: ActivePrompt
 ): Promise<ClassificationResult> {
   const content = activePrompt.prompt
-    .replace(/\{\{specialty\}\}|\{specialty\}/g, specialty)
-    .replace(/\{\{title\}\}|\{title\}/g,         article.title)
-    .replace(/\{\{abstract\}\}|\{abstract\}/g,   article.abstract ?? "No abstract available");
+    .replace(/\{\{specialty\}\}|\{specialty\}/g,                 specialty)
+    .replace(/\{\{title\}\}|\{title\}/g,                         article.title)
+    .replace(/\{\{abstract\}\}|\{abstract\}/g,                   article.abstract ?? "No abstract available")
+    .replace(/\{\{subspecialty_list\}\}|\{subspecialty_list\}/g, SUBSPECIALTY_OPTIONS.join(", "));
 
   const message = await trackedCall(`classification_${activePrompt.version}`, {
     model: SCORING_MODEL,

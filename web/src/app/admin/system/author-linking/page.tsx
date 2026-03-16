@@ -9,11 +9,11 @@ interface AuthorLinkingLog {
   completed_at: string | null;
   status: "running" | "completed" | "failed";
   articles_processed: number;
+  authors_processed: number;
   authors_linked: number;
   new_authors: number;
-  duplicates: number;
-  rejected: number;
-  errors: string[];
+  existing: number;
+  errors: number;
 }
 
 interface RejectedRow {
@@ -34,8 +34,9 @@ interface StatusResponse {
   unlinkedAuthorSlots: number;
   totalAuthors: number;
   totalNew: number;
-  totalDuplicates: number;
-  totalRejected: number;
+  totalExisting: number;
+  totalErrors: number;
+  totalAuthorsProcessed: number;
   rejectedAuthorsCount: number;
 }
 
@@ -194,8 +195,8 @@ export default function AuthorLinkingPage() {
 
         {/* Breadcrumb */}
         <div style={{ marginBottom: 4 }}>
-          <Link href="/admin/system" style={{ fontSize: 13, color: "#6b7280", textDecoration: "none" }}>
-            ← System
+          <Link href="/admin/system/import" style={{ fontSize: 13, color: "#6b7280", textDecoration: "none" }}>
+            ← Import
           </Link>
         </div>
 
@@ -211,6 +212,18 @@ export default function AuthorLinkingPage() {
             </p>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button
+              onClick={() => { void handleShowRejected(); setShowRejected(true); }}
+              disabled={!status?.totalErrors || status.totalErrors === 0}
+              style={{
+                padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                background: "#f3f4f6", color: "#374151", border: "1px solid #d1d5db",
+                cursor: status?.totalErrors ? "pointer" : "default",
+                opacity: status?.totalErrors ? 1 : 0.4,
+              }}
+            >
+              Se fejl {status?.totalErrors ? `(${status.totalErrors.toLocaleString("da-DK")})` : ""}
+            </button>
             {isRunning && (
               <button
                 onClick={() => { void handleReset(); }}
@@ -261,90 +274,10 @@ export default function AuthorLinkingPage() {
             <KpiCard label="Nye forfattere" value={status?.totalNew} color="#16a34a" />
           </div>
 
-          <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-            <KpiCard label="Dubletter" value={status?.totalDuplicates} color="#2563eb" />
-            <KpiCard
-              label="Afvist"
-              value={status?.totalRejected}
-              color="#dc2626"
-              onClick={() => {
-                if (!showRejected) { void handleShowRejected(); }
-                else setShowRejected(false);
-              }}
-              active={showRejected}
-            />
-            {status?.latest && (
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "flex-end", gap: 4, minWidth: 140 }}>
-                <div style={{ fontSize: 13, color: "#6b7280" }}>
-                  {status.latest.articles_processed.toLocaleString("da-DK")} artikler behandlet
-                </div>
-                <div style={{ fontSize: 13, color: "#6b7280" }}>
-                  {status.latest.authors_linked.toLocaleString("da-DK")} forfattere koblet
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Inline rejected list */}
-          {showRejected && (
-            <div style={{
-              marginBottom: 16, padding: 16,
-              background: "#fef2f2", borderRadius: 8, border: "1px solid #fecaca",
-            }}>
-              <div style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                marginBottom: 12,
-              }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#dc2626", letterSpacing: "0.05em" }}>
-                  AFVISTE FORFATTERE
-                </span>
-                {rejectedRows && rejectedRows.length > 0 && (
-                  <span style={{ fontSize: 11, color: "#9ca3af" }}>
-                    Viser seneste {Math.min(rejectedRows.length, 20)} af {status?.rejectedAuthorsCount ?? rejectedRows.length}
-                  </span>
-                )}
-              </div>
-              {loadingRejected ? (
-                <div style={{ padding: 16, textAlign: "center", fontSize: 13, color: "#9ca3af" }}>Indlæser…</div>
-              ) : !rejectedRows?.length ? (
-                <div style={{ padding: 16, textAlign: "center", fontSize: 13, color: "#9ca3af" }}>Ingen afviste forfattere</div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {rejectedRows.slice(0, 20).map((row) => (
-                    <div key={row.id} style={{
-                      display: "flex", alignItems: "center", gap: 12,
-                      padding: "8px 12px", background: "#fff", borderRadius: 6,
-                      fontSize: 13, border: "1px solid #fecaca",
-                    }}>
-                      <span style={{ fontFamily: "monospace", fontSize: 12, color: "#6b7280", flexShrink: 0 }}>
-                        {row.pubmed_id}
-                      </span>
-                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#374151" }}>
-                        {row.articles?.title ?? "—"}
-                      </span>
-                      <span style={{ fontSize: 11, color: "#9ca3af", flexShrink: 0 }}>
-                        pos. {row.position ?? "—"}
-                      </span>
-                      <span style={{
-                        background: "#fef2f2", color: "#dc2626", fontSize: 10, fontWeight: 600,
-                        padding: "2px 6px", borderRadius: 4, flexShrink: 0,
-                      }}>
-                        {row.reason}
-                      </span>
-                      <span style={{ fontSize: 11, color: "#9ca3af", flexShrink: 0 }}>
-                        {fmt(row.created_at)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Balance check */}
-          {status != null && (status.totalNew + status.totalDuplicates + status.totalRejected) > 0 && (() => {
-            const total = status.totalNew + status.totalDuplicates + status.totalRejected;
-            const balanced = true; // new + duplicates + rejected always equals total by definition
+          {status != null && (status.totalNew + status.totalExisting + status.totalErrors) > 0 && (() => {
+            const total = status.totalNew + status.totalExisting + status.totalErrors;
+            const balanced = true; // new + existing + errors always equals total by definition
             return (
               <div style={{
                 display: "flex", alignItems: "center", gap: 8,
@@ -356,7 +289,7 @@ export default function AuthorLinkingPage() {
               }}>
                 <span>{balanced ? "✓" : "✗"}</span>
                 <span>
-                  Balance: Nye ({status.totalNew.toLocaleString("da-DK")}) + Dubletter ({status.totalDuplicates.toLocaleString("da-DK")}) + Afvist ({status.totalRejected.toLocaleString("da-DK")}) = {total.toLocaleString("da-DK")} slots processeret
+                  Nye ({status.totalNew.toLocaleString("da-DK")}) + Eksisterede ({status.totalExisting.toLocaleString("da-DK")}) + Fejl ({status.totalErrors.toLocaleString("da-DK")}) = {total.toLocaleString("da-DK")} slots processeret
                 </span>
               </div>
             );
@@ -380,7 +313,7 @@ export default function AuthorLinkingPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid #e5e7eb" }}>
-                  {["DATO", "ARTIKLER BEHANDLET", "NYE FORFATTERE", "DUBLETTER", "AFVIST", "VARIGHED", "STATUS"].map((h) => (
+                  {["DATO", "ARTIKLER BEHANDLET", "FORFATTERE BEHANDLET", "NYE", "EKSISTEREDE", "FEJL", "VARIGHED", "STATUS"].map((h) => (
                     <th key={h} style={thStyle}>{h}</th>
                   ))}
                 </tr>
@@ -394,14 +327,17 @@ export default function AuthorLinkingPage() {
                     <td style={{ padding: "12px", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: "#374151" }}>
                       {log.articles_processed.toLocaleString("da-DK")}
                     </td>
+                    <td style={{ padding: "12px", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: "#374151" }}>
+                      {log.authors_processed.toLocaleString("da-DK")}
+                    </td>
                     <td style={{ padding: "12px", fontVariantNumeric: "tabular-nums", color: "#16a34a" }}>
                       {log.new_authors.toLocaleString("da-DK")}
                     </td>
                     <td style={{ padding: "12px", fontVariantNumeric: "tabular-nums", color: "#2563eb" }}>
-                      {log.duplicates.toLocaleString("da-DK")}
+                      {log.existing.toLocaleString("da-DK")}
                     </td>
-                    <td style={{ padding: "12px", fontVariantNumeric: "tabular-nums", color: log.rejected > 0 ? "#dc2626" : "#9ca3af" }}>
-                      {log.rejected > 0 ? log.rejected.toLocaleString("da-DK") : "—"}
+                    <td style={{ padding: "12px", fontVariantNumeric: "tabular-nums", color: log.errors > 0 ? "#dc2626" : "#9ca3af" }}>
+                      {log.errors > 0 ? log.errors.toLocaleString("da-DK") : "—"}
                     </td>
                     <td style={{ padding: "12px", color: "#6b7280", whiteSpace: "nowrap" }}>
                       {log.status === "running" ? "Kører…" : fmtDuration(log.started_at, log.completed_at)}
@@ -432,6 +368,94 @@ export default function AuthorLinkingPage() {
 
 
       </div>
-    </div>
+
+    {/* Rejected authors modal */}
+    {showRejected && (
+      <div
+        style={{
+          position: "fixed", inset: 0, zIndex: 50,
+          background: "rgba(0,0,0,0.45)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 24,
+        }}
+        onClick={() => setShowRejected(false)}
+      >
+        <div
+          style={{
+            background: "#fff", borderRadius: 12, width: "100%", maxWidth: 760,
+            maxHeight: "80vh", display: "flex", flexDirection: "column",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Modal header */}
+          <div style={{
+            padding: "16px 24px", borderBottom: "1px solid #e5e7eb",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            flexShrink: 0,
+          }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>Afviste forfattere</div>
+              {rejectedRows && (
+                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
+                  Viser {Math.min(rejectedRows.length, 20)} af {status?.rejectedAuthorsCount ?? rejectedRows.length}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setShowRejected(false)}
+              style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#6b7280", lineHeight: 1 }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Modal body — scrollable table */}
+          <div style={{ overflowY: "auto", flex: 1 }}>
+            {loadingRejected ? (
+              <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "#9ca3af" }}>Indlæser…</div>
+            ) : !rejectedRows?.length ? (
+              <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "#9ca3af" }}>Ingen afviste forfattere</div>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead style={{ position: "sticky", top: 0, background: "#f8f9fb", zIndex: 1 }}>
+                  <tr>
+                    {["PUBMED ID", "FORFATTER", "ÅRSAG", "DATO"].map((h) => (
+                      <th key={h} style={thStyle}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rejectedRows.slice(0, 20).map((row) => (
+                    <tr key={row.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                      <td style={{ padding: "10px 12px", fontFamily: "monospace", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
+                        {row.pubmed_id}
+                      </td>
+                      <td style={{ padding: "10px 12px", color: "#374151" }}>
+                        {(row.raw_data?.lastName as string | undefined || row.raw_data?.foreName as string | undefined)
+                          ? `${(row.raw_data.lastName as string | undefined) ?? ""}${row.raw_data.foreName ? ", " + (row.raw_data.foreName as string) : ""}`.trim()
+                          : "—"}
+                      </td>
+                      <td style={{ padding: "10px 12px" }}>
+                        <span style={{
+                          background: "#fef2f2", color: "#dc2626", fontSize: 10, fontWeight: 600,
+                          padding: "2px 6px", borderRadius: 4,
+                        }}>
+                          {row.reason}
+                        </span>
+                      </td>
+                      <td style={{ padding: "10px 12px", color: "#9ca3af", whiteSpace: "nowrap", fontSize: 12 }}>
+                        {fmt(row.created_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
   );
 }

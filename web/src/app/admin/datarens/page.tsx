@@ -1,11 +1,53 @@
-import Link from "next/link";
+"use client";
 
-const items = [
-  { href: "/admin/datarens/author-geo", title: "Author Geo", desc: "Validér forfatter-lokationer fra affiliation-parsing" },
-  { href: "/admin/datarens/dedub",      title: "Dedub",      desc: "Deduplicering af forfatterposter" },
-];
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+
+interface VerificationStats {
+  human:        number;
+  uverificeret: number;
+}
+
+function fmt(n: number | undefined): string {
+  if (n === undefined) return "–";
+  return n.toLocaleString("da-DK");
+}
 
 export default function DatarensPage() {
+  const [stats, setStats]       = useState<VerificationStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  useEffect(() => {
+    const supabase = createClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.rpc as any)("get_author_verification_stats")
+      .single()
+      .then(({ data }: { data: VerificationStats | null }) => {
+        if (data) setStats(data);
+      })
+      .finally(() => setStatsLoading(false));
+  }, []);
+
+  const statLabel = statsLoading
+    ? "–"
+    : `${fmt(stats?.human)} human · ${fmt(stats?.uverificeret)} uverificeret`;
+
+  const items = [
+    {
+      href:  "/admin/datarens/author-geo",
+      title: "Author Verification",
+      desc:  "Verificér forfatter-lokationer fra affiliation-parsing",
+      stats: statLabel,
+    },
+    {
+      href:  "/admin/datarens/dedub",
+      title: "Dedub",
+      desc:  "Deduplicering af forfatterposter",
+      stats: null,
+    },
+  ];
+
   return (
     <div style={{
       fontFamily: "var(--font-inter), Inter, sans-serif",
@@ -52,6 +94,11 @@ export default function DatarensPage() {
                 <div>
                   <div style={{ fontSize: "16px", fontWeight: 600, marginBottom: "6px" }}>{item.title}</div>
                   <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>{item.desc}</p>
+                  {item.stats !== null && (
+                    <p style={{ fontSize: "12px", color: "#aaa", margin: "6px 0 0", fontVariantNumeric: "tabular-nums" }}>
+                      {item.stats}
+                    </p>
+                  )}
                 </div>
                 <span style={{ fontSize: "18px", color: "#bbb", flexShrink: 0 }}>→</span>
               </div>

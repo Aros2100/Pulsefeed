@@ -19,7 +19,7 @@ export async function GET() {
     admin.from("authors").select("id", { count: "exact", head: true }),
     admin
       .from("author_linking_logs")
-      .select("new_authors, duplicates, rejected")
+      .select("new_authors, duplicates, rejected, authors_processed")
       .in("status", ["completed", "running"]),
     admin
       .from("rejected_authors" as never)
@@ -37,7 +37,7 @@ export async function GET() {
     ),
   ];
 
-  let filterNameByImportLogId: Record<string, string> = {};
+  const filterNameByImportLogId: Record<string, string> = {};
   if (importLogIds.length > 0) {
     const { data: importLogs } = await admin
       .from("import_logs")
@@ -52,17 +52,22 @@ export async function GET() {
   }
 
   const enrichedLogs = logs.map((l) => {
-    const importLogId = (l as Record<string, unknown>).import_log_id as string | null;
+    const raw = l as Record<string, unknown>;
+    const importLogId = raw.import_log_id as string | null;
     return {
       ...l,
+      existing: (raw.duplicates as number) ?? 0,
+      errors: (raw.rejected as number) ?? 0,
+      authors_processed: (raw.authors_processed as number) ?? 0,
       import_filter_name: importLogId ? (filterNameByImportLogId[importLogId] ?? "—") : null,
     };
   });
 
   const totals = totalsResult.data ?? [];
-  const totalNew        = totals.reduce((s, r) => s + ((r as Record<string, number>).new_authors ?? 0), 0);
-  const totalDuplicates = totals.reduce((s, r) => s + ((r as Record<string, number>).duplicates  ?? 0), 0);
-  const totalRejected   = totals.reduce((s, r) => s + ((r as Record<string, number>).rejected    ?? 0), 0);
+  const totalNew              = totals.reduce((s, r) => s + ((r as Record<string, number>).new_authors      ?? 0), 0);
+  const totalExisting         = totals.reduce((s, r) => s + ((r as Record<string, number>).duplicates       ?? 0), 0);
+  const totalErrors           = totals.reduce((s, r) => s + ((r as Record<string, number>).rejected         ?? 0), 0);
+  const totalAuthorsProcessed = totals.reduce((s, r) => s + ((r as Record<string, number>).authors_processed ?? 0), 0);
 
   return NextResponse.json({
     ok: true,
@@ -72,8 +77,9 @@ export async function GET() {
     unlinkedAuthorSlots: (unlinkedSlotsResult.data as number | null) ?? 0,
     totalAuthors: authorsResult.count ?? 0,
     totalNew,
-    totalDuplicates,
-    totalRejected,
+    totalExisting,
+    totalErrors,
+    totalAuthorsProcessed,
     rejectedAuthorsCount: rejectedAuthorsResult.count ?? 0,
   });
 }

@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { getActivePrompt, ANALYSIS_MODEL } from "@/lib/lab/scorer";
 import { trackedCall } from "@/lib/ai/tracked-client";
+import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
 
 const schema = z.object({
   specialty: z.string().refine(
@@ -86,6 +87,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
+  const promptForOptimization = activePrompt.prompt
+    .replace(SUBSPECIALTY_OPTIONS.join(", "), "{{subspecialty_list}}");
+
   let userMessage: string;
 
   if (isClassification) {
@@ -103,7 +107,7 @@ export async function POST(request: NextRequest) {
 
 The AI used this prompt (version: ${activePrompt.version}):
 <current_prompt>
-${activePrompt.prompt}
+${promptForOptimization}
 </current_prompt>
 
 CORRECTIONS — Human changed AI's subspecialty tags (${rows.length} cases):
@@ -113,7 +117,7 @@ Analyze the TRENDS — not individual articles. Identify:
 1. What subspecialties does the AI over-assign? (max 5 patterns, put in false_positive_patterns)
 2. What subspecialties does the AI under-assign or miss? (max 5 patterns, put in false_negative_patterns)
 3. What specific changes to the prompt would improve classification accuracy?
-4. Write an improved prompt. Must use {{title}} and {{abstract}} as placeholders.
+4. Write an improved prompt. Must use {{title}}, {{abstract}}, and {{subspecialty_list}} as placeholders.
 
 Respond in JSON only — no markdown, no backticks:
 {
@@ -127,7 +131,7 @@ Respond in JSON only — no markdown, no backticks:
 
 The AI used this prompt (version: ${activePrompt.version}):
 <current_prompt>
-${activePrompt.prompt}
+${promptForOptimization}
 </current_prompt>
 
 FALSE POSITIVES — AI approved, human rejected (${falsePositives.length} cases):
@@ -140,7 +144,7 @@ Analyze the TRENDS — not individual articles. Identify:
 1. What categories of articles does the AI incorrectly approve? (max 5 patterns)
 2. What categories of articles does the AI incorrectly reject? (max 5 patterns)
 3. What specific changes to the prompt would fix these trends?
-4. Write an improved prompt. Must use {{title}} and {{abstract}} as placeholders.
+4. Write an improved prompt. Must use {{title}}, {{abstract}}, and {{subspecialty_list}} as placeholders.
 
 Respond in JSON only — no markdown, no backticks:
 {

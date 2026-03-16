@@ -112,8 +112,9 @@ export default async function ImportDashboardPage() {
     c1ApprovedRes, c2ApprovedRes, c2PendingRes, c2RejectedRes,
     c3ApprovedRes, c3PendingRes, c3RejectedRes,
     totalArticlesRes,
-    authorsResult, unlinkedResult, unlinkedSlotsResult, linkingTotalsResult,
+    authorsResult, unlinkedResult, unlinkedSlotsResult,
     latestC1LogResult, latestC2LogResult, latestC3LogResult,
+    latestLinkingRunResult,
   ] = await Promise.all([
     // Article counts per circle+status
     countQ(1, "approved"), countQ(2, "approved"), countQ(2, "pending"), countQ(2, "rejected"),
@@ -124,9 +125,6 @@ export default async function ImportDashboardPage() {
     admin.from("authors").select("*", { count: "exact", head: true }),
     admin.rpc("count_unlinked_articles" as never),
     admin.rpc("count_unlinked_author_slots" as never),
-    admin.from("author_linking_logs")
-      .select("new_authors, duplicates, rejected")
-      .in("status", ["completed", "running"]),
     // Latest completed import log per circle
     admin.from("pubmed_filters").select("id").eq("specialty", "neurosurgery").eq("circle", 1)
       .then(async (fRes: { data: { id: string }[] | null }) => {
@@ -148,6 +146,12 @@ export default async function ImportDashboardPage() {
       .eq("status", "completed").eq("circle", 3)
       .order("started_at", { ascending: false }).limit(1)
       .maybeSingle() as Promise<{ data: ImportLog | null }>,
+    admin.from("author_linking_logs")
+      .select("started_at")
+      .eq("status", "completed")
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   // ── Article stats ──
@@ -169,10 +173,7 @@ export default async function ImportDashboardPage() {
   const totalAuthors = authorsResult.count ?? 0;
   const unlinkedArticles = (unlinkedResult.data as unknown as number) ?? 0;
   const unlinkedAuthorSlots = (unlinkedSlotsResult.data as unknown as number) ?? 0;
-  const linkingTotals = (linkingTotalsResult.data ?? []) as { new_authors: number; duplicates: number; rejected: number }[];
-  const totalNewAuthors = linkingTotals.reduce((s, r) => s + (r.new_authors ?? 0), 0);
-  const totalDuplicateAuthors = linkingTotals.reduce((s, r) => s + (r.duplicates ?? 0), 0);
-  const totalRejectedAuthors = linkingTotals.reduce((s, r) => s + (r.rejected ?? 0), 0);
+  const latestLinkingRun = fmt((latestLinkingRunResult as { data: { started_at: string } | null }).data?.started_at ?? null);
 
   // Circle table data
   const circleRows: {
@@ -297,9 +298,6 @@ export default async function ImportDashboardPage() {
               { label: "Artikler uden forfattere", value: unlinkedArticles, color: "#ea580c" },
               { label: "Afventer", value: unlinkedAuthorSlots, color: "#1a1a1a" },
               { label: "Forfattere i DB", value: totalAuthors, color: "#1a1a1a" },
-              { label: "Nye forfattere", value: totalNewAuthors, color: "#16a34a" },
-              { label: "Dubletter", value: totalDuplicateAuthors, color: "#2563eb" },
-              { label: "Afvist", value: totalRejectedAuthors, color: "#dc2626" },
             ].map(({ label, value, color }) => (
               <div key={label} style={{
                 background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10,
@@ -311,6 +309,15 @@ export default async function ImportDashboardPage() {
                 <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>{label}</div>
               </div>
             ))}
+            <div style={{
+              background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10,
+              padding: "16px 20px", flex: 1, minWidth: 130,
+            }}>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "#1a1a1a", letterSpacing: "-0.02em" }}>
+                {latestLinkingRun}
+              </div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>Seneste kørsel</div>
+            </div>
           </div>
         </div>
 

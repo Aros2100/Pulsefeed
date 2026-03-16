@@ -3,6 +3,7 @@ CREATE OR REPLACE FUNCTION find_author_duplicates(
   p_match_state    boolean DEFAULT false,
   p_match_city     boolean DEFAULT true,
   p_match_hospital boolean DEFAULT false,
+  p_country        text    DEFAULT NULL,
   p_last_name_chars          integer  DEFAULT 4,
   p_exclude_countries        text[]   DEFAULT ARRAY['China', 'South Korea', 'Japan'],
   p_max_group_size           integer  DEFAULT 8,
@@ -29,6 +30,7 @@ AS $fn$
     FROM authors
     WHERE display_name_normalized IS NOT NULL
       AND display_name_normalized <> ''
+      AND (p_country IS NULL OR country = p_country)
   ),
   -- Find candidate pairs
   pairs AS (
@@ -65,6 +67,7 @@ AS $fn$
       AND (NOT p_match_state    OR a1.state    IS NULL OR a2.state    IS NULL OR a1.state    = a2.state)
       AND (NOT p_match_city     OR a1.city     IS NULL OR a2.city     IS NULL OR a1.city     = a2.city)
       AND (NOT p_match_hospital OR a1.hospital IS NULL OR a2.hospital IS NULL OR a1.hospital = a2.hospital)
+      AND (p_country IS NULL OR (a1.country = p_country AND a2.country = p_country))
   ),
   -- Flatten pairs to (group_anchor, member_id)
   -- Each author belongs to the group of their minimum connected id_lo

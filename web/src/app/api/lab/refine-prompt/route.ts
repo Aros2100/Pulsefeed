@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { trackedCall } from "@/lib/ai/tracked-client";
+import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
 
 const regressionCommentSchema = z.object({
   article_id: z.string().uuid(),
@@ -43,11 +44,14 @@ export async function POST(request: NextRequest) {
     ? `\n\nThe domain expert also reviewed regression cases (articles where the new prompt disagrees with earlier correct decisions) and provided these comments:\n<regression_comments>\n${regression_comments.map((c, i) => `${i + 1}. ${c.title ? `"${c.title}" — ` : ""}${c.comment}`).join("\n")}\n</regression_comments>\n\nUse these regression comments to avoid introducing new errors while fixing the prompt.`
     : "";
 
+  const promptForOptimization = current_prompt
+    .replace(SUBSPECIALTY_OPTIONS.join(", "), "{{subspecialty_list}}");
+
   const userMessage = `You are refining an AI scoring prompt for ${specialty} article relevance.
 
 The current candidate prompt is:
 <current_prompt>
-${current_prompt}
+${promptForOptimization}
 </current_prompt>
 
 This prompt was generated based on these error patterns:
@@ -59,7 +63,7 @@ The domain expert has reviewed the prompt and provided this feedback:
 ${feedback}
 </feedback>${regressionSection}
 
-Rewrite the prompt incorporating the expert's feedback while maintaining the corrections for the error patterns above. Keep {{title}} and {{abstract}} as placeholders. Keep the JSON response format instruction at the end.
+Rewrite the prompt incorporating the expert's feedback while maintaining the corrections for the error patterns above. Keep {{title}}, {{abstract}}, and {{subspecialty_list}} as placeholders. Keep the JSON response format instruction at the end.
 
 Respond with the refined prompt text only — no explanation, no markdown.`;
 

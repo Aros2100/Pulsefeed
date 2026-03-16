@@ -60,18 +60,6 @@ export default async function ClassificationSimulatePage({ searchParams }: Props
 
   if (!run) redirect("/admin/lab/classification/optimize");
 
-  // Fetch active model version (for regression sample)
-  const { data: activeVersionData } = await admin
-    .from("model_versions")
-    .select("version")
-    .eq("specialty", run.specialty)
-    .eq("module", "classification_subspecialty")
-    .eq("active", true)
-    .limit(1)
-    .maybeSingle();
-
-  const activeModelVersion = (activeVersionData?.version as string | null) ?? run.base_version;
-
   // Fetch all decisions
   const [{ data: rawDecisions }, { data: rawAgreementData }] = await Promise.all([
     admin
@@ -79,7 +67,6 @@ export default async function ClassificationSimulatePage({ searchParams }: Props
       .select("decision, ai_decision, ai_confidence, disagreement_reason, article_id, articles(title, journal_title)")
       .eq("specialty", run.specialty)
       .eq("module", "classification_subspecialty")
-      .eq("model_version", activeModelVersion)
       .not("ai_decision", "is", null)
       .order("decided_at", { ascending: false }),
 
@@ -88,7 +75,6 @@ export default async function ClassificationSimulatePage({ searchParams }: Props
       .select("decision, ai_decision, ai_confidence, article_id, articles(title, journal_title)")
       .eq("specialty", run.specialty)
       .eq("module", "classification_subspecialty")
-      .neq("model_version", activeModelVersion)
       .not("ai_decision", "is", null)
       .order("decided_at", { ascending: false })
       .limit(300),

@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
     p_match_state?: boolean;
     p_match_city?: boolean;
     p_match_hospital?: boolean;
+    p_country?: string | null;
     p_last_name_chars?: number;
     p_max_group_size?: number;
   };
@@ -33,6 +34,7 @@ export async function POST(request: NextRequest) {
     p_match_state    = false,
     p_match_city     = true,
     p_match_hospital = false,
+    p_country        = null,
     p_last_name_chars = 4,
     p_max_group_size  = 8,
   } = body;
@@ -45,6 +47,7 @@ export async function POST(request: NextRequest) {
     p_match_state,
     p_match_city,
     p_match_hospital,
+    p_country,
     p_last_name_chars,
     p_max_group_size,
   });

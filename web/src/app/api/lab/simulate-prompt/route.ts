@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { trackedCall } from "@/lib/ai/tracked-client";
+import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
 
 const DELAY_MS = 1300; // stay safely under 50 req/min
 
@@ -30,9 +31,10 @@ async function scoreWithPrompt(
   promptTemplate: string
 ): Promise<ScoreResult> {
   const content = promptTemplate
-    .replace(/\{\{specialty\}\}|\{specialty\}/g, specialty)
-    .replace(/\{\{title\}\}|\{title\}/g, article.title)
-    .replace(/\{\{abstract\}\}|\{abstract\}/g, article.abstract ?? "No abstract available");
+    .replace(/\{\{specialty\}\}|\{specialty\}/g,                 specialty)
+    .replace(/\{\{title\}\}|\{title\}/g,                         article.title)
+    .replace(/\{\{abstract\}\}|\{abstract\}/g,                   article.abstract ?? "No abstract available")
+    .replace(/\{\{subspecialty_list\}\}|\{subspecialty_list\}/g, SUBSPECIALTY_OPTIONS.join(", "));
 
   const message = await trackedCall("simulate_prompt", {
     model: "claude-haiku-4-5-20251001",

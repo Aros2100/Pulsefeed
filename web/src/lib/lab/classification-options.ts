@@ -2,7 +2,7 @@ export const SUBSPECIALTY_OPTIONS = [
   "Spine surgery",
   "Neurosurgical oncology and Radiosurgery",
   "Vascular and Endovascular Neurosurgery",
-  "Functional, pain and epilepsy surgery",
+  "Functional Pain and Epilepsy Surgery",
   "Pediatric and foetal neurosurgery",
   "Neurotraumatology",
   "Peripheral nerve surgery",
@@ -14,6 +14,6 @@ export const SUBSPECIALTY_OPTIONS = [
   "Neurorehabilitation",
   "Surgical Technique and Technology",
   "Basic and Translational Research",
-  "Ethics, Education and Socioeconomics",
-  "Digital Health, Robotics, and Innovation",
+  "Ethics Education and Socioeconomics",
+  "Digital Health Robotics and Innovation",
 ] as const;

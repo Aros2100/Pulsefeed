@@ -27,7 +27,7 @@ const SUB_SHORT_LABELS: Record<string, string> = {
   "Spine surgery": "Spine",
   "Neurosurgical oncology and Radiosurgery": "Oncology",
   "Vascular and Endovascular Neurosurgery": "Vascular",
-  "Functional, pain and epilepsy surgery": "Functional",
+  "Functional Pain and Epilepsy Surgery": "Functional",
   "Pediatric and foetal neurosurgery": "Pediatric",
   "Neurotraumatology": "Trauma",
   "Peripheral nerve surgery": "Peripheral nerve",
@@ -39,8 +39,8 @@ const SUB_SHORT_LABELS: Record<string, string> = {
   "Neurorehabilitation": "Neurorehab",
   "Surgical Technique and Technology": "Surgical Tech",
   "Basic and Translational Research": "Basic Research",
-  "Ethics, Education and Socioeconomics": "Ethics/Education",
-  "Digital Health, Robotics, and Innovation": "Digital Health",
+  "Ethics Education and Socioeconomics": "Ethics/Education",
+  "Digital Health Robotics and Innovation": "Digital Health",
 };
 
 // ── Evidence levels ──────────────────────────────────────────────────────────
