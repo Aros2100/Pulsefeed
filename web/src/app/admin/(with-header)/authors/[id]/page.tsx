@@ -124,11 +124,24 @@ function formatDanishDate(ts: string | null): string {
 
 const EVENT_COLORS: Record<string, { dot: string; border: string; bg: string; label: string }> = {
   created:           { dot: "#3b82f6", border: "#bfdbfe", bg: "#eff6ff", label: "Oprettet" },
-  openalex_enriched: { dot: "#8b5cf6", border: "#ddd6fe", bg: "#f5f3ff", label: "OpenAlex Beriget" },
-  geo_updated:       { dot: "#f97316", border: "#fed7aa", bg: "#fff7ed", label: "Geo Opdateret" },
+  openalex_enriched: { dot: "#8b5cf6", border: "#ddd6fe", bg: "#f5f3ff", label: "Institutional and location data enriched from OpenAlex" },
+  geo_updated:       { dot: "#f97316", border: "#fed7aa", bg: "#fff7ed", label: "Geo opdateret" },
   merged:            { dot: "#ef4444", border: "#fecaca", bg: "#fef2f2", label: "Flettet" },
+  article_linked:    { dot: "#10b981", border: "#a7f3d0", bg: "#f0fdf4", label: "New article linked to author" },
+  openalex_fetched:  { dot: "#7c3aed", border: "#ddd6fe", bg: "#f5f3ff", label: "Author matched in OpenAlex" },
+  geo_parsed:        { dot: "#ea580c", border: "#fed7aa", bg: "#fff7ed", label: "Author location parsed" },
 };
 const FALLBACK_EVENT_COLOR = { dot: "#6b7280", border: "#d1d5db", bg: "#f9fafb", label: "Hændelse" };
+
+function KV({ label, value }: { label: string; value: React.ReactNode }) {
+  if (!value && value !== 0) return null;
+  return (
+    <div style={{ display: "flex", gap: "8px", alignItems: "baseline", fontSize: "13px" }}>
+      <span style={{ color: "#888", minWidth: "140px", flexShrink: 0 }}>{label}</span>
+      <span style={{ color: "#1a1a1a" }}>{value}</span>
+    </div>
+  );
+}
 
 function PayloadRows({ payload }: { payload: Record<string, unknown> }) {
   const entries = Object.entries(payload).filter(([, v]) => v != null && v !== "");
@@ -143,6 +156,109 @@ function PayloadRows({ payload }: { payload: Record<string, unknown> }) {
       ))}
     </div>
   );
+}
+
+type EP = Record<string, unknown>;
+
+function translateSource(v: unknown): string | null {
+  if (v === "parser")   return "PubMed affiliation text";
+  if (v === "openalex") return "OpenAlex";
+  return v != null ? String(v) : null;
+}
+
+function translateVerifiedBy(v: unknown): string | null {
+  if (v === "uverificeret") return "Not verified";
+  return v != null ? String(v) : null;
+}
+
+function translateConfidence(conf: number): string {
+  if (conf >= 1.0) return "Certain (ORCID)";
+  if (conf >= 0.8) return "Probable (name + location)";
+  return `${(conf * 100).toFixed(0)}%`;
+}
+
+function CreatedEventCard({ p }: { p: EP }) {
+  const conf = p.match_confidence as number | null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      <KV label="Source"      value={translateSource(p.source)} />
+      <KV label="Verified by" value={translateVerifiedBy(p.verified_by)} />
+      {conf != null && <KV label="Match confidence" value={translateConfidence(conf)} />}
+      {typeof p.article_id === "string" && p.article_id && (
+        <KV label="Article" value={
+          <a href={`/admin/articles/${p.article_id}`} style={{ color: "#1a6eb5", textDecoration: "none", fontSize: "12px", fontFamily: "monospace" }}>
+            {p.article_id.slice(0, 8)}… ↗
+          </a>
+        } />
+      )}
+    </div>
+  );
+}
+
+function OpenAlexEnrichedEventCard({ p }: { p: EP }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      {p.openalex_id != null && (
+        <KV label="OpenAlex ID" value={
+          <a href={`https://openalex.org/authors/${p.openalex_id}`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
+            {String(p.openalex_id)} ↗
+          </a>
+        } />
+      )}
+      {p.ror_id          != null && <KV label="ROR ID"           value={String(p.ror_id)} />}
+      {p.institution_type != null && <KV label="Institution type" value={String(p.institution_type)} />}
+      <KV label="Geo source" value={p.geo_source as string | null} />
+    </div>
+  );
+}
+
+function OpenAlexFetchedEventCard({ p }: { p: EP }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      {p.openalex_id       != null && <KV label="OpenAlex ID"      value={String(p.openalex_id)} />}
+      {p.ror_id            != null && <KV label="ROR ID"           value={String(p.ror_id)} />}
+      {p.institution_type  != null && <KV label="Institution type" value={String(p.institution_type)} />}
+      {p.fwci              != null && <KV label="FWCI"             value={(p.fwci as number).toFixed(2)} />}
+    </div>
+  );
+}
+
+function GeoEventCard({ p }: { p: EP }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      {p.country     != null && <KV label="Land"        value={String(p.country)} />}
+      {p.city        != null && <KV label="By"          value={String(p.city)} />}
+      {p.state       != null && <KV label="Stat"        value={String(p.state)} />}
+      {p.institution != null && <KV label="Institution" value={String(p.institution)} />}
+      {p.source      != null && <KV label="Source"      value={translateSource(p.source)} />}
+    </div>
+  );
+}
+
+function ArticleLinkedEventCard({ p }: { p: EP }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      {typeof p.article_id === "string" && p.article_id && (
+        <KV label="Article" value={
+          <a href={`/admin/articles/${p.article_id}`} style={{ color: "#1a6eb5", textDecoration: "none", fontSize: "12px", fontFamily: "monospace" }}>
+            {p.article_id.slice(0, 8)}… ↗
+          </a>
+        } />
+      )}
+    </div>
+  );
+}
+
+function AuthorEventBody({ eventType, payload }: { eventType: string; payload: EP }) {
+  switch (eventType) {
+    case "created":           return <CreatedEventCard          p={payload} />;
+    case "openalex_enriched": return <OpenAlexEnrichedEventCard p={payload} />;
+    case "openalex_fetched":  return <OpenAlexFetchedEventCard  p={payload} />;
+    case "geo_updated":       return <GeoEventCard              p={payload} />;
+    case "geo_parsed":        return <GeoEventCard              p={payload} />;
+    case "article_linked":    return <ArticleLinkedEventCard    p={payload} />;
+    default:                  return <PayloadRows               payload={payload} />;
+  }
 }
 
 const TABS: { key: Tab; label: string }[] = [
@@ -219,7 +335,7 @@ export default function AdminAuthorDetailPage() {
         .from("author_events")
         .select("id, event_type, payload, created_at")
         .eq("author_id", id)
-        .order("created_at", { ascending: false });
+        .order("sequence", { ascending: true });
       setEvents((eventRows as AuthorEvent[] | null) ?? []);
 
       setLoading(false);
@@ -355,7 +471,7 @@ export default function AdminAuthorDetailPage() {
                               <span style={{ fontSize: "12px", fontWeight: 700, color: c.dot, textTransform: "uppercase", letterSpacing: "0.06em" }}>{c.label}</span>
                               <span style={{ fontSize: "11px", color: "#9ca3af" }}>{formatDanishDate(ev.created_at)}</span>
                             </div>
-                            <PayloadRows payload={ev.payload} />
+                            <AuthorEventBody eventType={ev.event_type} payload={ev.payload} />
                           </div>
                         </div>
                       );

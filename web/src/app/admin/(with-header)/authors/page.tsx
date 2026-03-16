@@ -1,10 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 const PAGE_SIZE = 50;
+
+const selectStyle: React.CSSProperties = {
+  border: "1px solid #d1d5db",
+  borderRadius: "8px",
+  padding: "10px 14px",
+  fontSize: "14px",
+  color: "#1a1a1a",
+  background: "#fff",
+  outline: "none",
+  cursor: "pointer",
+};
 
 function AuthorScoreBadge({ score }: { score: number }) {
   const bg    = score >= 35 ? "#f0fdf4" : score >= 15 ? "#fffbeb" : "#fef2f2";
@@ -22,45 +34,111 @@ interface Author {
   affiliations: string[] | null;
   article_count: number | null;
   author_score: number | null;
+  created_at: string | null;
+}
+
+const IMPORTED_OPTIONS = [
+  { value: "",     label: "Alle perioder" },
+  { value: "7d",   label: "Seneste 7 dage" },
+  { value: "30d",  label: "Seneste 30 dage" },
+  { value: "90d",  label: "Seneste 3 måneder" },
+  { value: "365d", label: "Seneste år" },
+];
+
+function importedCutoff(value: string): string | null {
+  if (!value) return null;
+  const days = parseInt(value, 10);
+  return new Date(Date.now() - days * 86400000).toISOString();
 }
 
 export default function AdminAuthorsPage() {
-  const [query, setQuery] = useState("");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const query         = searchParams.get("q") ?? "";
+  const filterCountry = searchParams.get("country") ?? "";
+  const filterCity    = searchParams.get("city") ?? "";
+  const filterImported = searchParams.get("imported") ?? "";
+  const page          = parseInt(searchParams.get("page") ?? "0", 10);
+
+  const [inputValue, setInputValue] = useState(query);
   const [authors, setAuthors] = useState<Author[]>([]);
   const [total, setTotal] = useState<number | null>(null);
-  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  const [countries, setCountries] = useState<string[]>([]);
+  const [cities, setCities] = useState<string[]>([]);
+
+  function setParam(key: string, value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+    if (key !== "page") params.delete("page");
+    router.replace(`${pathname}?${params.toString()}`);
+  }
+
+  // Sync inputValue → URL with 300ms debounce
   useEffect(() => {
-    setPage(0);
+    const timer = setTimeout(() => {
+      setParam("q", inputValue);
+    }, 300);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputValue]);
+
+  // Keep inputValue in sync if URL changes externally (e.g. back/forward)
+  useEffect(() => {
+    setInputValue(query);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
+  // Fetch distinct country + city values once
   useEffect(() => {
-    const delay = query.trim().length >= 2 ? 300 : 0;
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      const supabase = createClient();
-      const from = page * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
+    const supabase = createClient();
+    void Promise.all([
+      supabase.from("authors").select("country").not("country", "is", null).limit(200),
+      supabase.from("authors").select("city").not("city", "is", null).limit(200),
+    ]).then(([cRes, ciRes]) => {
+      const cData  = (cRes.data  ?? []) as { country: string }[];
+      const ciData = (ciRes.data ?? []) as { city: string }[];
+      setCountries([...new Set(cData.map((r) => r.country).filter(Boolean))].sort());
+      setCities([...new Set(ciData.map((r) => r.city).filter(Boolean))].sort());
+    });
+  }, []);
 
-      let req = supabase
-        .from("authors")
-        .select("id, display_name, affiliations, article_count, author_score", { count: "exact" })
-        .order("author_score", { ascending: false, nullsFirst: false })
-        .order("article_count", { ascending: false, nullsFirst: false })
-        .range(from, to);
+  // Main data fetch
+  useEffect(() => {
+    const supabase = createClient();
+    const from = page * PAGE_SIZE;
+    const to   = from + PAGE_SIZE - 1;
+    setLoading(true);
 
-      if (query.trim().length >= 2) {
-        req = req.ilike("display_name", `%${query.trim()}%`);
-      }
+    let req = supabase
+      .from("authors")
+      .select("id, display_name, affiliations, article_count, author_score, created_at", { count: "exact" })
+      .order("created_at", { ascending: false, nullsFirst: false })
+      .range(from, to);
 
-      const { data, count } = await req;
+    if (query.trim().length >= 2) {
+      req = req.ilike("display_name", `%${query.trim()}%`);
+    }
+    if (filterCountry)  req = req.eq("country", filterCountry);
+    if (filterCity)     req = req.eq("city", filterCity);
+    if (filterImported) {
+      const cutoff = importedCutoff(filterImported);
+      if (cutoff) req = req.gte("created_at", cutoff);
+    }
+
+    req.then(({ data, count }) => {
       setAuthors((data as unknown as Author[]) ?? []);
       setTotal(count ?? null);
       setLoading(false);
-    }, delay);
-    return () => clearTimeout(timer);
-  }, [query, page]);
+    });
+  }, [query, page, filterCountry, filterCity, filterImported]);
 
   const totalPages = total !== null ? Math.ceil(total / PAGE_SIZE) : null;
 
@@ -68,32 +146,19 @@ export default function AdminAuthorsPage() {
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
-
-        <div style={{ marginBottom: "28px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-          <div>
-            <div style={{ fontSize: "26px", fontWeight: 700 }}>Authors</div>
-            <div style={{ fontSize: "14px", color: "#888", marginTop: "4px" }}>
-              {total !== null ? `${total.toLocaleString("da-DK")} forfattere i databasen` : "Browse researchers indexed in the database"}
-            </div>
+        <div style={{ marginBottom: "28px" }}>
+          <div style={{ fontSize: "26px", fontWeight: 700 }}>Authors</div>
+          <div style={{ fontSize: "14px", color: "#888", marginTop: "4px" }}>
+            {total !== null ? `${total.toLocaleString("da-DK")} forfattere i databasen` : "Browse researchers indexed in the database"}
           </div>
-          <Link
-            href="/admin/authors/merge"
-            style={{
-              fontSize: "13px", fontWeight: 600, padding: "8px 16px",
-              background: "#b91c1c", color: "#fff", borderRadius: "8px",
-              textDecoration: "none", whiteSpace: "nowrap", marginTop: "4px",
-            }}
-          >
-            Merge duplikater
-          </Link>
         </div>
 
-        <div style={{ marginBottom: "20px" }}>
+        <div style={{ marginBottom: "12px" }}>
           <input
             type="text"
             placeholder="Search by name…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
             style={{
               width: "100%",
               boxSizing: "border-box",
@@ -106,6 +171,43 @@ export default function AdminAuthorsPage() {
               background: "#fff",
             }}
           />
+        </div>
+
+        {/* Filter row */}
+        <div style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
+          {countries.length > 0 && (
+            <select
+              value={filterCountry}
+              onChange={(e) => setParam("country", e.target.value)}
+              style={selectStyle}
+            >
+              <option value="">Alle lande</option>
+              {countries.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          )}
+          {cities.length > 0 && (
+            <select
+              value={filterCity}
+              onChange={(e) => setParam("city", e.target.value)}
+              style={selectStyle}
+            >
+              <option value="">Alle byer</option>
+              {cities.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          )}
+          <select
+            value={filterImported}
+            onChange={(e) => setParam("imported", e.target.value)}
+            style={selectStyle}
+          >
+            {IMPORTED_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
         </div>
 
         <div style={{
@@ -153,6 +255,9 @@ export default function AdminAuthorsPage() {
                 )}
               </div>
               <div style={{ marginLeft: "16px", flexShrink: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "12px", color: "#aaa" }}>
+                  {author.created_at ? new Date(author.created_at).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" }) : ""}
+                </span>
                 {author.author_score != null && (
                   <AuthorScoreBadge score={author.author_score} />
                 )}
@@ -173,7 +278,7 @@ export default function AdminAuthorsPage() {
               padding: "16px 24px", borderTop: "1px solid #f0f0f0",
             }}>
               <button
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                onClick={() => setParam("page", String(Math.max(0, page - 1)))}
                 disabled={page === 0}
                 style={{
                   fontSize: "13px", fontWeight: 600, padding: "6px 14px",
@@ -187,7 +292,7 @@ export default function AdminAuthorsPage() {
                 {page + 1} / {totalPages}
               </span>
               <button
-                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                onClick={() => setParam("page", String(Math.min(totalPages - 1, page + 1)))}
                 disabled={page >= totalPages - 1}
                 style={{
                   fontSize: "13px", fontWeight: 600, padding: "6px 14px",

@@ -4,7 +4,10 @@ export type AuthorEventType =
   | "created"
   | "openalex_enriched"
   | "geo_updated"
-  | "merged";
+  | "merged"
+  | "article_linked"
+  | "openalex_fetched"
+  | "geo_parsed";
 
 export async function logAuthorEvent(
   authorId: string,

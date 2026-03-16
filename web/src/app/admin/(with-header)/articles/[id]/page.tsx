@@ -24,17 +24,16 @@ function specialtyLabel(slug: string) {
 // ── Timeline colours ──────────────────────────────────────────────────────────
 
 const COLORS: Record<string, { dot: string; border: string; bg: string; label: string }> = {
-  imported:       { dot: "#3b82f6", border: "#bfdbfe", bg: "#eff6ff",  label: "Import" },
+  imported:       { dot: "#3b82f6", border: "#bfdbfe", bg: "#eff6ff",  label: "Article imported" },
   enriched:       { dot: "#8b5cf6", border: "#ddd6fe", bg: "#f5f3ff",  label: "AI Berigelse" },
   lab_decision:   { dot: "#10b981", border: "#a7f3d0", bg: "#f0fdf4",  label: "Lab" },
   feedback:       { dot: "#f59e0b", border: "#fde68a", bg: "#fffbeb",  label: "Feedback" },
   status_changed: { dot: "#f97316", border: "#fed7aa", bg: "#fff7ed",  label: "Status ændret" },
   verified:       { dot: "#10b981", border: "#a7f3d0", bg: "#f0fdf4",  label: "Verificeret" },
-  author_linked:  { dot: "#3b82f6", border: "#bfdbfe", bg: "#eff6ff",  label: "Forfattere" },
+  author_linked:  { dot: "#3b82f6", border: "#bfdbfe", bg: "#eff6ff",  label: "Authors linked to article" },
   quality_check:          { dot: "#6b7280", border: "#d1d5db", bg: "#f9fafb",  label: "Quality Check" },
   auto_tagged:            { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff",  label: "Auto-Tagged" },
-  impact_factor_updated:  { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff",  label: "Impact Factor opdateret" },
-  citation_count_updated: { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff",  label: "Citations opdateret" },
+  citation_count_updated: { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff",  label: "Citation count updated" },
 };
 
 const FALLBACK_COLOR = { dot: "#6b7280", border: "#d1d5db", bg: "#f9fafb", label: "Event" };
@@ -126,12 +125,11 @@ type P = Record<string, unknown>;
 function ImportedCard({ p }: { p: P }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-      <KV label="Cirkel"            value={p.circle != null ? `Circle ${p.circle}` : null} />
-      <KV label="Status ved import" value={
-        <Badge color={p.status === "approved" ? "green" : "blue"}>{String(p.status ?? "pending")}</Badge>
-      } />
+      {p.status === "approved" && (
+        <KV label="Auto-approved" value={<Badge color="green">Yes (C1 source)</Badge>} />
+      )}
       {Array.isArray(p.specialty_tags) && (p.specialty_tags as string[]).length > 0 && (
-        <KV label="Specialty tags" value={
+        <KV label="Specialty" value={
           <span style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
             {(p.specialty_tags as string[]).map((s) => (
               <Badge key={s} color="blue">{specialtyLabel(s)}</Badge>
@@ -251,10 +249,10 @@ function VerifiedCard({ p }: { p: P }) {
 function AuthorLinkedCard({ p }: { p: P }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-      <KV label="Forfattere linket" value={p.authors_linked != null ? String(p.authors_linked) : null} />
-      <KV label="Nye"               value={p.new != null ? String(p.new) : null} />
-      <KV label="Duplikater"        value={p.duplicates != null ? String(p.duplicates) : null} />
-      {(p.rejected as number) > 0   && <KV label="Afvist" value={String(p.rejected)} />}
+      <KV label="Authors linked" value={p.authors_linked != null ? String(p.authors_linked) : null} />
+      <KV label="New"            value={p.new != null ? String(p.new) : null} />
+      <KV label="Existing authors matched" value={p.duplicates != null ? String(p.duplicates) : null} />
+      {(p.rejected as number) > 0 && <KV label="Rejected" value={String(p.rejected)} />}
     </div>
   );
 }
@@ -283,7 +281,7 @@ function ImpactFactorUpdatedCard({ p }: { p: P }) {
 function CitationCountUpdatedCard({ p }: { p: P }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-      <KV label="Citationer" value={p.citation_count != null ? String(p.citation_count) : "—"} />
+      <KV label="Citation count" value={p.citation_count != null ? String(p.citation_count) : "—"} />
     </div>
   );
 }
@@ -408,7 +406,7 @@ export default async function AdminArticleLogPage({
 
   const [articleResult, eventsResult, authorLinksResult] = await Promise.all([
     admin.from("articles").select("*").eq("id", id).maybeSingle(),
-    admin.from("article_events" as never).select("*").eq("article_id", id).order("created_at", { ascending: true }),
+    admin.from("article_events" as never).select("*").eq("article_id", id).order("sequence", { ascending: true }),
     admin.from("article_authors").select("author_id, position, authors(author_score, department, hospital, city, state, country, verified_by)").eq("article_id", id),
   ]);
 
@@ -931,7 +929,7 @@ export default async function AdminArticleLogPage({
     { title: "Speciale scoring",         types: ["enriched"] },
     { title: "Auto-Tagging",            types: ["auto_tagged"] },
     { title: "Validering",               types: ["lab_decision"] },
-    { title: "Bibliometri",              types: ["impact_factor_updated", "citation_count_updated"] },
+    { title: "Bibliometri",              types: ["citation_count_updated"] },
   ];
 
   const grouped = SECTIONS.map((s) => ({

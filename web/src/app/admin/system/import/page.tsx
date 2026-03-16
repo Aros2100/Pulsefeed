@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import ImportDashboardActions from "./ImportDashboardActions";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -95,6 +94,43 @@ function SectionHeading({ title }: { title: string }) {
   );
 }
 
+interface PeriodRow {
+  label: string;
+  today: number;
+  week: number;
+  month: number;
+  year: number;
+  total: number;
+}
+
+function PeriodTable({ rows }: { rows: PeriodRow[] }) {
+  const cols = ["I dag", "Denne uge", "Denne måned", "I år", "Total"];
+  return (
+    <div style={{ borderBottom: "1px solid #eef0f4", overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            <th style={{ ...thStyle, width: "160px" }}></th>
+            {cols.map(c => <th key={c} style={thStyle}>{c}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(row => (
+            <tr key={row.label}>
+              <td style={{ ...tdStyle, fontWeight: 700, color: "#5a6a85", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                {row.label}
+              </td>
+              {[row.today, row.week, row.month, row.year, row.total].map((v, i) => (
+                <td key={i} style={{ ...tdStyle, fontSize: "20px", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{num(v)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function ImportDashboardPage() {
@@ -115,6 +151,10 @@ export default async function ImportDashboardPage() {
     authorsResult, unlinkedResult, unlinkedSlotsResult,
     latestC1LogResult, latestC2LogResult, latestC3LogResult,
     latestLinkingRunResult,
+    articlesTodayRes, articlesWeekRes, articlesMonthRes, articlesYearRes,
+    authorsTodayRes, authorsWeekRes, authorsMonthRes, authorsYearRes, authorsTotalRes,
+    openalexTodayRes, openalexWeekRes, openalexMonthRes, openalexYearRes, openalexTotalRes,
+    uverTodayRes, uverWeekRes, uverMonthRes, uverYearRes, uverTotalRes,
   ] = await Promise.all([
     // Article counts per circle+status
     countQ(1, "approved"), countQ(2, "approved"), countQ(2, "pending"), countQ(2, "rejected"),
@@ -152,6 +192,55 @@ export default async function ImportDashboardPage() {
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // Article counts by period (imported_at)
+    a.from("articles").select("id", { count: "exact", head: true })
+      .gte("imported_at", new Date(new Date().setHours(0,0,0,0)).toISOString()),
+    a.from("articles").select("id", { count: "exact", head: true })
+      .gte("imported_at", new Date(Date.now() - 7 * 86400000).toISOString()),
+    a.from("articles").select("id", { count: "exact", head: true })
+      .gte("imported_at", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
+    a.from("articles").select("id", { count: "exact", head: true })
+      .gte("imported_at", new Date(new Date().getFullYear(), 0, 1).toISOString()),
+    // Author linking: sum of authors_processed by period (started_at, status = completed)
+    a.from("author_linking_logs").select("authors_processed").eq("status", "completed")
+      .gte("started_at", new Date(new Date().setHours(0,0,0,0)).toISOString()),
+    a.from("author_linking_logs").select("authors_processed").eq("status", "completed")
+      .gte("started_at", new Date(Date.now() - 7 * 86400000).toISOString()),
+    a.from("author_linking_logs").select("authors_processed").eq("status", "completed")
+      .gte("started_at", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
+    a.from("author_linking_logs").select("authors_processed").eq("status", "completed")
+      .gte("started_at", new Date(new Date().getFullYear(), 0, 1).toISOString()),
+    a.from("author_linking_logs").select("authors_processed").eq("status", "completed"),
+    // OpenAlex: authors with openalex_enriched_at IS NOT NULL, counted by openalex_enriched_at
+    a.from("authors").select("id", { count: "exact", head: true })
+      .not("openalex_enriched_at", "is", null)
+      .gte("openalex_enriched_at", new Date(new Date().setHours(0,0,0,0)).toISOString()),
+    a.from("authors").select("id", { count: "exact", head: true })
+      .not("openalex_enriched_at", "is", null)
+      .gte("openalex_enriched_at", new Date(Date.now() - 7 * 86400000).toISOString()),
+    a.from("authors").select("id", { count: "exact", head: true })
+      .not("openalex_enriched_at", "is", null)
+      .gte("openalex_enriched_at", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
+    a.from("authors").select("id", { count: "exact", head: true })
+      .not("openalex_enriched_at", "is", null)
+      .gte("openalex_enriched_at", new Date(new Date().getFullYear(), 0, 1).toISOString()),
+    a.from("authors").select("id", { count: "exact", head: true })
+      .not("openalex_enriched_at", "is", null),
+    // Uverificeret: verified_by = 'uverificeret', counted by created_at
+    a.from("authors").select("id", { count: "exact", head: true })
+      .eq("verified_by", "uverificeret")
+      .gte("created_at", new Date(new Date().setHours(0,0,0,0)).toISOString()),
+    a.from("authors").select("id", { count: "exact", head: true })
+      .eq("verified_by", "uverificeret")
+      .gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString()),
+    a.from("authors").select("id", { count: "exact", head: true })
+      .eq("verified_by", "uverificeret")
+      .gte("created_at", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
+    a.from("authors").select("id", { count: "exact", head: true })
+      .eq("verified_by", "uverificeret")
+      .gte("created_at", new Date(new Date().getFullYear(), 0, 1).toISOString()),
+    a.from("authors").select("id", { count: "exact", head: true })
+      .eq("verified_by", "uverificeret"),
   ]);
 
   // ── Article stats ──
@@ -174,6 +263,36 @@ export default async function ImportDashboardPage() {
   const unlinkedArticles = (unlinkedResult.data as unknown as number) ?? 0;
   const unlinkedAuthorSlots = (unlinkedSlotsResult.data as unknown as number) ?? 0;
   const latestLinkingRun = fmt((latestLinkingRunResult as { data: { started_at: string } | null }).data?.started_at ?? null);
+
+  // Article period counts
+  const articlesToday = (articlesTodayRes as { count: number | null }).count ?? 0;
+  const articlesWeek  = (articlesWeekRes  as { count: number | null }).count ?? 0;
+  const articlesMonth = (articlesMonthRes as { count: number | null }).count ?? 0;
+  const articlesYear  = (articlesYearRes  as { count: number | null }).count ?? 0;
+
+  // Author period sums
+  const sumAuthors = (rows: { authors_processed: number }[]) =>
+    rows.reduce((s, r) => s + (r.authors_processed ?? 0), 0);
+
+  const authorsToday = sumAuthors((authorsTodayRes.data ?? []) as { authors_processed: number }[]);
+  const authorsWeek  = sumAuthors((authorsWeekRes.data  ?? []) as { authors_processed: number }[]);
+  const authorsMonth = sumAuthors((authorsMonthRes.data ?? []) as { authors_processed: number }[]);
+  const authorsYear  = sumAuthors((authorsYearRes.data  ?? []) as { authors_processed: number }[]);
+  const authorsTotal = sumAuthors((authorsTotalRes.data ?? []) as { authors_processed: number }[]);
+
+  // OpenAlex period counts
+  const openalexToday = (openalexTodayRes as { count: number | null }).count ?? 0;
+  const openalexWeek  = (openalexWeekRes  as { count: number | null }).count ?? 0;
+  const openalexMonth = (openalexMonthRes as { count: number | null }).count ?? 0;
+  const openalexYear  = (openalexYearRes  as { count: number | null }).count ?? 0;
+  const openalexTotal = (openalexTotalRes as { count: number | null }).count ?? 0;
+
+  // Uverificeret period counts
+  const uverToday = (uverTodayRes as { count: number | null }).count ?? 0;
+  const uverWeek  = (uverWeekRes  as { count: number | null }).count ?? 0;
+  const uverMonth = (uverMonthRes as { count: number | null }).count ?? 0;
+  const uverYear  = (uverYearRes  as { count: number | null }).count ?? 0;
+  const uverTotal = (uverTotalRes as { count: number | null }).count ?? 0;
 
   // Circle table data
   const circleRows: {
@@ -222,6 +341,10 @@ export default async function ImportDashboardPage() {
           <div style={sectionHeader}>
             <span style={headerLabel}>Import-kilder</span>
           </div>
+
+          <PeriodTable rows={[
+            { label: "Importeret", today: articlesToday, week: articlesWeek, month: articlesMonth, year: articlesYear, total: totalArticles },
+          ]} />
 
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
@@ -285,7 +408,7 @@ export default async function ImportDashboardPage() {
         <SectionHeading title="Forfattere" />
         <div style={sectionCard}>
           <div style={sectionHeader}>
-            <span style={headerLabel}>Forfatter-linking</span>
+            <span style={headerLabel}>Forfatter-berigelse</span>
             <Link
               href="/admin/system/author-linking"
               style={{ fontSize: "13px", fontWeight: 600, color: "#E83B2A", textDecoration: "none" }}
@@ -293,6 +416,13 @@ export default async function ImportDashboardPage() {
               Administrér →
             </Link>
           </div>
+
+          <PeriodTable rows={[
+            { label: "Linket",           today: authorsToday, week: authorsWeek, month: authorsMonth, year: authorsYear, total: authorsTotal },
+            { label: "OpenAlex",         today: openalexToday, week: openalexWeek, month: openalexMonth, year: openalexYear, total: openalexTotal },
+            { label: "Geo-uverificeret", today: uverToday, week: uverWeek, month: uverMonth, year: uverYear, total: uverTotal },
+          ]} />
+
           <div style={{ padding: "20px 24px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
             {[
               { label: "Artikler uden forfattere", value: unlinkedArticles, color: "#ea580c" },
@@ -318,27 +448,6 @@ export default async function ImportDashboardPage() {
               </div>
               <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>Seneste kørsel</div>
             </div>
-          </div>
-        </div>
-
-        {/* ═══ SEKTION 3: BERIGELSE ═══ */}
-        <SectionHeading title="Berigelse" />
-        <div style={sectionCard}>
-          <div style={sectionHeader}>
-            <span style={headerLabel}>Citations & Impact Factor</span>
-          </div>
-          <div style={{ padding: "20px 24px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
-            <ImportDashboardActions specialtySlugs={[]} subset="citations" />
-            <ImportDashboardActions specialtySlugs={[]} subset="impact-factor" />
-          </div>
-        </div>
-
-        <div style={sectionCard}>
-          <div style={sectionHeader}>
-            <span style={headerLabel}>Geo-location</span>
-          </div>
-          <div style={{ padding: "20px 24px" }}>
-            <ImportDashboardActions specialtySlugs={[]} subset="geo" />
           </div>
         </div>
 

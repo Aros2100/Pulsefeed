@@ -17,6 +17,7 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
   const linkedArticleIds: string[] = [];
   let articlesProcessed = 0;
   let authorsLinked = 0;
+  let authorsProcessed = 0;
   let newAuthors = 0;
   let duplicates = 0;
   let rejected = 0;
@@ -91,10 +92,11 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
           console.log(`[author-linker] calling linkAuthorsToArticle for PMID ${article.pubmed_id} (${authors.length} authors, oaWork=${oaWork ? 'yes' : 'no'})`);
           await linkAuthorsToArticle(admin, article.id, authors, oaWork)
             .then(async (result) => {
-              newAuthors  += result.new;
-              duplicates  += result.duplicates;
-              rejected    += result.rejected;
-              authorsLinked += result.new + result.duplicates;
+              newAuthors      += result.new;
+              duplicates      += result.duplicates;
+              rejected        += result.rejected;
+              authorsLinked   += result.new + result.duplicates;
+              authorsProcessed += result.new + result.duplicates + result.rejected;
               console.log(`[author-linker] linked PMID ${article.pubmed_id} — new=${result.new} dup=${result.duplicates} rejected=${result.rejected}`);
 
               // Populate article geo fields from first/last author affiliation
@@ -178,7 +180,7 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
       console.log(`[author-linker] writing progress to DB — logId=${logId} articles_processed=${articlesProcessed} authors_linked=${authorsLinked}`);
       const { error: updateErr } = await admin
         .from("author_linking_logs")
-        .update({ articles_processed: articlesProcessed, authors_linked: authorsLinked, new_authors: newAuthors, duplicates, rejected })
+        .update({ articles_processed: articlesProcessed, authors_linked: authorsLinked, authors_processed: authorsProcessed, new_authors: newAuthors, duplicates, rejected })
         .eq("id", logId);
       if (updateErr) {
         console.error(`[author-linker] progress update failed:`, updateErr.message);
@@ -207,6 +209,7 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
         completed_at: new Date().toISOString(),
         articles_processed: articlesProcessed,
         authors_linked: authorsLinked,
+        authors_processed: authorsProcessed,
         new_authors: newAuthors,
         duplicates,
         rejected,

@@ -349,6 +349,7 @@ async function mergeAuthor(
   newOrcid: string | null,
   displayName: string,
   reason: "orcid" | "geo" = "geo",
+  articleId?: string | null,
 ): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const update: Record<string, any> = {};
@@ -361,7 +362,11 @@ async function mergeAuthor(
   if (newOrcid && !existing.orcid) update.orcid = newOrcid;
   update.display_name_normalized = normalizeAuthorName(displayName);
   await admin.from("authors").update(update).eq("id", existingId);
-  void logAuthorEvent(existingId, "merged", { reason, merged_into_id: existingId });
+  void logAuthorEvent(existingId, "merged", {
+    reason,
+    merged_into_id: existingId,
+    ...(articleId ? { article_id: articleId } : {}),
+  });
 }
 
 function countryCodeToName(code: string): string | null {
@@ -373,6 +378,7 @@ async function resolveAuthorFromOpenAlex(
   pubmedAuthor: Author,
   oaAuthorship: OpenAlexAuthorship,
   articleId?: string | null,
+  oaWork?: OpenAlexWork | null,
 ): Promise<{ id: string; outcome: AuthorOutcome }> {
   const oaId = oaAuthorship.author.id;
   const oaOrcid = oaAuthorship.author.orcid;
@@ -435,6 +441,8 @@ async function resolveAuthorFromOpenAlex(
         openalex_id: oaId,
         ror_id: primaryInst?.ror ?? null,
         institution_type: primaryInst?.type ?? null,
+        geo_source: "openalex",
+        verified_by: "openalex",
       });
       return { id: orcidMatch.id, outcome: "duplicate" };
     }
@@ -482,6 +490,8 @@ async function resolveAuthorFromOpenAlex(
         openalex_id: oaId,
         ror_id: primaryInst?.ror ?? null,
         institution_type: primaryInst?.type ?? null,
+        geo_source: "openalex",
+        verified_by: "openalex",
       });
       return { id: nameMatch.id, outcome: "duplicate" };
     }
@@ -521,6 +531,14 @@ async function resolveAuthorFromOpenAlex(
       openalex_id: oaId,
       ror_id: enrichment.ror_id ?? null,
       institution_type: enrichment.institution_type ?? null,
+      geo_source: "openalex",
+      verified_by: "openalex",
+    });
+    void logAuthorEvent(result.id, "openalex_fetched", {
+      openalex_id: oaId,
+      ror_id: primaryInst?.ror ?? null,
+      institution_type: primaryInst?.type ?? null,
+      fwci: oaWork?.fwci ?? null,
     });
   }
 
@@ -559,7 +577,7 @@ async function resolveAuthorId(
       .maybeSingle();
 
     if (orcidMatch) {
-      await mergeAuthor(admin, orcidMatch.id, orcidMatch, parsed, newOrcid, displayName, "orcid");
+      await mergeAuthor(admin, orcidMatch.id, orcidMatch, parsed, newOrcid, displayName, "orcid", articleId);
       return { id: orcidMatch.id, outcome: "duplicate" };
     }
   }
@@ -604,7 +622,7 @@ async function resolveAuthorId(
     if (newOrcid) {
       const orcidMatch = candidates.find(c => c.orcid === newOrcid);
       if (orcidMatch) {
-        await mergeAuthor(admin, orcidMatch.id, orcidMatch, parsed, newOrcid, displayName, "orcid");
+        await mergeAuthor(admin, orcidMatch.id, orcidMatch, parsed, newOrcid, displayName, "orcid", articleId);
         return { id: orcidMatch.id, outcome: "duplicate" };
       }
       // All candidates with a different ORCID → skip them, create new
@@ -661,7 +679,7 @@ async function resolveAuthorId(
         if (matches.length === 1) {
           const match = matches[0];
           if (!(newOrcid && match.orcid && newOrcid !== match.orcid)) {
-            await mergeAuthor(admin, match.id, match, parsed, newOrcid, displayName);
+            await mergeAuthor(admin, match.id, match, parsed, newOrcid, displayName, "geo", articleId);
             return { id: match.id, outcome: 'duplicate' };
           }
         }
@@ -705,7 +723,7 @@ async function resolveAuthorId(
         if (matches.length === 1) {
           const match = matches[0];
           if (!(newOrcid && match.orcid && newOrcid !== match.orcid)) {
-            await mergeAuthor(admin, match.id, match, parsed, newOrcid, displayName);
+            await mergeAuthor(admin, match.id, match, parsed, newOrcid, displayName, "geo", articleId);
             if (displayName.length > (match.display_name?.length ?? 0)) {
               await db.from('authors').update({
                 display_name: displayName,
@@ -742,7 +760,7 @@ async function matchByGeo(
         && c.country?.toLowerCase() === parsed.country!.toLowerCase()
     );
     if (geoMatch) {
-      await mergeAuthor(admin, geoMatch.id, geoMatch, parsed, newOrcid, displayName);
+      await mergeAuthor(admin, geoMatch.id, geoMatch, parsed, newOrcid, displayName, "geo", articleId);
       return { id: geoMatch.id, outcome: "duplicate" };
     }
   }
@@ -758,7 +776,7 @@ async function matchByGeo(
     if (sameCityCountry.length === 1) {
       const match = sameCityCountry[0];
       if (!(newOrcid && match.orcid && newOrcid !== match.orcid)) {
-        await mergeAuthor(admin, match.id, match, parsed, newOrcid, displayName);
+        await mergeAuthor(admin, match.id, match, parsed, newOrcid, displayName, "geo", articleId);
         return { id: match.id, outcome: "duplicate" };
       }
     }
@@ -767,7 +785,7 @@ async function matchByGeo(
   // 2c. Same name + existing has no geo
   const noGeoMatch = candidates.find(c => !c.city && !c.country);
   if (noGeoMatch) {
-    await mergeAuthor(admin, noGeoMatch.id, noGeoMatch, parsed, newOrcid, displayName);
+    await mergeAuthor(admin, noGeoMatch.id, noGeoMatch, parsed, newOrcid, displayName, "geo", articleId);
     return { id: noGeoMatch.id, outcome: "duplicate" };
   }
 
@@ -775,7 +793,7 @@ async function matchByGeo(
   if (!parsed.city && !parsed.country) {
     const firstWithGeo = candidates.find(c => c.city || c.country);
     if (firstWithGeo) {
-      await mergeAuthor(admin, firstWithGeo.id, firstWithGeo, parsed, newOrcid, displayName);
+      await mergeAuthor(admin, firstWithGeo.id, firstWithGeo, parsed, newOrcid, displayName, "geo", articleId);
       return { id: firstWithGeo.id, outcome: "duplicate" };
     }
   }
@@ -830,6 +848,16 @@ async function createNewAuthor(
     geo_source: openalexId ? "openalex" : "parser",
     ...(articleId ? { article_id: articleId } : {}),
   });
+
+  if (parsed.country || parsed.city) {
+    void logAuthorEvent(created!.id, "geo_parsed", {
+      country: parsed.country ?? null,
+      city: parsed.city ?? null,
+      institution: parsed.institution ?? null,
+      source: "parser",
+      confidence: null,
+    });
+  }
 
   return { id: created!.id, outcome: "new" };
 }
@@ -887,7 +915,7 @@ export async function linkAuthorsToArticle(
     const tResolve = Date.now();
     const oaAuthorship = oaMatchMap.get(i) ?? null;
     const { id: authorId, outcome } = oaAuthorship
-      ? await resolveAuthorFromOpenAlex(admin, author, oaAuthorship, articleId)
+      ? await resolveAuthorFromOpenAlex(admin, author, oaAuthorship, articleId, oaWork)
       : await resolveAuthorId(admin, author, articleId);
     console.log(`[import] resolve "${authorName}": ${Date.now() - tResolve}ms (${oaAuthorship ? "openalex" : "parser"})`);
 
@@ -948,6 +976,9 @@ export async function linkAuthorsToArticle(
       newCount++;
     } else {
       dupCount++;
+      void logAuthorEvent(authorId, "article_linked", {
+        article_id: articleId,
+      });
     }
   }
 
@@ -1400,7 +1431,7 @@ export async function runImport(
           if (upsertErr) {
             errors.push(`Upsert batch error: ${upsertErr.message}`);
           } else {
-            filterImported += batch.length;
+            filterImported += (upsertedRows ?? []).length;
             totalAuthorSlots += batch.reduce((sum, a) => {
               const authors = (a.authors as unknown as unknown[]) ?? [];
               return sum + authors.length;
