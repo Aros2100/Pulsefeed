@@ -1,6 +1,7 @@
 import { trackedCall } from "@/lib/ai/tracked-client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
+import { ARTICLE_TYPE_OPTIONS } from "@/lib/lab/article-type-options";
 
 export const SCORING_MODEL = process.env.AI_SCORING_MODEL ?? "claude-haiku-4-5-20251001";
 export const ANALYSIS_MODEL = process.env.AI_ANALYSIS_MODEL ?? "claude-sonnet-4-20250514";
@@ -52,7 +53,7 @@ export async function getActivePrompt(specialty: string, module: string): Promis
 }
 
 export async function scoreArticle(
-  article: { title: string; abstract: string | null },
+  article: { id?: string; title: string; abstract: string | null },
   specialty: string,
   activePrompt: ActivePrompt
 ): Promise<ScoreResult & { version: string }> {
@@ -65,7 +66,7 @@ export async function scoreArticle(
     model: SCORING_MODEL,
     max_tokens: 256,
     messages: [{ role: "user", content }],
-  });
+  }, article.id, "specialty");
 
   const raw = (message.content[0] as { type: string; text: string }).text.trim();
 
@@ -83,7 +84,7 @@ export async function scoreArticle(
 }
 
 export async function scoreClassification(
-  article: { title: string; abstract: string | null },
+  article: { id?: string; title: string; abstract: string | null },
   specialty: string,
   activePrompt: ActivePrompt
 ): Promise<ClassificationResult> {
@@ -97,7 +98,7 @@ export async function scoreClassification(
     model: SCORING_MODEL,
     max_tokens: 512,
     messages: [{ role: "user", content }],
-  });
+  }, article.id, "classification");
 
   const raw = (message.content[0] as { type: string; text: string }).text.trim();
 
@@ -135,8 +136,77 @@ export async function scoreClassification(
   }
 }
 
+export interface ArticleTypeResult {
+  article_type: string;
+  confidence: number;
+  rationale: string;
+  version: string;
+}
+
+export async function scoreArticleType(
+  article: {
+    id?: string;
+    title: string;
+    abstract: string | null;
+    journal_abbr?: string | null;
+    journal_title?: string | null;
+    mesh_terms?: unknown;
+    publication_types?: unknown;
+  },
+  activePrompt: ActivePrompt
+): Promise<ArticleTypeResult> {
+  const journal = article.journal_abbr ?? article.journal_title ?? "Unknown";
+  const meshTerms = Array.isArray(article.mesh_terms)
+    ? (article.mesh_terms as string[]).join(", ")
+    : "None";
+  const pubTypes = Array.isArray(article.publication_types)
+    ? (article.publication_types as string[]).join(", ")
+    : "None";
+
+  const content = activePrompt.prompt
+    .replace(/\{\{title\}\}|\{title\}/g,                           article.title)
+    .replace(/\{\{journal\}\}|\{journal\}/g,                       journal)
+    .replace(/\{\{abstract\}\}|\{abstract\}/g,                     article.abstract ?? "No abstract available")
+    .replace(/\{\{mesh_terms\}\}|\{mesh_terms\}/g,                 meshTerms)
+    .replace(/\{\{publication_types\}\}|\{publication_types\}/g,   pubTypes);
+
+  const message = await trackedCall(`article_type_${activePrompt.version}`, {
+    model: SCORING_MODEL,
+    max_tokens: 512,
+    messages: [{ role: "user", content }],
+  }, article.id, "article_type");
+
+  const raw = (message.content[0] as { type: string; text: string }).text.trim();
+  const articleTypeSet = new Set<string>(ARTICLE_TYPE_OPTIONS);
+
+  try {
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as {
+      article_type?: string;
+      confidence?: number;
+      rationale?: string;
+    };
+
+    const article_type =
+      typeof parsed.article_type === "string" && articleTypeSet.has(parsed.article_type)
+        ? parsed.article_type
+        : "Other";
+    const confidence = Math.min(99, Math.max(1, Math.round(Number(parsed.confidence ?? 50))));
+    const rationale = typeof parsed.rationale === "string" ? parsed.rationale.slice(0, 500) : "";
+
+    return { article_type, confidence, rationale, version: activePrompt.version };
+  } catch {
+    return {
+      article_type: "Other",
+      confidence: 50,
+      rationale: "Failed to parse AI response",
+      version: activePrompt.version,
+    };
+  }
+}
+
 export async function scoreCondensation(
-  article: { title: string; abstract: string | null },
+  article: { id?: string; title: string; abstract: string | null },
   specialty: string,
   activePrompt: ActivePrompt
 ): Promise<CondensationResult> {
@@ -149,7 +219,7 @@ export async function scoreCondensation(
     model: SCORING_MODEL,
     max_tokens: 1024,
     messages: [{ role: "user", content }],
-  });
+  }, article.id, "condensation");
 
   const raw = (message.content[0] as { type: string; text: string }).text.trim();
 

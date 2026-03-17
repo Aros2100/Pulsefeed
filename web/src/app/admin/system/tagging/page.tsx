@@ -61,7 +61,7 @@ export default async function TaggingPage() {
         padding: "40px 24px 0",
       }}>
         <div style={{ marginBottom: "8px" }}>
-          <Link href="/admin/system" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+          <Link href="/admin/system/auto-tagging" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
             ← System
           </Link>
         </div>

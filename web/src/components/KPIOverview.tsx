@@ -96,6 +96,29 @@ const PERIODS: { key: Period; label: string }[] = [
   { key: "year", label: "Year" },
 ];
 
+function buildArticlesHref(
+  period: Period,
+  scope: string,
+  geoLevel: GeoLevel,
+  userGeo: UserGeo | null,
+): string {
+  const params = new URLSearchParams();
+  params.set("period", period);
+  if (scope !== "all") params.set("subspecialty", scope);
+  if (geoLevel !== "all" && userGeo) {
+    const paramName: Record<string, string> = {
+      continent: "continent",
+      region:    "region",
+      country:   "country",
+      city:      "city",
+    };
+    const geoValue = userGeo[geoLevel as keyof UserGeo];
+    const name = paramName[geoLevel];
+    if (geoValue && name) params.set(name, geoValue);
+  }
+  return `/articles?${params.toString()}`;
+}
+
 interface KPIOverviewProps {
   userSubspecialties: string[] | null;
 }
@@ -319,7 +342,7 @@ export default function KPIOverview({ userSubspecialties }: KPIOverviewProps) {
 
           {/* Center: big number */}
           <Link
-            href={`/articles?period=${period}${scope !== "all" ? `&subspecialty=${encodeURIComponent(scope)}` : ""}`}
+            href={buildArticlesHref(period, scope, geoLevel, data?.userGeo ?? null)}
             style={{
               flex: 1,
               display: "flex",
@@ -328,7 +351,7 @@ export default function KPIOverview({ userSubspecialties }: KPIOverviewProps) {
               justifyContent: "center",
               padding: "28px 32px",
               textDecoration: "none",
-              cursor: "pointer",
+              color: "inherit",
             }}
           >
             <div className={fraunces.className} style={{
@@ -337,6 +360,7 @@ export default function KPIOverview({ userSubspecialties }: KPIOverviewProps) {
               color: "#1e293b",
               lineHeight: 1,
               letterSpacing: "-0.02em",
+              cursor: "pointer",
             }}>
               {loading && !data ? "—" : <AnimatedNumber value={centralNumber} />}
             </div>

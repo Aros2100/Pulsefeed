@@ -43,7 +43,7 @@ Rules:
 Affiliation: "${raw}"`,
         },
       ],
-    });
+    }, undefined, "geo");
 
     const text =
       response.content[0].type === "text" ? response.content[0].text : null;

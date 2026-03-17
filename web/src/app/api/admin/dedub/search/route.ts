@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
     p_country,
     p_last_name_chars,
     p_max_group_size,
+    p_exact_lastname: false,
   });
 
   if (error) {

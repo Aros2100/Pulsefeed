@@ -122,6 +122,9 @@ export async function runImportCircle2(
     // Pre-load existing pubmed_ids from DB once (used for cross-source dedup)
     // We'll refresh per-source to catch articles inserted in earlier iterations.
 
+    // Global cap: all sources share the same max_results value (set identically via the UI)
+    const maxTotalResults = sources[0].max_results ?? 100;
+
     // 2–7. Loop per source so each article gets its source_id populated
     for (const source of sources) {
       const query = buildAffiliationQuery([source.value]);
@@ -147,8 +150,15 @@ export async function runImportCircle2(
         .select("pubmed_id")
         .in("pubmed_id", unseenPmids);
       const existingSet = new Set(existing?.map((r) => r.pubmed_id) ?? []);
-      const newPmids = unseenPmids.filter((id) => !existingSet.has(id));
+      let newPmids = unseenPmids.filter((id) => !existingSet.has(id));
       totalSkipped += pmids.length - newPmids.length;
+
+      // Apply global cap: never import more than maxTotalResults across all sources
+      const remaining = maxTotalResults - totalImported;
+      if (newPmids.length > remaining) {
+        totalSkipped += newPmids.length - remaining;
+        newPmids = newPmids.slice(0, remaining);
+      }
 
       // Mark all as seen (including already-existing) so later sources skip them
       for (const id of unseenPmids) seenPmids.add(id);
@@ -231,6 +241,8 @@ export async function runImportCircle2(
         .from("circle_2_sources")
         .update({ last_run_at: new Date().toISOString() })
         .eq("id", source.id);
+
+      if (totalImported >= maxTotalResults) break;
     }
 
   } catch (err) {

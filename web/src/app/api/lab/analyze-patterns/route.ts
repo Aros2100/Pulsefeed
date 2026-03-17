@@ -160,7 +160,7 @@ Respond in JSON only — no markdown, no backticks:
       model: ANALYSIS_MODEL,
       max_tokens: 4096,
       messages: [{ role: "user", content: userMessage }],
-    });
+    }, undefined, module);
 
     const raw = (message.content[0] as { type: string; text: string }).text.trim();
     const jsonMatch = raw.match(/\{[\s\S]*\}/);

@@ -72,7 +72,7 @@ Respond with the refined prompt text only — no explanation, no markdown.`;
       model: "claude-sonnet-4-20250514",
       max_tokens: 4096,
       messages: [{ role: "user", content: userMessage }],
-    });
+    }, undefined, specialty);
 
     const refined_prompt = (message.content[0] as { type: string; text: string }).text.trim();
 

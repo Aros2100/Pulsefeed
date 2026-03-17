@@ -3,7 +3,9 @@
 //   - get_scored_not_validated_articles (specialty_tag)
 //   - get_classification_not_validated_articles (classification)
 //   - get_condensation_not_validated_articles (condensation)
+//   - get_article_type_not_validated_articles (article_type)
 //   - count_scored_not_validated, count_classification_not_validated, count_condensation_not_validated
+//   - count_article_type_not_validated
 
 /**
  * Central filter definitions per Lab module.
@@ -28,6 +30,12 @@ export const MODULE_FILTERS = {
     filters: { status: "approved", circle: 3 },
     requireAbstract: true,
     nullCheck: "condensed_at",
+  },
+  article_type: {
+    description: "Approved articles for article type classification",
+    filters: { status: "approved", circle: null },
+    requireAbstract: true,
+    nullCheck: "article_type_scored_at",
   },
 } as const;
 

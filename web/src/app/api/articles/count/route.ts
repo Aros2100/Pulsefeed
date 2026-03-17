@@ -7,32 +7,33 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ count: 0 }, { status: 401 });
 
   const params = request.nextUrl.searchParams;
-  const period = params.get("period") ?? "week";
+  const period      = params.get("period") ?? "uge";
   const subspecialty = params.get("subspecialty");
-  const region = params.get("region");
+  const country     = params.get("country");
+  const city        = params.get("city");
+  const region      = params.get("region");
 
-  // Compute date boundary
   const now = new Date();
   let since: Date;
   switch (period) {
-    case "month": since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break;
-    case "year":  since = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000); break;
-    default:      since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
+    case "måned": since = new Date(now.getTime() - 30  * 24 * 60 * 60 * 1000); break;
+    case "år":    since = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000); break;
+    default:      since = new Date(now.getTime() - 7   * 24 * 60 * 60 * 1000); break;
   }
 
   let query = supabase
     .from("articles")
     .select("*", { count: "exact", head: true })
-    .eq("status", "approved")
-    .gte("imported_at", since.toISOString());
+    .eq("status", "approved");
 
-  if (subspecialty) {
-    query = query.contains("subspecialty_ai", [subspecialty]);
+  if (period !== "alle") {
+    query = query.gte("imported_at", since.toISOString());
   }
 
-  if (region) {
-    query = query.contains("article_regions", [region]);
-  }
+  if (subspecialty) query = query.contains("subspecialty_ai",   [subspecialty]);
+  if (country)      query = query.contains("article_countries", [country]);
+  if (city)         query = query.contains("article_cities",    [city]);
+  if (region)       query = query.contains("article_regions",   [region]);
 
   const { count, error } = await query;
   if (error) return NextResponse.json({ count: 0 }, { status: 500 });

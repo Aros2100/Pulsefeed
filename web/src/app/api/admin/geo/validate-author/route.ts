@@ -15,13 +15,20 @@ export async function GET() {
   const admin = createAdminClient() as any;
   const SELECT = "id, display_name, affiliations, city, country, hospital, department, state, article_count";
 
-  // Hent næste uverificerede forfatter – flest artikler først
-  const { data: candidates } = await admin
-    .from("authors")
-    .select(SELECT)
-    .eq("verified_by", "uverificeret")
-    .order("article_count", { ascending: false, nullsFirst: false })
-    .limit(50);
+  // Hent næste uverificerede forfatter – flest artikler først, prioriteret efter datakvalitet
+  const priorityQueries = [
+    { p: 1, q: admin.from("authors").select(SELECT).or("verified_by.eq.uverificeret,verified_by.is.null").not("affiliations", "is", null).neq("affiliations", "{}").is("country", null).is("hospital", null).is("city", null).order("article_count", { ascending: false, nullsFirst: false }).limit(50) },
+    { p: 2, q: admin.from("authors").select(SELECT).or("verified_by.eq.uverificeret,verified_by.is.null").is("country", null).not("hospital", "is", null).order("article_count", { ascending: false, nullsFirst: false }).limit(50) },
+    { p: 3, q: admin.from("authors").select(SELECT).or("verified_by.eq.uverificeret,verified_by.is.null").not("city", "is", null).is("hospital", null).not("country", "is", null).order("article_count", { ascending: false, nullsFirst: false }).limit(50) },
+    { p: 4, q: admin.from("authors").select(SELECT).or("verified_by.eq.uverificeret,verified_by.is.null").order("article_count", { ascending: false, nullsFirst: false }).limit(50) },
+  ];
+
+  let candidates = null;
+  let priority = 0;
+  for (const { p, q } of priorityQueries) {
+    const { data } = await q;
+    if (data && data.length > 0) { candidates = data; priority = p; break; }
+  }
 
   if (!candidates || candidates.length === 0) {
     return NextResponse.json({ ok: true, author: null, remaining: 0 });
@@ -67,7 +74,7 @@ export async function GET() {
     author: chosen,
     articles,
     remaining: filtered.length,
-    priority: 0,
+    priority,
   });
 }
 

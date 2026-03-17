@@ -6,6 +6,7 @@ import SidebarNav from "./SidebarNav";
 import SaveButton from "@/components/SaveButton";
 import ArticleViewTracker from "./ArticleViewTracker";
 import ShareButton from "./ShareButton";
+import BackButton from "./BackButton";
 
 interface PicoData { population?: string; intervention?: string; comparison?: string; outcome?: string }
 
@@ -68,6 +69,7 @@ export default async function ArticleDetailPage({
         <main style={{ padding: "32px 0 80px" }}>
           {/* Action bar */}
           <div style={{ display: "flex", gap: "8px", alignItems: "center", justifyContent: "flex-end", marginBottom: "16px" }}>
+            <BackButton />
             <ShareButton />
             <SaveButton
               articleId={id}

@@ -98,6 +98,7 @@ interface AuthorEvent {
   event_type: string;
   payload: Record<string, unknown>;
   created_at: string;
+  sequence: number;
 }
 
 interface ArticleItem {
@@ -336,7 +337,24 @@ export default function AdminAuthorDetailPage() {
         .select("id, event_type, payload, created_at")
         .eq("author_id", id)
         .order("sequence", { ascending: true });
-      setEvents((eventRows as AuthorEvent[] | null) ?? []);
+      const EVENT_ORDER = [
+        "created",
+        "geo_parsed",
+        "openalex_fetched",
+        "openalex_enriched",
+        "article_linked",
+        "merged",
+      ];
+      const rows = (eventRows as AuthorEvent[] | null) ?? [];
+      rows.sort((a, b) => {
+        const aTime = Math.floor(new Date(a.created_at).getTime() / 1000);
+        const bTime = Math.floor(new Date(b.created_at).getTime() / 1000);
+        if (aTime !== bTime) return aTime - bTime;
+        const ai = EVENT_ORDER.indexOf(a.event_type);
+        const bi = EVENT_ORDER.indexOf(b.event_type);
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      });
+      setEvents(rows);
 
       setLoading(false);
     }

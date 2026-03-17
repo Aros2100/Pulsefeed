@@ -40,7 +40,7 @@ async function scoreWithPrompt(
     model: "claude-haiku-4-5-20251001",
     max_tokens: 256,
     messages: [{ role: "user", content }],
-  });
+  }, article.id, specialty);
 
   const raw = (message.content[0] as { type: string; text: string }).text.trim();
 

@@ -1,22 +1,24 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { MessageCreateParamsNonStreaming } from "@anthropic-ai/sdk/resources/messages";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { MODEL_PRICING } from "./model-pricing";
 
 const anthropic = new Anthropic();
 
-// Haiku pricing (per 1M tokens)
-const PRICING: Record<string, { input: number; output: number }> = {
-  "claude-haiku-4-5-20251001": { input: 0.80, output: 4.00 },
-};
-
 function calcCost(model: string, inputTokens: number, outputTokens: number): number {
-  const p = PRICING[model] ?? { input: 0.80, output: 4.00 };
+  const p = MODEL_PRICING[model];
+  if (!p) {
+    console.error(`[tracked-client] UNKNOWN MODEL PRICING: "${model}" — cost_usd will be 0. Add to model-pricing.ts`);
+    return 0;
+  }
   return (inputTokens * p.input + outputTokens * p.output) / 1_000_000;
 }
 
 export async function trackedCall(
   modelKey: string,
-  params: MessageCreateParamsNonStreaming
+  params: MessageCreateParamsNonStreaming,
+  articleId?: string,
+  task?: string
 ) {
   const response = await anthropic.messages.create({ ...params, stream: false }, { timeout: 60_000 });
 
@@ -34,6 +36,8 @@ export async function trackedCall(
       completion_tokens: completionTokens,
       total_tokens:      totalTokens,
       cost_usd:          costUsd,
+      article_id:        articleId ?? null,
+      task:              task ?? null,
     })
     .then(({ error }) => {
       if (error) console.error("[api_usage] insert failed:", error.message);

@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       role: "user",
       content: `How confident are you that this medical article is relevant to ${specialty}? Reply with ONLY an integer from 0 to 100, where 100 = definitely relevant, 0 = definitely not relevant.\n\n${content}`,
     }],
-  });
+  }, articleId, "specialty");
 
   const raw = (message.content[0] as { type: string; text: string }).text.trim();
   const score = Math.min(100, Math.max(0, parseInt(raw.replace(/\D/g, ""), 10) || 50));
