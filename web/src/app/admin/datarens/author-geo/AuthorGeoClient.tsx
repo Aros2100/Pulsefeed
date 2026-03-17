@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import AuthorGeoFields from "@/components/authors/AuthorGeoFields";
 
 interface AuthorData {
   id: string;
@@ -29,15 +30,6 @@ interface GeoFields {
   state: string;
 }
 
-const INST_KEYWORDS = [
-  "hospital", "university", "institute", "medical", "clinic",
-  "school", "college", "center", "centre", "department", "health",
-];
-
-function looksLikeInstitution(val: string): boolean {
-  const lower = val.toLowerCase();
-  return INST_KEYWORDS.some((kw) => lower.includes(kw));
-}
 
 export default function AuthorGeoClient() {
   const [author, setAuthor] = useState<AuthorData | null>(null);
@@ -126,10 +118,6 @@ export default function AuthorGeoClient() {
     setSaving(false);
   }
 
-  function updateField(key: keyof GeoFields, value: string) {
-    setFields((prev) => ({ ...prev, [key]: value }));
-  }
-
   const isChanged = author && (
     (fields.city || null) !== (author.city ?? null) ||
     (fields.country || null) !== (author.country ?? null) ||
@@ -169,16 +157,6 @@ export default function AuthorGeoClient() {
       </div>
     );
   }
-
-  // ── Field config ──────────────────────────────────────────────────────────────
-
-  const fieldConfig: { key: keyof GeoFields; label: string; warn?: boolean }[] = [
-    { key: "department", label: "Department" },
-    { key: "hospital",   label: "Hospital / Institution" },
-    { key: "city",       label: "City", warn: !!author.city && looksLikeInstitution(author.city) },
-    { key: "state",      label: "State / Region" },
-    { key: "country",    label: "Country" },
-  ];
 
   // ── Main layout ───────────────────────────────────────────────────────────────
 
@@ -316,34 +294,11 @@ export default function AuthorGeoClient() {
               Geo-felter
             </div>
 
-            {fieldConfig.map(({ key, label, warn }) => (
-              <div key={key}>
-                <label style={{ fontSize: "12px", fontWeight: 600, color: "#374151", display: "block", marginBottom: "4px" }}>
-                  {label}
-                  {warn && (
-                    <span style={{ fontSize: "10px", color: "#d97706", fontWeight: 600, marginLeft: "8px" }}>
-                      Ligner institution
-                    </span>
-                  )}
-                </label>
-                <input
-                  type="text"
-                  value={fields[key]}
-                  onChange={(e) => updateField(key, e.target.value)}
-                  style={{
-                    width: "100%", padding: "8px 12px", borderRadius: "7px", fontSize: "13px",
-                    fontFamily: "inherit",
-                    border: `1.5px solid ${warn ? "#d97706" : "#e5e7eb"}`,
-                    background: warn ? "#fffbeb" : "#fff",
-                    outline: "none",
-                    transition: "border-color 0.15s",
-                    boxSizing: "border-box" as const,
-                  }}
-                  onFocus={(e) => { e.target.style.borderColor = "#E83B2A"; }}
-                  onBlur={(e) => { e.target.style.borderColor = warn ? "#d97706" : "#e5e7eb"; }}
-                />
-              </div>
-            ))}
+            <AuthorGeoFields
+              values={fields}
+              onChange={(field, value) => setFields((prev) => ({ ...prev, [field]: value }))}
+              disabled={saving}
+            />
 
             {/* Buttons */}
             <div style={{ display: "flex", gap: "10px", marginTop: "8px", flexWrap: "wrap" }}>
