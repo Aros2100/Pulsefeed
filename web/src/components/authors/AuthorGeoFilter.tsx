@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { REGION_MAP, getContinent } from "@/lib/geo/continent-map";
-import { showState } from "@/lib/geo/state-policy";
+import { getStatePolicy } from "@/lib/geo/state-policy";
 import { US_STATES } from "@/lib/geo/country-map";
 
 function titleCase(s: string): string {
@@ -80,7 +80,6 @@ export default function AuthorGeoFilter({ userHospital, total }: AuthorGeoFilter
   const geoSearch = searchParams.get("geo_search") ?? "";
 
   const [geoInput, setGeoInput] = useState(geoSearch);
-  const [stateInput, setStateInput] = useState(state);
   const [cities,    setCities]    = useState<string[]>([]);
   const [hospitals, setHospitals] = useState<string[]>([]);
 
@@ -100,7 +99,6 @@ export default function AuthorGeoFilter({ userHospital, total }: AuthorGeoFilter
 
   // Sync local text inputs ↔ URL
   useEffect(() => { setGeoInput(geoSearch); }, [geoSearch]);
-  useEffect(() => { setStateInput(state); }, [state]);
 
   // Debounce geo_search → URL
   useEffect(() => {
@@ -114,16 +112,6 @@ export default function AuthorGeoFilter({ userHospital, total }: AuthorGeoFilter
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geoInput]);
-
-  // Debounce state text input → URL
-  useEffect(() => {
-    if (stateInput === state) return;
-    const t = setTimeout(() => {
-      setGeoParam("state", stateInput);
-    }, 300);
-    return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stateInput]);
 
   // Fetch cities + hospitals when country changes
   useEffect(() => {
@@ -188,7 +176,7 @@ export default function AuthorGeoFilter({ userHospital, total }: AuthorGeoFilter
   }, [continent, region]);
 
   const stateOptions = STATES[country] ?? null;
-  const isStateVisible = showState(country || null);
+  const isStateVisible = getStatePolicy(country || null) === "mandatory";
 
   const activeFilters: { key: string; label: string }[] = [
     { key: "continent",  label: continent },
@@ -237,7 +225,7 @@ export default function AuthorGeoFilter({ userHospital, total }: AuthorGeoFilter
         </select>
       </div>
 
-      {/* State row (animated) */}
+      {/* State row (animated, mandatory countries only) */}
       <div style={{
         overflow: "hidden",
         maxHeight: isStateVisible ? "60px" : "0",
@@ -245,19 +233,11 @@ export default function AuthorGeoFilter({ userHospital, total }: AuthorGeoFilter
         transition: "max-height 0.25s ease, opacity 0.2s ease",
         marginBottom: isStateVisible ? "8px" : "0",
       }}>
-        {stateOptions ? (
+        {stateOptions && (
           <select value={state} onChange={(e) => setGeoParam("state", e.target.value)} style={sel}>
             <option value="">Alle stater/provinser</option>
             {stateOptions.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-        ) : (
-          <input
-            type="text"
-            placeholder="Stat/provins…"
-            value={stateInput}
-            onChange={(e) => setStateInput(e.target.value)}
-            style={{ ...sel, padding: "8px 12px", minWidth: "180px", fontFamily: "inherit" }}
-          />
         )}
       </div>
 
