@@ -502,7 +502,7 @@ export default function TrainingClient({ specialty, label }: Props) {
         return {
           article_id: v.article_id,
           verdict: v.verdict === "relevant" ? "approved" : "rejected",
-          ai_decision: v.ai_verdict === "relevant" ? "approved" : v.ai_verdict === "not_relevant" ? "rejected" : null,
+          ai_decision: aiData[v.article_id]?.aiDecision ?? null,
           ai_confidence: v.ai_confidence,
           disagreement_reason: isDisagreement
             ? (reasons[v.article_id] === "Other" ? (otherText[v.article_id] || null) : (reasons[v.article_id] ?? null))
