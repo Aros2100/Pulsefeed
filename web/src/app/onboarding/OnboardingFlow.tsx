@@ -102,11 +102,12 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
 
   // Continent → fetch regions
   useEffect(() => {
+    console.log('continent:', geoContinent);
     if (!geoContinent) { setRegionOptions([]); setGeoRegion(""); setCountryOptions([]); setGeoCountry(""); setStateOptions([]); setGeoState(""); setCityOptions([]); setGeoCity(""); return; }
     setLoadingGeo(true);
     fetch(`/api/geo/regions?continent=${encodeURIComponent(geoContinent)}`)
       .then((r) => r.json())
-      .then((d: { regions: string[] }) => setRegionOptions(d.regions))
+      .then((d: { regions: string[] }) => { console.log('regions response:', d); setRegionOptions(d.regions); })
       .catch(() => setRegionOptions([]))
       .finally(() => setLoadingGeo(false));
     setGeoRegion(""); setCountryOptions([]); setGeoCountry(""); setStateOptions([]); setGeoState(""); setCityOptions([]); setGeoCity("");

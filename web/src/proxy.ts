@@ -7,6 +7,7 @@ const PUBLIC_PATHS = [
   "/api/auth/",         // POST /api/auth/register, forgot-password, update-password
   "/api/subscribers/",  // unsubscribe / resubscribe (token-authenticated)
   "/api/internal/",     // cron endpoints — secured by CRON_SECRET header
+  "/api/geo/",          // geo dropdowns used during onboarding (unauthenticated)
   "/verify-email",
   "/forgot-password",
   "/login",
