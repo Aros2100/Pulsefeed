@@ -2,10 +2,15 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
+import { REGION_MAP, getContinent } from "@/lib/geo/continent-map";
 import Header from "@/components/Header";
 import ArticleListClient from "./ArticleListClient";
 
 const PAGE_SIZE = 25;
+
+function titleCase(s: string): string {
+  return s.split(" ").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
 
 function periodSince(period: string): string {
   const now = new Date();
@@ -21,18 +26,31 @@ function periodSince(period: string): string {
 export default async function ArticlesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string; subspecialty?: string; region?: string; country?: string; city?: string; institution?: string; page?: string }>;
+  searchParams: Promise<{
+    period?: string; subspecialty?: string;
+    continent?: string; region?: string; country?: string; city?: string;
+    hospital?: string; geo_search?: string;
+    page?: string;
+  }>;
 }) {
-  const { period, subspecialty, region, country, city, institution, page } = await searchParams;
+  const { period, subspecialty, continent, region, country, city, hospital, geo_search, page } = await searchParams;
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const { data: profile } = await supabase
-    .from("users").select("specialty_slugs").eq("id", user.id).single();
+    .from("users").select("specialty_slugs, author_id").eq("id", user.id).single();
 
   const specialtySlugs: string[] = profile?.specialty_slugs ?? [];
+
+  // Fetch user's hospital for pre-filling the geo filter
+  let userHospital: string | null = null;
+  if (profile?.author_id) {
+    const { data: authorRow } = await supabase
+      .from("authors").select("hospital").eq("id", profile.author_id).single();
+    userHospital = (authorRow as { hospital?: string | null } | null)?.hospital ?? null;
+  }
 
   const currentPage = Math.max(1, parseInt(page ?? "1", 10));
   const from = (currentPage - 1) * PAGE_SIZE;
@@ -54,11 +72,23 @@ export default async function ArticlesPage({
     articlesQuery = articlesQuery.gte("indexed_date", periodSince(period ?? "uge"));
   }
 
-  if (subspecialty) articlesQuery = articlesQuery.contains("subspecialty_ai",      [subspecialty]);
-  if (region)       articlesQuery = articlesQuery.contains("article_regions",      [region]);
-  if (country)      articlesQuery = articlesQuery.contains("article_countries",    [country]);
-  if (city)         articlesQuery = articlesQuery.contains("article_cities",       [city]);
-  if (institution)  articlesQuery = articlesQuery.contains("article_institutions", [institution]);
+  if (subspecialty) articlesQuery = articlesQuery.contains("subspecialty_ai", [subspecialty]);
+
+  if (continent) {
+    const regions = [...new Set(
+      Object.entries(REGION_MAP)
+        .filter(([, r]) => getContinent(r) === continent)
+        .map(([, r]) => r),
+    )];
+    if (regions.length > 0) articlesQuery = articlesQuery.overlaps("article_regions", regions);
+  }
+  if (region)     articlesQuery = articlesQuery.contains("article_regions",      [region]);
+  if (country)    articlesQuery = articlesQuery.contains("article_countries",    [country]);
+  if (city)       articlesQuery = articlesQuery.contains("article_cities",       [city]);
+  if (hospital)   articlesQuery = articlesQuery.contains("article_institutions", [hospital]);
+  if (geo_search) articlesQuery = articlesQuery.or(
+    `article_countries.cs.{${geo_search}},article_cities.cs.{${geo_search}},article_institutions.cs.{${geo_search}}`,
+  );
 
   const [
     { data: articles, count: totalCount },
@@ -119,6 +149,9 @@ export default async function ArticlesPage({
     }
   }
 
+  // Build title-case country lookup for geoMap
+  void titleCase; // used above for continent filtering
+
   const geoMap = {
     regions: [...allRegions].sort(),
     regionToCountries: Object.fromEntries(
@@ -142,12 +175,9 @@ export default async function ArticlesPage({
         projects={(projectRows ?? []) as { id: string; name: string }[]}
         activePeriod={period ?? null}
         activeSubspecialty={subspecialty ?? null}
-        activeRegion={region ?? null}
-        activeCountry={country ?? null}
-        activeCity={city ?? null}
-        activeInstitution={institution ?? null}
         subspecialtyOptions={[...SUBSPECIALTY_OPTIONS]}
         geoMap={geoMap}
+        userHospital={userHospital}
         currentPage={currentPage}
         totalPages={totalPages}
         totalCount={totalCount ?? 0}

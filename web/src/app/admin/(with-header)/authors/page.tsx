@@ -4,8 +4,14 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { REGION_MAP, getContinent } from "@/lib/geo/continent-map";
+import AuthorGeoFilter from "@/components/authors/AuthorGeoFilter";
 
 const PAGE_SIZE = 50;
+
+function titleCase(s: string): string {
+  return s.split(" ").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
 
 const selectStyle: React.CSSProperties = {
   border: "1px solid #d1d5db",
@@ -56,19 +62,22 @@ export default function AdminAuthorsPage() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const query         = searchParams.get("q") ?? "";
-  const filterCountry = searchParams.get("country") ?? "";
-  const filterCity    = searchParams.get("city") ?? "";
-  const filterImported = searchParams.get("imported") ?? "";
-  const page          = parseInt(searchParams.get("page") ?? "0", 10);
+  const query          = searchParams.get("q")          ?? "";
+  const continent      = searchParams.get("continent")  ?? "";
+  const region         = searchParams.get("region")     ?? "";
+  const country        = searchParams.get("country")    ?? "";
+  const state          = searchParams.get("state")      ?? "";
+  const city           = searchParams.get("city")       ?? "";
+  const hospital       = searchParams.get("hospital")   ?? "";
+  const geoSearch      = searchParams.get("geo_search") ?? "";
+  const filterImported = searchParams.get("imported")   ?? "";
+  const page           = parseInt(searchParams.get("page") ?? "0", 10);
 
   const [inputValue, setInputValue] = useState(query);
   const [authors, setAuthors] = useState<Author[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const [countries, setCountries] = useState<string[]>([]);
-  const [cities, setCities] = useState<string[]>([]);
+  const [userHospital, setUserHospital] = useState<string | null>(null);
 
   function setParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -96,17 +105,18 @@ export default function AdminAuthorsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
-  // Fetch distinct country + city values once
+  // Fetch current user's hospital once on mount
   useEffect(() => {
     const supabase = createClient();
-    void Promise.all([
-      supabase.from("authors").select("country").not("country", "is", null).limit(200),
-      supabase.from("authors").select("city").not("city", "is", null).limit(200),
-    ]).then(([cRes, ciRes]) => {
-      const cData  = (cRes.data  ?? []) as { country: string }[];
-      const ciData = (ciRes.data ?? []) as { city: string }[];
-      setCountries([...new Set(cData.map((r) => r.country).filter(Boolean))].sort());
-      setCities([...new Set(ciData.map((r) => r.city).filter(Boolean))].sort());
+    void supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const { data: profile } = await supabase
+        .from("users").select("author_id").eq("id", user.id).single();
+      if (profile?.author_id) {
+        const { data: author } = await supabase
+          .from("authors").select("hospital").eq("id", profile.author_id).single();
+        setUserHospital((author as { hospital?: string | null } | null)?.hospital ?? null);
+      }
     });
   }, []);
 
@@ -117,7 +127,8 @@ export default function AdminAuthorsPage() {
     const to   = from + PAGE_SIZE - 1;
     setLoading(true);
 
-    let req = supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let req: any = supabase
       .from("authors")
       .select("id, display_name, affiliations, article_count, author_score, created_at", { count: "exact" })
       .order("created_at", { ascending: false, nullsFirst: false })
@@ -126,19 +137,36 @@ export default function AdminAuthorsPage() {
     if (query.trim().length >= 2) {
       req = req.ilike("display_name", `%${query.trim()}%`);
     }
-    if (filterCountry)  req = req.eq("country", filterCountry);
-    if (filterCity)     req = req.eq("city", filterCity);
+    if (continent) {
+      const cList = Object.entries(REGION_MAP)
+        .filter(([, r]) => getContinent(r) === continent)
+        .map(([c]) => titleCase(c));
+      if (cList.length > 0) req = req.in("country", cList);
+    }
+    if (region) {
+      const cList = Object.entries(REGION_MAP)
+        .filter(([, r]) => r === region)
+        .map(([c]) => titleCase(c));
+      if (cList.length > 0) req = req.in("country", cList);
+    }
+    if (country)   req = req.eq("country", country);
+    if (state)     req = req.eq("state", state);
+    if (city)      req = req.eq("city", city);
+    if (hospital)  req = req.ilike("hospital", `%${hospital}%`);
+    if (geoSearch) req = req.or(
+      `country.ilike.%${geoSearch}%,city.ilike.%${geoSearch}%,hospital.ilike.%${geoSearch}%`,
+    );
     if (filterImported) {
       const cutoff = importedCutoff(filterImported);
       if (cutoff) req = req.gte("created_at", cutoff);
     }
 
-    req.then(({ data, count }) => {
+    void (req as Promise<{ data: unknown; count: number | null }>).then(({ data, count }) => {
       setAuthors((data as unknown as Author[]) ?? []);
       setTotal(count ?? null);
       setLoading(false);
     });
-  }, [query, page, filterCountry, filterCity, filterImported]);
+  }, [query, page, continent, region, country, state, city, hospital, geoSearch, filterImported]);
 
   const totalPages = total !== null ? Math.ceil(total / PAGE_SIZE) : null;
 
@@ -161,7 +189,7 @@ export default function AdminAuthorsPage() {
             onChange={(e) => setInputValue(e.target.value)}
             style={{
               width: "100%",
-              boxSizing: "border-box",
+              boxSizing: "border-box" as const,
               border: "1px solid #d1d5db",
               borderRadius: "8px",
               padding: "10px 14px",
@@ -173,32 +201,8 @@ export default function AdminAuthorsPage() {
           />
         </div>
 
-        {/* Filter row */}
-        <div style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
-          {countries.length > 0 && (
-            <select
-              value={filterCountry}
-              onChange={(e) => setParam("country", e.target.value)}
-              style={selectStyle}
-            >
-              <option value="">Alle lande</option>
-              {countries.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          )}
-          {cities.length > 0 && (
-            <select
-              value={filterCity}
-              onChange={(e) => setParam("city", e.target.value)}
-              style={selectStyle}
-            >
-              <option value="">Alle byer</option>
-              {cities.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          )}
+        {/* Imported filter */}
+        <div style={{ marginBottom: "12px" }}>
           <select
             value={filterImported}
             onChange={(e) => setParam("imported", e.target.value)}
@@ -210,6 +214,9 @@ export default function AdminAuthorsPage() {
           </select>
         </div>
 
+        {/* Geo filter */}
+        <AuthorGeoFilter userHospital={userHospital} total={total} />
+
         <div style={{
           background: "#fff",
           borderRadius: "10px",
@@ -217,7 +224,7 @@ export default function AdminAuthorsPage() {
           overflow: "hidden",
         }}>
           <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
+            <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase" as const, fontWeight: 700 }}>
               {loading ? "Loading…" : total !== null ? `Side ${page + 1} af ${totalPages} · ${total.toLocaleString("da-DK")} forfattere` : ""}
             </div>
           </div>
@@ -247,7 +254,7 @@ export default function AdminAuthorsPage() {
                 {author.affiliations && author.affiliations.length > 0 && (
                   <div style={{
                     fontSize: "12px", color: "#888", marginTop: "2px",
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
                     maxWidth: "600px",
                   }}>
                     {author.affiliations[0]}
@@ -288,7 +295,7 @@ export default function AdminAuthorsPage() {
               >
                 ← Forrige
               </button>
-              <span style={{ fontSize: "13px", color: "#5a6a85", minWidth: "80px", textAlign: "center" }}>
+              <span style={{ fontSize: "13px", color: "#5a6a85", minWidth: "80px", textAlign: "center" as const }}>
                 {page + 1} / {totalPages}
               </span>
               <button

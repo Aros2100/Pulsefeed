@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import SaveButton from "@/components/SaveButton";
+import ArticleGeoFilter from "@/components/articles/ArticleGeoFilter";
 
 interface Article {
   id: string;
@@ -34,12 +35,9 @@ interface Props {
   projects:            Project[];
   activePeriod:        string | null;
   activeSubspecialty:  string | null;
-  activeRegion:        string | null;
-  activeCountry:       string | null;
-  activeCity:          string | null;
-  activeInstitution:   string | null;
   subspecialtyOptions: string[];
   geoMap:              GeoMap;
+  userHospital:        string | null;
   currentPage:         number;
   totalPages:          number;
   totalCount:          number;
@@ -104,12 +102,9 @@ export default function ArticleListClient({
   projects,
   activePeriod,
   activeSubspecialty,
-  activeRegion,
-  activeCountry,
-  activeCity,
-  activeInstitution,
   subspecialtyOptions,
   geoMap,
+  userHospital,
   currentPage,
   totalPages,
   totalCount,
@@ -167,10 +162,6 @@ export default function ArticleListClient({
     } else {
       params.delete(key);
     }
-    // Cascade clears: each level clears all below it
-    if (key === "region")  { params.delete("country"); params.delete("city"); params.delete("institution"); }
-    if (key === "country") { params.delete("city"); params.delete("institution"); }
-    if (key === "city")    { params.delete("institution"); }
     // Filter changes reset to page 1
     if (key !== "page") params.delete("page");
     router.push(`/articles?${params.toString()}`);
@@ -215,10 +206,7 @@ export default function ArticleListClient({
     }
   }
 
-  const activePeriodKey    = activePeriod ?? "uge";
-  const countryOptions     = activeRegion  ? (geoMap.regionToCountries[activeRegion]   ?? []) : [];
-  const cityOptions        = activeCountry ? (geoMap.countryToCities[activeCountry]    ?? []) : [];
-  const institutionOptions = activeCity    ? (geoMap.cityToInstitutions[activeCity]    ?? []) : [];
+  const activePeriodKey = activePeriod ?? "uge";
 
   const navBtnStyle = (disabled: boolean): React.CSSProperties => ({
     fontSize: "12px",
@@ -248,7 +236,7 @@ export default function ArticleListClient({
             borderBottom: "1px solid #dde3ed",
             padding: "10px 24px",
           }}>
-            <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700 }}>
+            <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase" as const, fontWeight: 700 }}>
               {specialtyLabel}
             </div>
           </div>
@@ -266,96 +254,50 @@ export default function ArticleListClient({
             padding: "12px 24px",
             display: "flex",
             gap: "16px",
-            alignItems: "center",
-            flexWrap: "wrap",
+            alignItems: "flex-start",
+            flexWrap: "wrap" as const,
           }}>
 
-            {/* Tid */}
-            <div style={{ display: "flex", gap: "4px" }}>
-              {PERIOD_BUTTONS.map((btn) => {
-                const isActive = activePeriodKey === btn.value;
-                return (
-                  <button
-                    key={btn.value}
-                    onClick={() => setParam("period", btn.value === "uge" ? null : btn.value)}
-                    style={{
-                      fontSize: "12px",
-                      padding: "5px 11px",
-                      borderRadius: "6px",
-                      border: `1px solid ${isActive ? "#1a1a1a" : "#dde3ed"}`,
-                      background: isActive ? "#1a1a1a" : "#fff",
-                      color: isActive ? "#fff" : "#5a6a85",
-                      cursor: "pointer",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {btn.label}
-                  </button>
-                );
-              })}
-            </div>
+            {/* Tid + Subspecialer */}
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" as const, alignItems: "center" }}>
+              <div style={{ display: "flex", gap: "4px" }}>
+                {PERIOD_BUTTONS.map((btn) => {
+                  const isActive = activePeriodKey === btn.value;
+                  return (
+                    <button
+                      key={btn.value}
+                      onClick={() => setParam("period", btn.value === "uge" ? null : btn.value)}
+                      style={{
+                        fontSize: "12px",
+                        padding: "5px 11px",
+                        borderRadius: "6px",
+                        border: `1px solid ${isActive ? "#1a1a1a" : "#dde3ed"}`,
+                        background: isActive ? "#1a1a1a" : "#fff",
+                        color: isActive ? "#fff" : "#5a6a85",
+                        cursor: "pointer",
+                        whiteSpace: "nowrap" as const,
+                      }}
+                    >
+                      {btn.label}
+                    </button>
+                  );
+                })}
+              </div>
 
-            {/* Subspecialer */}
-            <select
-              value={activeSubspecialty ?? ""}
-              onChange={(e) => setParam("subspecialty", e.target.value || null)}
-              style={selectStyle}
-            >
-              <option value="">Alle subspecialer</option>
-              {subspecialtyOptions.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-
-            {/* Lokation */}
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
               <select
-                value={activeRegion ?? ""}
-                onChange={(e) => setParam("region", e.target.value || null)}
+                value={activeSubspecialty ?? ""}
+                onChange={(e) => setParam("subspecialty", e.target.value || null)}
                 style={selectStyle}
               >
-                <option value="">Alle regioner</option>
-                {geoMap.regions.map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
-
-              <select
-                value={activeCountry ?? ""}
-                onChange={(e) => setParam("country", e.target.value || null)}
-                disabled={!activeRegion}
-                style={{ ...selectStyle, opacity: activeRegion ? 1 : 0.4 }}
-              >
-                <option value="">Alle lande</option>
-                {countryOptions.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-
-              <select
-                value={activeCity ?? ""}
-                onChange={(e) => setParam("city", e.target.value || null)}
-                disabled={!activeCountry}
-                style={{ ...selectStyle, opacity: activeCountry ? 1 : 0.4 }}
-              >
-                <option value="">Alle byer</option>
-                {cityOptions.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-
-              <select
-                value={activeInstitution ?? ""}
-                onChange={(e) => setParam("institution", e.target.value || null)}
-                disabled={!activeCity}
-                style={{ ...selectStyle, opacity: activeCity ? 1 : 0.4 }}
-              >
-                <option value="">Alle institutioner</option>
-                {institutionOptions.map((inst) => (
-                  <option key={inst} value={inst}>{inst}</option>
+                <option value="">Alle subspecialer</option>
+                {subspecialtyOptions.map((s) => (
+                  <option key={s} value={s}>{s}</option>
                 ))}
               </select>
             </div>
+
+            {/* Geo filter */}
+            <ArticleGeoFilter geoMap={geoMap} userHospital={userHospital} />
 
           </div>
         </div>
@@ -368,13 +310,13 @@ export default function ArticleListClient({
           overflow: "hidden",
         }}>
           <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
-            <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
+            <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase" as const, fontWeight: 700 }}>
               Latest articles
             </div>
           </div>
 
           {displayedArticles.length === 0 ? (
-            <div style={{ padding: "48px 24px", textAlign: "center", color: "#999", fontSize: "14px" }}>
+            <div style={{ padding: "48px 24px", textAlign: "center" as const, color: "#999", fontSize: "14px" }}>
               No articles match this filter.
             </div>
           ) : (
@@ -407,7 +349,7 @@ export default function ArticleListClient({
                 >
                   <div>
                     {meta && (
-                      <div style={{ fontSize: "11px", color: "#aaa", marginBottom: "5px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                      <div style={{ fontSize: "11px", color: "#aaa", marginBottom: "5px", letterSpacing: "0.04em", textTransform: "uppercase" as const }}>
                         {meta}
                       </div>
                     )}
@@ -421,7 +363,7 @@ export default function ArticleListClient({
                     {author && (
                       <div style={{ fontSize: "13px", color: "#888", marginTop: "5px" }}>{author}</div>
                     )}
-                    <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" as const }}>
                       {pubType && (
                         <span style={{ fontSize: "11px", background: "#fff", border: "1px solid #ddd", borderRadius: "4px", padding: "2px 8px", color: "#555" }}>
                           {pubType}
@@ -435,7 +377,7 @@ export default function ArticleListClient({
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px", paddingTop: "2px" }}>
+                  <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: "8px", paddingTop: "2px" }}>
                     <div onClick={(e) => e.stopPropagation()}>
                       <SaveButton
                         articleId={article.id}
@@ -444,7 +386,7 @@ export default function ArticleListClient({
                         projects={projects}
                       />
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
+                    <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", gap: "6px" }}>
                       {article.news_value && (
                         <div style={{ fontSize: "13px", color: "#f4a100", letterSpacing: "1px" }}>
                           {stars(article.news_value)}
@@ -453,7 +395,7 @@ export default function ArticleListClient({
                       {rel && (
                         <div style={{
                           fontSize: "11px", padding: "2px 8px", borderRadius: "10px",
-                          fontWeight: 600, whiteSpace: "nowrap",
+                          fontWeight: 600, whiteSpace: "nowrap" as const,
                           background: rel.bg, color: rel.color,
                         }}>
                           {rel.label}
@@ -468,7 +410,7 @@ export default function ArticleListClient({
 
           {/* Vis flere button */}
           {loadedUpTo < totalPages && (
-            <div style={{ padding: "16px 24px", borderTop: "1px solid #f0f0f0", textAlign: "center" }}>
+            <div style={{ padding: "16px 24px", borderTop: "1px solid #f0f0f0", textAlign: "center" as const }}>
               <button
                 onClick={loadMore}
                 disabled={isLoading}
@@ -496,7 +438,7 @@ export default function ArticleListClient({
             alignItems: "center",
             justifyContent: "center",
             gap: "6px",
-            flexWrap: "wrap",
+            flexWrap: "wrap" as const,
           }}>
             <button
               onClick={() => navigatePage(1)}
@@ -529,7 +471,7 @@ export default function ArticleListClient({
                   fontSize: "13px",
                   border: "1px solid #dde3ed",
                   borderRadius: "6px",
-                  textAlign: "center",
+                  textAlign: "center" as const,
                   outline: "none",
                 }}
               />
