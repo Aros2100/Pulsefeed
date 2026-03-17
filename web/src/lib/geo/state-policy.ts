@@ -17,30 +17,11 @@ const MANDATORY_COUNTRIES = new Set([
   "India",
   "China",
   "Japan",
+  "Mexico",
+  "Argentina",
 ]);
 
-const OPTIONAL_COUNTRIES = new Set([
-  "Germany",
-  "United Kingdom",
-  "France",
-  "Italy",
-  "Spain",
-  "Russia",
-  "Mexico",
-  "Turkey",
-  "South Korea",
-  "Indonesia",
-  "Philippines",
-  "Colombia",
-  "Argentina",
-  "South Africa",
-  "Nigeria",
-  "Poland",
-  "Romania",
-  "Ukraine",
-  "Thailand",
-  "Malaysia",
-]);
+const OPTIONAL_COUNTRIES = new Set<string>([]);
 
 export function getStatePolicy(country: string | null): StatePolicy {
   if (!country) return "hidden";

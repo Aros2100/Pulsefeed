@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { COUNTRY_LIST } from "@/lib/geo/country-list";
 import { US_STATES } from "@/lib/geo/country-map";
-import { showState, stateMissing } from "@/lib/geo/state-policy";
+import { getStatePolicy, stateMissing } from "@/lib/geo/state-policy";
 import { RAW_INSTITUTIONS } from "@/lib/geo/institution-map";
 import { CITY_TO_COUNTRY } from "@/lib/geo/city-map";
 
@@ -114,7 +114,7 @@ export default function AuthorGeoFields({ values, onChange, disabled }: AuthorGe
   const isFreeCity = hasCityList && city !== "" && !cityInList;
 
   const stateMap = STATES[country] ?? null;
-  const isStateVisible = showState(country);
+  const isStateVisible = getStatePolicy(country) === "mandatory";
   const isStateRequired = stateMissing(country, state || null);
 
   // Normalize state: if stored as abbreviation (e.g. "CA"), map to full name for dropdown
