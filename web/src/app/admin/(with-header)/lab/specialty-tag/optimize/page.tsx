@@ -67,9 +67,9 @@ export default async function OptimizePage() {
   const latestRun     = (latestRunRes.data ?? null) as OptimizationRun | null;
 
   const versionSuffix = activeModelVersion ? ` · ${activeModelVersion}` : "";
-  const hasSufficientData = totalDisagree >= 100;
-  const dataBanner = totalDisagree < 100
-    ? { bg: "#fef2f2", border: "#fecaca", dot: "#dc2626", text: "#b91c1c", msg: `Insufficient data — need at least 100 disagreements to identify reliable trends (${totalDisagree} so far${versionSuffix})` }
+  const hasSufficientData = totalDisagree >= 20;
+  const dataBanner = totalDisagree < 20
+    ? { bg: "#fef2f2", border: "#fecaca", dot: "#dc2626", text: "#b91c1c", msg: `Insufficient data — need at least 20 disagreements to identify reliable trends (${totalDisagree} so far${versionSuffix})` }
     : { bg: "#f0fdf4", border: "#bbf7d0", dot: "#15803d", text: "#14532d", msg: `Sufficient data for reliable trend analysis (${totalDisagree} disagreements${versionSuffix})` };
 
   return (
