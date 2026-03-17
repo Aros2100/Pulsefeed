@@ -3,12 +3,12 @@
  * instead of a country. Case-insensitive lookup.
  */
 
-interface CityInfo {
+export interface CityInfo {
   city: string;
   country: string;
 }
 
-const CITY_TO_COUNTRY: Record<string, CityInfo> = {
+export const CITY_TO_COUNTRY: Record<string, CityInfo> = {
   // === United States ===
   "ann arbor": { city: "Ann Arbor", country: "United States" },
   "atlanta": { city: "Atlanta", country: "United States" },

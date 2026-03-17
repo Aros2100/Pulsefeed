@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import AuthorGeoFields from "@/components/authors/AuthorGeoFields";
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
@@ -302,6 +303,11 @@ export default function AdminAuthorDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("profil");
 
+  // Geo edit state
+  const [editingGeo, setEditingGeo] = useState(false);
+  const [savingGeo, setSavingGeo] = useState(false);
+  const [geoValues, setGeoValues] = useState({ country: "", city: "", state: "", hospital: "", department: "" });
+
   useEffect(() => {
     if (!id) return;
     const supabase = createClient();
@@ -316,7 +322,17 @@ export default function AdminAuthorDetailPage() {
         .eq("id", id)
         .single();
 
-      if (authorData) setAuthor(authorData as unknown as AuthorRow);
+      if (authorData) {
+        const a = authorData as unknown as AuthorRow;
+        setAuthor(a);
+        setGeoValues({
+          country:    a.country    ?? "",
+          city:       a.city       ?? "",
+          state:      a.state      ?? "",
+          hospital:   a.hospital   ?? "",
+          department: a.department ?? "",
+        });
+      }
 
       const { data: articleRows } = await supabase
         .from("article_authors")
@@ -382,6 +398,36 @@ export default function AdminAuthorDetailPage() {
   const count       = author.article_count ?? articles.length;
   const authorScore = (count >= 3 && author.author_score != null) ? Number(author.author_score) : null;
 
+  async function saveGeo() {
+    setSavingGeo(true);
+    try {
+      const res = await fetch(`/api/admin/authors/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          country:    geoValues.country    || null,
+          city:       geoValues.city       || null,
+          state:      geoValues.state      || null,
+          hospital:   geoValues.hospital   || null,
+          department: geoValues.department || null,
+        }),
+      });
+      const data = await res.json() as { ok: boolean; error?: string };
+      if (data.ok) {
+        setAuthor((prev) => prev ? {
+          ...prev,
+          country:    geoValues.country    || null,
+          city:       geoValues.city       || null,
+          state:      geoValues.state      || null,
+          hospital:   geoValues.hospital   || null,
+          department: geoValues.department || null,
+        } : prev);
+        setEditingGeo(false);
+      }
+    } catch { /* ignore */ }
+    setSavingGeo(false);
+  }
+
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
       <div style={{ maxWidth: "760px", margin: "0 auto", padding: "32px 24px 80px" }}>
@@ -415,11 +461,6 @@ export default function AdminAuthorDetailPage() {
           {activeTab === "profil" && (
             <CardBody>
               <FactRow label="Name" value={author.display_name} />
-              {author.department && <FactRow label="Afdeling"  value={author.department} />}
-              {author.hospital   && <FactRow label="Hospital"  value={author.hospital} />}
-              {author.city       && <FactRow label="By"        value={author.city} />}
-              {author.state      && <FactRow label="Stat/Region" value={author.state} />}
-              {author.country    && <FactRow label="Land"      value={author.country} />}
               {author.orcid && (
                 <FactRow
                   label="ORCID"
@@ -430,6 +471,72 @@ export default function AdminAuthorDetailPage() {
                   }
                 />
               )}
+
+              {/* Geo section */}
+              <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #f0f0f0" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85" }}>
+                    Lokation
+                  </span>
+                  {!editingGeo && (
+                    <button
+                      onClick={() => setEditingGeo(true)}
+                      style={{ fontSize: "12px", color: "#5a6a85", background: "none", border: "1px solid #dde3ed", padding: "4px 10px", borderRadius: "6px", cursor: "pointer", fontFamily: "inherit" }}
+                    >
+                      Rediger
+                    </button>
+                  )}
+                </div>
+
+                {editingGeo ? (
+                  <div>
+                    <AuthorGeoFields
+                      values={geoValues}
+                      onChange={(field, value) => setGeoValues((g) => ({ ...g, [field]: value }))}
+                      disabled={savingGeo}
+                    />
+                    <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
+                      <button
+                        onClick={() => void saveGeo()}
+                        disabled={savingGeo}
+                        style={{ fontSize: "12px", padding: "6px 14px", borderRadius: "6px", background: "#1a1a1a", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                      >
+                        {savingGeo ? "Gemmer…" : "Gem"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setGeoValues({
+                            country:    author.country    ?? "",
+                            city:       author.city       ?? "",
+                            state:      author.state      ?? "",
+                            hospital:   author.hospital   ?? "",
+                            department: author.department ?? "",
+                          });
+                          setEditingGeo(false);
+                        }}
+                        disabled={savingGeo}
+                        style={{ fontSize: "12px", padding: "6px 14px", borderRadius: "6px", background: "none", color: "#5a6a85", border: "1px solid #dde3ed", cursor: "pointer", fontFamily: "inherit" }}
+                      >
+                        Annuller
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    {!author.country && !author.city && !author.hospital ? (
+                      <span style={{ fontSize: "13px", color: "#aaa" }}>Ingen lokationsdata</span>
+                    ) : (
+                      <>
+                        {author.department && <FactRow label="Afdeling"    value={author.department} />}
+                        {author.hospital   && <FactRow label="Hospital"    value={author.hospital} />}
+                        {author.city       && <FactRow label="By"          value={author.city} />}
+                        {author.state      && <FactRow label="Stat/Region" value={author.state} />}
+                        {author.country    && <FactRow label="Land"        value={author.country} />}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardBody>
           )}
 

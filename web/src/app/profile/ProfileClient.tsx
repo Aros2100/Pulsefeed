@@ -3,8 +3,8 @@
 import { useState } from "react";
 import ProfileEditClient from "./ProfileEditClient";
 import ProfilePrivacyClient from "./ProfilePrivacyClient";
+import AuthorGeoFields from "@/components/authors/AuthorGeoFields";
 import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
-import { COUNTRY_LIST } from "@/lib/geo/country-list";
 import { showState } from "@/lib/geo/state-policy";
 
 const MANDATORY_SUBSPECIALTY = "Neurosurgery";
@@ -98,11 +98,13 @@ export default function ProfileClient({
   const [savingSub, setSavingSub] = useState(false);
 
   // Location state
-  const [geoCountry, setGeoCountry] = useState(initialCountry ?? "");
-  const [geoCity, setGeoCity] = useState(initialCity ?? "");
-  const [geoState, setGeoState] = useState(initialState ?? "");
-  const [geoHospital, setGeoHospital] = useState(initialHospital ?? "");
-  const [geoDepartment, setGeoDepartment] = useState(initialDepartment ?? "");
+  const [geoValues, setGeoValues] = useState({
+    country:    initialCountry    ?? "",
+    city:       initialCity       ?? "",
+    state:      initialState      ?? "",
+    hospital:   initialHospital   ?? "",
+    department: initialDepartment ?? "",
+  });
   const [editingGeo, setEditingGeo] = useState(false);
   const [savingGeo, setSavingGeo] = useState(false);
 
@@ -139,11 +141,11 @@ export default function ProfileClient({
     setSavingGeo(true);
     try {
       await patch({
-        country: geoCountry || null,
-        city: geoCity || null,
-        state: geoState || null,
-        hospital: geoHospital || null,
-        department: geoDepartment || null,
+        country:    geoValues.country    || null,
+        city:       geoValues.city       || null,
+        state:      geoValues.state      || null,
+        hospital:   geoValues.hospital   || null,
+        department: geoValues.department || null,
       });
       setEditingGeo(false);
     } catch { /* ignore */ }
@@ -270,48 +272,24 @@ export default function ProfileClient({
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div style={{ flex: 1 }}>
               {editingGeo ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <div>
-                    <div style={labelSt}>Country</div>
-                    <select
-                      value={geoCountry}
-                      onChange={(e) => setGeoCountry(e.target.value)}
-                      style={{ ...inputStyle, appearance: "auto" }}
-                    >
-                      <option value="">— Select country —</option>
-                      {COUNTRY_LIST.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <div style={labelSt}>City</div>
-                    <input value={geoCity} onChange={(e) => setGeoCity(e.target.value)} style={inputStyle} />
-                  </div>
-                  {showState(geoCountry || null) && (
-                    <div>
-                      <div style={labelSt}>State / Province</div>
-                      <input value={geoState} onChange={(e) => setGeoState(e.target.value)} style={inputStyle} />
-                    </div>
-                  )}
-                  <div>
-                    <div style={labelSt}>Hospital / Institution (optional)</div>
-                    <input value={geoHospital} onChange={(e) => setGeoHospital(e.target.value)} style={inputStyle} />
-                  </div>
-                  <div>
-                    <div style={labelSt}>Department (optional)</div>
-                    <input value={geoDepartment} onChange={(e) => setGeoDepartment(e.target.value)} style={inputStyle} />
-                  </div>
-                  <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                <div>
+                  <AuthorGeoFields
+                    values={geoValues}
+                    onChange={(field, value) => setGeoValues((g) => ({ ...g, [field]: value }))}
+                    disabled={savingGeo}
+                  />
+                  <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
                     <button onClick={saveGeo} disabled={savingGeo} style={btnPrimary}>
                       {savingGeo ? "..." : "Save"}
                     </button>
                     <button onClick={() => {
-                      setGeoCountry(initialCountry ?? "");
-                      setGeoCity(initialCity ?? "");
-                      setGeoState(initialState ?? "");
-                      setGeoHospital(initialHospital ?? "");
-                      setGeoDepartment(initialDepartment ?? "");
+                      setGeoValues({
+                        country:    initialCountry    ?? "",
+                        city:       initialCity       ?? "",
+                        state:      initialState      ?? "",
+                        hospital:   initialHospital   ?? "",
+                        department: initialDepartment ?? "",
+                      });
                       setEditingGeo(false);
                     }} style={btnSecondary}>
                       Cancel
@@ -320,12 +298,12 @@ export default function ProfileClient({
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                  {geoCountry && <InfoRow label="Country" value={geoCountry} />}
-                  {geoCity && <InfoRow label="City" value={geoCity} />}
-                  {showState(geoCountry || null) && geoState && <InfoRow label="State / Province" value={geoState} />}
-                  {geoHospital && <InfoRow label="Hospital" value={geoHospital} />}
-                  {geoDepartment && <InfoRow label="Department" value={geoDepartment} />}
-                  {!geoCountry && !geoCity && !geoHospital && (
+                  {geoValues.country   && <InfoRow label="Country"    value={geoValues.country} />}
+                  {geoValues.city      && <InfoRow label="City"       value={geoValues.city} />}
+                  {showState(geoValues.country || null) && geoValues.state && <InfoRow label="State / Province" value={geoValues.state} />}
+                  {geoValues.hospital  && <InfoRow label="Hospital"   value={geoValues.hospital} />}
+                  {geoValues.department && <InfoRow label="Department" value={geoValues.department} />}
+                  {!geoValues.country && !geoValues.city && !geoValues.hospital && (
                     <div style={{ fontSize: "14px", fontWeight: 600, color: "#9ca3af" }}>No location configured</div>
                   )}
                 </div>

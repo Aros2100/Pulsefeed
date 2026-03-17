@@ -12,7 +12,7 @@ export type InstitutionInfo = {
 // Keys are lowercased for case-insensitive lookup.
 // The lookup checks if a segment CONTAINS the key (substring match).
 // Order: longer keys first to avoid partial matches (e.g. "Aarhus University Hospital" before "Aarhus University").
-const RAW_INSTITUTIONS: [string, InstitutionInfo][] = [
+export const RAW_INSTITUTIONS: [string, InstitutionInfo][] = [
   // Danish hospitals (critical for C3)
   ["aarhus university hospital", { institution: "Aarhus University Hospital", city: "Aarhus", country: "Denmark" }],
   ["aalborg university hospital", { institution: "Aalborg University Hospital", city: "Aalborg", country: "Denmark" }],
