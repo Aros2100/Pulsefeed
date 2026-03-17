@@ -460,7 +460,9 @@ export default function TrainingClient({ specialty, label }: Props) {
     // Auto-advance only when setting a verdict (not deselecting) and no AI disagreement
     if (!isDeselect) {
       const ai = aiData[articleId];
-      const isDisagreement = ai?.verdict != null && ai.verdict !== verdict;
+      const isDisagreement = ai?.aiDecision != null &&
+        ((verdict === "not_relevant" && ai.aiDecision === "approved") ||
+         (verdict === "relevant"     && ai.aiDecision === "rejected"));
 
       if (!isDisagreement) {
         const visible = applyConfFilter(articles, confidenceFilter);
@@ -496,9 +498,10 @@ export default function TrainingClient({ specialty, label }: Props) {
       }))
       .filter((v): v is { article_id: string; verdict: EditorVerdict; ai_verdict: EditorVerdict | null; ai_confidence: number | null } => v.verdict != null)
       .map((v) => {
+        const aiDecision = aiData[v.article_id]?.aiDecision ?? null;
         const isDisagreement =
-          (v.verdict === "not_relevant" && v.ai_verdict === "relevant") ||
-          (v.verdict === "relevant" && v.ai_verdict === "not_relevant");
+          (v.verdict === "not_relevant" && aiDecision === "approved") ||
+          (v.verdict === "relevant" && aiDecision === "rejected");
         return {
           article_id: v.article_id,
           verdict: v.verdict === "relevant" ? "approved" : "rejected",
