@@ -141,10 +141,14 @@ export async function POST(request: NextRequest) {
 
   const [approvedResult, rejectedResult, ...remapResults] = await Promise.all([
     approvedIds.length > 0
-      ? admin.from("articles")
-          .update({ approval_method: "human", status: "approved", specialty_tags: [specialty] })
-          .in("id", approvedIds)
-      : Promise.resolve({ error: null }),
+      ? Promise.all(approvedIds.map((id) => {
+          const oldTags = (oldMap.get(id)?.specialty_tags ?? []) as string[];
+          const newTags = [...new Set([...oldTags, specialty])];
+          return admin.from("articles")
+            .update({ approval_method: "human", status: "approved", specialty_tags: newTags })
+            .eq("id", id);
+        }))
+      : Promise.resolve([]),
     rejectedRegularIds.length > 0
       ? admin.from("articles")
           .update({ status: "rejected" })
@@ -164,9 +168,10 @@ export async function POST(request: NextRequest) {
     }),
   ]);
 
-  if (approvedResult.error) {
-    console.error("[lab/sessions] articles approved update error:", approvedResult.error);
-    return NextResponse.json({ ok: false, error: approvedResult.error.message }, { status: 500 });
+  const approvedErrors = (approvedResult as { error: unknown }[]).filter((r) => r.error);
+  if (approvedErrors.length > 0) {
+    console.error("[lab/sessions] articles approved update error:", approvedErrors[0].error);
+    return NextResponse.json({ ok: false, error: "Failed to update approved articles" }, { status: 500 });
   }
   if (rejectedResult.error) {
     console.error("[lab/sessions] articles rejected update error:", rejectedResult.error);
