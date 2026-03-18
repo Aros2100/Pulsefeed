@@ -47,8 +47,8 @@ export default async function CondensationOverviewPage() {
     picoTotalResult, picoRejectedResult,
     lastResult,
   ] = await Promise.all([
-    admin.rpc("count_condensation_not_validated" as never, { p_specialty: specialty } as never),
-    admin.rpc("count_pico_not_validated" as never, { p_specialty: specialty } as never),
+    admin.rpc("count_condensation_not_validated", { p_specialty: specialty }),
+    admin.rpc("count_pico_not_validated", { p_specialty: specialty }),
 
     // Tekst
     admin

@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { Json } from "@/lib/supabase/types";
 import { linkAuthorsToArticle, decodeHtmlEntities, type Author } from "@/lib/pubmed/importer";
 import { runLinkingChecks } from "@/lib/pubmed/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
@@ -148,13 +149,13 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
                   position:       rawAuthors.findIndex(
                     (r) => r.lastName === a.lastName && r.foreName === a.foreName
                   ) + 1 || idx + 1,
-                  raw_data:       rawAuthors.find(
+                  raw_data:       (rawAuthors.find(
                     (r) => r.lastName === a.lastName && r.foreName === a.foreName
-                  ) ?? {},
+                  ) ?? {}) as Json,
                   reason:         "no_lastname_no_orcid",
                   linking_log_id: logId,
                 }));
-                await admin.from("rejected_authors" as never).insert(rejects as never);
+                await admin.from("rejected_authors").insert(rejects);
               }
 
               linkedArticleIds.push(article.id);

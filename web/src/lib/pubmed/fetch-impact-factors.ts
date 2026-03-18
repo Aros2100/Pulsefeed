@@ -116,7 +116,7 @@ export async function runImpactFactorFetch(limit = 2000): Promise<{ updated: num
         impact_factor:            factor,
         journal_h_index:          hIndex,
         impact_factor_fetched_at: new Date().toISOString(),
-      } as never)
+      })
       .or(`issn_electronic.eq.${issn},issn_print.eq.${issn}`)
       .select("id");
 
@@ -128,12 +128,12 @@ export async function runImpactFactorFetch(limit = 2000): Promise<{ updated: num
       updated += affectedIds.length;
       if (affectedIds.length > 0) {
         const { error: evErr } = await admin
-          .from("article_events" as never)
+          .from("article_events")
           .insert(affectedIds.map((articleId: string) => ({
             article_id: articleId,
             event_type: "impact_factor_updated",
             payload:    { impact_factor: factor, journal_h_index: hIndex },
-          })) as never);
+          })));
         if (evErr) console.warn(`[fetch-if] Event insert failed for ISSN ${issn}:`, evErr.message);
       }
     }

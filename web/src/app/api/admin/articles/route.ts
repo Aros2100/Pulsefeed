@@ -39,13 +39,13 @@ export async function GET(request: Request) {
   if (subspecialty) query = query.contains("specialty_tags", [subspecialty]);
   if (verified === "true")  query = query.eq("verified", true);
   if (verified === "false") query = query.eq("verified", false);
-  if (approvalMethod === "null")  query = query.is("approval_method" as never, null as never);
-  else if (approvalMethod)        query = query.eq("approval_method" as never, approvalMethod as never);
+  if (approvalMethod === "null")  query = query.is("approval_method", null);
+  else if (approvalMethod)        query = query.eq("approval_method", approvalMethod);
   if (hasAbstract === "true")  query = query.not("abstract", "is", null);
   if (hasAbstract === "false") query = query.is("abstract", null);
   if (dateFrom) query = query.gte("imported_at", dateFrom);
   if (dateTo)   query = query.lte("imported_at", dateTo);
-  if (meshTerm) query = query.ilike("mesh_terms_text" as never, `%${meshTerm}%` as never);
+  if (meshTerm) query = query.ilike("mesh_terms_text", `%${meshTerm}%`);
   if (search)   query = query.or(`title.ilike.%${search}%,journal_abbr.ilike.%${search}%`);
 
   const { data, error, count } = await query

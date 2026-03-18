@@ -54,10 +54,10 @@ export async function runAutoTag(
   const admin = createAdminClient();
 
   const { data: rules, error: rulesErr } = await admin
-    .from("tagging_rules" as never)
-    .select("id, term, approve_rate, total_decisions" as never)
-    .eq("specialty" as never, specialty as never)
-    .eq("status" as never, "active" as never);
+    .from("tagging_rules")
+    .select("id, term, approve_rate, total_decisions")
+    .eq("specialty", specialty)
+    .eq("status", "active");
 
   if (rulesErr || !rules || (rules as TaggingRule[]).length === 0) {
     return { tagged: 0, skipped: 0 };
@@ -78,7 +78,7 @@ export async function runAutoTag(
       .select("id, mesh_terms")
       .eq("status", "pending")
       .contains("specialty_tags", [specialty])
-      .is("auto_tagged_at" as never, null as never)
+      .is("auto_tagged_at", null)
       .range(from, from + PAGE_SIZE - 1);
 
     if (!articles || articles.length === 0) break;
@@ -97,7 +97,7 @@ export async function runAutoTag(
           .update({
             status: "approved",
             auto_tagged_at: new Date().toISOString(),
-          } as never)
+          })
           .eq("id", article.id);
 
         if (!updateErr) {

@@ -5,6 +5,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { Json } from "@/lib/supabase/types";
 
 interface CheckResult {
   name: string;
@@ -30,14 +31,14 @@ async function saveChecks(
   const failedChecks = checks.filter(c => !c.passed).length;
   const passed = failedChecks === 0;
 
-  await supabase.from("import_quality_checks" as never).insert({
+  await supabase.from("import_quality_checks").insert({
     import_log_id: importLogId,
     check_type: checkType,
     passed,
     total_checks: checks.length,
     failed_checks: failedChecks,
-    checks,
-  } as never);
+    checks: checks as unknown as Json,
+  });
 
   return { passed, totalChecks: checks.length, failedChecks, checks };
 }
@@ -54,7 +55,7 @@ export async function runArticleChecks(
   const supabase = createAdminClient();
 
   const { data: importLog, error: logError } = await supabase
-    .from("import_logs" as never)
+    .from("import_logs")
     .select("*")
     .eq("id", importLogId)
     .single();
@@ -82,7 +83,7 @@ export async function runArticleChecks(
 
   // Check 2: Alle artikler har title
   const { count: noTitle } = await supabase
-    .from("articles" as never)
+    .from("articles")
     .select("*", { count: "exact", head: true })
     .is("title", null)
     .gte("imported_at", startedAt)
@@ -100,7 +101,7 @@ export async function runArticleChecks(
 
   // Check 3: Abstract-mangler < 30%
   const { count: noAbstract } = await supabase
-    .from("articles" as never)
+    .from("articles")
     .select("*", { count: "exact", head: true })
     .is("abstract", null)
     .gte("imported_at", startedAt)
@@ -119,7 +120,7 @@ export async function runArticleChecks(
 
   // Check 4: Alle artikler har authors JSONB
   const { data: emptyAuthors } = await supabase
-    .from("articles" as never)
+    .from("articles")
     .select("id", { count: "exact" })
     .gte("imported_at", startedAt)
     .lte("imported_at", completedAt)
@@ -164,7 +165,7 @@ export async function runLinkingChecks(
   const supabase = createAdminClient();
 
   const { data: linkingLog, error: logError } = await supabase
-    .from("author_linking_logs" as never)
+    .from("author_linking_logs")
     .select("started_at, completed_at, import_log_id, new_authors, duplicates, rejected")
     .eq("id", authorLinkingLogId)
     .single();
@@ -194,7 +195,7 @@ export async function runLinkingChecks(
 
   // Check 2: Author linking-rate > 80%
   const { data: articlesInWindow } = await supabase
-    .from("articles" as never)
+    .from("articles")
     .select("id, authors")
     .gte("imported_at", startedAt)
     .lte("imported_at", completedAt);
@@ -202,7 +203,7 @@ export async function runLinkingChecks(
   if (articlesInWindow && articlesInWindow.length > 0) {
     const articleIds = (articlesInWindow as Array<{ id: string; authors: unknown[] }>).map(a => a.id);
     const { count: linkedCount } = await supabase
-      .from("article_authors" as never)
+      .from("article_authors")
       .select("*", { count: "exact", head: true })
       .in("article_id", articleIds);
 
@@ -224,7 +225,7 @@ export async function runLinkingChecks(
 
   // Check 3: Ingen suspekte forfatternavne
   const { count: suspectNames } = await supabase
-    .from("authors" as never)
+    .from("authors")
     .select("*", { count: "exact", head: true })
     .gte("created_at", startedAt)
     .lte("created_at", completedAt)

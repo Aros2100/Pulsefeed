@@ -95,8 +95,8 @@ export async function POST(request: NextRequest) {
   } else {
     // Normal Lab-scoring: fill up to BATCH_LIMIT
     const { data: alreadyScoredCount } = await admin.rpc(
-      "count_classification_not_validated" as never,
-      { p_specialty: specialty } as never,
+      "count_classification_not_validated",
+      { p_specialty: specialty },
     );
     const existing = Number(alreadyScoredCount ?? 0);
     const remaining = Math.max(0, BATCH_LIMIT - existing);
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
                 const { error } = await admin
                   .from("articles")
                   .update({
-                    subspecialty_ai:              cls.subspecialty as unknown as string,
+                    subspecialty_ai:              cls.subspecialty,
                     classification_reason:        cls.reason,
                     classification_model_version: cls.version,
                     classification_scored_at:     new Date().toISOString(),

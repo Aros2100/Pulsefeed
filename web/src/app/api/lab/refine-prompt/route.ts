@@ -85,7 +85,7 @@ Respond with the refined prompt text only — no explanation, no markdown.`;
 
       const { data: run } = await (
         admin
-          .from("model_optimization_runs" as never)
+          .from("model_optimization_runs")
           .select("refinement_iterations")
           .eq("id", run_id)
           .single() as unknown as Promise<RunResult>
@@ -102,11 +102,11 @@ Respond with the refined prompt text only — no explanation, no markdown.`;
 
       await (
         admin
-          .from("model_optimization_runs" as never)
+          .from("model_optimization_runs")
           .update({
             improved_prompt:         refined_prompt,
             refinement_iterations:   updatedIterations,
-          } as never)
+          })
           .eq("id", run_id) as unknown as Promise<{ error: unknown }>
       );
     }

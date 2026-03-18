@@ -16,7 +16,7 @@ export async function GET() {
 
   const admin = createAdminClient();
   const { data, error } = await admin
-    .from("system_alerts" as never)
+    .from("system_alerts")
     .select("id, title, message, type, active, expires_at, created_at")
     .order("created_at", { ascending: false });
 
@@ -42,8 +42,8 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
   const { data, error } = await admin
-    .from("system_alerts" as never)
-    .insert({ ...result.data, expires_at: result.data.expires_at ?? null } as never)
+    .from("system_alerts")
+    .insert({ ...result.data, expires_at: result.data.expires_at ?? null })
     .select("id, title, message, type, active, expires_at, created_at")
     .single();
 

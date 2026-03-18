@@ -9,7 +9,7 @@ export async function GET() {
   const admin = createAdminClient();
 
   const { data, error } = await (admin
-    .from("import_logs" as never)
+    .from("import_logs")
     .select(`
       id,
       started_at,
@@ -32,8 +32,8 @@ export async function GET() {
 
   // Fetch unlinked author slots per import log in one RPC call
   const { data: slotsRows } = await admin.rpc(
-    "unlinked_author_slots_for_import_logs" as never,
-    { p_ids: ids } as never
+    "unlinked_author_slots_for_import_logs",
+    { p_ids: ids }
   );
   type SlotsRow = { import_log_id: string; slots: number };
   const slotsByLogId = new Map<string, number>(

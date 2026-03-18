@@ -420,7 +420,7 @@ export default async function AdminArticleLogPage({
 
   const [articleResult, eventsResult, authorLinksResult] = await Promise.all([
     admin.from("articles").select("*").eq("id", id).maybeSingle(),
-    admin.from("article_events" as never).select("*").eq("article_id", id).order("sequence", { ascending: true }),
+    admin.from("article_events").select("*").eq("article_id", id).order("sequence", { ascending: true }),
     admin.from("article_authors").select("author_id, position, authors(author_score, department, hospital, city, state, country, verified_by)").eq("article_id", id),
   ]);
 

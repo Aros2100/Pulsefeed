@@ -23,13 +23,13 @@ export default async function ArticleTypeSystemPage() {
     admin
       .from("articles")
       .select("*", { count: "exact", head: true })
-      .eq("article_type_method" as never, "deterministic" as never),
+      .eq("article_type_method", "deterministic"),
 
     admin
-      .from("article_type_rules" as never)
-      .select("*" as never)
-      .order("article_type" as never, { ascending: true } as never)
-      .order("publication_type" as never, { ascending: true } as never),
+      .from("article_type_rules")
+      .select("*")
+      .order("article_type", { ascending: true })
+      .order("publication_type", { ascending: true }),
   ]);
 
   const pending       = pendingRes.count ?? 0;

@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   const articleIds = decisions.map((d) => d.article_id);
   const { data: articleRows } = await admin
     .from("articles")
-    .select("id, condensed_model_version" as never)
+    .select("id, condensed_model_version")
     .in("id", articleIds);
 
   const versionMap = new Map(

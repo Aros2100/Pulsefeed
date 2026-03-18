@@ -94,8 +94,8 @@ export default async function SpecialtyImportPage({
 
   // ── Stats via RPC ──────────────────────────────────────────────────────────
   const { data: statsRows } = await admin.rpc(
-    "get_specialty_article_stats" as never,
-    { specialty_slug: specialty } as never
+    "get_specialty_article_stats",
+    { specialty_slug: specialty }
   );
   const stats = (statsRows as unknown as StatRow[]) ?? [];
 

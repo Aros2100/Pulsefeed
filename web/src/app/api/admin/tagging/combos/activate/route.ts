@@ -20,13 +20,13 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
   const { error } = await admin
-    .from("tagging_rule_combos" as never)
+    .from("tagging_rule_combos")
     .update({
       status: "active",
       activated_at: new Date().toISOString(),
       activated_by: auth.userId,
-    } as never)
-    .eq("id" as never, parsed.data.ruleId as never);
+    })
+    .eq("id", parsed.data.ruleId);
 
   if (error) {
     return NextResponse.json(

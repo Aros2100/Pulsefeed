@@ -28,8 +28,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const admin = createAdminClient();
   const { data, error } = await admin
-    .from("system_alerts" as never)
-    .update(result.data as never)
+    .from("system_alerts")
+    .update(result.data)
     .eq("id", id)
     .select("id, title, message, type, active, expires_at, created_at")
     .single();
@@ -49,7 +49,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
   const admin = createAdminClient();
   const { error } = await admin
-    .from("system_alerts" as never)
+    .from("system_alerts")
     .delete()
     .eq("id", id);
 

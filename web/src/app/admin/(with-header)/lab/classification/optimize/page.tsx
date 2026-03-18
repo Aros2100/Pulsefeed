@@ -54,7 +54,7 @@ export default async function ClassificationOptimizePage() {
     ),
 
     admin
-      .from("model_optimization_runs" as never)
+      .from("model_optimization_runs")
       .select("id, base_version, total_decisions, fp_count, fn_count, fp_patterns, fn_patterns, recommended_changes, improved_prompt, created_at")
       .eq("specialty", specialty)
       .eq("module", "classification_subspecialty")

@@ -37,7 +37,7 @@ export default async function SimulatePage({ searchParams }: Props) {
   type RunResult = { data: RawRun | null; error: unknown };
   const { data: run } = await (
     admin
-      .from("model_optimization_runs" as never)
+      .from("model_optimization_runs")
       .select("id, specialty, module, base_version, improved_prompt, fp_count, fn_count, created_at")
       .eq("id", run_id)
       .single() as unknown as Promise<RunResult>

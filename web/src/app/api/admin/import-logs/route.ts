@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   // Filter by circle column for C3 (which sets import_logs.circle = 3).
   // C1/C2 logs don't have circle set — filter by specialty + pubmed_filters instead.
   if (circle === 3) {
-    logsQuery = logsQuery.eq("circle" as never, 3);
+    logsQuery = logsQuery.eq("circle", 3);
   } else if (specialty) {
     const { data: filters } = await admin
       .from("pubmed_filters")

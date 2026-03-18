@@ -14,9 +14,9 @@ export async function runPublicationTypeMapping(
 
   // 1. Hent aktive regler hvor mindst ét felt er sat
   const { data: rules, error: rulesErr } = await admin
-    .from("publication_type_rules" as never)
-    .select("id, pubmed_type, article_type, study_design" as never)
-    .or("article_type.not.is.null,study_design.not.is.null" as never);
+    .from("publication_type_rules")
+    .select("id, pubmed_type, article_type, study_design")
+    .or("article_type.not.is.null,study_design.not.is.null");
 
   if (rulesErr) throw new Error(`Rules fetch failed: ${rulesErr.message}`);
 
@@ -31,12 +31,12 @@ export async function runPublicationTypeMapping(
 
   // 2. Hent artikler der mangler mapping og har publication_types
   const { data: articles, error: artErr } = await admin
-    .from("articles" as never)
-    .select("id, publication_types" as never)
-    .is("article_type_ai" as never, null as never)
-    .is("study_design_ai" as never, null as never)
-    .not("publication_types" as never, "is" as never, null as never)
-    .limit(limit as never);
+    .from("articles")
+    .select("id, publication_types")
+    .is("article_type_ai", null)
+    .is("study_design_ai", null)
+    .not("publication_types", "is", null)
+    .limit(limit);
 
   if (artErr) throw new Error(`Articles fetch failed: ${artErr.message}`);
 
@@ -70,9 +70,9 @@ export async function runPublicationTypeMapping(
     if (studyDesigns.size > 0) update.study_design_ai = [...studyDesigns];
 
     const { error: updErr } = await admin
-      .from("articles" as never)
-      .update(update as never)
-      .eq("id" as never, article.id as never);
+      .from("articles")
+      .update(update)
+      .eq("id", article.id);
 
     if (updErr) {
       console.error(`[pubtype-map] update failed for ${article.id}:`, updErr.message);

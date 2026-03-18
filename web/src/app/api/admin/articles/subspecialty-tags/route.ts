@@ -7,7 +7,7 @@ export async function GET() {
   if (!auth.ok) return auth.response;
 
   const admin = createAdminClient();
-  const { data, error } = await admin.rpc("get_distinct_specialty_tags" as never) as {
+  const { data, error } = await admin.rpc("get_distinct_specialty_tags") as {
     data: { tag: string }[] | null;
     error: unknown;
   };

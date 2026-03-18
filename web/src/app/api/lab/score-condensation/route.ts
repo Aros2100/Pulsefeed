@@ -77,8 +77,8 @@ export async function POST(request: NextRequest) {
 
   // Count how many scored-but-not-validated articles already exist.
   const { data: alreadyScoredCount } = await admin.rpc(
-    "count_condensation_not_validated" as never,
-    { p_specialty: specialty } as never,
+    "count_condensation_not_validated",
+    { p_specialty: specialty },
   );
   const existing = Number(alreadyScoredCount ?? 0);
   const remaining = Math.max(0, BATCH_LIMIT - existing);

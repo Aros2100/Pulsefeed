@@ -20,9 +20,9 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
   const { error } = await admin
-    .from("tagging_rules" as never)
-    .update({ status: "tracking" } as never)
-    .eq("id" as never, parsed.data.ruleId as never);
+    .from("tagging_rules")
+    .update({ status: "tracking" })
+    .eq("id", parsed.data.ruleId);
 
   if (error) {
     return NextResponse.json(

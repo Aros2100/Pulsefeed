@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     const t2 = pair.term_1 < pair.term_2 ? pair.term_2 : pair.term_1;
 
     const { error } = await admin
-      .from("tagging_rule_combos" as never)
+      .from("tagging_rule_combos")
       .upsert(
         {
           specialty,
@@ -43,8 +43,8 @@ export async function POST(request: NextRequest) {
           status: "active",
           activated_at: now,
           activated_by: auth.userId,
-        } as never,
-        { onConflict: "specialty,term_1,term_2" } as never
+        },
+        { onConflict: "specialty,term_1,term_2" }
       );
 
     if (error) {

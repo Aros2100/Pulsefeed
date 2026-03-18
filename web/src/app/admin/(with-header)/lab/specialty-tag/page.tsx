@@ -46,7 +46,7 @@ export default async function SpecialtyTagPage() {
 
   // --- Batch 1: base queries ---
   const [queueResult, totalResult, lastResult, versionsResult, allVersionsResult] = await Promise.all([
-    admin.rpc("count_scored_not_validated" as never, { p_specialty: specialty } as never),
+    admin.rpc("count_scored_not_validated", { p_specialty: specialty }),
     admin
       .from("lab_decisions")
       .select("*", { count: "exact", head: true })

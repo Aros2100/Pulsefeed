@@ -31,9 +31,9 @@ export async function POST() {
       try {
         // Fetch active rules
         const { data: rulesData, error: rulesError } = await admin
-          .from("article_type_rules" as never)
-          .select("publication_type, article_type" as never)
-          .eq("is_active" as never, true as never);
+          .from("article_type_rules")
+          .select("publication_type, article_type")
+          .eq("is_active", true);
 
         if (rulesError) {
           send({ done: true, error: (rulesError as { message: string }).message, scored: 0, skipped: 0 });
@@ -104,7 +104,7 @@ export async function POST() {
                 article_type_validated:     true,
                 article_type_scored_at:     new Date().toISOString(),
                 article_type_model_version: "deterministic-v1",
-              } as never)
+              })
               .eq("id", article.id);
             scored++;
           }

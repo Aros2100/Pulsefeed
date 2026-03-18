@@ -8,10 +8,10 @@ async function runRecalculate() {
   const activeSpecialties = SPECIALTIES.filter((s) => s.active).map((s) => s.slug);
 
   for (const specialty of activeSpecialties) {
-    const { error } = await admin.rpc("recalculate_tagging_rule_combos" as never, {
+    const { error } = await admin.rpc("recalculate_tagging_rule_combos", {
       p_specialty: specialty,
       p_include_c1: true,
-    } as never);
+    });
     if (error) {
       console.error(`[tagging] combo recalculate failed for ${specialty}:`, error.message);
     } else {

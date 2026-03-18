@@ -8,7 +8,8 @@ export async function GET() {
 
   const admin = createAdminClient();
 
-  const { data, error } = await admin.rpc("get_geo_status" as never);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (admin as any).rpc("get_geo_status");
 
   if (error) {
     // Fallback: run raw query via individual counts

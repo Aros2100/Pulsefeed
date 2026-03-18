@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
   const { error } = await admin
     .from("articles")
-    .update(updateFields as never)
+    .update(updateFields)
     .eq("id", articleId)
     .eq("status", "pending");
 

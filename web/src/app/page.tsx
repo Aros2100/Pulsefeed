@@ -42,8 +42,8 @@ export default async function DashboardPage() {
 
   // Fetch top subspecialties from DB
   const { data: topSubsData } = await supabase.rpc(
-    "get_top_subspecialties" as never,
-    { p_limit: 3 } as never,
+    "get_top_subspecialties",
+    { p_limit: 3 },
   );
   const topSubspecialties = (topSubsData ?? []) as { tag: string; count: number }[];
 

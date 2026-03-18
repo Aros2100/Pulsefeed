@@ -199,7 +199,7 @@ export default async function CondensationEvaluationPage({ searchParams }: Props
   const [articlesForMap, allAccRes] = await Promise.all([
     articleIds.length > 0
       ? admin.from("articles")
-          .select("id, title, journal_abbr, abstract, short_headline, short_resume, bottom_line, pico_population, pico_intervention, pico_comparison, pico_outcome, sample_size" as never)
+          .select("id, title, journal_abbr, abstract, short_headline, short_resume, bottom_line, pico_population, pico_intervention, pico_comparison, pico_outcome, sample_size")
           .in("id", articleIds)
       : Promise.resolve({ data: null }),
     admin.from("lab_decisions")

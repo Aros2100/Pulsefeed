@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
         status: "approved",
         approval_method: "mesh_auto_tag",
         auto_tagged_at: now,
-      } as never)
+      })
       .in("id", chunk)
       .eq("status", "pending");
 

@@ -11,10 +11,10 @@ export default async function CombosPage() {
 
   // Fetch combo rules
   const { data: rules } = await admin
-    .from("tagging_rule_combos" as never)
-    .select("*" as never)
-    .eq("specialty" as never, specialty as never)
-    .order("total_decisions" as never, { ascending: false } as never);
+    .from("tagging_rule_combos")
+    .select("*")
+    .eq("specialty", specialty)
+    .order("total_decisions", { ascending: false });
 
   type RawRule = {
     id: string;
@@ -34,10 +34,10 @@ export default async function CombosPage() {
   const typedRules = (rules ?? []) as RawRule[];
 
   // Fetch co-occurrences (for heatmap)
-  const { data: coOccurrences } = await admin.rpc("get_mesh_co_occurrences" as never, {
+  const { data: coOccurrences } = await admin.rpc("get_mesh_co_occurrences", {
     p_specialty: specialty,
     p_min_count: 3,
-  } as never);
+  });
 
   const typedCoOccurrences = (coOccurrences ?? []) as {
     term_1: string;
@@ -46,9 +46,9 @@ export default async function CombosPage() {
   }[];
 
   // Fetch article counts per combo rule
-  const { data: articleCounts } = await admin.rpc("get_combo_article_counts" as never, {
+  const { data: articleCounts } = await admin.rpc("get_combo_article_counts", {
     p_specialty: specialty,
-  } as never);
+  });
 
   const typedCounts = (articleCounts ?? []) as {
     term_1: string;
@@ -72,11 +72,11 @@ export default async function CombosPage() {
   });
 
   // Fetch pending articles matching active combos
-  const { data: pendingArticles } = await admin.rpc("get_combo_pending_articles" as never, {
+  const { data: pendingArticles } = await admin.rpc("get_combo_pending_articles", {
     p_specialty: specialty,
-  } as never);
+  });
 
-  const typedPending = (pendingArticles ?? []) as {
+  const typedPending = (pendingArticles ?? []) as unknown as {
     article_id: string;
     title: string;
     journal_abbr: string | null;
@@ -85,9 +85,9 @@ export default async function CombosPage() {
   }[];
 
   // Fetch KPIs via RPC
-  const { data: kpiData } = await admin.rpc("get_tagging_kpis" as never, {
+  const { data: kpiData } = await admin.rpc("get_tagging_kpis", {
     p_specialty: specialty,
-  } as never);
+  });
 
   const kpis = (kpiData as { total_pending: number; no_mesh: number; single_ready: number; combo_ready: number; no_match: number } | null) ?? {
     total_pending: 0, no_mesh: 0, single_ready: 0, combo_ready: 0, no_match: 0,

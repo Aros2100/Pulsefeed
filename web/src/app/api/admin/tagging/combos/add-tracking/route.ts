@@ -31,11 +31,11 @@ export async function POST(request: NextRequest) {
 
   // Check if already exists
   const { data: existing } = await admin
-    .from("tagging_rule_combos" as never)
-    .select("id, status" as never)
-    .eq("specialty" as never, specialty as never)
-    .eq("term_1" as never, t1 as never)
-    .eq("term_2" as never, t2 as never)
+    .from("tagging_rule_combos")
+    .select("id, status")
+    .eq("specialty", specialty)
+    .eq("term_1", t1)
+    .eq("term_2", t2)
     .maybeSingle();
 
   const row = existing as { id: string; status: string } | null;
@@ -47,13 +47,13 @@ export async function POST(request: NextRequest) {
     if (activate) {
       // tracking/draft/disabled → activate
       await admin
-        .from("tagging_rule_combos" as never)
+        .from("tagging_rule_combos")
         .update({
           status: "active",
           activated_at: new Date().toISOString(),
           activated_by: auth.userId,
-        } as never)
-        .eq("id" as never, row.id as never);
+        })
+        .eq("id", row.id);
       return NextResponse.json({ ok: true, result: "activated" });
     }
     if (row.status === "tracking") {
@@ -61,22 +61,22 @@ export async function POST(request: NextRequest) {
     }
     // disabled → restore to tracking
     await admin
-      .from("tagging_rule_combos" as never)
-      .update({ status: "tracking" } as never)
-      .eq("id" as never, row.id as never);
+      .from("tagging_rule_combos")
+      .update({ status: "tracking" })
+      .eq("id", row.id);
     return NextResponse.json({ ok: true, result: "restored" });
   }
 
   // Insert new rule
   const { error } = await admin
-    .from("tagging_rule_combos" as never)
+    .from("tagging_rule_combos")
     .insert({
       specialty,
       term_1: t1,
       term_2: t2,
       status: activate ? "active" : "tracking",
       ...(activate ? { activated_at: new Date().toISOString(), activated_by: auth.userId } : {}),
-    } as never);
+    });
 
   if (error) {
     return NextResponse.json(

@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { Json } from "@/lib/supabase/types";
 
 export type ArticleEventType =
   | "imported"
@@ -19,12 +20,12 @@ export async function logArticleEvent(
   try {
     const admin = createAdminClient();
     const { error } = await admin
-      .from("article_events" as never)
+      .from("article_events")
       .insert({
         article_id: articleId,
         event_type: eventType,
-        payload,
-      } as never);
+        payload: payload as Json,
+      });
 
     if (error) {
       console.error(`[article-events] Failed to log ${eventType} for article ${articleId}:`, error.message);

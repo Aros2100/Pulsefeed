@@ -28,13 +28,13 @@ export async function POST(request: NextRequest) {
   // Activate checked terms
   if (activeIds.length > 0) {
     const { error } = await admin
-      .from("tagging_rules" as never)
+      .from("tagging_rules")
       .update({
         status: "active",
         activated_at: now,
         activated_by: auth.userId,
-      } as never)
-      .in("id" as never, activeIds as never);
+      })
+      .in("id", activeIds);
 
     if (error) {
       return NextResponse.json(
@@ -49,9 +49,9 @@ export async function POST(request: NextRequest) {
   // For simplicity we set all to 'disabled' since admin explicitly unchecked them.
   if (disableIds.length > 0) {
     const { error } = await admin
-      .from("tagging_rules" as never)
-      .update({ status: "disabled" } as never)
-      .in("id" as never, disableIds as never);
+      .from("tagging_rules")
+      .update({ status: "disabled" })
+      .in("id", disableIds);
 
     if (error) {
       return NextResponse.json(

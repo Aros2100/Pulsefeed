@@ -171,7 +171,7 @@ Respond in JSON only — no markdown, no backticks:
     type InsertResult = { data: Array<{ id: string }> | null; error: { message: string; code: string } | null };
     const { data: insertData, error: insertError } = await (
       admin
-        .from("model_optimization_runs" as never)
+        .from("model_optimization_runs")
         .insert({
           specialty,
           module,
@@ -183,7 +183,7 @@ Respond in JSON only — no markdown, no backticks:
           fn_patterns:         result.false_negative_patterns,
           recommended_changes: result.recommended_changes,
           improved_prompt:     result.improved_prompt,
-        } as never)
+        })
         .select("id") as unknown as Promise<InsertResult>
     );
 

@@ -71,7 +71,7 @@ export async function runCitationFetch(limit = 500): Promise<{ updated: number; 
       .update({
         citation_count:       count,
         citations_fetched_at: new Date().toISOString(),
-      } as never)
+      })
       .eq("id", row.id);
 
     if (updateError) {
@@ -80,12 +80,12 @@ export async function runCitationFetch(limit = 500): Promise<{ updated: number; 
     } else {
       updated++;
       const { error: evErr } = await admin
-        .from("article_events" as never)
+        .from("article_events")
         .insert({
           article_id: row.id,
           event_type: "citation_count_updated",
           payload:    { citation_count: count },
-        } as never);
+        });
       if (evErr) console.warn(`[fetch-citations] Event insert failed for article ${row.id}:`, evErr.message);
     }
   }

@@ -11,10 +11,10 @@ export async function GET(request: NextRequest) {
   const minCount = parseInt(searchParams.get("min_count") ?? "3", 10);
 
   const admin = createAdminClient();
-  const { data, error } = await admin.rpc("get_mesh_co_occurrences" as never, {
+  const { data, error } = await admin.rpc("get_mesh_co_occurrences", {
     p_specialty: specialty,
     p_min_count: minCount,
-  } as never);
+  });
 
   if (error) {
     return NextResponse.json(

@@ -25,7 +25,7 @@ export default async function ArticleTypeOverviewPage() {
     lastResult,
   ] = await Promise.all([
     // Queue count via RPC
-    admin.rpc("count_article_type_not_validated" as never, {} as never),
+    admin.rpc("count_article_type_not_validated"),
 
     // Total decisions
     admin

@@ -15,14 +15,14 @@ export async function GET() {
       .order("started_at", { ascending: false })
       .limit(20),
     admin.rpc("count_unlinked_articles"),
-    admin.rpc("count_unlinked_author_slots" as never),
+    admin.rpc("count_unlinked_author_slots"),
     admin.from("authors").select("id", { count: "exact", head: true }),
     admin
       .from("author_linking_logs")
       .select("new_authors, duplicates, rejected, authors_processed")
       .in("status", ["completed", "running"]),
     admin
-      .from("rejected_authors" as never)
+      .from("rejected_authors")
       .select("id", { count: "exact", head: true }),
   ]);
 

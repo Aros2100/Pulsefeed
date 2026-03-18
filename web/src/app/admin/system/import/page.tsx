@@ -163,8 +163,8 @@ export default async function ImportDashboardPage() {
     admin.from("articles").select("id", { count: "exact", head: true }),
     // Authors
     admin.from("authors").select("*", { count: "exact", head: true }),
-    admin.rpc("count_unlinked_articles" as never),
-    admin.rpc("count_unlinked_author_slots" as never),
+    admin.rpc("count_unlinked_articles"),
+    admin.rpc("count_unlinked_author_slots"),
     // Latest completed import log per circle
     admin.from("pubmed_filters").select("id").eq("specialty", "neurosurgery").eq("circle", 1)
       .then(async (fRes: { data: { id: string }[] | null }) => {

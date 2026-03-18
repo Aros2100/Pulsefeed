@@ -19,8 +19,8 @@ export async function GET(request: NextRequest) {
 
   // Only return articles that ARE scored but have NOT been validated via lab_decisions
   const { data: articles, error } = await admin.rpc(
-    "get_scored_not_validated_articles" as never,
-    { p_specialty: specialty, p_limit: 100 } as never,
+    "get_scored_not_validated_articles",
+    { p_specialty: specialty, p_limit: 100 },
   );
 
   if (error) {

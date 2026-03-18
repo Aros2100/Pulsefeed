@@ -41,7 +41,7 @@ export default async function ClassificationOverviewPage() {
     lastResult,
   ] = await Promise.all([
     // Queue count via RPC
-    admin.rpc("count_classification_not_validated" as never, { p_specialty: specialty } as never),
+    admin.rpc("count_classification_not_validated", { p_specialty: specialty }),
 
     // Subspecialty total decisions
     admin

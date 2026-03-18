@@ -20,9 +20,9 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
   const { error } = await admin
-    .from("tagging_rule_combos" as never)
-    .update({ status: "disabled" } as never)
-    .eq("id" as never, parsed.data.ruleId as never);
+    .from("tagging_rule_combos")
+    .update({ status: "disabled" })
+    .eq("id", parsed.data.ruleId);
 
   if (error) {
     return NextResponse.json(

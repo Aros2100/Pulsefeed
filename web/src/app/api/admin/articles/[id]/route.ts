@@ -65,7 +65,7 @@ export async function PUT(
 
   // Update subspecialty_ai
   if (subspecialty_ai !== undefined) {
-    const { error } = await admin.from("articles").update({ subspecialty_ai } as never).eq("id", articleId);
+    const { error } = await admin.from("articles").update({ subspecialty_ai }).eq("id", articleId);
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }

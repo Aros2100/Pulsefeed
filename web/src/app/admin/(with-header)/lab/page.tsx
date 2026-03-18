@@ -23,10 +23,10 @@ export default async function LabPage() {
   const admin = createAdminClient();
 
   const [specQueueResult, clsQueueResult, cndQueueResult, atQueueResult] = await Promise.all([
-    admin.rpc("count_scored_not_validated" as never, { p_specialty: specialty } as never),
-    admin.rpc("count_classification_not_validated" as never, { p_specialty: specialty } as never),
-    admin.rpc("count_condensation_not_validated" as never, { p_specialty: specialty } as never),
-    admin.rpc("count_article_type_not_validated" as never),
+    admin.rpc("count_scored_not_validated", { p_specialty: specialty }),
+    admin.rpc("count_classification_not_validated", { p_specialty: specialty }),
+    admin.rpc("count_condensation_not_validated", { p_specialty: specialty }),
+    admin.rpc("count_article_type_not_validated"),
   ]);
 
   const specQueueCount = (specQueueResult.data as number | null) ?? 0;

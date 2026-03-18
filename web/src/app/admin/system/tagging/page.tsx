@@ -11,10 +11,10 @@ export default async function TaggingPage() {
 
   // Fetch all tagging rules
   const { data: rules } = await admin
-    .from("tagging_rules" as never)
-    .select("*" as never)
-    .eq("specialty" as never, specialty as never)
-    .order("total_decisions" as never, { ascending: false } as never);
+    .from("tagging_rules")
+    .select("*")
+    .eq("specialty", specialty)
+    .order("total_decisions", { ascending: false });
 
   const typedRules = (rules ?? []) as {
     id: string;
@@ -31,18 +31,18 @@ export default async function TaggingPage() {
   }[];
 
   // Fetch KPIs via RPC
-  const { data: kpiData } = await admin.rpc("get_tagging_kpis" as never, {
+  const { data: kpiData } = await admin.rpc("get_tagging_kpis", {
     p_specialty: specialty,
-  } as never);
+  });
 
   const kpis = (kpiData as { total_pending: number; no_mesh: number; single_ready: number; combo_ready: number; no_match: number } | null) ?? {
     total_pending: 0, no_mesh: 0, single_ready: 0, combo_ready: 0, no_match: 0,
   };
 
   // Fetch pending articles matching active single terms
-  const { data: readyArticlesRaw } = await admin.rpc("get_single_ready_articles" as never, {
+  const { data: readyArticlesRaw } = await admin.rpc("get_single_ready_articles", {
     p_specialty: specialty,
-  } as never);
+  });
 
   const readyArticles = (readyArticlesRaw ?? []) as {
     article_id: string;

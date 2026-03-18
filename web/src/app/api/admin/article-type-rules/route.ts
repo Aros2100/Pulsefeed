@@ -16,10 +16,10 @@ export async function GET() {
 
   const admin = createAdminClient();
   const { data, error } = await admin
-    .from("article_type_rules" as never)
-    .select("*" as never)
-    .order("article_type" as never, { ascending: true } as never)
-    .order("publication_type" as never, { ascending: true } as never);
+    .from("article_type_rules")
+    .select("*")
+    .order("article_type", { ascending: true })
+    .order("publication_type", { ascending: true });
 
   if (error) return NextResponse.json({ ok: false, error: (error as { message: string }).message }, { status: 500 });
   return NextResponse.json({ ok: true, data: (data ?? []) as Rule[] });
@@ -43,9 +43,9 @@ export async function PATCH(request: NextRequest) {
 
   const admin = createAdminClient();
   const { error } = await admin
-    .from("article_type_rules" as never)
-    .update({ is_active: result.data.is_active } as never)
-    .eq("id" as never, result.data.id as never);
+    .from("article_type_rules")
+    .update({ is_active: result.data.is_active })
+    .eq("id", result.data.id);
 
   if (error) return NextResponse.json({ ok: false, error: (error as { message: string }).message }, { status: 500 });
   return NextResponse.json({ ok: true });
@@ -69,12 +69,12 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
   const { data, error } = await admin
-    .from("article_type_rules" as never)
+    .from("article_type_rules")
     .insert({
       publication_type: result.data.publication_type,
       article_type: result.data.article_type,
       is_active: true,
-    } as never)
+    })
     .select()
     .single();
 
@@ -99,9 +99,9 @@ export async function DELETE(request: NextRequest) {
 
   const admin = createAdminClient();
   const { error } = await admin
-    .from("article_type_rules" as never)
+    .from("article_type_rules")
     .delete()
-    .eq("id" as never, result.data.id as never);
+    .eq("id", result.data.id);
 
   if (error) return NextResponse.json({ ok: false, error: (error as { message: string }).message }, { status: 500 });
   return NextResponse.json({ ok: true });

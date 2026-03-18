@@ -10,17 +10,17 @@ export async function GET() {
 
   const [rulesRes, articleTypesRes, studyDesignsRes] = await Promise.all([
     admin
-      .from("publication_type_rules" as never)
-      .select("*" as never)
-      .order("pubmed_type" as never),
+      .from("publication_type_rules")
+      .select("*")
+      .order("pubmed_type"),
     admin
-      .from("article_type_categories" as never)
-      .select("*" as never)
-      .order("name" as never),
+      .from("article_type_categories")
+      .select("*")
+      .order("name"),
     admin
-      .from("study_design_categories" as never)
-      .select("*" as never)
-      .order("name" as never),
+      .from("study_design_categories")
+      .select("*")
+      .order("name"),
   ]);
 
   if (rulesRes.error) {
@@ -52,12 +52,12 @@ export async function PUT(request: NextRequest) {
   const admin = createAdminClient();
 
   const { error } = await admin
-    .from("publication_type_rules" as never)
+    .from("publication_type_rules")
     .update({
       article_type: body.article_type ?? null,
       study_design: body.study_design ?? null,
-    } as never)
-    .eq("id" as never, body.id as never);
+    })
+    .eq("id", body.id);
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

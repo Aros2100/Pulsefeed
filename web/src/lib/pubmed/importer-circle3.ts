@@ -200,7 +200,7 @@ export async function runImportCircle3(
           // ON CONFLICT (pubmed_id) DO NOTHING — never overwrite existing articles
           const { data: upsertedRows, error: upsertErr } = await admin
             .from("articles")
-            .upsert(batch as never, { onConflict: "pubmed_id", ignoreDuplicates: true })
+            .upsert(batch, { onConflict: "pubmed_id", ignoreDuplicates: true })
             .select("id, pubmed_id");
 
           if (upsertErr) {
