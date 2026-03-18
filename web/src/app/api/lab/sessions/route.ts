@@ -62,8 +62,7 @@ export async function POST(request: NextRequest) {
     (freshArticles ?? []).map((a) => [a.id as string, a as { id: string; ai_decision: string | null; specialty_confidence: number | null }])
   );
 
-  // user_id FK currently references public.users — pass null to avoid constraint
-  // violations until the FK target is confirmed. Auth is already enforced above.
+  // Auth is enforced above via requireAdmin.
   const editorId: string | null = auth.userId ?? null;
 
   // Hent aktiv model-version til at tagge lab_decisions med
