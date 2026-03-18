@@ -10,6 +10,7 @@ import { buildImportEventPayload } from "@/lib/article-events/import-payload";
 import type { OpenAlexWork, OpenAlexAuthorship } from "@/lib/openalex/client";
 import { matchPubMedToOpenAlex } from "@/lib/openalex/match-authors";
 import { logAuthorEvent } from "@/lib/author-events";
+import pLimit from "p-limit";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -270,11 +271,16 @@ function normalizeOrcid(orcid: string): string {
   return orcid.replace(/^https?:\/\/orcid\.org\//, "").trim();
 }
 
+interface OpenAlexIdResult {
+  id: string;
+  institution: { displayName: string; ror: string | null; type: string } | null;
+}
+
 async function fetchOpenAlexId(
   orcid: string | null,
   name: string,
   affiliation: string | null
-): Promise<string | null> {
+): Promise<OpenAlexIdResult | null> {
   try {
     let filter: string;
     if (orcid) {
@@ -294,9 +300,22 @@ async function fetchOpenAlexId(
     });
     clearTimeout(timeout);
     if (!res.ok) return null;
-    const data = (await res.json()) as { results?: { id?: string }[] };
-    const raw = data.results?.[0]?.id ?? null;
-    return raw ? raw.replace("https://openalex.org/", "") : null;
+    const data = (await res.json()) as {
+      results?: {
+        id?: string;
+        last_known_institutions?: { display_name?: string; ror?: string; type?: string }[];
+      }[];
+    };
+    const first = data.results?.[0] ?? null;
+    if (!first?.id) return null;
+    const rawId = first.id.replace("https://openalex.org/", "");
+    const rawInst = first.last_known_institutions?.[0] ?? null;
+    const institution = rawInst ? {
+      displayName: String(rawInst.display_name ?? ""),
+      ror: rawInst.ror ? rawInst.ror.replace("https://ror.org/", "") : null,
+      type: String(rawInst.type ?? ""),
+    } : null;
+    return { id: rawId, institution };
   } catch {
     return null;
   }
@@ -422,7 +441,7 @@ async function resolveAuthorFromOpenAlex(
 
     if (orcidMatch) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const upgrades: Record<string, any> = { openalex_id: oaId, geo_source: "openalex", openalex_enriched_at: new Date().toISOString() };
+      const upgrades: Record<string, any> = { openalex_id: oaId, geo_source: "openalex", verified_by: "openalex", openalex_enriched_at: new Date().toISOString() };
       if (countryName) upgrades.country = countryName;
       if (primaryInst) {
         const { hospital, department } = splitInstitutionAndDepartment(primaryInst.displayName);
@@ -475,6 +494,7 @@ async function resolveAuthorFromOpenAlex(
         institution_type: primaryInst?.type ?? null,
         country: countryName,
         geo_source: "openalex",
+        verified_by: "openalex",
         openalex_enriched_at: new Date().toISOString(),
         display_name: displayName,
         display_name_normalized: normalized,
@@ -551,6 +571,7 @@ async function resolveAuthorId(
   admin: AdminClient,
   author: Author,
   articleId?: string | null,
+  preResolvedOA?: OpenAlexIdResult | null,
 ): Promise<{ id: string; outcome: AuthorOutcome }> {
   const displayName = [author.foreName, author.lastName].filter(Boolean).join(" ").trim();
   const normalized = normalizeAuthorName(displayName || "Unknown");
@@ -585,7 +606,11 @@ async function resolveAuthorId(
   }
 
   // ── 1.5. OpenAlex lookup ──────────────────────────────────────────────────
-  const openAlexId = await fetchOpenAlexId(newOrcid, displayName, primaryAff);
+  const openAlexResult = preResolvedOA !== undefined
+    ? preResolvedOA
+    : await fetchOpenAlexId(newOrcid, displayName, parsed.institution);
+  const openAlexId = openAlexResult?.id ?? null;
+  const openAlexInstitution = openAlexResult?.institution ?? null;
   if (openAlexId) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: oaMatch } = await (admin as any)
@@ -631,14 +656,14 @@ async function resolveAuthorId(
       const withoutOrcidConflict = candidates.filter(c => !c.orcid);
       if (withoutOrcidConflict.length === 0) {
         // Every candidate has a different ORCID — create new author
-        return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId);
+        return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution);
       }
       // Continue matching only against candidates without ORCID
-      return await matchByGeo(admin, withoutOrcidConflict, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId);
+      return await matchByGeo(admin, withoutOrcidConflict, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution);
     }
 
     // No ORCID on new author — filter out candidates where ORCID conflict is impossible
-    return await matchByGeo(admin, candidates, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId);
+    return await matchByGeo(admin, candidates, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution);
   }
 
   // ── 2.5. Initial-match: "J Sørensen" → "Jens Sørensen" ─────────────────────
@@ -740,7 +765,7 @@ async function resolveAuthorId(
   }
 
   // ── 3. No candidates — create new author ───────────────────────────────────
-  return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId);
+  return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution);
 }
 
 async function matchByGeo(
@@ -754,6 +779,7 @@ async function matchByGeo(
   parsed: { city: string | null; country: string | null; institution: string | null; department: string | null },
   openAlexId: string | null,
   articleId?: string | null,
+  openAlexInstitution?: { displayName: string; ror: string | null; type: string } | null,
 ): Promise<{ id: string; outcome: AuthorOutcome }> {
   // 2b. Same name + same city + same country
   if (parsed.city && parsed.country) {
@@ -801,7 +827,7 @@ async function matchByGeo(
   }
 
   // 2e. No match — create new author
-  return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId);
+  return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution);
 }
 
 async function createNewAuthor(
@@ -814,12 +840,43 @@ async function createNewAuthor(
   parsed: { city: string | null; country: string | null; institution: string | null; department: string | null },
   resolvedOpenAlexId?: string | null,
   articleId?: string | null,
+  resolvedOpenAlexInstitution?: { displayName: string; ror: string | null; type: string } | null,
 ): Promise<{ id: string; outcome: AuthorOutcome }> {
   await sleep(150);
-  const openalexId = resolvedOpenAlexId ?? await fetchOpenAlexId(orcid, displayName, primaryAff);
+  const openalexId = resolvedOpenAlexId ?? null;
+  const oaInst = (openalexId && resolvedOpenAlexInstitution) ? resolvedOpenAlexInstitution : null;
+
+  // Determine institution fields: prefer OA over parser
+  let hospital = parsed.institution;
+  let department = parsed.department;
+  let institutionType: string | null = null;
+  let rorId: string | null = null;
+  if (oaInst) {
+    const split = splitInstitutionAndDepartment(oaInst.displayName);
+    if (split.hospital) hospital = split.hospital;
+    if (split.department) department = split.department;
+    institutionType = oaInst.type || null;
+    rorId = oaInst.ror ?? null;
+  }
+
+  // Determine geo: ROR geo as primary, fall back to parser
+  let city = parsed.city;
+  let country = parsed.country;
+  let state: string | null = null;
+  if (oaInst?.ror) {
+    const rorGeo = await fetchRorGeo(oaInst.ror);
+    if (rorGeo.city)    city    = rorGeo.city;
+    if (rorGeo.state)   state   = rorGeo.state;
+    if (rorGeo.country) country = rorGeo.country;
+  }
+  if (!state) {
+    state = await resolveState(admin, city, country);
+  }
+
   const email = primaryAff ? extractEmail(primaryAff) : null;
-  const authorState = await resolveState(admin, parsed.city, parsed.country);
   const matchConfidence = orcid ? 1.0 : 0.8;
+  const geoSource = openalexId ? "openalex" : "parser";
+  const verifiedBy = openalexId ? "openalex" : "uverificeret";
 
   const { data: created } = await admin
     .from("authors")
@@ -829,25 +886,27 @@ async function createNewAuthor(
       orcid,
       openalex_id: openalexId,
       openalex_enriched_at: openalexId ? new Date().toISOString() : null,
-      geo_source: openalexId ? "openalex" : "parser",
-      verified_by: openalexId ? "openalex" : "uverificeret",
+      geo_source: geoSource,
+      verified_by: verifiedBy,
       email,
       affiliations,
       match_confidence: matchConfidence,
-      department: parsed.department,
-      hospital: parsed.institution,
-      city: parsed.city,
-      country: parsed.country,
-      state: authorState,
+      department,
+      hospital,
+      ror_id: rorId,
+      institution_type: institutionType,
+      city,
+      country,
+      state,
     })
     .select("id")
     .single();
 
   void logAuthorEvent(created!.id, "created", {
     source: openalexId ? "openalex" : "parser",
-    verified_by: openalexId ? "openalex" : "uverificeret",
+    verified_by: verifiedBy,
     match_confidence: matchConfidence,
-    geo_source: openalexId ? "openalex" : "parser",
+    geo_source: geoSource,
     ...(articleId ? { article_id: articleId } : {}),
   });
 
@@ -899,6 +958,22 @@ export async function linkAuthorsToArticle(
       )
     : new Map<number, OpenAlexAuthorship>();
 
+  // Pre-fetch OpenAlex IDs in parallel for authors not matched via OA work
+  const oaLimit = pLimit(5);
+  const preResolvedOAMap = new Map<number, OpenAlexIdResult | null>();
+  await Promise.all(
+    authors.map((author, i) => {
+      if (oaMatchMap.has(i) || (!author.lastName && !author.orcid)) return Promise.resolve();
+      return oaLimit(async () => {
+        const orcid = author.orcid ? normalizeOrcid(author.orcid) : null;
+        const name = [author.foreName, author.lastName].filter(Boolean).join(" ").trim();
+        const primaryAff = author.affiliations[0] ?? null;
+        const geoParsed = primaryAff ? geoParseAffiliation(primaryAff) : null;
+        preResolvedOAMap.set(i, await fetchOpenAlexId(orcid, name, geoParsed?.institution ?? null));
+      });
+    })
+  );
+
   for (let i = 0; i < authors.length; i++) {
     const author = authors[i];
 
@@ -918,7 +993,7 @@ export async function linkAuthorsToArticle(
     const oaAuthorship = oaMatchMap.get(i) ?? null;
     const { id: authorId, outcome } = oaAuthorship
       ? await resolveAuthorFromOpenAlex(admin, author, oaAuthorship, articleId, oaWork)
-      : await resolveAuthorId(admin, author, articleId);
+      : await resolveAuthorId(admin, author, articleId, preResolvedOAMap.get(i));
     console.log(`[import] resolve "${authorName}": ${Date.now() - tResolve}ms (${oaAuthorship ? "openalex" : "parser"})`);
 
     // Capture geo data including state from the resolved author
