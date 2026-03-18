@@ -46,10 +46,7 @@ export default async function SpecialtyTagPage() {
 
   // --- Batch 1: base queries ---
   const [queueResult, totalResult, lastResult, versionsResult, allVersionsResult] = await Promise.all([
-    admin
-      .from("articles")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending"),
+    admin.rpc("count_scored_not_validated" as never, { p_specialty: specialty } as never),
     admin
       .from("lab_decisions")
       .select("*", { count: "exact", head: true })
@@ -141,7 +138,7 @@ export default async function SpecialtyTagPage() {
       : noVersion,
   ]);
 
-  const queueCount          = queueResult.count ?? 0;
+  const queueCount          = (queueResult.data as number | null) ?? 0;
   const totalDecisions      = totalResult.count ?? 0;
   const lastDecisionAt      = lastResult.data?.[0]?.decided_at ?? null;
   const activeVersionCount  = activeVersionCountResult.count ?? 0;
