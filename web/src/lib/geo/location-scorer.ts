@@ -96,9 +96,9 @@ export async function runLocationParsing(limit = 500): Promise<{
     const firstAuthor = authors[0];
     const lastAuthor = authors.length > 1 ? authors[authors.length - 1] : null;
 
-    const firstParsed = parseAffiliation(getAffiliationString(firstAuthor));
+    const firstParsed = await parseAffiliation(getAffiliationString(firstAuthor));
     const lastParsed = lastAuthor
-      ? parseAffiliation(getAffiliationString(lastAuthor))
+      ? await parseAffiliation(getAffiliationString(lastAuthor))
       : null;
 
     const now = new Date().toISOString();
@@ -291,9 +291,9 @@ export async function reparseLowConfidence(cutoffDate: string, limit = 500): Pro
     if (!Array.isArray(article.authors) || article.authors.length === 0) continue;
 
     const authors = article.authors as AuthorEntry[];
-    const firstParsed = parseAffiliation(getAffiliationString(authors[0]));
+    const firstParsed = await parseAffiliation(getAffiliationString(authors[0]));
     const lastParsed = authors.length > 1
-      ? parseAffiliation(getAffiliationString(authors[authors.length - 1]))
+      ? await parseAffiliation(getAffiliationString(authors[authors.length - 1]))
       : null;
 
     let overallConfidence: "high" | "low" | null = null;

@@ -28,7 +28,7 @@ export async function POST() {
 
       for (const author of data) {
         const raw = (author.affiliations as string[])?.[0] ?? null;
-        const parsed = raw ? geoParseAffiliation(raw) : null;
+        const parsed = raw ? await geoParseAffiliation(raw) : null;
 
         await db.from("authors").update({
           country: parsed?.country ?? null,

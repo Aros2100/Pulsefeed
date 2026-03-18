@@ -7,8 +7,7 @@ import { lookupCountry, CANONICAL_COUNTRIES, US_STATES } from "./country-map";
 import { lookupInstitution } from "./institution-map";
 import { isAdministrativeRegion, isProvinceCode } from "./region-map";
 import { lookupCity } from "./city-map";
-import { CITY_NAMES } from "./city-set";
-import { CITY_COUNTRY_MAP } from "./city-country-map";
+import { getCityCache } from "./city-cache";
 
 export type ParsedAffiliation = {
   department: string | null;
@@ -112,7 +111,7 @@ const CITY_EXTRACT_BLOCKLIST = new Set([
 ]);
 
 /** Try to extract a city name embedded in an institution segment */
-function extractCityFromSegment(segment: string): string | null {
+function extractCityFromSegment(segment: string, cityNames: Set<string>): string | null {
   const words = segment.split(/\s+/);
   // Check pairs of words first (longer match = better, e.g. "New Haven", "Hong Kong")
   for (let i = 0; i < words.length - 1; i++) {
@@ -120,17 +119,17 @@ function extractCityFromSegment(segment: string): string | null {
     const w1blocked = CITY_EXTRACT_BLOCKLIST.has(words[i].toLowerCase());
     const w2blocked = CITY_EXTRACT_BLOCKLIST.has(words[i + 1].toLowerCase());
     if (w1blocked && w2blocked) continue;
-    if (CITY_NAMES.has(pair.toLowerCase())) return pair;
+    if (cityNames.has(pair.toLowerCase())) return pair;
   }
   // Then single words (skip short generic words)
   for (const word of words) {
-    if (word.length >= 4 && !CITY_EXTRACT_BLOCKLIST.has(word.toLowerCase()) && CITY_NAMES.has(word.toLowerCase())) return word;
+    if (word.length >= 4 && !CITY_EXTRACT_BLOCKLIST.has(word.toLowerCase()) && cityNames.has(word.toLowerCase())) return word;
   }
   return null;
 }
 
 /** Clean city string: strip DK-prefix, postal codes, district suffixes, UK postcodes */
-function cleanCity(raw: string): string {
+function cleanCity(raw: string, cityNames: Set<string>): string {
   // If entire string is a UK postcode, return empty
   if (/^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i.test(raw.trim())) return "";
   let city = raw;
@@ -163,10 +162,10 @@ function cleanCity(raw: string): string {
   }
   // Strip " - State of ..." suffix (Brazilian cities: "São Paulo - State of São Paulo")
   city = city.replace(/\s+-\s+State\s+of\s+.*$/i, "").trim();
-  // Strip trailing "City" if the base name is a known city (e.g. "Mexico City" → "Mexico" only if "Mexico" is in CITY_NAMES)
+  // Strip trailing "City" if the base name is a known city (e.g. "Mexico City" → "Mexico" only if "Mexico" is in city names)
   if (city.endsWith(" City")) {
     const base = city.slice(0, -5).trim();
-    if (base && CITY_NAMES.has(base.toLowerCase())) {
+    if (base && cityNames.has(base.toLowerCase())) {
       city = base;
     }
   }
@@ -175,9 +174,11 @@ function cleanCity(raw: string): string {
   return city;
 }
 
-export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
+export async function parseAffiliation(raw: string | null): Promise<ParsedAffiliation | null> {
   // Step 1: Handle null/empty
   if (!raw || !raw.trim()) return null;
+
+  const { names: cityNames, countryMap: cityCountryMap } = await getCityCache();
 
   // Step 1b: Strip trailing author initials from raw string BEFORE splitting on ";"
   let text = raw.replace(/\s*\([A-Za-z][A-Za-z.\-,\s]{2,}\)\s*\.?\s*$/, "").trim();
@@ -415,11 +416,11 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
     }
 
     if (cityIdx >= 0) {
-      const rawCity = cleanCity(segments[cityIdx]);
+      const rawCity = cleanCity(segments[cityIdx], cityNames);
 
       // Check if cleaned city is actually a country name (e.g. "Rwanda")
       // but allow names that are also known cities (e.g. "Singapore")
-      if (rawCity && lookupCountry(rawCity) !== null && !CITY_NAMES.has(rawCity.toLowerCase())) {
+      if (rawCity && lookupCountry(rawCity) !== null && !cityNames.has(rawCity.toLowerCase())) {
         segments.splice(cityIdx, 1);
         cityIdx = -1;
       }
@@ -432,7 +433,7 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
             // Don't remove this segment — it will be picked up as institution in step 9
           } else {
             // Has institution keywords but not in institution-map → try extracting city from segment
-            const extracted = extractCityFromSegment(segments[cityIdx]);
+            const extracted = extractCityFromSegment(segments[cityIdx], cityNames);
             city = extracted;
             // Don't splice — leave for Step 9 to pick up as institution
           }
@@ -442,7 +443,7 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
           if (instInfo2) {
             city = instInfo2.city;
             // Don't remove — will be picked up as institution in step 9
-          } else if (CITY_NAMES.has(rawCity.toLowerCase())) {
+          } else if (cityNames.has(rawCity.toLowerCase())) {
             // Validated against GeoNames city set
             city = rawCity;
             segments.splice(cityIdx, 1);
@@ -515,7 +516,7 @@ export function parseAffiliation(raw: string | null): ParsedAffiliation | null {
     if (cityInfo) {
       country = cityInfo.country;
     } else {
-      const fallback = CITY_COUNTRY_MAP.get(city.toLowerCase());
+      const fallback = cityCountryMap.get(city.toLowerCase());
       if (fallback) country = fallback;
     }
   }

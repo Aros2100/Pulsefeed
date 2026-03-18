@@ -583,7 +583,7 @@ async function resolveAuthorId(
     .map(a => stripEmailFromAffiliation(a))
     .filter((a): a is string => Boolean(a));
   const cleanAffiliation = affiliations[0] ?? null;
-  const geoParsed = cleanAffiliation ? geoParseAffiliation(cleanAffiliation) : null;
+  const geoParsed = cleanAffiliation ? await geoParseAffiliation(cleanAffiliation) : null;
   const parsed = {
     city: geoParsed?.city ?? null,
     country: geoParsed?.country ?? null,
@@ -968,7 +968,7 @@ export async function linkAuthorsToArticle(
         const orcid = author.orcid ? normalizeOrcid(author.orcid) : null;
         const name = normalizeAuthorName([author.foreName, author.lastName].filter(Boolean).join(" ").trim());
         const primaryAff = author.affiliations[0] ?? null;
-        const geoParsed = primaryAff ? geoParseAffiliation(primaryAff) : null;
+        const geoParsed = primaryAff ? await geoParseAffiliation(primaryAff) : null;
         preResolvedOAMap.set(i, await fetchOpenAlexId(orcid, name, geoParsed?.institution ?? null));
       });
     })
@@ -981,7 +981,7 @@ export async function linkAuthorsToArticle(
     if (!author.lastName && !author.orcid) {
       // Still capture geo for position tracking
       const rejPrimaryAff = author.affiliations[0] ?? null;
-      const geoParsed = rejPrimaryAff ? geoParseAffiliation(rejPrimaryAff) : null;
+      const geoParsed = rejPrimaryAff ? await geoParseAffiliation(rejPrimaryAff) : null;
       if (i === 0 && geoParsed) firstAuthorGeo = { ...geoParsed, state: null };
       if (i === authors.length - 1 && authors.length > 1 && geoParsed) lastAuthorGeo = { ...geoParsed, state: null };
       rejectedCount++;
@@ -1013,12 +1013,12 @@ export async function linkAuthorsToArticle(
         };
         // Try to get city from parser as supplement
         const linkPrimaryAff = author.affiliations[0] ?? null;
-        const geoParsed = linkPrimaryAff ? geoParseAffiliation(linkPrimaryAff) : null;
+        const geoParsed = linkPrimaryAff ? await geoParseAffiliation(linkPrimaryAff) : null;
         if (geoParsed?.city) geoForArticle.city = geoParsed.city;
         if (geoParsed?.department) geoForArticle.department = geoParsed.department;
       } else {
         const linkPrimaryAff = author.affiliations[0] ?? null;
-        const geoParsed = linkPrimaryAff ? geoParseAffiliation(linkPrimaryAff) : null;
+        const geoParsed = linkPrimaryAff ? await geoParseAffiliation(linkPrimaryAff) : null;
         if (geoParsed) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const { data: authorRow } = await (admin as any)
