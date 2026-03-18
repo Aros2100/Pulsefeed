@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchPubMedIds, fetchArticleDetails } from "./importer";
 import { runArticleChecks } from "@/lib/pubmed/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
+import { buildImportEventPayload } from "@/lib/article-events/import-payload";
 import type { Json } from "@/lib/supabase/types";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -217,14 +218,15 @@ export async function runImportCircle3(
 
             void Promise.all(
               (upsertedRows ?? []).map((row) =>
-                logArticleEvent(row.id, "imported", {
-                  circle: 3,
-                  status: "pending",
-                  specialty_tags: ["neurosurgery"],
-                  pubmed_id: row.pubmed_id,
-                  import_log_id: logId,
-                  country: "Denmark",
-                })
+                logArticleEvent(row.id, "imported", buildImportEventPayload({
+                  circle:          3,
+                  status:          "pending",
+                  approval_method: null,
+                  specialty_tags:  ["neurosurgery"],
+                  pubmed_id:       row.pubmed_id,
+                  import_log_id:   logId,
+                  source_id:       null,
+                }))
               )
             );
           }

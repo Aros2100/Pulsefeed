@@ -6,6 +6,7 @@ import { lookupCountry } from "@/lib/geo/country-map";
 import { lookupState } from "@/lib/geo/state-map";
 import { runArticleChecks } from "@/lib/pubmed/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
+import { buildImportEventPayload } from "@/lib/article-events/import-payload";
 import type { OpenAlexWork, OpenAlexAuthorship } from "@/lib/openalex/client";
 import { matchPubMedToOpenAlex } from "@/lib/openalex/match-authors";
 import { logAuthorEvent } from "@/lib/author-events";
@@ -1440,14 +1441,15 @@ export async function runImport(
             // Fire-and-forget — logArticleEvent catches its own errors
             void Promise.all(
               (upsertedRows ?? []).map((row) =>
-                logArticleEvent(row.id, "imported", {
+                logArticleEvent(row.id, "imported", buildImportEventPayload({
                   circle: 1,
                   status: "approved",
+                  approval_method: "journal",
                   specialty_tags: [specialty],
                   pubmed_id: row.pubmed_id,
-                  filter_name: filter.name,
                   import_log_id: filterLogId,
-                })
+                  source_id: null,
+                }))
               )
             );
           }

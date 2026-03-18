@@ -123,10 +123,21 @@ function CardKVRow({ label, value }: { label: string; value: React.ReactNode }) 
 type P = Record<string, unknown>;
 
 function ImportedCard({ p }: { p: P }) {
+  const circle = p.circle as number | null;
+  const approvalBadge = p.approval_method === "journal"
+    ? <Badge color="blue">Auto-approved by journal</Badge>
+    : p.approval_method === "human"
+      ? <Badge color="green">Approved by editor</Badge>
+      : <span style={{ color: "#9ca3af" }}>—</span>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-      {p.status === "approved" && (
-        <KV label="Auto-approved" value={<Badge color="green">Yes (C1 source)</Badge>} />
+      {circle != null && (
+        <KV label="Circle" value={<Badge color="blue">{`Circle ${circle}`}</Badge>} />
+      )}
+      {p.status != null && (
+        <KV label="Status" value={
+          <Badge color={p.status === "approved" ? "green" : "orange"}>{String(p.status)}</Badge>
+        } />
       )}
       {Array.isArray(p.specialty_tags) && (p.specialty_tags as string[]).length > 0 && (
         <KV label="Specialty" value={
@@ -137,7 +148,10 @@ function ImportedCard({ p }: { p: P }) {
           </span>
         } />
       )}
-      {p.filter_name ? <KV label="Filter" value={String(p.filter_name)} /> : null}
+      <KV label="Approval method" value={approvalBadge} />
+      {circle === 2 && p.source_id != null && (
+        <KV label="Source ID" value={String(p.source_id)} />
+      )}
     </div>
   );
 }
