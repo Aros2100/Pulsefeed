@@ -608,6 +608,23 @@ export default function AdminAuthorDetailPage() {
           )}
         </Card>
 
+        {author.affiliations && author.affiliations.length > 0 && (
+          <Card>
+            <CardHeader label="Affiliations" />
+            <CardBody>
+              {author.affiliations.map((aff, i) => (
+                <div key={i} style={{
+                  fontSize: "13px", color: "#1a1a1a", lineHeight: 1.5,
+                  padding: "8px 0",
+                  borderBottom: i < author.affiliations!.length - 1 ? "1px solid #f5f5f5" : undefined,
+                }}>
+                  {aff}
+                </div>
+              ))}
+            </CardBody>
+          </Card>
+        )}
+
         {/* Articles card — always visible */}
         <Card>
           <CardHeader label={`Articles · ${count}`} />
