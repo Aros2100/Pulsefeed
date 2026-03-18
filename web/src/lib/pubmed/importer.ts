@@ -608,7 +608,7 @@ async function resolveAuthorId(
   // ── 1.5. OpenAlex lookup ──────────────────────────────────────────────────
   const openAlexResult = preResolvedOA !== undefined
     ? preResolvedOA
-    : await fetchOpenAlexId(newOrcid, displayName, parsed.institution);
+    : await fetchOpenAlexId(newOrcid, normalized, parsed.institution);
   const openAlexId = openAlexResult?.id ?? null;
   const openAlexInstitution = openAlexResult?.institution ?? null;
   if (openAlexId) {
@@ -966,7 +966,7 @@ export async function linkAuthorsToArticle(
       if (oaMatchMap.has(i) || (!author.lastName && !author.orcid)) return Promise.resolve();
       return oaLimit(async () => {
         const orcid = author.orcid ? normalizeOrcid(author.orcid) : null;
-        const name = [author.foreName, author.lastName].filter(Boolean).join(" ").trim();
+        const name = normalizeAuthorName([author.foreName, author.lastName].filter(Boolean).join(" ").trim());
         const primaryAff = author.affiliations[0] ?? null;
         const geoParsed = primaryAff ? geoParseAffiliation(primaryAff) : null;
         preResolvedOAMap.set(i, await fetchOpenAlexId(orcid, name, geoParsed?.institution ?? null));
