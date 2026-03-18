@@ -1,9 +1,11 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import Header from "@/components/Header";
 import FollowButton from "@/components/FollowButton";
 import ScoreBadge from "@/components/ScoreBadge";
+import AuthorMergeButton from "@/components/authors/AuthorMergeButton";
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
@@ -97,19 +99,29 @@ export default async function AuthorDetailPage({
   if (!author) notFound();
   const typedAuthor = author as unknown as AuthorRow;
 
-  const { data: followRow } = await supabase
-    .from("author_follows")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("author_id", id)
-    .maybeSingle();
+  const admin = createAdminClient();
 
-  const { data: articleRows } = await supabase
-    .from("article_authors")
-    .select("position, articles(id, title, journal_abbr, published_date, news_value, evidence_score)")
-    .eq("author_id", id)
-    .order("position", { ascending: true })
-    .limit(100);
+  const [{ data: followRow }, { data: articleRows }, { data: userRow }] = await Promise.all([
+    supabase
+      .from("author_follows")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("author_id", id)
+      .maybeSingle(),
+    supabase
+      .from("article_authors")
+      .select("position, articles(id, title, journal_abbr, published_date, news_value, evidence_score)")
+      .eq("author_id", id)
+      .order("position", { ascending: true })
+      .limit(100),
+    admin
+      .from("users")
+      .select("author_id")
+      .eq("id", user.id)
+      .single(),
+  ]);
+
+  const userAuthorId = (userRow as { author_id: string | null } | null)?.author_id ?? null;
 
   const articles = ((articleRows ?? []) as unknown as ArticleRow[])
     .map((r) => r.articles)
@@ -186,6 +198,9 @@ export default async function AuthorDetailPage({
                 }
               />
             )}
+            <div style={{ marginTop: "16px" }}>
+              <AuthorMergeButton authorId={id} userAuthorId={userAuthorId} />
+            </div>
           </CardBody>
         </Card>
 

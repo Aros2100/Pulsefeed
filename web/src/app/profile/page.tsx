@@ -7,6 +7,7 @@ import { SPECIALTIES } from "@/lib/auth/specialties";
 import Header from "@/components/Header";
 import ProfileAvatarUpload from "./ProfileAvatarUpload";
 import ProfileClient from "./ProfileClient";
+import MergeCheck from "./MergeCheck";
 
 const card: React.CSSProperties = {
   background: "#fff", borderRadius: "10px",
@@ -116,6 +117,16 @@ export default async function ProfilePage() {
               Link your profile →
             </Link>
           </div>
+        )}
+
+        {/* Merge candidates */}
+        {profile?.author_id && (
+          <>
+            <div style={{ marginTop: "28px" }}>
+              <SectionLabel>Mulige dubletter</SectionLabel>
+            </div>
+            <MergeCheck />
+          </>
         )}
 
       </div>

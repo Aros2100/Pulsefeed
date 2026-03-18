@@ -791,11 +791,10 @@ export default function TrainingClient({ specialty, label }: Props) {
                         "Other",
                       ]
                     : [
-                        "Klinisk relevant trods lav AI-score",
-                        "Ny behandlingsmetode / intervention",
-                        "Ændrer klinisk praksis",
-                        "Vigtig sikkerhedsdata",
-                        "Sjælden tilstand / specialiseret emne",
+                        "Klinisk relevant",
+                        "Uddannelse i specialet",
+                        "Ny behandlingsmetode",
+                        "Sjælden tilstand",
                         "Andet",
                       ];
 

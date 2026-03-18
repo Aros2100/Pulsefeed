@@ -38,7 +38,8 @@ export default async function FollowingPage() {
     const { data } = await supabase
       .from("authors")
       .select("id, display_name, department, hospital, city, country, article_count, author_score")
-      .in("id", authorIds);
+      .in("id", authorIds)
+      .is("deleted_at", null);
 
     if (data) {
       type AuthorRow = typeof authors[0];

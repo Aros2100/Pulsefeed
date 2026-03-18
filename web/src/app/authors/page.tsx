@@ -38,6 +38,7 @@ export default function AuthorsPage() {
       let req = supabase
         .from("authors")
         .select("id, display_name, affiliations, article_count, author_score", { count: "exact" })
+        .is("deleted_at", null)
         .order("author_score", { ascending: false, nullsFirst: false })
         .order("article_count", { ascending: false, nullsFirst: false })
         .range(from, to);
