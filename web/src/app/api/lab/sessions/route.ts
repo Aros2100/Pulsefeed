@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
 
   // user_id FK currently references public.users — pass null to avoid constraint
   // violations until the FK target is confirmed. Auth is already enforced above.
-  const editorId: string | null = null;
+  const editorId: string | null = auth.userId ?? null;
 
   // Hent aktiv model-version til at tagge lab_decisions med
   const { data: activeVersion } = await admin
