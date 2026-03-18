@@ -51,9 +51,6 @@ function formatShortDate(d: string | null): string {
   } catch { return ""; }
 }
 
-function scoreToVerdict(score: number): EditorVerdict {
-  return score >= 50 ? "relevant" : "not_relevant";
-}
 
 function applyConfFilter(articles: TrainingArticle[], filter: ConfidenceFilter): TrainingArticle[] {
   if (filter === "all") return articles;
@@ -301,7 +298,9 @@ export default function TrainingClient({ specialty, label }: Props) {
       for (const a of list) {
         if (a.specialty_confidence != null) {
           initialAI[a.id] = {
-            verdict: scoreToVerdict(a.specialty_confidence),
+            verdict: a.ai_decision === "approved" ? "relevant"
+                   : a.ai_decision === "rejected" ? "not_relevant"
+                   : null,
             confidence: a.specialty_confidence,
             aiDecision: a.ai_decision,
             loading: false,
@@ -338,7 +337,7 @@ export default function TrainingClient({ specialty, label }: Props) {
         setAiData((prev) => ({
           ...prev,
           [selectedId]: {
-            verdict: d.ok ? ((d.verdict === "relevant" || d.verdict === "not_relevant") ? d.verdict : null) : null,
+            verdict: d.ok ? (d.ai_decision === "approved" ? "relevant" : d.ai_decision === "rejected" ? "not_relevant" : null) : null,
             confidence: d.ok ? (d.confidence ?? null) : null,
             aiDecision: d.ok ? (d.ai_decision ?? null) : null,
             loading: false,
