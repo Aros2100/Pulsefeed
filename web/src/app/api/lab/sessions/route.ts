@@ -51,6 +51,17 @@ export async function POST(request: NextRequest) {
   const { specialty, module, verdicts } = result.data;
   const admin = createAdminClient();
 
+  // Re-fetch ai_decision from DB — never trust client-sent values
+  const articleIds = verdicts.map((v) => v.article_id);
+  const { data: freshArticles } = await admin
+    .from("articles")
+    .select("id, ai_decision, specialty_confidence")
+    .in("id", articleIds);
+
+  const freshMap = new Map(
+    (freshArticles ?? []).map((a) => [a.id as string, a as { id: string; ai_decision: string | null; specialty_confidence: number | null }])
+  );
+
   // user_id FK currently references public.users — pass null to avoid constraint
   // violations until the FK target is confirmed. Auth is already enforced above.
   const editorId: string | null = null;
@@ -106,8 +117,8 @@ export async function POST(request: NextRequest) {
     specialty,
     module,
     decision: v.verdict,
-    ai_decision: v.ai_decision ?? null,
-    ai_confidence: v.ai_confidence ?? null,
+    ai_decision: (freshMap.get(v.article_id)?.ai_decision ?? null) as "approved" | "rejected" | null,
+    ai_confidence: freshMap.get(v.article_id)?.specialty_confidence ?? null,
     disagreement_reason: v.disagreement_reason ?? null,
     model_version: modelVersion,
   }));
