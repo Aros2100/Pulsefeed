@@ -527,6 +527,7 @@ async function resolveAuthorFromOpenAlex(
     }
     if (primaryInst?.type) enrichment.institution_type = primaryInst.type;
     if (resolved.geo_source !== "manual") enrichment.geo_source = "openalex";
+    enrichment.verified_by = "openalex";
     await admin.from("authors").update(enrichment).eq("id", result.id);
     void logAuthorEvent(result.id, "openalex_enriched", {
       openalex_id: oaId,
