@@ -596,7 +596,7 @@ export default function TrainingClient({ specialty, label }: Props) {
       <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f5f7fa", gap: "12px" }}>
         <div style={{ fontSize: "40px" }}>🎉</div>
         <div style={{ fontSize: "18px", fontWeight: 700, color: "#1a1a1a" }}>No unverified articles</div>
-        <div style={{ fontSize: "14px", color: "#888" }}>All Circle 2 articles for {label} have been reviewed.</div>
+        <div style={{ fontSize: "14px", color: "#888" }}>All pending articles for {label} have been reviewed.</div>
         <button onClick={() => router.push("/admin/lab")} style={{ marginTop: "12px", borderRadius: "8px", padding: "10px 20px", background: "#1a1a1a", color: "#fff", border: "none", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
           ← Back to The Lab
         </button>
