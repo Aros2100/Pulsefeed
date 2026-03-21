@@ -5,7 +5,7 @@ import ProfileAvatarUpload from "./ProfileAvatarUpload";
 import ProfilePrivacyClient from "./ProfilePrivacyClient";
 import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
 
-const MANDATORY_SUBSPECIALTY = "Neurosurgery";
+const MANDATORY_SUBSPECIALTY: string = "Neurosurgery";
 
 interface Props {
   email:                     string;
