@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 const tabs = [
   { href: "/admin/system/tagging", label: "Single terms" },
   { href: "/admin/system/tagging/combos", label: "Combo terms" },
-  { href: "/admin/system/tagging/publication-types", label: "Publication Types" },
 ];
 
 export default function TaggingNav() {
