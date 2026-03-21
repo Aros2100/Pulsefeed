@@ -32,11 +32,7 @@ for (const line of readFileSync(envPath, "utf8").split("\n")) {
 // but missing specialty_reasoning (no lab_decision yet).
 // Or hardcode specific IDs to rescore only those.
 const ARTICLE_IDS: string[] = [
-  "03835826-a3dc-4d4c-a129-3411a6b1e720",
-  "99054037-8c04-49db-8f72-80d95cc842c6",
-  "63116f61-f1cb-48af-b299-4ce0df231be4",
-  "fe489ac4-fe37-4fb1-b2da-ff5930d29522",
-  "c4fa0256-c6dd-487c-a803-920452264e1e",
+  "cb95450c-b1b8-49c6-8ef6-f422233bfb33",
 ];
 
 // The specialty slug used to look up the active prompt:
@@ -173,6 +169,7 @@ async function main() {
     try {
       const score = await scoreArticle(article, SPECIALTY, activePrompt);
 
+      console.log("reason:", score.reason);
       const { error: updateError } = await db
         .from("articles")
         .update({

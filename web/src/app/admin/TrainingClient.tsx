@@ -57,9 +57,9 @@ function applyConfFilter(articles: TrainingArticle[], filter: ConfidenceFilter):
   return articles.filter((a) => {
     const s = a.specialty_confidence;
     if (s == null) return false;
-    if (filter === "high")   return s >= 70;
-    if (filter === "medium") return s >= 40 && s < 70;
-    if (filter === "low")    return s < 40;
+    if (filter === "high")   return s > 90;
+    if (filter === "medium") return s >= 80 && s <= 90;
+    if (filter === "low")    return s < 80;
     return true;
   });
 }
@@ -555,16 +555,16 @@ export default function TrainingClient({ specialty, label }: Props) {
 
   const filterCounts = {
     all:    articles.length,
-    high:   articles.filter((a) => a.specialty_confidence != null && a.specialty_confidence >= 70).length,
-    medium: articles.filter((a) => a.specialty_confidence != null && a.specialty_confidence >= 40 && a.specialty_confidence < 70).length,
-    low:    articles.filter((a) => a.specialty_confidence != null && a.specialty_confidence < 40).length,
+    high:   articles.filter((a) => a.specialty_confidence != null && a.specialty_confidence > 90).length,
+    medium: articles.filter((a) => a.specialty_confidence != null && a.specialty_confidence >= 80 && a.specialty_confidence <= 90).length,
+    low:    articles.filter((a) => a.specialty_confidence != null && a.specialty_confidence < 80).length,
   };
 
   const filterTabs: { key: ConfidenceFilter; label: string }[] = [
     { key: "all",    label: `All (${filterCounts.all})` },
-    { key: "high",   label: `70+ (${filterCounts.high})` },
-    { key: "medium", label: `40–69 (${filterCounts.medium})` },
-    { key: "low",    label: `<40 (${filterCounts.low})` },
+    { key: "high",   label: `>90 (${filterCounts.high})` },
+    { key: "medium", label: `80–90 (${filterCounts.medium})` },
+    { key: "low",    label: `<80 (${filterCounts.low})` },
   ];
 
   // ── Loading / empty states ────────────────────────────────────────────────
