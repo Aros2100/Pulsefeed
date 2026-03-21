@@ -41,11 +41,13 @@ export default async function CostPage() {
 
   const since = (ts: string) => new Date(ts) > new Date(BASELINE) ? ts : BASELINE;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rpc = (admin as any).rpc.bind(admin) as (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown }>;
   const [{ data: todayRows }, { data: weekRows }, { data: monthRows }, { data: allRows }] = await Promise.all([
-    admin.rpc("get_cost_dashboard", { since_ts: since(todayStart()) }),
-    admin.rpc("get_cost_dashboard", { since_ts: since(weekStart()) }),
-    admin.rpc("get_cost_dashboard", { since_ts: since(monthStart()) }),
-    admin.rpc("get_cost_dashboard", { since_ts: BASELINE }),
+    rpc("get_cost_dashboard", { since_ts: since(todayStart()) }),
+    rpc("get_cost_dashboard", { since_ts: since(weekStart()) }),
+    rpc("get_cost_dashboard", { since_ts: since(monthStart()) }),
+    rpc("get_cost_dashboard", { since_ts: BASELINE }),
   ]);
 
   return (

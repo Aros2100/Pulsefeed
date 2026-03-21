@@ -163,7 +163,7 @@ export default function CostChart({ today, week, month, all }: {
                 <td style={tdTotal}>{totalArtikler > 0 ? nFmt(totalArtikler) : ""}</td>
                 <td style={tdTotal}>{totalArtikler > 0 ? fmt$(totalDrift / totalArtikler, 4) : ""}</td>
                 <td style={tdTotal}>{nFmt(TASKS.reduce((s, t) => s + getDrift(rows, t.key).kald, 0))}</td>
-                <td style={tdTotal}></td>
+                <td style={tdTotal}>{TASKS.reduce((s, t) => s + getDrift(rows, t.key).kald, 0) > 0 ? fmt$(totalDrift / TASKS.reduce((s, t) => s + getDrift(rows, t.key).kald, 0), 4) : ""}</td>
               </tr>
             </tbody>
           </table>
