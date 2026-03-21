@@ -31,7 +31,7 @@ interface CoOccurrence {
 }
 
 interface PendingArticle {
-  article_id: string;
+  id: string;
   title: string;
   journal_abbr: string | null;
   published_date: string | null;
@@ -203,7 +203,7 @@ export default function CombosClient({
     if (selectedArticles.size === pendingArticles.length) {
       setSelectedArticles(new Set());
     } else {
-      setSelectedArticles(new Set(pendingArticles.map((a) => a.article_id)));
+      setSelectedArticles(new Set(pendingArticles.map((a) => a.id)));
     }
   }
 
@@ -1014,18 +1014,18 @@ export default function CombosClient({
                   </tr>
                 )}
                 {pendingArticles.map((article, i) => (
-                  <tr key={`${article.article_id}-${i}`} style={{ borderBottom: "1px solid #f1f3f7" }}>
+                  <tr key={`${article.id}-${i}`} style={{ borderBottom: "1px solid #f1f3f7" }}>
                     <td style={{ ...tdStyle, textAlign: "center" }}>
                       <input
                         type="checkbox"
-                        checked={selectedArticles.has(article.article_id)}
-                        onChange={() => toggleArticle(article.article_id)}
+                        checked={selectedArticles.has(article.id)}
+                        onChange={() => toggleArticle(article.id)}
                         style={{ accentColor: "#1a1a1a" }}
                       />
                     </td>
                     <td style={tdStyle}>
                       <a
-                        href={`/admin/articles/${article.article_id}`}
+                        href={`/admin/articles/${article.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{

@@ -77,7 +77,7 @@ export default async function CombosPage() {
   });
 
   const typedPending = (pendingArticles ?? []) as unknown as {
-    article_id: string;
+    id: string;
     title: string;
     journal_abbr: string | null;
     published_date: string | null;
