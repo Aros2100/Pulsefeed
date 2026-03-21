@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
-import VersionSelector from "./VersionSelector";
+import VersionSelector from "@/components/lab/VersionSelector";
 import PromptDrawer, { type ModelVersion } from "@/components/lab/PromptDrawer";
 
 function fmtDate(iso: string | null): string {
@@ -215,22 +215,6 @@ export default async function EvaluationPage({ searchParams }: Props) {
 
   // False positives: AI approved, human rejected
   const falsePositivesRaw = allDecisions.filter((d) => d.decision === "rejected" && d.ai_decision === "approved");
-  console.log(
-    "[FP analysis] false_positives:",
-    JSON.stringify(
-      falsePositivesRaw.map((d) => ({
-        article_id:          d.article_id,
-        ai_confidence:       d.ai_confidence,
-        disagreement_reason: d.disagreement_reason,
-        decided_at:          d.decided_at,
-        title:               d.article_id ? (articleMap[d.article_id]?.title ?? null) : null,
-        journal:             d.article_id ? (articleMap[d.article_id]?.journal_abbr ?? null) : null,
-        abstract:            d.article_id ? (articleMap[d.article_id]?.abstract ?? null) : null,
-      })),
-      null,
-      2
-    )
-  );
 
   // Stats
   const total           = allDecisions.length;

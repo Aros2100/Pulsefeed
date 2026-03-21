@@ -3,6 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import CostChart from "./CostChart";
 import type { TaskData } from "./CostChart";
 
+export const dynamic = "force-dynamic";
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function weekStart(): string {
@@ -108,7 +110,8 @@ export default async function CostPage() {
 
   const { data: rawRows } = await admin
     .from("api_usage")
-    .select("model_key, task, article_id, cost_usd, total_tokens, called_at");
+    .select("model_key, task, article_id, cost_usd, total_tokens, called_at")
+    .limit(100000);
 
   const allRows = (rawRows ?? []) as unknown as Row[];
   const ws = weekStart();

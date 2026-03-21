@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SPECIALTIES } from "@/lib/auth/specialties";
-import Header from "@/components/Header";
 import SearchClient from "./SearchClient";
 
 export default async function SearchPage({
@@ -45,7 +44,6 @@ export default async function SearchPage({
 
   return (
     <div style={{ background: "#f5f7fa", minHeight: "100vh" }}>
-      <Header />
       <SearchClient
         articles={articles ?? []}
         specialtyTags={specialtyTags}

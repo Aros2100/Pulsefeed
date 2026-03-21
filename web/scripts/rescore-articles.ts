@@ -28,12 +28,15 @@ for (const line of readFileSync(envPath, "utf8").split("\n")) {
 
 // ── Config ─────────────────────────────────────────────────────────────────
 
-// Hardcode the article IDs to rescore here:
+// Leave empty to auto-fetch: all pending articles with active model_version
+// but missing specialty_reasoning (no lab_decision yet).
+// Or hardcode specific IDs to rescore only those.
 const ARTICLE_IDS: string[] = [
-  "4e618d25-b38a-48e4-91ec-51234b75c002",
-  "75d60f3b-d42a-4b40-9aab-17cf233662ed",
-  "fcf0e1f2-d186-4021-9374-476f0daeceac",
-  "1c7f6b12-bd95-491a-a9f4-f16b0871e36c",
+  "03835826-a3dc-4d4c-a129-3411a6b1e720",
+  "99054037-8c04-49db-8f72-80d95cc842c6",
+  "63116f61-f1cb-48af-b299-4ce0df231be4",
+  "fe489ac4-fe37-4fb1-b2da-ff5930d29522",
+  "c4fa0256-c6dd-487c-a803-920452264e1e",
 ];
 
 // The specialty slug used to look up the active prompt:
@@ -95,7 +98,7 @@ async function scoreArticle(article: ArticleRow, specialty: string, activePrompt
 
   const message = await ai.messages.create({
     model:      SCORING_MODEL,
-    max_tokens: 256,
+    max_tokens: 512,
     messages:   [{ role: "user", content }],
   });
 
@@ -121,32 +124,45 @@ async function scoreArticle(article: ArticleRow, specialty: string, activePrompt
 
 // ── Main ───────────────────────────────────────────────────────────────────
 async function main() {
-  if (ARTICLE_IDS.length === 0) {
-    console.error("No article IDs configured. Add IDs to the ARTICLE_IDS array in this script.");
-    process.exit(1);
-  }
-
-  console.log(`Rescoring ${ARTICLE_IDS.length} article(s) for specialty "${SPECIALTY}"…\n`);
-
   const activePrompt = await getActivePrompt(SPECIALTY);
   console.log(`Active prompt: ${activePrompt.version}\n`);
 
-  // Fetch articles
-  const { data: articles, error: fetchError } = await db
-    .from("articles")
-    .select("id, title, abstract")
-    .in("id", ARTICLE_IDS);
+  let rows: ArticleRow[];
 
-  if (fetchError) {
-    console.error("Failed to fetch articles:", fetchError.message);
-    process.exit(1);
+  if (ARTICLE_IDS.length > 0) {
+    // Explicit list
+    const { data, error } = await db
+      .from("articles")
+      .select("id, title, abstract")
+      .in("id", ARTICLE_IDS);
+    if (error) { console.error("Failed to fetch articles:", error.message); process.exit(1); }
+    rows = (data ?? []) as ArticleRow[];
+    const missing = ARTICLE_IDS.filter((id) => !rows.find((r) => r.id === id));
+    if (missing.length > 0) {
+      console.warn(`Warning: ${missing.length} ID(s) not found in DB:\n  ${missing.join("\n  ")}\n`);
+    }
+  } else {
+    // Auto-fetch: pending articles with active model_version, no reasoning, no lab_decision
+    const { data, error } = await db
+      .from("articles")
+      .select("id, title, abstract")
+      .eq("status", "pending")
+      .eq("model_version", activePrompt.version)
+      .not("specialty_confidence", "is", null)
+      .is("specialty_reasoning", null)
+      .not("id", "in", `(select article_id from lab_decisions where module = 'specialty_tag')`)
+      .limit(200);
+    if (error) { console.error("Failed to auto-fetch articles:", error.message); process.exit(1); }
+    rows = (data ?? []) as ArticleRow[];
+    console.log(`Auto-fetched ${rows.length} article(s) missing reasoning for ${activePrompt.version}\n`);
   }
 
-  const rows = (articles ?? []) as ArticleRow[];
-  const missing = ARTICLE_IDS.filter((id) => !rows.find((r) => r.id === id));
-  if (missing.length > 0) {
-    console.warn(`Warning: ${missing.length} ID(s) not found in DB:\n  ${missing.join("\n  ")}\n`);
+  if (rows.length === 0) {
+    console.log("No articles to rescore.");
+    process.exit(0);
   }
+
+  console.log(`Rescoring ${rows.length} article(s) for specialty "${SPECIALTY}"…\n`);
 
   let succeeded = 0;
   let failed    = 0;

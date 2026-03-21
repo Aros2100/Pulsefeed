@@ -29,29 +29,42 @@ export default function ProfileAvatarUpload({ avatarUrl: initial, displayName }:
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", marginBottom: "28px" }}>
+    <div style={{ position: "relative", flexShrink: 0, width: "72px", height: "72px" }}>
       <div
         onClick={() => inputRef.current?.click()}
         style={{
-          width: "80px", height: "80px", borderRadius: "50%", overflow: "hidden",
-          background: "#EEF2F7", border: "2px solid #dde3ed", cursor: "pointer",
+          width: "72px", height: "72px", borderRadius: "50%", overflow: "hidden",
+          background: "var(--color-background-secondary)",
+          border: "0.5px solid var(--color-border-tertiary)",
+          cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
-          flexShrink: 0,
         }}
       >
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={avatarUrl} alt={displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
-          <span style={{ fontSize: "24px", fontWeight: 700, color: "#5a6a85" }}>{initials(displayName || "?")}</span>
+          <span style={{ fontSize: "22px", fontWeight: 700, color: "var(--color-text-secondary)" }}>
+            {initials(displayName || "?")}
+          </span>
         )}
       </div>
       <button
         onClick={() => inputRef.current?.click()}
         disabled={uploading}
-        style={{ fontSize: "12px", color: "#5a6a85", background: "none", border: "none", cursor: uploading ? "wait" : "pointer", textDecoration: "underline", padding: 0 }}
+        title={uploading ? "Uploading…" : "Change photo"}
+        style={{
+          position: "absolute", bottom: "0", right: "0",
+          width: "22px", height: "22px", borderRadius: "50%",
+          background: uploading ? "var(--color-background-secondary)" : "var(--color-background-primary)",
+          border: "0.5px solid var(--color-border-tertiary)",
+          cursor: uploading ? "wait" : "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "11px", padding: 0,
+        }}
+        aria-label="Change photo"
       >
-        {uploading ? "Uploading…" : "Change photo"}
+        {uploading ? "…" : "✎"}
       </button>
       <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} />
     </div>

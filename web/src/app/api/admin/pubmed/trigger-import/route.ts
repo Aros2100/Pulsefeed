@@ -27,14 +27,12 @@ export async function POST(request: NextRequest) {
   after(async () => {
     try {
       const aiResult = await runAILocationParsing(200);
-      console.log("[geo/ai-parse]", aiResult);
     } catch (e) {
       console.error("[geo/ai-parse] failed:", e);
     }
   });
 
   after(() => {
-    runPublicationTypeMapping(200).then(r => console.log("[pubtype-map]", r)).catch(e => console.error("[pubtype-map] error:", e));
   });
 
   return NextResponse.json({ ok: true });

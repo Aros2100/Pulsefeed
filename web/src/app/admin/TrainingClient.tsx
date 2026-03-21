@@ -730,7 +730,7 @@ export default function TrainingClient({ specialty, label }: Props) {
                     <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700, marginBottom: "8px" }}>
                       Abstract
                     </div>
-                    <div style={{ fontSize: "14px", lineHeight: 1.8, color: "#2a2a2a" }}>
+                    <div style={{ fontSize: "16px", lineHeight: 1.8, color: "#2a2a2a" }}>
                       {renderAbstract(currentArticle.abstract)}
                     </div>
                   </>

@@ -145,7 +145,7 @@ export default function AuditClient() {
 
         {/* Header */}
         <div style={{ marginBottom: "24px" }}>
-          <Link href="/admin/lab/author-geo" style={{ fontSize: "12px", color: "#888", textDecoration: "none" }}>
+          <Link href="/admin/datarens/author-geo" style={{ fontSize: "12px", color: "#888", textDecoration: "none" }}>
             ← Author Geo
           </Link>
           <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase" as const, fontWeight: 700, marginTop: "8px", marginBottom: "4px" }}>

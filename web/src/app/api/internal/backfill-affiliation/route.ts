@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseAffiliation } from "@/lib/affiliations";
+import { normalizeCity } from "@/lib/geo/normalize";
 
 const BATCH_SIZE = 50;
 
@@ -34,9 +35,6 @@ export async function POST(request: NextRequest) {
   let skipped = 0;
   const errors: string[] = [];
 
-  console.log(
-    `[backfill-affiliation] offset=${offset} batch=${batch.length} remaining≈${(count ?? 0) - offset}`
-  );
 
   for (const author of batch) {
     const affiliations = author.affiliations as string[] | null;
@@ -53,7 +51,7 @@ export async function POST(request: NextRequest) {
         .update({
           department: parsed.department,
           hospital: parsed.hospital,
-          city: parsed.city,
+          city: normalizeCity(parsed.city),
           country: parsed.country,
         })
         .eq("id", author.id);
@@ -69,9 +67,6 @@ export async function POST(request: NextRequest) {
   const nextOffset = offset + batch.length;
   const done = batch.length < BATCH_SIZE;
 
-  console.log(
-    `[backfill-affiliation] done — updated=${updated} skipped=${skipped} errors=${errors.length} more=${!done}`
-  );
 
   return NextResponse.json({
     ok: true,

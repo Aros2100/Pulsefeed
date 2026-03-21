@@ -24,6 +24,17 @@ export interface SimulationAgreement {
   old_ai_confidence: number | null;
 }
 
+export interface SimulatorConfig {
+  label: string;
+  accent: string;
+  optimizeHref: string;
+  resultType: "binary" | "tags" | "single";
+  scoreEndpoint: string;
+  rescoreIncludesSpecialty: boolean;
+  showSpecialtyInSubtitle: boolean;
+  regressionCommentPlaceholder?: string;
+}
+
 interface SimResult {
   decision: string;
   confidence: number;
@@ -38,12 +49,21 @@ interface Props {
   initialPrompt: string;
   disagreements: SimulationDisagreement[];
   agreementArticles: SimulationAgreement[];
+  config: SimulatorConfig;
 }
 
 type Filter    = "all" | "fixed" | "wrong";
 type RegFilter = "all" | "ok" | "regression";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────────
+
+function parseTags(value: string): string[] {
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed.map(String);
+  } catch { /* not JSON */ }
+  return value ? [value] : [];
+}
 
 function parseSingle(value: string): string[] {
   if (!value) return [];
@@ -60,6 +80,12 @@ function arraysEqual(a: string[], b: string[]): boolean {
   const sorted1 = [...a].sort();
   const sorted2 = [...b].sort();
   return sorted1.every((v, i) => v === sorted2[i]);
+}
+
+function decisionsMatch(a: string, b: string, resultType: "binary" | "tags" | "single"): boolean {
+  if (resultType === "binary") return a === b;
+  if (resultType === "tags") return arraysEqual(parseTags(a), parseTags(b));
+  return arraysEqual(parseSingle(a), parseSingle(b));
 }
 
 // ── SSE helper ─────────────────────────────────────────────────────────────────
@@ -107,13 +133,52 @@ function Spinner({ size = 14 }: { size?: number }) {
   );
 }
 
+function DecisionBadge({ decision, confidence }: { decision: string; confidence?: number | null }) {
+  const isApproved = decision === "approved";
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+      <span style={{
+        fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px",
+        background: isApproved ? "#dcfce7" : "#fee2e2",
+        color:      isApproved ? "#15803d" : "#b91c1c",
+        whiteSpace: "nowrap" as const,
+      }}>
+        {isApproved ? "Godkendt" : "Afvist"}
+      </span>
+      {confidence != null && (
+        <span style={{
+          fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px",
+          background: isApproved ? "#dcfce7" : "#fee2e2",
+          color:      isApproved ? "#15803d" : "#b91c1c",
+        }}>{confidence}%</span>
+      )}
+    </span>
+  );
+}
+
+const BADGE_COLORS = {
+  purple: { bg: "#f5f3ff", text: "#7c3aed", border: "#ddd6fe" },
+  blue:   { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
+  green:  { bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" },
+};
+
+function SubspecialtyBadges({ tags, color }: { tags: string[]; color: "purple" | "blue" | "green" }) {
+  const c = BADGE_COLORS[color];
+  if (tags.length === 0) return <span style={{ color: "#ccc", fontSize: "11px" }}>—</span>;
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+      {tags.map(tag => (
+        <span key={tag} style={{
+          fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px",
+          background: c.bg, color: c.text, border: `1px solid ${c.border}`,
+        }}>{tag}</span>
+      ))}
+    </div>
+  );
+}
+
 function TypeBadge({ value, color }: { value: string; color: "purple" | "blue" | "green" }) {
-  const colors = {
-    purple: { bg: "#f5f3ff", text: "#7c3aed", border: "#ddd6fe" },
-    blue:   { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
-    green:  { bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" },
-  };
-  const c = colors[color];
+  const c = BADGE_COLORS[color];
   if (!value) return <span style={{ color: "#ccc", fontSize: "11px" }}>—</span>;
   return (
     <span style={{
@@ -123,17 +188,61 @@ function TypeBadge({ value, color }: { value: string; color: "purple" | "blue" |
   );
 }
 
+function DecisionDisplay({
+  value,
+  confidence,
+  reason,
+  resultType,
+  color,
+}: {
+  value: string;
+  confidence?: number | null;
+  reason?: string | null;
+  resultType: "binary" | "tags" | "single";
+  color: "blue" | "purple" | "green";
+}) {
+  if (resultType === "binary") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+        <DecisionBadge decision={value} confidence={confidence} />
+        {reason && (
+          <div style={{ fontSize: "11px", color: "#888", lineHeight: 1.4, fontStyle: "italic" }}>{reason}</div>
+        )}
+      </div>
+    );
+  }
+  const items = resultType === "tags" ? parseTags(value) : parseSingle(value);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+      {resultType === "tags"
+        ? <SubspecialtyBadges tags={items} color={color} />
+        : <TypeBadge value={items[0] ?? ""} color={color} />
+      }
+      {confidence != null && confidence > 0 && (
+        <span style={{ fontSize: "11px", color: "#888" }}>{confidence}%</span>
+      )}
+      {reason && (
+        <div style={{ fontSize: "11px", color: "#888", lineHeight: 1.4, fontStyle: "italic" }}>{reason}</div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function ArticleTypeSimulatorClient({
+export default function SimulatorClient({
   runId,
   specialty,
   module,
-  baseVersion,
+  baseVersion: _baseVersion,
   initialPrompt,
   disagreements,
   agreementArticles,
+  config,
 }: Props) {
+  const { label, accent, optimizeHref, resultType, scoreEndpoint, rescoreIncludesSpecialty, showSpecialtyInSubtitle } = config;
+  const regressionCommentPlaceholder = config.regressionCommentPlaceholder ?? "Fx: Korrekt — noter årsag";
+
   // ── Prompt state ─────────────────────────────────────────────────────────
   const [promptText, setPromptText] = useState(initialPrompt);
 
@@ -196,10 +305,7 @@ export default function ArticleTypeSimulatorClient({
               });
             }
             if (data.scored !== undefined) {
-              setSimProgress({
-                scored: data.scored as number,
-                total:  totalArticles,
-              });
+              setSimProgress({ scored: data.scored as number, total: totalArticles });
             }
           }
         );
@@ -281,9 +387,12 @@ export default function ArticleTypeSimulatorClient({
     setRescoreDone(false);
     setRescoreProgress({ scored: 0, total: 0 });
     try {
+      const body = rescoreIncludesSpecialty
+        ? { specialty, scoreAll: true }
+        : { scoreAll: true };
       await consumeSSE(
-        "/api/lab/score-article-type",
-        { scoreAll: true },
+        scoreEndpoint,
+        body,
         (data) => {
           if (data.scored !== undefined) {
             setRescoreProgress({
@@ -357,8 +466,7 @@ export default function ArticleTypeSimulatorClient({
   const summary = (simDone && simResults && disagreements.length > 0) ? (() => {
     const fixed = disagreements.filter((d) => {
       const sim = simResults.get(d.article_id);
-      if (!sim) return false;
-      return arraysEqual(parseSingle(sim.decision), parseSingle(d.human_decision));
+      return sim ? decisionsMatch(sim.decision, d.human_decision, resultType) : false;
     }).length;
     const total       = disagreements.length;
     const newAccuracy = Math.round(fixed / total * 100);
@@ -368,23 +476,22 @@ export default function ArticleTypeSimulatorClient({
   const regressionSummary = (simDone && regResults && agreementArticles.length > 0) ? (() => {
     const regressions = agreementArticles.filter((d) => {
       const sim = regResults.get(d.article_id);
-      if (!sim) return false;
-      return !arraysEqual(parseSingle(sim.decision), parseSingle(d.old_ai_decision));
+      return sim ? !decisionsMatch(sim.decision, d.old_ai_decision, resultType) : false;
     }).length;
     return { regressions, total: agreementArticles.length };
   })() : null;
 
   const filteredRows = disagreements.filter((d) => {
     if (!simResults || filter === "all") return true;
-    const sim = simResults.get(d.article_id);
-    const fixed = sim ? arraysEqual(parseSingle(sim.decision), parseSingle(d.human_decision)) : false;
+    const sim   = simResults.get(d.article_id);
+    const fixed = sim ? decisionsMatch(sim.decision, d.human_decision, resultType) : false;
     return filter === "fixed" ? fixed : !fixed;
   });
 
   const filteredRegRows = agreementArticles.filter((d) => {
     if (!regResults || regFilter === "all") return true;
-    const sim = regResults.get(d.article_id);
-    const isRegression = sim ? !arraysEqual(parseSingle(sim.decision), parseSingle(d.old_ai_decision)) : false;
+    const sim          = regResults.get(d.article_id);
+    const isRegression = sim ? !decisionsMatch(sim.decision, d.old_ai_decision, resultType) : false;
     return regFilter === "regression" ? isRegression : !isRegression;
   });
 
@@ -392,7 +499,8 @@ export default function ArticleTypeSimulatorClient({
 
   // ── Styles ────────────────────────────────────────────────────────────────
 
-  const ACCENT = "#7c3aed";
+  const humanMinWidth = resultType === "binary" ? "90px"  : "140px";
+  const aiMinWidth    = resultType === "binary" ? "160px" : "180px";
 
   const cardStyle: React.CSSProperties = {
     background: "#fff", borderRadius: "10px",
@@ -406,7 +514,7 @@ export default function ArticleTypeSimulatorClient({
   };
 
   const sectionLabelStyle: React.CSSProperties = {
-    fontSize: "11px", letterSpacing: "0.08em", color: ACCENT,
+    fontSize: "11px", letterSpacing: "0.08em", color: accent,
     textTransform: "uppercase" as const, fontWeight: 700,
   };
 
@@ -434,7 +542,7 @@ export default function ArticleTypeSimulatorClient({
         {/* Back */}
         <div style={{ marginBottom: "8px" }}>
           <Link
-            href="/admin/lab/article-type/optimize"
+            href={optimizeHref}
             style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}
           >
             ← Optimize
@@ -443,14 +551,17 @@ export default function ArticleTypeSimulatorClient({
 
         {/* Heading */}
         <div style={{ marginBottom: "28px" }}>
-          <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: ACCENT, textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
-            Prompt Simulator · Article Type
+          <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: accent, textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
+            Prompt Simulator · {label}
           </div>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
             Simuler forbedret prompt
           </h1>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
-            Simulerer new prompt · {disagreements.length} uenigheder + {agreementArticles.length} regressionstest
+            {showSpecialtyInSubtitle
+              ? `Simulerer new prompt mod ${specialty} · ${disagreements.length} uenigheder + ${agreementArticles.length} regressionstest`
+              : `Simulerer new prompt · ${disagreements.length} uenigheder + ${agreementArticles.length} regressionstest`
+            }
           </p>
         </div>
 
@@ -506,7 +617,7 @@ export default function ArticleTypeSimulatorClient({
                       <div style={{
                         height: "100%",
                         width: `${simProgress.total > 0 ? Math.round(simProgress.scored / simProgress.total * 100) : 0}%`,
-                        background: ACCENT, borderRadius: "99px", transition: "width 0.4s ease",
+                        background: accent, borderRadius: "99px", transition: "width 0.4s ease",
                       }} />
                     </div>
                   </div>
@@ -574,19 +685,16 @@ export default function ArticleTypeSimulatorClient({
                     <tr>
                       <th style={{ ...thStyle, minWidth: "220px" }}>Titel</th>
                       <th style={{ ...thStyle, minWidth: "120px" }}>Journal</th>
-                      <th style={{ ...thStyle, minWidth: "140px" }}>Human</th>
-                      <th style={{ ...thStyle, minWidth: "180px" }}>Gammel AI</th>
-                      <th style={{ ...thStyle, minWidth: "180px" }}>Ny AI</th>
+                      <th style={{ ...thStyle, minWidth: humanMinWidth }}>Human</th>
+                      <th style={{ ...thStyle, minWidth: aiMinWidth }}>Gammel AI</th>
+                      <th style={{ ...thStyle, minWidth: aiMinWidth }}>Ny AI</th>
                       <th style={{ ...thStyle, minWidth: "110px", textAlign: "center" }}>Rettet?</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredRows.map((d, i) => {
-                      const sim      = simResults.get(d.article_id);
-                      const humanVal = d.human_decision;
-                      const oldAiVal = d.old_ai_decision;
-                      const newAiVal = sim?.decision ?? "";
-                      const fixed    = sim ? arraysEqual(parseSingle(sim.decision), parseSingle(d.human_decision)) : false;
+                      const sim   = simResults.get(d.article_id);
+                      const fixed = sim ? decisionsMatch(sim.decision, d.human_decision, resultType) : false;
                       return (
                         <tr key={d.article_id} style={{ background: i % 2 === 1 ? "#fafafa" : "#fff" }}>
                           <td style={{ ...tdStyle, maxWidth: "280px" }}>
@@ -608,34 +716,26 @@ export default function ArticleTypeSimulatorClient({
                             {d.journal_title ?? <span style={{ color: "#ccc" }}>—</span>}
                           </td>
                           <td style={tdStyle}>
-                            <TypeBadge value={humanVal} color="blue" />
+                            <DecisionDisplay value={d.human_decision} resultType={resultType} color="blue" />
                           </td>
                           <td style={tdStyle}>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                              <TypeBadge value={oldAiVal} color="purple" />
-                              {d.old_ai_confidence != null && (
-                                <span style={{ fontSize: "11px", color: "#888" }}>{d.old_ai_confidence}%</span>
-                              )}
-                              {d.disagreement_reason && (
-                                <div style={{ fontSize: "11px", color: "#888", lineHeight: 1.4, fontStyle: "italic" }}>
-                                  {d.disagreement_reason}
-                                </div>
-                              )}
-                            </div>
+                            <DecisionDisplay
+                              value={d.old_ai_decision}
+                              confidence={d.old_ai_confidence}
+                              reason={d.disagreement_reason}
+                              resultType={resultType}
+                              color="purple"
+                            />
                           </td>
                           <td style={tdStyle}>
                             {sim ? (
-                              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                                <TypeBadge value={newAiVal} color="green" />
-                                {sim.confidence > 0 && (
-                                  <span style={{ fontSize: "11px", color: "#888" }}>{sim.confidence}%</span>
-                                )}
-                                {sim.reason && (
-                                  <div style={{ fontSize: "11px", color: "#888", lineHeight: 1.4, fontStyle: "italic" }}>
-                                    {sim.reason}
-                                  </div>
-                                )}
-                              </div>
+                              <DecisionDisplay
+                                value={sim.decision}
+                                confidence={sim.confidence}
+                                reason={sim.reason}
+                                resultType={resultType}
+                                color="green"
+                              />
                             ) : (
                               <span style={{ color: "#aaa" }}>—</span>
                             )}
@@ -714,9 +814,9 @@ export default function ArticleTypeSimulatorClient({
                     <tr>
                       <th style={{ ...thStyle, minWidth: "220px" }}>Titel</th>
                       <th style={{ ...thStyle, minWidth: "120px" }}>Journal</th>
-                      <th style={{ ...thStyle, minWidth: "140px" }}>Human</th>
-                      <th style={{ ...thStyle, minWidth: "180px" }}>Gammel AI</th>
-                      <th style={{ ...thStyle, minWidth: "180px" }}>Ny AI</th>
+                      <th style={{ ...thStyle, minWidth: humanMinWidth }}>Human</th>
+                      <th style={{ ...thStyle, minWidth: aiMinWidth }}>Gammel AI</th>
+                      <th style={{ ...thStyle, minWidth: aiMinWidth }}>Ny AI</th>
                       <th style={{ ...thStyle, minWidth: "120px", textAlign: "center" }}>Regression?</th>
                       <th style={{ ...thStyle, minWidth: "200px" }}>Kommentar</th>
                     </tr>
@@ -724,10 +824,7 @@ export default function ArticleTypeSimulatorClient({
                   <tbody>
                     {filteredRegRows.map((d, i) => {
                       const sim          = regResults.get(d.article_id);
-                      const humanVal     = d.human_decision;
-                      const oldAiVal     = d.old_ai_decision;
-                      const newAiVal     = sim?.decision ?? "";
-                      const isRegression = sim ? !arraysEqual(parseSingle(sim.decision), parseSingle(d.old_ai_decision)) : false;
+                      const isRegression = sim ? !decisionsMatch(sim.decision, d.old_ai_decision, resultType) : false;
                       return (
                         <tr key={d.article_id} style={{ background: i % 2 === 1 ? "#fafafa" : "#fff" }}>
                           <td style={{ ...tdStyle, maxWidth: "280px" }}>
@@ -749,29 +846,25 @@ export default function ArticleTypeSimulatorClient({
                             {d.journal_title ?? <span style={{ color: "#ccc" }}>—</span>}
                           </td>
                           <td style={tdStyle}>
-                            <TypeBadge value={humanVal} color="blue" />
+                            <DecisionDisplay value={d.human_decision} resultType={resultType} color="blue" />
                           </td>
                           <td style={tdStyle}>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                              <TypeBadge value={oldAiVal} color="purple" />
-                              {d.old_ai_confidence != null && (
-                                <span style={{ fontSize: "11px", color: "#888" }}>{d.old_ai_confidence}%</span>
-                              )}
-                            </div>
+                            <DecisionDisplay
+                              value={d.old_ai_decision}
+                              confidence={d.old_ai_confidence}
+                              resultType={resultType}
+                              color="purple"
+                            />
                           </td>
                           <td style={tdStyle}>
                             {sim ? (
-                              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                                <TypeBadge value={newAiVal} color="green" />
-                                {sim.confidence > 0 && (
-                                  <span style={{ fontSize: "11px", color: "#888" }}>{sim.confidence}%</span>
-                                )}
-                                {sim.reason && (
-                                  <div style={{ fontSize: "11px", color: "#888", lineHeight: 1.4, fontStyle: "italic" }}>
-                                    {sim.reason}
-                                  </div>
-                                )}
-                              </div>
+                              <DecisionDisplay
+                                value={sim.decision}
+                                confidence={sim.confidence}
+                                reason={sim.reason}
+                                resultType={resultType}
+                                color="green"
+                              />
                             ) : (
                               <span style={{ color: "#aaa" }}>—</span>
                             )}
@@ -792,7 +885,7 @@ export default function ArticleTypeSimulatorClient({
                             <textarea
                               value={regComments.get(d.article_id) ?? ""}
                               onChange={(e) => setComment(d.article_id, e.target.value)}
-                              placeholder={isRegression ? "Fx: Korrekt — teknisk note" : "Valgfri kommentar"}
+                              placeholder={isRegression ? regressionCommentPlaceholder : "Valgfri kommentar"}
                               rows={2}
                               style={{
                                 width: "100%", boxSizing: "border-box",
@@ -906,7 +999,7 @@ export default function ArticleTypeSimulatorClient({
               boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
               padding: "20px 24px",
             }}>
-              <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: ACCENT, textTransform: "uppercase", fontWeight: 700, marginBottom: "16px" }}>
+              <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: accent, textTransform: "uppercase", fontWeight: 700, marginBottom: "16px" }}>
                 Beslutning · Step 4
               </div>
 

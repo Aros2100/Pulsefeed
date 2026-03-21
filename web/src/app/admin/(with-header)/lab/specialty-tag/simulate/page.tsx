@@ -1,6 +1,17 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import SimulatorClient, { type SimulationDisagreement, type SimulationAgreement } from "./SimulatorClient";
+import SimulatorClient, { type SimulationDisagreement, type SimulationAgreement, type SimulatorConfig } from "@/components/lab/SimulatorClient";
+
+const CONFIG: SimulatorConfig = {
+  label: "Specialty Tag",
+  accent: "#E83B2A",
+  optimizeHref: "/admin/lab/specialty-tag/optimize",
+  resultType: "binary",
+  scoreEndpoint: "/api/lab/score-batch",
+  rescoreIncludesSpecialty: true,
+  showSpecialtyInSubtitle: true,
+  regressionCommentPlaceholder: "Fx: Korrekt afvist — ren neurologi",
+};
 
 interface Props {
   searchParams: Promise<{ run_id?: string }>;
@@ -141,6 +152,7 @@ export default async function SimulatePage({ searchParams }: Props) {
       initialPrompt={run.improved_prompt ?? ""}
       disagreements={disagreements}
       agreementArticles={agreementArticles}
+      config={CONFIG}
     />
   );
 }

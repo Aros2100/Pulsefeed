@@ -42,15 +42,9 @@ export default function ArticleGeoFilter({ geoMap, userHospital }: ArticleGeoFil
   const [geoInput, setGeoInput] = useState(geoSearch);
   const initializedRef = useRef(false);
 
-  // Default hospital on first mount
+  // Mark as initialized on first mount
   useEffect(() => {
-    if (initializedRef.current) return;
     initializedRef.current = true;
-    if (!searchParams.get("hospital") && userHospital) {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("hospital", userHospital);
-      router.replace(`/articles?${params.toString()}`);
-    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

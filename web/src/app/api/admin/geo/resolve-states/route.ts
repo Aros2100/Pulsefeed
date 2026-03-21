@@ -83,7 +83,6 @@ export async function POST() {
         fromMap++;
         looked++;
         if (looked % 50 === 0) {
-          console.log(`[resolve-states] ${looked}/${uncached.length} — map:${fromMap} nominatim:${fromNominatim} null:${nullResults}`);
         }
         continue;
       }
@@ -100,18 +99,15 @@ export async function POST() {
       looked++;
 
       if (looked % 50 === 0) {
-        console.log(`[resolve-states] ${looked}/${uncached.length} — map:${fromMap} nominatim:${fromNominatim} null:${nullResults}`);
       }
 
       // Rate limit
       await new Promise((r) => setTimeout(r, NOMINATIM_DELAY));
     }
 
-    console.log(`[resolve-states] lookups done — ${looked} total, map:${fromMap}, nominatim:${fromNominatim}, null:${nullResults}`);
 
     // 3. Backfill authors.state from cache
     const { count: authorsUpdated } = await db.rpc("backfill_author_states");
-    console.log(`[resolve-states] authors backfilled: ${authorsUpdated ?? "rpc not available, using manual update"}`);
 
     // Manual fallback if RPC doesn't exist
     if (authorsUpdated == null) {
@@ -131,7 +127,6 @@ export async function POST() {
           .select("id", { count: "exact", head: true });
         authUpdated += count ?? 0;
       }
-      console.log(`[resolve-states] authors backfilled (manual): ${authUpdated}`);
     }
 
     // 4. Backfill articles.geo_state from first author's state
@@ -166,11 +161,9 @@ export async function POST() {
         if (!error) artUpdated++;
       }
       if (artUpdated % 200 === 0 && artUpdated > 0) {
-        console.log(`[resolve-states] articles backfilled: ${artUpdated}`);
       }
     }
 
-    console.log(`[resolve-states] done — articles backfilled: ${artUpdated}`);
   });
 
   return NextResponse.json({ ok: true, pairsToLookup: uncached.length });

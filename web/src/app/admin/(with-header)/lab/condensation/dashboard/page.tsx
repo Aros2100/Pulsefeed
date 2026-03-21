@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
-import BenchmarkTable from "../../specialty-tag/dashboard/BenchmarkTable";
+import BenchmarkTable from "@/components/lab/BenchmarkTable";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

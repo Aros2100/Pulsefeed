@@ -215,8 +215,5 @@ export async function fetchWorksByDois(
     )
   );
 
-  console.log(
-    `[openalex] batch: ${result.size}/${dois.length} works found`
-  );
   return result;
 }

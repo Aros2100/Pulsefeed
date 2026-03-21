@@ -1,10 +1,11 @@
 /**
- * Enrich authors with ror_id but missing city by fetching location data from ROR.
- * Fills in city (always), state and country only if currently null.
+ * Normalize geo fields (city, state, country) for all authors with a ror_id
+ * by fetching authoritative location data from the ROR API.
+ * Overwrites existing values — use --dry-run to preview changes first.
  *
  * Run with:
- *   cd web && npx tsx src/scripts/backfill-ror-cities.ts           # live
- *   cd web && npx tsx src/scripts/backfill-ror-cities.ts --dry-run # preview
+ *   cd web && npx tsx src/scripts/normalize-ror-geo.ts           # live
+ *   cd web && npx tsx src/scripts/normalize-ror-geo.ts --dry-run # preview
  */
 
 import { readFileSync } from "fs";
@@ -30,6 +31,7 @@ interface AuthorRow {
   id: string;
   display_name: string;
   ror_id: string;
+  city: string | null;
   state: string | null;
   country: string | null;
 }
@@ -48,7 +50,6 @@ interface RorOrg {
 
 async function fetchRorOrg(rorId: string): Promise<RorOrg | null> {
   const url = `${ROR_BASE}/${rorId}`;
-
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
 
@@ -67,9 +68,7 @@ async function fetchRorOrg(rorId: string): Promise<RorOrg | null> {
     return (await res.json()) as RorOrg;
   } catch (err) {
     clearTimeout(timeout);
-    console.warn(
-      `  [ror] ${rorId}: ${err instanceof Error ? err.message : String(err)}`
-    );
+    console.warn(`  [ror] ${rorId}: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
 }
@@ -80,9 +79,9 @@ async function main() {
   if (DRY_RUN) console.log("\n*** DRY RUN — no writes ***\n");
 
   let totalProcessed = 0;
-  let totalCity      = 0;
-  let totalState     = 0;
-  let totalCountry   = 0;
+  let totalUpdated   = 0;
+  let totalSkipped   = 0;
+  let totalFailed    = 0;
   let batchNum       = 0;
   let offset         = 0;
 
@@ -91,9 +90,8 @@ async function main() {
 
     const { data: authors, error } = await admin
       .from("authors")
-      .select("id, display_name, ror_id, state, country")
+      .select("id, display_name, ror_id, city, state, country")
       .not("ror_id", "is", null)
-      .is("city", null)
       .order("created_at", { ascending: true })
       .range(offset, offset + BATCH_SIZE - 1) as unknown as {
         data: AuthorRow[] | null;
@@ -107,17 +105,16 @@ async function main() {
 
     if (!authors || authors.length === 0) break;
 
-    let batchCity    = 0;
-    let batchState   = 0;
-    let batchCountry = 0;
+    let batchUpdated = 0;
 
     for (const author of authors) {
       totalProcessed++;
 
       const org = await fetchRorOrg(author.ror_id);
 
-      if (!org || !org.locations || org.locations.length === 0) {
+      if (!org?.locations?.length) {
         console.log(`  ${author.display_name} (${author.ror_id}): no locations`);
+        totalFailed++;
         continue;
       }
 
@@ -125,39 +122,33 @@ async function main() {
 
       if (!geo) {
         console.log(`  ${author.display_name} (${author.ror_id}): no geonames_details`);
+        totalFailed++;
         continue;
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updates: Record<string, any> = {};
+      const changes: string[] = [];
 
-      if (geo.name) {
+      if (geo.name && normalizeCity(geo.name) !== author.city) {
         updates.city = normalizeCity(geo.name);
-        batchCity++;
+        changes.push(`city: ${author.city ?? "(null)"} -> ${geo.name}`);
       }
-
-      if (geo.country_subdivision_name && !author.state) {
+      if (geo.country_subdivision_name && geo.country_subdivision_name !== author.state) {
         updates.state = geo.country_subdivision_name;
-        batchState++;
+        changes.push(`state: ${author.state ?? "(null)"} -> ${geo.country_subdivision_name}`);
       }
-
-      if (geo.country_name && !author.country) {
+      if (geo.country_name && geo.country_name !== author.country) {
         updates.country = geo.country_name;
-        batchCountry++;
+        changes.push(`country: ${author.country ?? "(null)"} -> ${geo.country_name}`);
       }
 
       if (Object.keys(updates).length === 0) {
-        console.log(`  ${author.display_name}: nothing to update`);
+        totalSkipped++;
         continue;
       }
 
-      console.log(
-        `  ${author.display_name}:` +
-        (updates.city    ? ` city=${updates.city}`       : "") +
-        (updates.state   ? ` state=${updates.state}`     : "") +
-        (updates.country ? ` country=${updates.country}` : "") +
-        (DRY_RUN ? " [dry]" : "")
-      );
+      console.log(`  ${author.display_name}: ${changes.join(", ")}${DRY_RUN ? " [dry]" : ""}`);
 
       if (!DRY_RUN) {
         const { error: updateError } = await admin
@@ -167,32 +158,29 @@ async function main() {
 
         if (updateError) {
           console.warn(`  Supabase error for ${author.id}: ${updateError.message}`);
+          totalFailed++;
           continue;
         }
       }
+
+      batchUpdated++;
+      totalUpdated++;
     }
 
-    totalCity    += batchCity;
-    totalState   += batchState;
-    totalCountry += batchCountry;
-
-    console.log(
-      `Batch ${batchNum}: ${authors.length} authors, ` +
-      `+city=${batchCity}, +state=${batchState}, +country=${batchCountry}`
-    );
+    console.log(`Batch ${batchNum}: ${authors.length} authors, updated=${batchUpdated}`);
 
     if (authors.length < BATCH_SIZE) break;
 
     offset += BATCH_SIZE;
-    await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+    await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
   }
 
   console.log(`\n=== ${DRY_RUN ? "DRY RUN " : ""}Summary ===`);
-  console.log(`  Authors processed:     ${totalProcessed}`);
-  console.log(`  City added:            ${totalCity}`);
-  console.log(`  State added:           ${totalState}`);
-  console.log(`  Country added:         ${totalCountry}`);
-  console.log(`  Batches processed:     ${batchNum}`);
+  console.log(`  Authors processed: ${totalProcessed}`);
+  console.log(`  Updated:           ${totalUpdated}`);
+  console.log(`  Already correct:   ${totalSkipped}`);
+  console.log(`  No ROR data:       ${totalFailed}`);
+  console.log(`  Batches:           ${batchNum}`);
 }
 
 main().catch((e) => {

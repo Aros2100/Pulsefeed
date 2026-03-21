@@ -21,12 +21,10 @@ export async function POST() {
         totalConflicted += result.conflicted;
         totalFailed += result.failed;
 
-        console.log("[geo/ai-parse] batch done:", result);
 
         if (result.processed === 0) break;
       }
 
-      console.log("[geo/ai-parse] ALL DONE:", { totalProcessed, totalUpgraded, totalConflicted, totalFailed });
     } catch (e) {
       console.error("[geo/ai-parse] failed:", e);
     }

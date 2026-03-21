@@ -166,7 +166,6 @@ Respond in JSON only — no markdown, no backticks:
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const result = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as Omit<PatternAnalysisResult, "current_prompt" | "run_id">;
 
-    console.log(`[analyze-patterns] inserting run: specialty=${specialty} module=${module} version=${activePrompt.version} fp=${falsePositives.length} fn=${falseNegatives.length}`);
 
     type InsertResult = { data: Array<{ id: string }> | null; error: { message: string; code: string } | null };
     const { data: insertData, error: insertError } = await (
@@ -190,7 +189,6 @@ Respond in JSON only — no markdown, no backticks:
     if (insertError) {
       console.error("[analyze-patterns] DB insert failed:", JSON.stringify(insertError));
     } else {
-      console.log("[analyze-patterns] DB insert succeeded, id:", insertData?.[0]?.id);
     }
 
     const runId = insertData?.[0]?.id ?? null;

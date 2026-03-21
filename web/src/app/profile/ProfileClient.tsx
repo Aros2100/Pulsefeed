@@ -1,114 +1,121 @@
 "use client";
 
 import { useState } from "react";
-import ProfileEditClient from "./ProfileEditClient";
+import ProfileAvatarUpload from "./ProfileAvatarUpload";
 import ProfilePrivacyClient from "./ProfilePrivacyClient";
-import AuthorGeoFields from "@/components/authors/AuthorGeoFields";
 import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
-import { showState } from "@/lib/geo/state-policy";
 
 const MANDATORY_SUBSPECIALTY = "Neurosurgery";
 
 interface Props {
   email:                     string;
   initialName:               string;
+  initialTitle:              string;
   initialSpecialtySlugs:     string[];
   initialIsPublic:           boolean;
   initialEmailNotifications: boolean;
   articleCount:              number;
   specialtyLabels:           Record<string, string>;
-  // Read-only info fields
-  roleType:    string | null;
-  authorCity:  string | null;
-  authorCountry: string | null;
-  // New
+  roleType:                  string | null;
+  authorCity:                string | null;
+  authorCountry:             string | null;
   initialSubspecialties:     string[];
   initialCountry:            string | null;
   initialCity:               string | null;
   initialState:              string | null;
   initialHospital:           string | null;
   initialDepartment:         string | null;
-  hasAuthorId:               boolean;
+  authorId:                  string | null;
+  avatarUrl:                 string | null;
+  displayName:               string;
+  firstArticleDate:          string | null;
+  latestArticleDate:         string | null;
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700, marginBottom: "12px" }}>
-      {children}
-    </div>
-  );
+function formatDate(d: string | null | undefined): string {
+  if (!d) return "—";
+  const parts = d.split("-");
+  const year = parts[0];
+  const month = parts[1];
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `${months[parseInt(month, 10) - 1]} ${year}`;
 }
 
-function CardHeader({ label }: { label: string }) {
-  return (
-    <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
-      <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>{label}</div>
-    </div>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ padding: "12px 24px", borderBottom: "1px solid #f0f0f0" }}>
-      <div style={{ fontSize: "12px", color: "#888", marginBottom: "2px" }}>{label}</div>
-      <div style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a" }}>{value}</div>
-    </div>
-  );
-}
-
-function roleLabel(roleType: string | null): string | null {
-  if (roleType === "clinician")  return "Clinician";
-  if (roleType === "researcher") return "Researcher";
-  if (roleType === "both")       return "Clinician & Researcher";
-  return null;
-}
+const BG   = "#ffffff";
+const BG2  = "#EEF2F7";
+const BORDER = "1px solid #c8d0dc";
+const RADIUS = "10px";
 
 const card: React.CSSProperties = {
-  background: "#fff", borderRadius: "10px",
-  boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
+  background: BG, border: BORDER, borderRadius: RADIUS,
   overflow: "hidden", marginBottom: "28px",
+};
+const cardHeader: React.CSSProperties = {
+  background: BG2, borderBottom: BORDER,
+  padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between",
+};
+const sectionLabel: React.CSSProperties = {
+  fontSize: "11px", letterSpacing: "0.09em", color: "var(--color-text-secondary)",
+  textTransform: "uppercase" as const, fontWeight: 500, marginTop: "28px", marginBottom: "10px",
+};
+const labelStyle: React.CSSProperties = {
+  fontSize: "11px", letterSpacing: "0.09em", color: "var(--color-text-secondary)",
+  textTransform: "uppercase" as const, fontWeight: 500, marginBottom: "5px",
+};
+const valueStyle: React.CSSProperties = {
+  fontSize: "14px", fontWeight: 600, color: "var(--color-text-primary)",
+};
+const inputStyle: React.CSSProperties = {
+  fontSize: "13px", padding: "7px 10px", borderRadius: "6px",
+  border: BORDER, outline: "none", width: "100%",
+  boxSizing: "border-box" as const, fontFamily: "inherit",
+  background: BG, color: "var(--color-text-primary)",
+};
+const editBtn: React.CSSProperties = {
+  fontSize: "12px", color: "var(--color-text-secondary)", background: "none",
+  border: BORDER, padding: "5px 12px", borderRadius: "6px",
+  cursor: "pointer", fontFamily: "inherit",
+};
+const btnPrimary: React.CSSProperties = {
+  fontSize: "12px", padding: "6px 14px", borderRadius: "6px",
+  background: "var(--color-text-primary)", color: BG,
+  border: "none", cursor: "pointer", fontFamily: "inherit",
+};
+const btnSecondary: React.CSSProperties = {
+  fontSize: "12px", padding: "6px 14px", borderRadius: "6px",
+  background: "none", color: "var(--color-text-secondary)",
+  border: BORDER, cursor: "pointer", fontFamily: "inherit",
+};
+const specialtyPill: React.CSSProperties = {
+  background: "#EEEDFE", color: "#3C3489", border: "1px solid #AFA9EC",
+  borderRadius: "6px", padding: "3px 10px", fontSize: "12px", fontWeight: 600,
+};
+const subPill: React.CSSProperties = {
+  background: BG2, color: "#3d4f6b", border: BORDER,
+  borderRadius: "6px", padding: "3px 10px", fontSize: "12px", fontWeight: 500,
 };
 
 export default function ProfileClient({
-  email,
-  initialName,
-  initialSpecialtySlugs,
-  initialIsPublic,
-  initialEmailNotifications,
-  articleCount,
-  specialtyLabels,
-  roleType,
-  authorCity,
-  authorCountry,
-  initialSubspecialties,
-  initialCountry,
-  initialCity,
-  initialState,
-  initialHospital,
-  initialDepartment,
-  hasAuthorId,
+  email, initialName, initialTitle, initialSpecialtySlugs,
+  initialIsPublic, initialEmailNotifications, articleCount, specialtyLabels,
+  initialSubspecialties, initialCountry, initialCity, initialState,
+  initialHospital, initialDepartment, avatarUrl, displayName,
+  firstArticleDate, latestArticleDate,
 }: Props) {
-  const [name,          setName]          = useState(initialName);
-  const [specialtySlugs, setSpecialtySlugs] = useState(initialSpecialtySlugs);
-
-  // Subspecialties state
+  const [name, setName]                     = useState(initialName);
+  const [title, setTitle]                   = useState(initialTitle);
+  const [specialtySlugs] = useState(initialSpecialtySlugs);
   const [subspecialties, setSubspecialties] = useState<string[]>(initialSubspecialties);
-  const [editingSub, setEditingSub] = useState(false);
-  const [tempSub, setTempSub] = useState<string[]>(initialSubspecialties);
-  const [savingSub, setSavingSub] = useState(false);
-
-  // Location state
-  const [geoValues, setGeoValues] = useState({
-    country:    initialCountry    ?? "",
-    city:       initialCity       ?? "",
-    state:      initialState      ?? "",
-    hospital:   initialHospital   ?? "",
-    department: initialDepartment ?? "",
+  const [editingAccount, setEditingAccount] = useState(false);
+  const [editingSub, setEditingSub]         = useState(false);
+  const [tempSub, setTempSub]               = useState<string[]>(initialSubspecialties);
+  const [savingSub, setSavingSub]           = useState(false);
+  const [accountDraft, setAccountDraft]     = useState({
+    name: initialName, title: initialTitle,
+    hospital: initialHospital ?? "", country: initialCountry ?? "",
+    city: initialCity ?? "", state: initialState ?? "", department: initialDepartment ?? "",
   });
-  const [editingGeo, setEditingGeo] = useState(false);
-  const [savingGeo, setSavingGeo] = useState(false);
-
-  const role = roleLabel(roleType);
+  const [savingAccount, setSavingAccount] = useState(false);
 
   async function patch(body: Record<string, unknown>) {
     const res = await fetch("/api/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -116,14 +123,20 @@ export default function ProfileClient({
     if (!data.ok) throw new Error(data.error ?? "Error");
   }
 
-  function toggleSub(sub: string) {
-    setTempSub((prev) => {
-      if (prev.includes(sub)) return prev.filter((s) => s !== sub);
-      // Max 3 elective (excluding mandatory)
-      const elective = prev.filter((s) => s !== MANDATORY_SUBSPECIALTY);
-      if (elective.length >= 3 && sub !== MANDATORY_SUBSPECIALTY) return prev;
-      return [...prev, sub];
-    });
+  async function saveAccount() {
+    setSavingAccount(true);
+    try {
+      await patch({
+        name: accountDraft.name || null, title: accountDraft.title || null,
+        hospital: accountDraft.hospital || null, country: accountDraft.country || null,
+        city: accountDraft.city || null, state: accountDraft.state || null,
+        department: accountDraft.department || null,
+      });
+      setName(accountDraft.name);
+      setTitle(accountDraft.title);
+      setEditingAccount(false);
+    } catch { /* ignore */ }
+    setSavingAccount(false);
   }
 
   async function saveSub() {
@@ -137,191 +150,162 @@ export default function ProfileClient({
     setSavingSub(false);
   }
 
-  async function saveGeo() {
-    setSavingGeo(true);
-    try {
-      await patch({
-        country:    geoValues.country    || null,
-        city:       geoValues.city       || null,
-        state:      geoValues.state      || null,
-        hospital:   geoValues.hospital   || null,
-        department: geoValues.department || null,
-      });
-      setEditingGeo(false);
-    } catch { /* ignore */ }
-    setSavingGeo(false);
+  function toggleSub(sub: string) {
+    if (sub === MANDATORY_SUBSPECIALTY) return;
+    setTempSub((prev) => {
+      if (prev.includes(sub)) return prev.filter((s) => s !== sub);
+      const elective = prev.filter((s) => s !== MANDATORY_SUBSPECIALTY);
+      if (elective.length >= 3) return prev;
+      return [...prev, sub];
+    });
   }
 
-  const rowStyle: React.CSSProperties = { padding: "14px 24px", borderBottom: "1px solid #f0f0f0" };
-  const labelSt: React.CSSProperties = { fontSize: "12px", color: "#888", marginBottom: "2px" };
-  const inputStyle: React.CSSProperties = {
-    fontSize: "13px", padding: "7px 10px", borderRadius: "6px",
-    border: "1px solid #dde3ed", outline: "none", width: "100%",
-    maxWidth: "320px", boxSizing: "border-box" as const, fontFamily: "inherit",
-  };
-  const btnPrimary: React.CSSProperties = { fontSize: "12px", padding: "6px 14px", borderRadius: "6px", background: "#1a1a1a", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" };
-  const btnSecondary: React.CSSProperties = { fontSize: "12px", padding: "6px 14px", borderRadius: "6px", background: "none", color: "#5a6a85", border: "1px solid #dde3ed", cursor: "pointer", fontFamily: "inherit" };
-  const editBtn: React.CSSProperties = { fontSize: "12px", color: "#5a6a85", background: "none", border: "1px solid #dde3ed", padding: "5px 12px", borderRadius: "6px", cursor: "pointer", fontFamily: "inherit" };
-
-  const electiveSubs = subspecialties.filter((s) => s !== MANDATORY_SUBSPECIALTY);
+  const electiveSubs = subspecialties.filter(s => s !== MANDATORY_SUBSPECIALTY);
 
   return (
     <>
-      {/* ── Account card ─────────────────────────────────── */}
-      <SectionLabel>Account</SectionLabel>
+      {/* ── Hero Card ── */}
       <div style={card}>
-        <CardHeader label="Personal information" />
-        <div style={{ padding: "4px 0 0" }}>
-          <InfoRow label="Email" value={email} />
-          {role           && <InfoRow label="Role"    value={role} />}
-          {authorCity     && <InfoRow label="City"    value={authorCity} />}
-          {authorCountry  && <InfoRow label="Country" value={authorCountry} />}
-          <ProfileEditClient
-            initialName={name}
-            initialSpecialtySlugs={specialtySlugs}
-            onNameSaved={setName}
-            onSpecialtiesSaved={setSpecialtySlugs}
-          />
-        </div>
-      </div>
-
-      {/* ── Subspecialties card ─────────────────────────── */}
-      <SectionLabel>Subspecialties</SectionLabel>
-      <div style={card}>
-        <CardHeader label="Neurosurgical subspecialties" />
-        <div style={rowStyle}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div style={{ flex: 1 }}>
-              {editingSub ? (
-                <div>
-                  {/* Mandatory badge */}
-                  <div style={{ marginBottom: "10px" }}>
-                    <span style={{ background: "#EEF2F7", borderRadius: "6px", padding: "3px 10px", fontSize: "12px", fontWeight: 600, color: "#5a6a85" }}>
-                      {MANDATORY_SUBSPECIALTY} (mandatory)
-                    </span>
+        <div style={{ padding: "20px 24px" }}>
+          <div style={{ display: "flex", gap: "20px", alignItems: "flex-start" }}>
+            <ProfileAvatarUpload avatarUrl={avatarUrl} displayName={displayName} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: "20px", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.2 }}>
+                {name || "—"}
+              </div>
+              {title && <div style={{ fontSize: "13px", color: "var(--color-text-secondary)", marginTop: "3px" }}>{title}</div>}
+              {accountDraft.hospital && (
+                <div style={{ fontSize: "13px", color: "var(--color-text-secondary)", marginTop: "2px" }}>
+                  {accountDraft.hospital}{accountDraft.department ? ` · ${accountDraft.department}` : ""}
+                </div>
+              )}
+              {/* Specialty */}
+              <div style={{ marginTop: "12px" }}>
+                <div style={{ fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, color: "var(--color-text-secondary)", marginBottom: "3px" }}>Specialty</div>
+                <div style={{ fontSize: "13px", color: "var(--color-text-primary)" }}>
+                  {specialtySlugs.map(slug => specialtyLabels[slug] ?? slug).join(", ") || "—"}
+                </div>
+              </div>
+              {/* Subspecialties — exclude mandatory */}
+              {electiveSubs.length > 0 && (
+                <div style={{ marginTop: "8px" }}>
+                  <div style={{ fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500, color: "var(--color-text-secondary)", marginBottom: "3px" }}>Subspecialties</div>
+                  <div style={{ fontSize: "13px", color: "var(--color-text-primary)" }}>
+                    {electiveSubs.join(", ")}
+                  </div>
+                </div>
+              )}
+              {/* Edit subspecialties inline */}
+              {editingSub && (
+                <div style={{ marginTop: "14px", padding: "14px", background: BG2, borderRadius: "8px", border: BORDER }}>
+                  <div style={{ fontSize: "11px", color: "var(--color-text-secondary)", textTransform: "uppercase" as const, letterSpacing: "0.07em", fontWeight: 500, marginBottom: "10px" }}>
+                    Select subspecialties (max 3)
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
-                    {SUBSPECIALTY_OPTIONS.map((sub) => {
+                    {SUBSPECIALTY_OPTIONS.filter(s => s !== MANDATORY_SUBSPECIALTY).map((sub) => {
                       const selected = tempSub.includes(sub);
-                      const electiveCount = tempSub.filter((s) => s !== MANDATORY_SUBSPECIALTY).length;
+                      const electiveCount = tempSub.filter(s => s !== MANDATORY_SUBSPECIALTY).length;
                       const disabled = !selected && electiveCount >= 3;
                       return (
-                        <button
-                          key={sub}
-                          onClick={() => toggleSub(sub)}
-                          disabled={disabled}
-                          style={{
-                            fontSize: "12px", padding: "5px 12px", borderRadius: "6px",
-                            cursor: disabled ? "not-allowed" : "pointer",
-                            background: selected ? "#2563eb" : disabled ? "#f9fafb" : "#f5f7fa",
-                            color: selected ? "#fff" : disabled ? "#c0c0c0" : "#5a6a85",
-                            border: selected ? "1px solid #2563eb" : "1px solid #dde3ed",
-                            fontFamily: "inherit",
-                          }}
-                        >
-                          {sub}
-                        </button>
+                        <button key={sub} onClick={() => toggleSub(sub)} disabled={disabled} style={{
+                          fontSize: "12px", padding: "4px 10px", borderRadius: "6px",
+                          cursor: disabled ? "not-allowed" : "pointer",
+                          background: selected ? "var(--color-text-primary)" : BG,
+                          color: selected ? BG : disabled ? "#aaa" : "var(--color-text-secondary)",
+                          border: selected ? "1px solid var(--color-text-primary)" : BORDER,
+                          fontFamily: "inherit", opacity: disabled ? 0.5 : 1,
+                        }}>{sub}</button>
                       );
                     })}
                   </div>
-                  <div style={{ fontSize: "11px", color: "#888", marginBottom: "10px" }}>
-                    Max 3 subspecialties (+ mandatory Neurosurgery)
-                  </div>
                   <div style={{ display: "flex", gap: "8px" }}>
-                    <button onClick={saveSub} disabled={savingSub} style={btnPrimary}>
-                      {savingSub ? "..." : "Save"}
-                    </button>
-                    <button onClick={() => { setTempSub(subspecialties); setEditingSub(false); }} style={btnSecondary}>
-                      Cancel
-                    </button>
+                    <button onClick={saveSub} disabled={savingSub} style={btnPrimary}>{savingSub ? "…" : "Save"}</button>
+                    <button onClick={() => { setTempSub(subspecialties); setEditingSub(false); }} style={btnSecondary}>Cancel</button>
                   </div>
-                </div>
-              ) : (
-                <div>
-                  {subspecialties.length > 0 ? (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                      <span style={{ background: "#EEF2F7", borderRadius: "6px", padding: "3px 10px", fontSize: "12px", fontWeight: 600, color: "#5a6a85" }}>
-                        {MANDATORY_SUBSPECIALTY}
-                      </span>
-                      {electiveSubs.map((sub) => (
-                        <span key={sub} style={{ background: "#dbeafe", borderRadius: "6px", padding: "3px 10px", fontSize: "12px", fontWeight: 600, color: "#1e40af" }}>
-                          {sub}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: "14px", fontWeight: 600, color: "#9ca3af" }}>No subspecialties configured</div>
-                  )}
                 </div>
               )}
             </div>
             {!editingSub && (
-              <button onClick={() => { setTempSub(subspecialties); setEditingSub(true); }} style={editBtn}>
-                Edit
-              </button>
+              <div style={{ display: "flex", gap: "8px", flexShrink: 0, alignSelf: "flex-start" }}>
+                <button onClick={() => { setTempSub(subspecialties); setEditingSub(true); }} style={editBtn}>Edit subspecialties</button>
+              </div>
             )}
           </div>
         </div>
-      </div>
-
-      {/* ── Location card ──────────────────────────────── */}
-      <SectionLabel>Location</SectionLabel>
-      <div style={card}>
-        <CardHeader label={hasAuthorId ? "Location (syncs to author profile)" : "Location"} />
-        <div style={rowStyle}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div style={{ flex: 1 }}>
-              {editingGeo ? (
-                <div>
-                  <AuthorGeoFields
-                    values={geoValues}
-                    onChange={(field, value) => setGeoValues((g) => ({ ...g, [field]: value }))}
-                    disabled={savingGeo}
-                  />
-                  <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
-                    <button onClick={saveGeo} disabled={savingGeo} style={btnPrimary}>
-                      {savingGeo ? "..." : "Save"}
-                    </button>
-                    <button onClick={() => {
-                      setGeoValues({
-                        country:    initialCountry    ?? "",
-                        city:       initialCity       ?? "",
-                        state:      initialState      ?? "",
-                        hospital:   initialHospital   ?? "",
-                        department: initialDepartment ?? "",
-                      });
-                      setEditingGeo(false);
-                    }} style={btnSecondary}>
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                  {geoValues.country   && <InfoRow label="Country"    value={geoValues.country} />}
-                  {geoValues.city      && <InfoRow label="City"       value={geoValues.city} />}
-                  {showState(geoValues.country || null) && geoValues.state && <InfoRow label="State / Province" value={geoValues.state} />}
-                  {geoValues.hospital  && <InfoRow label="Hospital"   value={geoValues.hospital} />}
-                  {geoValues.department && <InfoRow label="Department" value={geoValues.department} />}
-                  {!geoValues.country && !geoValues.city && !geoValues.hospital && (
-                    <div style={{ fontSize: "14px", fontWeight: 600, color: "#9ca3af" }}>No location configured</div>
-                  )}
-                </div>
-              )}
+        {/* Stats row */}
+        <div style={{ borderTop: BORDER, padding: "16px 24px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+          {[
+            { label: "Publications indexed", value: String(articleCount) },
+            { label: "First article", value: formatDate(firstArticleDate) },
+            { label: "Latest article", value: formatDate(latestArticleDate) },
+          ].map((stat) => (
+            <div key={stat.label} style={{ background: BG2, border: BORDER, borderRadius: "8px", padding: "12px 16px" }}>
+              <div style={{ fontSize: "11px", color: "var(--color-text-secondary)", marginBottom: "4px", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>{stat.label}</div>
+              <div style={{ fontSize: "20px", fontWeight: 500, color: "var(--color-text-primary)" }}>{stat.value}</div>
             </div>
-            {!editingGeo && (
-              <button onClick={() => setEditingGeo(true)} style={editBtn}>
-                Edit
-              </button>
-            )}
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* ── Privacy & Notifications card ─────────────────── */}
-      <SectionLabel>Privacy & Notifications</SectionLabel>
+      {/* ── Account Card ── */}
+      <div style={sectionLabel}>Account</div>
       <div style={card}>
-        <CardHeader label="Profile visibility" />
+        <div style={{ position: "relative", padding: "20px 24px" }}>
+          {!editingAccount && (
+            <button onClick={() => setEditingAccount(true)} style={{ ...editBtn, position: "absolute", top: "16px", right: "24px" }}>Edit</button>
+          )}
+          {editingAccount ? (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 32px" }}>
+                {([
+                  { label: "Name", key: "name", placeholder: "" },
+                  { label: "Title", key: "title", placeholder: "e.g. Dr., Prof." },
+                  { label: "Hospital", key: "hospital", placeholder: "" },
+                  { label: "Country", key: "country", placeholder: "" },
+                  { label: "City", key: "city", placeholder: "" },
+                  { label: "State / Province", key: "state", placeholder: "" },
+                  { label: "Department", key: "department", placeholder: "" },
+                ] as { label: string; key: string; placeholder: string }[]).map(({ label, key, placeholder }) => (
+                  <div key={key}>
+                    <div style={labelStyle}>{label}</div>
+                    <input value={accountDraft[key as keyof typeof accountDraft]} placeholder={placeholder} onChange={(e) => setAccountDraft((d) => ({ ...d, [key]: e.target.value }))} style={inputStyle} />
+                  </div>
+                ))}
+                <div>
+                  <div style={labelStyle}>Email</div>
+                  <input value={email} readOnly style={{ ...inputStyle, opacity: 0.6, cursor: "default" }} />
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "20px" }}>
+                <button onClick={() => { setAccountDraft({ name, title, hospital: initialHospital ?? "", country: initialCountry ?? "", city: initialCity ?? "", state: initialState ?? "", department: initialDepartment ?? "" }); setEditingAccount(false); }} style={btnSecondary}>Cancel</button>
+                <button onClick={saveAccount} disabled={savingAccount} style={btnPrimary}>{savingAccount ? "…" : "Save"}</button>
+              </div>
+            </>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 32px" }}>
+              {[
+                { label: "Name", value: name },
+                { label: "Title", value: title },
+                { label: "Email", value: email },
+                { label: "Hospital", value: accountDraft.hospital },
+                { label: "Country", value: accountDraft.country },
+                { label: "City", value: accountDraft.city },
+                ...(accountDraft.state ? [{ label: "State / Province", value: accountDraft.state }] : []),
+                ...(accountDraft.department ? [{ label: "Department", value: accountDraft.department }] : []),
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <div style={labelStyle}>{label}</div>
+                  <div style={valueStyle}>{value || "—"}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Privacy & Notifications Card ── */}
+      <div style={sectionLabel}>Privacy &amp; Notifications</div>
+      <div style={card}>
         <ProfilePrivacyClient
           initialIsPublic={initialIsPublic}
           initialEmailNotifications={initialEmailNotifications}

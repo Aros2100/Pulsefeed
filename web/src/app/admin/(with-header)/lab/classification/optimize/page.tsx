@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
-import PatternAnalysis, { type OptimizationRun } from "../dashboard/PatternAnalysis";
+import PatternAnalysis, { type OptimizationRun } from "@/components/lab/PatternAnalysis";
 
 export default async function ClassificationOptimizePage() {
   const supabase = await createClient();
@@ -108,6 +108,8 @@ export default async function ClassificationOptimizePage() {
           module="classification_subspecialty"
           initialRun={latestRun}
           disabled={!hasSufficientData}
+          accentColor="#7c3aed"
+          simulatePath="/admin/lab/classification/simulate"
         />
 
       </div>

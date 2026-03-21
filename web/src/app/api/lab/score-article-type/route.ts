@@ -171,7 +171,6 @@ export async function POST(request: NextRequest) {
           )
         );
 
-        console.log(`[score-article-type] done — scored: ${scored}, failed: ${failedIds.length}, total: ${toScore.length}`);
         send({ done: true, scored, failed: failedIds.length, total: toScore.length });
       } catch (e) {
         send({ done: true, error: String(e), scored, failed: failedIds.length, total: toScore.length });

@@ -34,7 +34,6 @@ export async function runLocationParsing(limit = 500): Promise<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = admin as any;
 
-  console.log("[geo/run-parse] Starting parse, targeting unparsed articles");
 
   const { data: articles, error } = await db
     .from("articles")

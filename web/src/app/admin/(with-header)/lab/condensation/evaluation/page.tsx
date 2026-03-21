@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
-import VersionSelector from "../../specialty-tag/evaluation/VersionSelector";
+import VersionSelector from "@/components/lab/VersionSelector";
 import PromptDrawer, { type ModelVersion } from "@/components/lab/PromptDrawer";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

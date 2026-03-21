@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { aiParseAffiliation } from "@/lib/geo/ai-location-parser";
+import { normalizeCity } from "@/lib/geo/normalize";
 
 const BATCH_SIZE = 200;
 const DELAY_MS = 1300;
@@ -67,7 +68,7 @@ export async function POST() {
           await (admin as any)
             .from("authors")
             .update({
-              city: result.city,
+              city: normalizeCity(result.city),
               country: result.country,
               hospital: result.institution,
               department: result.department,
@@ -99,7 +100,6 @@ export async function POST() {
       await sleep(DELAY_MS);
     }
 
-    console.log(`[ai-parse-authors] done — updated: ${updated}, skipped: ${skipped}, total: ${toProcess.length}`);
   });
 
   return NextResponse.json({ ok: true, queued: toProcess.length });

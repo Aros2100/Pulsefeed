@@ -8,7 +8,6 @@ export async function POST() {
 
   after(() => {
     runPublicationTypeMapping()
-      .then((r) => console.log("[pubtype-map]", r))
       .catch((e) => console.error("[pubtype-map] error:", e));
   });
 

@@ -10,7 +10,6 @@ export async function POST() {
   after(async () => {
     try {
       const result = await reparseLowConfidence(new Date().toISOString(), 500);
-      console.log("[geo/reparse-low]", result);
     } catch (e) {
       console.error("[geo/reparse-low] failed:", e);
     }

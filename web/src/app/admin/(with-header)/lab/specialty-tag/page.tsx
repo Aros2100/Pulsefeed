@@ -257,7 +257,7 @@ export default async function SpecialtyTagPage() {
                 ? `Start session · ${queueCount} artikler klar →`
                 : "Start session →"
             }
-            actionHref={`/admin/system/layers/${specialty}/training`}
+            actionHref={`/admin/lab/specialty-tag/training`}
             actionColor={queueCount > 0 ? "#E83B2A" : "#1a1a1a"}
           />
 

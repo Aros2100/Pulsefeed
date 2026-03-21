@@ -83,9 +83,13 @@ export default function CostChart({ tasks }: { tasks: TaskData[] }) {
           ];
           const kpiItems = [
             { label: "Forbrug",      value: fmt$(data.cost, 2) },
-            { label: task.isGeo ? "Kald" : "Artikler", value: task.isGeo ? nFmt(data.calls) : nFmt(data.articles) },
-            ...(!task.isGeo ? [{ label: "Pris/artikel", value: data.articles > 0 ? fmt$(costPerArticle, 4) : "—" }] : []),
-            { label: "Kald", value: nFmt(data.calls) },
+            ...(!task.isGeo ? [
+              { label: "Artikler",    value: nFmt(data.articles) },
+              { label: "Pris/artikel", value: data.articles > 0 ? fmt$(costPerArticle, 4) : "—" },
+              { label: "Kald",        value: nFmt(data.calls) },
+            ] : [
+              { label: "Kald",        value: nFmt(data.calls) },
+            ]),
           ];
 
           return (

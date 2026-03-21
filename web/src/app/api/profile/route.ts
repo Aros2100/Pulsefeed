@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 const schema = z.object({
   name:                z.string().optional(),
+  title:               z.string().optional(),
   specialty_slugs:     z.array(z.string()).optional(),
   is_public:           z.boolean().optional(),
   email_notifications: z.boolean().optional(),

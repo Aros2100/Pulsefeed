@@ -1,6 +1,5 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import Header from "@/components/Header";
 import ArticleStamkort, { type ArticleData } from "@/components/articles/ArticleStamkort";
 import SidebarNav from "./SidebarNav";
 import SaveButton from "@/components/SaveButton";
@@ -53,7 +52,6 @@ export default async function ArticleDetailPage({
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
-      <Header />
       <ArticleViewTracker articleId={id} />
 
       <div style={{

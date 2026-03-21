@@ -9,6 +9,7 @@ export const ANALYSIS_MODEL = process.env.AI_ANALYSIS_MODEL ?? "claude-sonnet-4-
 export interface ScoreResult {
   confidence: number;
   ai_decision: "approved" | "rejected";
+  reason: string | null;
 }
 
 export interface CondensationResult {
@@ -64,7 +65,7 @@ export async function scoreArticle(
 
   const message = await trackedCall(`specialty_tag_${activePrompt.version}`, {
     model: SCORING_MODEL,
-    max_tokens: 256,
+    max_tokens: 512,
     messages: [{ role: "user", content }],
   }, article.id, "specialty");
 
@@ -72,14 +73,15 @@ export async function scoreArticle(
 
   try {
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as { decision?: string; confidence?: number };
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as { decision?: string; confidence?: number; reason?: string };
     const confidence = Math.min(100, Math.max(0, Math.round(Number(parsed.confidence ?? 50))));
     const ai_decision: "approved" | "rejected" = parsed.decision === "approved" ? "approved" : "rejected";
-    return { confidence, ai_decision, version: activePrompt.version };
+    const reason = typeof parsed.reason === "string" ? parsed.reason.slice(0, 500) : null;
+    return { confidence, ai_decision, reason, version: activePrompt.version };
   } catch {
     const match = raw.match(/\d+/);
     const confidence = match ? Math.min(100, Math.max(0, parseInt(match[0], 10))) : 50;
-    return { confidence, ai_decision: confidence >= 50 ? "approved" : "rejected", version: activePrompt.version };
+    return { confidence, ai_decision: confidence >= 50 ? "approved" : "rejected", reason: null, version: activePrompt.version };
   }
 }
 

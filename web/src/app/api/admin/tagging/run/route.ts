@@ -8,9 +8,6 @@ async function runAllAutoTag() {
 
   for (const specialty of activeSpecialties) {
     const result = await runAutoTag(specialty);
-    console.log(
-      `[tagging] auto-tag ${specialty}: tagged=${result.tagged}, skipped=${result.skipped}`
-    );
   }
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 interface Author {
@@ -40,18 +40,29 @@ export default function AuthorSearch({
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const doSearch = useCallback(async () => {
-    if (query.trim().length < 2) return;
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setResults([]);
+      setHasSearched(false);
+      return;
+    }
     setSearching(true);
-    setHasSearched(true);
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("authors")
-      .select("id, display_name, hospital, city, country, department, article_count")
-      .ilike("display_name", `%${query}%`)
-      .limit(8);
-    setResults((data as Author[]) ?? []);
-    setSearching(false);
+    const timer = setTimeout(async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("authors")
+        .select("id, display_name, hospital, city, country, department, article_count")
+        .ilike("display_name", `%${trimmed}%`)
+        .limit(8);
+      setResults((data as Author[]) ?? []);
+      setSearching(false);
+      setHasSearched(true);
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      setSearching(false);
+    };
   }, [query]);
 
   return (
@@ -69,46 +80,37 @@ export default function AuthorSearch({
         >
           Søg efter navn
         </label>
-        <div style={{ display: "flex", gap: "8px" }}>
+        <div style={{ position: "relative" }}>
           <input
             id="author-search"
             type="text"
             placeholder="e.g. John Smith…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") void doSearch(); }}
             style={{
-              flex: 1,
-              minWidth: 0,
+              width: "100%",
               boxSizing: "border-box",
               border: "1px solid #d1d5db",
               borderRadius: "7px",
-              padding: "10px 14px",
+              padding: "10px 36px 10px 14px",
               fontSize: "14px",
               color: "#1a1a1a",
               outline: "none",
               background: "#fff",
             }}
           />
-          <button
-            type="button"
-            onClick={() => void doSearch()}
-            disabled={searching || query.trim().length < 2}
-            style={{
-              flexShrink: 0,
-              background: "#1a1a1a",
-              color: "#fff",
-              border: "none",
-              borderRadius: "7px",
-              padding: "0 18px",
-              fontSize: "13px",
-              fontWeight: 600,
-              cursor: query.trim().length < 2 ? "not-allowed" : "pointer",
-              opacity: query.trim().length < 2 ? 0.5 : 1,
-            }}
-          >
-            {searching ? "Søger…" : "Søg"}
-          </button>
+          {searching && (
+            <span style={{
+              position: "absolute",
+              right: "12px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              fontSize: "12px",
+              color: "#888",
+            }}>
+              …
+            </span>
+          )}
         </div>
         {hasSearched && !searching && results.length === 0 && (
           <p style={{ marginTop: "6px", fontSize: "12px", color: "#888" }}>

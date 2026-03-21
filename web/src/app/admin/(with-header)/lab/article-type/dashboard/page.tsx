@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import BenchmarkTable from "./BenchmarkTable";
+import BenchmarkTable from "@/components/lab/BenchmarkTable";
 
 const FIXED_SPECIALTY = "neurosurgery";
 
@@ -379,7 +379,7 @@ export default async function ArticleTypeDashboardPage() {
           {tableRows.length === 0 ? (
             <div style={{ padding: "24px", fontSize: "13px", color: "#aaa" }}>Ingen versioner endnu.</div>
           ) : (
-            <BenchmarkTable versions={tableRows} />
+            <BenchmarkTable versions={tableRows} variant="article-type" />
           )}
         </div>
 

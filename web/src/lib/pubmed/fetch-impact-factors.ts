@@ -139,6 +139,5 @@ export async function runImpactFactorFetch(limit = 2000): Promise<{ updated: num
     }
   }
 
-  console.log(`[fetch-if] done — updated: ${updated}, failed: ${failed}, unique ISSNs: ${issnMap.size}`);
   return { updated, failed };
 }

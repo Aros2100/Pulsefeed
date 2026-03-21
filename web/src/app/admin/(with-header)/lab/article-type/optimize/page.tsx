@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import PatternAnalysis, { type OptimizationRun } from "../dashboard/PatternAnalysis";
+import PatternAnalysis, { type OptimizationRun } from "@/components/lab/PatternAnalysis";
 import { ARTICLE_TYPE_DISAGREEMENT_THRESHOLD } from "@/lib/lab/article-type-options";
 
 const FIXED_SPECIALTY = "neurosurgery";
@@ -96,6 +96,10 @@ export default async function ArticleTypeOptimizePage() {
           module="article_type"
           initialRun={latestRun}
           disabled={!hasSufficientData}
+          accentColor="#7c3aed"
+          threshold={ARTICLE_TYPE_DISAGREEMENT_THRESHOLD}
+          simulatePath="/admin/lab/article-type/simulate"
+          placeholder="Fx: 'Vær strengere på at skelne Case Reports fra Clinical Studies'"
         />
 
       </div>

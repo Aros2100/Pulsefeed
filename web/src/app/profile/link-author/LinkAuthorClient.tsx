@@ -15,14 +15,14 @@ export default function LinkAuthorClient() {
 
     const data = (await res.json()) as { ok: boolean; error?: string };
     if (data.ok) {
-      router.replace("/");
+      router.replace("/profile");
     }
   }
 
   return (
     <AuthorSearch
       onSelect={handleSelect}
-      onSkip={() => router.replace("/")}
+      onSkip={() => router.replace("/profile")}
       skipLabel="Skip — I'm not a published author"
     />
   );

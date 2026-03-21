@@ -15,7 +15,6 @@ async function runRecalculate() {
     if (error) {
       console.error(`[tagging] combo recalculate failed for ${specialty}:`, error.message);
     } else {
-      console.log(`[tagging] recalculated combo rules for ${specialty}`);
     }
   }
 }

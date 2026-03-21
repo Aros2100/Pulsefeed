@@ -1,6 +1,17 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import ArticleTypeSimulatorClient, { type SimulationDisagreement, type SimulationAgreement } from "./ArticleTypeSimulatorClient";
+import SimulatorClient, { type SimulationDisagreement, type SimulationAgreement, type SimulatorConfig } from "@/components/lab/SimulatorClient";
+
+const CONFIG: SimulatorConfig = {
+  label: "Article Type",
+  accent: "#7c3aed",
+  optimizeHref: "/admin/lab/article-type/optimize",
+  resultType: "single",
+  scoreEndpoint: "/api/lab/score-article-type",
+  rescoreIncludesSpecialty: false,
+  showSpecialtyInSubtitle: false,
+  regressionCommentPlaceholder: "Fx: Korrekt — teknisk note",
+};
 
 function arraysEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
@@ -10,7 +21,6 @@ function arraysEqual(a: string[], b: string[]): boolean {
 }
 
 function parseSingle(value: string): string[] {
-  // For article_type, decisions are plain strings (not JSON arrays)
   if (!value) return [];
   try {
     const parsed = JSON.parse(value);
@@ -135,7 +145,7 @@ export default async function ArticleTypeSimulatePage({ searchParams }: Props) {
   }
 
   return (
-    <ArticleTypeSimulatorClient
+    <SimulatorClient
       runId={run.id}
       specialty={run.specialty}
       module={run.module}
@@ -143,6 +153,7 @@ export default async function ArticleTypeSimulatePage({ searchParams }: Props) {
       initialPrompt={run.improved_prompt ?? ""}
       disagreements={disagreements}
       agreementArticles={agreementArticles}
+      config={CONFIG}
     />
   );
 }

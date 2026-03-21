@@ -5,8 +5,10 @@ import { SPECIALTIES } from "@/lib/auth/specialties";
 
 interface Props {
   initialName:           string;
+  initialTitle:          string;
   initialSpecialtySlugs: string[];
   onNameSaved?:          (name: string) => void;
+  onTitleSaved?:         (title: string) => void;
   onSpecialtiesSaved?:   (slugs: string[]) => void;
 }
 
@@ -17,16 +19,23 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       style={{
-        width: "42px", height: "24px", borderRadius: "999px", border: "none", cursor: "pointer",
-        background: checked ? "#15803d" : "#d1d5db", position: "relative", transition: "background 0.2s",
+        width: "36px", height: "20px", borderRadius: "999px",
+        border: checked ? "none" : "0.5px solid var(--color-border-tertiary)",
+        cursor: "pointer",
+        background: checked ? "#3B6D11" : "#c8d0dc",
+        position: "relative",
+        transition: "background 0.15s",
         flexShrink: 0,
+        padding: 0,
       }}
     >
       <span style={{
-        position: "absolute", top: "3px",
-        left: checked ? "21px" : "3px",
-        width: "18px", height: "18px", borderRadius: "50%", background: "#fff",
-        transition: "left 0.2s",
+        position: "absolute",
+        top: "2px",
+        left: checked ? "18px" : "2px",
+        width: "16px", height: "16px", borderRadius: "50%",
+        background: "#ffffff",
+        transition: "left 0.15s",
       }} />
     </button>
   );
@@ -34,15 +43,18 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
 export { Toggle };
 
-export default function ProfileEditClient({ initialName, initialSpecialtySlugs, onNameSaved, onSpecialtiesSaved }: Props) {
-  const [editingName, setEditingName]         = useState(false);
-  const [name,        setName]                = useState(initialName);
-  const [nameInput,   setNameInput]           = useState(initialName);
-  const [editingSpec, setEditingSpec]         = useState(false);
-  const [slugs,       setSlugs]              = useState(initialSpecialtySlugs);
-  const [tempSlugs,   setTempSlugs]          = useState(initialSpecialtySlugs);
-  const [saving,      setSaving]             = useState<"name" | "spec" | null>(null);
-  const [error,       setError]              = useState<string | null>(null);
+export default function ProfileEditClient({ initialName, initialTitle, initialSpecialtySlugs, onNameSaved, onTitleSaved, onSpecialtiesSaved }: Props) {
+  const [editingName,  setEditingName]  = useState(false);
+  const [name,         setName]         = useState(initialName);
+  const [nameInput,    setNameInput]    = useState(initialName);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [title,        setTitle]        = useState(initialTitle);
+  const [titleInput,   setTitleInput]   = useState(initialTitle);
+  const [editingSpec,  setEditingSpec]  = useState(false);
+  const [slugs,        setSlugs]        = useState(initialSpecialtySlugs);
+  const [tempSlugs,    setTempSlugs]    = useState(initialSpecialtySlugs);
+  const [saving,       setSaving]       = useState<"name" | "title" | "spec" | null>(null);
+  const [error,        setError]        = useState<string | null>(null);
 
   async function patch(body: Record<string, unknown>) {
     const res  = await fetch("/api/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -57,6 +69,17 @@ export default function ProfileEditClient({ initialName, initialSpecialtySlugs, 
       setName(nameInput);
       setEditingName(false);
       onNameSaved?.(nameInput);
+    } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    setSaving(null);
+  }
+
+  async function saveTitle() {
+    setSaving("title"); setError(null);
+    try {
+      await patch({ title: titleInput });
+      setTitle(titleInput);
+      setEditingTitle(false);
+      onTitleSaved?.(titleInput);
     } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
     setSaving(null);
   }
@@ -115,6 +138,40 @@ export default function ProfileEditClient({ initialName, initialSpecialtySlugs, 
           </div>
           {!editingName && (
             <button onClick={() => { setNameInput(name); setEditingName(true); }} style={{ fontSize: "12px", color: "#5a6a85", background: "none", border: "1px solid #dde3ed", padding: "5px 12px", borderRadius: "6px", cursor: "pointer" }}>
+              Edit
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Title row */}
+      <div style={rowStyle}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div style={{ flex: 1 }}>
+            <div style={labelStyle}>Title</div>
+            {editingTitle ? (
+              <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "6px" }}>
+                <input
+                  autoFocus
+                  value={titleInput}
+                  placeholder="e.g. Dr., Prof., Overlæge"
+                  onChange={(e) => setTitleInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void saveTitle(); if (e.key === "Escape") setEditingTitle(false); }}
+                  style={{ fontSize: "14px", padding: "6px 10px", borderRadius: "6px", border: "1px solid #dde3ed", outline: "none", flex: 1, maxWidth: "260px" }}
+                />
+                <button onClick={saveTitle} disabled={saving === "title"} style={{ fontSize: "12px", padding: "6px 14px", borderRadius: "6px", background: "#1a1a1a", color: "#fff", border: "none", cursor: "pointer" }}>
+                  {saving === "title" ? "…" : "Save"}
+                </button>
+                <button onClick={() => setEditingTitle(false)} style={{ fontSize: "12px", padding: "6px 14px", borderRadius: "6px", background: "none", color: "#5a6a85", border: "1px solid #dde3ed", cursor: "pointer" }}>
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div style={valueStyle}>{title || "—"}</div>
+            )}
+          </div>
+          {!editingTitle && (
+            <button onClick={() => { setTitleInput(title); setEditingTitle(true); }} style={{ fontSize: "12px", color: "#5a6a85", background: "none", border: "1px solid #dde3ed", padding: "5px 12px", borderRadius: "6px", cursor: "pointer" }}>
               Edit
             </button>
           )}

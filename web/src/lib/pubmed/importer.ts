@@ -4,6 +4,7 @@ import { extractEmail, stripEmailFromAffiliation } from "@/lib/affiliations";
 import { parseAffiliation as geoParseAffiliation } from "@/lib/geo/affiliation-parser";
 import { lookupCountry } from "@/lib/geo/country-map";
 import { lookupState } from "@/lib/geo/state-map";
+import { normalizeCity } from "@/lib/geo/normalize";
 import { runArticleChecks } from "@/lib/pubmed/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
 import { buildImportEventPayload } from "@/lib/article-events/import-payload";
@@ -375,7 +376,7 @@ async function mergeAuthor(
   const update: Record<string, any> = {};
   if (isGeoUpgrade(existing, parsed)) {
     if (parsed.country) update.country = parsed.country;
-    if (parsed.city) update.city = parsed.city;
+    if (parsed.city) update.city = normalizeCity(parsed.city);
     if (parsed.institution) update.hospital = parsed.institution;
     if (parsed.department) update.department = parsed.department;
   }
@@ -451,7 +452,7 @@ async function resolveAuthorFromOpenAlex(
         upgrades.institution_type = primaryInst.type;
         if (primaryInst.ror) {
           const rorGeo = await fetchRorGeo(primaryInst.ror);
-          if (rorGeo.city)                      upgrades.city    = rorGeo.city;
+          if (rorGeo.city)                      upgrades.city    = normalizeCity(rorGeo.city);
           if (rorGeo.state)                     upgrades.state   = rorGeo.state;
           if (rorGeo.country && !countryName)   upgrades.country = rorGeo.country;
         }
@@ -502,7 +503,7 @@ async function resolveAuthorFromOpenAlex(
       if (instDept) upgrades.department = instDept;
       if (primaryInst?.ror) {
         const rorGeo = await fetchRorGeo(primaryInst.ror);
-        if (rorGeo.city)                    upgrades.city  = rorGeo.city;
+        if (rorGeo.city)                    upgrades.city  = normalizeCity(rorGeo.city);
         if (rorGeo.state)                   upgrades.state = rorGeo.state;
         if (rorGeo.country && !countryName) upgrades.country = rorGeo.country;
       }
@@ -541,7 +542,7 @@ async function resolveAuthorFromOpenAlex(
     if (primaryInst?.ror && !resolved.ror_id) {
       enrichment.ror_id = primaryInst.ror;
       const rorGeo = await fetchRorGeo(primaryInst.ror);
-      if (rorGeo.city)    enrichment.city    = rorGeo.city;
+      if (rorGeo.city)    enrichment.city    = normalizeCity(rorGeo.city);
       if (rorGeo.state)   enrichment.state   = rorGeo.state;
       if (rorGeo.country) enrichment.country = rorGeo.country;
     }
@@ -860,12 +861,12 @@ async function createNewAuthor(
   }
 
   // Determine geo: ROR geo as primary, fall back to parser
-  let city = parsed.city;
+  let city = normalizeCity(parsed.city);
   let country = parsed.country;
   let state: string | null = null;
   if (oaInst?.ror) {
     const rorGeo = await fetchRorGeo(oaInst.ror);
-    if (rorGeo.city)    city    = rorGeo.city;
+    if (rorGeo.city)    city    = normalizeCity(rorGeo.city);
     if (rorGeo.state)   state   = rorGeo.state;
     if (rorGeo.country) country = rorGeo.country;
   }
@@ -994,7 +995,7 @@ export async function linkAuthorsToArticle(
     const { id: authorId, outcome } = oaAuthorship
       ? await resolveAuthorFromOpenAlex(admin, author, oaAuthorship, articleId, oaWork)
       : await resolveAuthorId(admin, author, articleId, preResolvedOAMap.get(i));
-    console.log(`[import] resolve "${authorName}": ${Date.now() - tResolve}ms (${oaAuthorship ? "openalex" : "parser"})`);
+    console.error(`[import] resolve "${authorName}": ${Date.now() - tResolve}ms (${oaAuthorship ? "openalex" : "parser"})`);
 
     // Capture geo data including state from the resolved author
     if (i === 0 || (i === authors.length - 1 && authors.length > 1)) {
@@ -1427,7 +1428,7 @@ export async function runImport(
       // 3. ESearch
       const tSearch = Date.now();
       const pmids = await fetchPubMedIds(filter.query_string, filter.max_results ?? 100);
-      console.log(`[import] fetchPubMedIds: ${Date.now() - tSearch}ms`);
+      console.error(`[import] fetchPubMedIds: ${Date.now() - tSearch}ms`);
       filterFetched = pmids.length;
       if (!pmids.length) continue;
 
@@ -1453,7 +1454,7 @@ export async function runImport(
       if (newPmids.length > 0) {
         const tFetch = Date.now();
         const articles = await fetchArticleDetails(newPmids);
-        console.log(`[import] fetchArticleDetails (${articles.length} articles): ${Date.now() - tFetch}ms`);
+        console.error(`[import] fetchArticleDetails (${articles.length} articles): ${Date.now() - tFetch}ms`);
 
         const tUpsert = Date.now();
         for (let i = 0; i < articles.length; i += BATCH_SIZE) {
@@ -1532,7 +1533,7 @@ export async function runImport(
 
           if (i + BATCH_SIZE < articles.length) await sleep(RATE_LIMIT_MS);
         }
-        console.log(`[import] upsert batch: ${Date.now() - tUpsert}ms`);
+        console.error(`[import] upsert batch: ${Date.now() - tUpsert}ms`);
       }
 
       await admin
@@ -1556,7 +1557,7 @@ export async function runImport(
         errors: filterErrors.length > 0 ? filterErrors : null,
         completed_at: new Date().toISOString(),
       };
-      console.log(`[import] finalizing log ${filterLogId}:`, JSON.stringify(finalizePayload));
+      console.error(`[import] finalizing log ${filterLogId}:`, JSON.stringify(finalizePayload));
       const { error: finalizeErr } = await admin
         .from("import_logs")
         .update(finalizePayload)

@@ -87,7 +87,9 @@ export interface AuthorGeoFieldsProps {
 const baseInput: React.CSSProperties = {
   width: "100%",
   boxSizing: "border-box" as const,
-  border: "1px solid #d1d5db",
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: "#d1d5db",
   borderRadius: "7px",
   padding: "10px 14px",
   fontSize: "14px",

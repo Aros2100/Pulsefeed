@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import Header from "@/components/Header";
 import ScoreBadge from "@/components/ScoreBadge";
 
 const PAGE_SIZE = 50;
@@ -59,7 +58,6 @@ export default function AuthorsPage() {
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
-      <Header />
 
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 80px" }}>
 

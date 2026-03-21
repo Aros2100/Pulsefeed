@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { logAuthorEvent } from "@/lib/author-events";
+import { normalizeCity } from "@/lib/geo/normalize";
 
 export async function PATCH(
   request: NextRequest,
@@ -25,7 +26,7 @@ export async function PATCH(
     .from("authors")
     .update({
       country:    body.country    ?? null,
-      city:       body.city       ?? null,
+      city:       normalizeCity(body.city),
       state:      body.state      ?? null,
       hospital:   body.hospital   ?? null,
       department: body.department ?? null,

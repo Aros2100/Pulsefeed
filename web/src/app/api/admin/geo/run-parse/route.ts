@@ -10,7 +10,6 @@ export async function POST() {
   after(async () => {
     try {
       const result = await runLocationParsing(500);
-      console.log("[geo/run-parse]", result);
     } catch (e) {
       console.error("[geo/run-parse] failed:", e);
     }

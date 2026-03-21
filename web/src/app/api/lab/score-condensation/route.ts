@@ -139,12 +139,10 @@ export async function POST(request: NextRequest) {
                   condensed_model_version:    cnd.version,
                   condensed_at:               new Date().toISOString(),
                 };
-                console.log(`[score-condensation] update payload for ${article.id}:`, JSON.stringify(updatePayload));
                 const { data, error } = await admin
                   .from("articles")
                   .update(updatePayload)
                   .eq("id", article.id);
-                console.log(`[score-condensation] DB update for ${article.id}:`, JSON.stringify({ error: error?.message ?? null, data }));
                 if (error) throw new Error(error.message);
                 scored++;
               } catch (e) {
@@ -156,7 +154,6 @@ export async function POST(request: NextRequest) {
           )
         );
 
-        console.log(`[score-condensation] done — scored: ${scored}, failed: ${failedIds.length}, total: ${toScore.length}`);
         send({ done: true, scored, failed: failedIds.length, total: toScore.length });
       } catch (e) {
         send({ done: true, error: String(e), scored, failed: failedIds.length, total: toScore.length });

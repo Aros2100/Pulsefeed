@@ -160,10 +160,16 @@ export async function POST(request: NextRequest) {
         }))
       : Promise.resolve([]),
     rejectedRegularIds.length > 0
-      ? admin.from("articles")
-          .update({ status: "rejected" })
-          .in("id", rejectedRegularIds)
-      : Promise.resolve({ error: null }),
+      ? Promise.all(rejectedRegularIds.map((id) => {
+          const oldTags = (oldMap.get(id)?.specialty_tags ?? []) as string[];
+          const newTags = oldTags.filter((t) => t !== specialty);
+          return admin.rpc("replace_article_specialty_tags", {
+            p_article_id: id,
+            p_tags:       newTags,
+            p_status:     "rejected",
+          });
+        }))
+      : Promise.resolve([]),
     // Per-article updates for remap rejections — bruger RPC der bypasser
     // merge_article_specialty_tags-triggeren, så specialty fjernes rent.
     ...rejectedRemapVerdicts.map((v) => {
@@ -183,9 +189,10 @@ export async function POST(request: NextRequest) {
     console.error("[lab/sessions] articles approved update error:", approvedErrors[0].error);
     return NextResponse.json({ ok: false, error: "Failed to update approved articles" }, { status: 500 });
   }
-  if (rejectedResult.error) {
-    console.error("[lab/sessions] articles rejected update error:", rejectedResult.error);
-    return NextResponse.json({ ok: false, error: rejectedResult.error.message }, { status: 500 });
+  const rejectedErrors = (rejectedResult as { error: unknown }[]).filter((r) => r.error);
+  if (rejectedErrors.length > 0) {
+    console.error("[lab/sessions] articles rejected update error:", rejectedErrors[0].error);
+    return NextResponse.json({ ok: false, error: "Failed to update rejected articles" }, { status: 500 });
   }
   for (const r of remapResults) {
     if (r.error) {

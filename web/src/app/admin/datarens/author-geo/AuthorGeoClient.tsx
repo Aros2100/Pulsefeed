@@ -179,6 +179,7 @@ export default function AuthorGeoClient() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "28px" }}>
           <div>
             <Link href="/admin/datarens" style={{ fontSize: "12px", color: "#888", textDecoration: "none" }}>← Datarens</Link>
+            <Link href="/admin/datarens/author-geo/audit" style={{ fontSize: "12px", color: "#888", textDecoration: "none", marginLeft: "16px" }}>Audit →</Link>
             <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase" as const, fontWeight: 700, marginTop: "8px", marginBottom: "4px" }}>
               Author Geo Validator
             </div>

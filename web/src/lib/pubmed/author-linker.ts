@@ -47,7 +47,7 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
       }
 
       const batch = articles ?? [];
-      console.log(`[author-linker] RPC returned ${batch.length} articles (data type: ${typeof articles}, isArray: ${Array.isArray(articles)})`);
+      console.error(`[author-linker] RPC returned ${batch.length} articles (data type: ${typeof articles}, isArray: ${Array.isArray(articles)})`);
       if (batch.length === 0) break;
 
       // Batch DOI → OpenAlex works lookup
@@ -59,7 +59,7 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
       if (doisInBatch.length > 0) {
         try {
           oaWorksMap = await fetchWorksByDois(doisInBatch.map(a => a.doi));
-          console.log(`[author-linker] OpenAlex: ${oaWorksMap.size}/${doisInBatch.length} works found`);
+          console.error(`[author-linker] OpenAlex: ${oaWorksMap.size}/${doisInBatch.length} works found`);
         } catch (e) {
           console.warn(`[author-linker] OpenAlex batch failed, falling back to parser:`, e);
         }
@@ -69,7 +69,7 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
       await Promise.all(
         batch.map((article) => limiter(async () => {
           const rawAuthors = (article.authors ?? []) as Record<string, unknown>[];
-          console.log(`[author-linker] PMID ${article.pubmed_id}: authors field type=${typeof article.authors}, rawAuthors.length=${rawAuthors.length}`);
+          console.error(`[author-linker] PMID ${article.pubmed_id}: authors field type=${typeof article.authors}, rawAuthors.length=${rawAuthors.length}`);
           if (rawAuthors.length === 0) {
             articlesProcessed++;
             return;
@@ -90,7 +90,7 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
 
           const articleDoi = (article.doi as string | null);
           const oaWork = articleDoi ? oaWorksMap.get(articleDoi.toLowerCase()) ?? null : null;
-          console.log(`[author-linker] calling linkAuthorsToArticle for PMID ${article.pubmed_id} (${authors.length} authors, oaWork=${oaWork ? 'yes' : 'no'})`);
+          console.error(`[author-linker] calling linkAuthorsToArticle for PMID ${article.pubmed_id} (${authors.length} authors, oaWork=${oaWork ? 'yes' : 'no'})`);
           await linkAuthorsToArticle(admin, article.id, authors, oaWork)
             .then(async (result) => {
               newAuthors      += result.new;
@@ -98,7 +98,7 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
               rejected        += result.rejected;
               authorsLinked   += result.new + result.duplicates;
               authorsProcessed += result.new + result.duplicates + result.rejected;
-              console.log(`[author-linker] linked PMID ${article.pubmed_id} — new=${result.new} dup=${result.duplicates} rejected=${result.rejected}`);
+              console.error(`[author-linker] linked PMID ${article.pubmed_id} — new=${result.new} dup=${result.duplicates} rejected=${result.rejected}`);
 
               // Populate article geo fields from first/last author affiliation
               if (result.firstAuthorGeo || result.lastAuthorGeo) {
@@ -178,7 +178,7 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
       );
 
       // Update progress after each batch
-      console.log(`[author-linker] writing progress to DB — logId=${logId} articles_processed=${articlesProcessed} authors_linked=${authorsLinked}`);
+      console.error(`[author-linker] writing progress to DB — logId=${logId} articles_processed=${articlesProcessed} authors_linked=${authorsLinked}`);
       const { error: updateErr } = await admin
         .from("author_linking_logs")
         .update({ articles_processed: articlesProcessed, authors_linked: authorsLinked, authors_processed: authorsProcessed, new_authors: newAuthors, duplicates, rejected })
@@ -186,10 +186,10 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
       if (updateErr) {
         console.error(`[author-linker] progress update failed:`, updateErr.message);
       } else {
-        console.log(`[author-linker] progress update OK`);
+        console.error(`[author-linker] progress update OK`);
       }
 
-      console.log(`[author-linker] batch done — articles=${articlesProcessed} authors=${authorsLinked}`);
+      console.error(`[author-linker] batch done — articles=${articlesProcessed} authors=${authorsLinked}`);
 
       if (batch.length < BATCH_SIZE) break;
       await new Promise((r) => setTimeout(r, 200));
@@ -218,7 +218,7 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
       })
       .eq("id", logId);
 
-    console.log(`[author-linker] done — articles=${articlesProcessed} authors=${authorsLinked} errors=${errors.length}`);
+    console.error(`[author-linker] done — articles=${articlesProcessed} authors=${authorsLinked} errors=${errors.length}`);
 
     // Linking quality checks
     try {

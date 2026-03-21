@@ -43,13 +43,11 @@ export async function POST() {
       processed += data.length;
 
       if (processed % 1000 < BATCH) {
-        console.log(`[reparse-authors] ${processed} processed, ${updated} updated`);
       }
 
       if (data.length < BATCH) break;
     }
 
-    console.log(`[reparse-authors] done — ${processed} processed, ${updated} updated`);
   });
 
   return NextResponse.json({ ok: true });

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { PatternAnalysisResult } from "@/app/api/lab/analyze-patterns/route";
-import { ARTICLE_TYPE_DISAGREEMENT_THRESHOLD } from "@/lib/lab/article-type-options";
 
 // ── Exported types ─────────────────────────────────────────────────────────────
 
@@ -27,6 +26,10 @@ interface Props {
   module: string;
   initialRun?: OptimizationRun | null;
   disabled?: boolean;
+  accentColor?: string;    // default: "#E83B2A"
+  threshold?: number;      // default: 50
+  simulatePath?: string;   // default: "/admin/lab/specialty-tag/simulate"
+  placeholder?: string;    // default: specialty-tag placeholder text
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
@@ -136,7 +139,16 @@ function PromptDiff({ oldPrompt, newPrompt }: { oldPrompt: string; newPrompt: st
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function PatternAnalysis({ specialty, module, initialRun, disabled }: Props) {
+export default function PatternAnalysis({
+  specialty,
+  module,
+  initialRun,
+  disabled,
+  accentColor  = "#E83B2A",
+  threshold    = 50,
+  simulatePath = "/admin/lab/specialty-tag/simulate",
+  placeholder  = "Fx: 'Godkend TBI-artikler selvom de ikke er kirurgiske' eller 'Vær strengere på ren neurologi'",
+}: Props) {
   const [loading,      setLoading]      = useState(false);
   const [result,       setResult]       = useState<PatternAnalysisResult | null>(
     initialRun ? runToResult(initialRun) : null
@@ -235,7 +247,7 @@ export default function PatternAnalysis({ specialty, module, initialRun, disable
         padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <div>
-          <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#7c3aed", textTransform: "uppercase" as const, fontWeight: 700 }}>
+          <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: accentColor, textTransform: "uppercase" as const, fontWeight: 700 }}>
             AI Mønsteranalyse · Step 2
           </span>
           {savedRun && (
@@ -248,7 +260,7 @@ export default function PatternAnalysis({ specialty, module, initialRun, disable
           type="button"
           onClick={handleAnalyze}
           disabled={isDisabled}
-          title={disabled ? `Utilstrækkelig data — kræver mindst ${ARTICLE_TYPE_DISAGREEMENT_THRESHOLD} uenigheder` : undefined}
+          title={disabled ? `Utilstrækkelig data — kræver mindst ${threshold} uenigheder` : undefined}
           style={{
             fontSize: "12px", fontWeight: 700,
             background: isDisabled ? "#f0f2f5" : "#1a1a1a",
@@ -268,7 +280,7 @@ export default function PatternAnalysis({ specialty, module, initialRun, disable
         {!result && !error && !loading && (
           <p style={{ fontSize: "13px", color: "#aaa", margin: 0 }}>
             {disabled
-              ? `Utilstrækkelig data — kræver mindst ${ARTICLE_TYPE_DISAGREEMENT_THRESHOLD} uenigheder for at køre mønsteranalyse.`
+              ? `Utilstrækkelig data — kræver mindst ${threshold} uenigheder for at køre mønsteranalyse.`
               : "Ingen analyse endnu — klik \"Kør ny analyse\" for at identificere mønstre i AI/human-uenigheder og få et forbedret prompt-forslag."
             }
           </p>
@@ -345,7 +357,7 @@ export default function PatternAnalysis({ specialty, module, initialRun, disable
               <textarea
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Fx: 'Vær strengere på at skelne Case Reports fra Clinical Studies'"
+                placeholder={placeholder}
                 rows={3}
                 style={{
                   width: "100%", boxSizing: "border-box",
@@ -385,7 +397,7 @@ export default function PatternAnalysis({ specialty, module, initialRun, disable
             {runId && (
               <div style={{ paddingTop: "4px", borderTop: "1px solid #f0f2f5" }}>
                 <Link
-                  href={`/admin/lab/article-type/simulate?run_id=${runId}`}
+                  href={`${simulatePath}?run_id=${runId}`}
                   style={{
                     display: "inline-flex", alignItems: "center", gap: "6px",
                     fontSize: "13px", fontWeight: 700,

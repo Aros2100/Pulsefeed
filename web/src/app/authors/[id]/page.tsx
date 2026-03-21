@@ -2,7 +2,6 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import Header from "@/components/Header";
 import FollowButton from "@/components/FollowButton";
 import ScoreBadge from "@/components/ScoreBadge";
 import AuthorMergeButton from "@/components/authors/AuthorMergeButton";
@@ -134,7 +133,6 @@ export default async function AuthorDetailPage({
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
-      <Header />
 
       <div style={{ maxWidth: "760px", margin: "0 auto", padding: "32px 24px 80px" }}>
 

@@ -1,7 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import Header from "@/components/Header";
 import MergeClient from "./MergeClient";
 
 const AUTHOR_SELECT = "id, display_name, country, state, city, hospital, department, openalex_id, orcid, article_count";
@@ -49,7 +48,6 @@ export default async function MergePage({
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
-      <Header />
       <MergeClient primary={primary as AuthorData} candidate={candidate as AuthorData} />
     </div>
   );

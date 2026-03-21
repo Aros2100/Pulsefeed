@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import Header from "@/components/Header";
 import RelativeTime from "@/components/RelativeTime";
 
 interface HistoryRow {
@@ -30,7 +29,6 @@ export default async function HistoryPage() {
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
-      <Header />
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
         <div style={{ marginBottom: "28px" }}>

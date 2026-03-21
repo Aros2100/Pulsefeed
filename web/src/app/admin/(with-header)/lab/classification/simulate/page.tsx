@@ -1,6 +1,17 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import ClassificationSimulatorClient, { type SimulationDisagreement, type SimulationAgreement } from "./ClassificationSimulatorClient";
+import SimulatorClient, { type SimulationDisagreement, type SimulationAgreement, type SimulatorConfig } from "@/components/lab/SimulatorClient";
+
+const CONFIG: SimulatorConfig = {
+  label: "Classification",
+  accent: "#7c3aed",
+  optimizeHref: "/admin/lab/classification/optimize",
+  resultType: "tags",
+  scoreEndpoint: "/api/lab/score-classification",
+  rescoreIncludesSpecialty: true,
+  showSpecialtyInSubtitle: true,
+  regressionCommentPlaceholder: "Fx: Korrekt — ren neurologi",
+};
 
 function parseTags(value: string): string[] {
   try {
@@ -132,7 +143,7 @@ export default async function ClassificationSimulatePage({ searchParams }: Props
   }
 
   return (
-    <ClassificationSimulatorClient
+    <SimulatorClient
       runId={run.id}
       specialty={run.specialty}
       module={run.module}
@@ -140,6 +151,7 @@ export default async function ClassificationSimulatePage({ searchParams }: Props
       initialPrompt={run.improved_prompt ?? ""}
       disagreements={disagreements}
       agreementArticles={agreementArticles}
+      config={CONFIG}
     />
   );
 }

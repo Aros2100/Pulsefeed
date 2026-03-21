@@ -149,6 +149,7 @@ export async function POST(request: NextRequest) {
                   .update({
                     specialty_confidence: score.confidence,
                     ai_decision:          score.ai_decision,
+                    specialty_reasoning:  score.reason,
                     model_version:        score.version,
                     specialty_scored_at:  new Date().toISOString(),
                   })
@@ -183,7 +184,6 @@ export async function POST(request: NextRequest) {
             .in("id", failedIds);
         }
 
-        console.log(`[score-batch] done — scored: ${scored}, failed: ${failedIds.length}, total: ${toScore.length}`);
         send({ done: true, scored, failed: failedIds.length, total: toScore.length });
       } catch (e) {
         send({ done: true, error: String(e), scored, failed: failedIds.length, total: toScore.length });

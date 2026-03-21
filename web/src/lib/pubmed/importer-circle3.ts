@@ -159,7 +159,6 @@ export async function runImportCircle3(
         const filteredOut = fetched.length - articles.length;
         if (filteredOut > 0) {
           totalSkipped += filteredOut;
-          console.log(`[import-circle3] Filtered ${filteredOut} articles lacking co-located neurosurg+Danish-hospital affiliation`);
         }
 
         // 6 + 7. Upsert + log events

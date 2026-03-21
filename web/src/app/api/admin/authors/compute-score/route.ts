@@ -9,7 +9,6 @@ async function runComputeAuthorScores() {
   if (error) {
     console.error("[author-score] Failed:", error.message);
   } else {
-    console.log("[author-score] Done");
   }
 }
 

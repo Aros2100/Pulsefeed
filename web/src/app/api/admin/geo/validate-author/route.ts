@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { normalizeCity } from "@/lib/geo/normalize";
 
 const INST_KEYWORDS = [
   "hospital", "university", "institute", "medical", "clinic",
@@ -83,7 +84,6 @@ export async function POST(request: NextRequest) {
   if (!auth.ok) return auth.response;
 
   const body = await request.json();
-  console.log("[validate-author] body:", JSON.stringify(body));
   const { author_id, action, city, country, hospital, department, state, verified_by } = body as {
     author_id: string;
     action: "approve" | "correct" | "insufficient_data" | "duplicate" | "audit_flagged";
@@ -125,8 +125,6 @@ export async function POST(request: NextRequest) {
       ai_decision: JSON.stringify(oldData),
       disagreement_reason: null,
     });
-    console.log("[validate-author] insert result:", JSON.stringify(insertData));
-    if (insertError) console.log("[validate-author] insert error:", insertError);
     return NextResponse.json({ ok: true });
   }
 
@@ -151,15 +149,13 @@ export async function POST(request: NextRequest) {
     ai_decision: JSON.stringify(oldData),
     disagreement_reason: changed ? "corrected" : null,
   });
-  console.log("[validate-author] insert result:", JSON.stringify(insertData));
-  if (insertError) console.log("[validate-author] insert error:", insertError);
 
   // Update author with new values
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (admin as any)
     .from("authors")
     .update({
-      city:        newData.city,
+      city:        normalizeCity(newData.city),
       country:     newData.country,
       hospital:    newData.hospital,
       department:  newData.department,

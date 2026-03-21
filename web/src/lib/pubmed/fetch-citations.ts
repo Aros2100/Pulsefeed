@@ -90,6 +90,5 @@ export async function runCitationFetch(limit = 500): Promise<{ updated: number; 
     }
   }
 
-  console.log(`[fetch-citations] done — updated: ${updated}, failed: ${failed}, total: ${rows.length}`);
   return { updated, failed };
 }

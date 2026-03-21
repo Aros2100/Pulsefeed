@@ -282,6 +282,7 @@ export type Database = {
           short_resume: string | null
           source_id: string | null
           specialty_confidence: number | null
+          specialty_reasoning: string | null
           specialty_scored_at: string | null
           specialty_tags: string[]
           status: string | null
@@ -396,6 +397,7 @@ export type Database = {
           short_resume?: string | null
           source_id?: string | null
           specialty_confidence?: number | null
+          specialty_reasoning?: string | null
           specialty_scored_at?: string | null
           specialty_tags?: string[]
           status?: string | null
@@ -510,6 +512,7 @@ export type Database = {
           short_resume?: string | null
           source_id?: string | null
           specialty_confidence?: number | null
+          specialty_reasoning?: string | null
           specialty_scored_at?: string | null
           specialty_tags?: string[]
           status?: string | null
@@ -657,6 +660,41 @@ export type Database = {
           },
         ]
       }
+      author_merge_log: {
+        Row: {
+          created_at: string
+          deleted_author_ids: string[]
+          id: string
+          merged_by_user_id: string
+          primary_author_id: string
+          resolved_fields: Json
+        }
+        Insert: {
+          created_at?: string
+          deleted_author_ids: string[]
+          id?: string
+          merged_by_user_id: string
+          primary_author_id: string
+          resolved_fields?: Json
+        }
+        Update: {
+          created_at?: string
+          deleted_author_ids?: string[]
+          id?: string
+          merged_by_user_id?: string
+          primary_author_id?: string
+          resolved_fields?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "author_merge_log_merged_by_user_id_fkey"
+            columns: ["merged_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       authors: {
         Row: {
           affiliations: string[] | null
@@ -666,6 +704,7 @@ export type Database = {
           city: string | null
           country: string | null
           created_at: string | null
+          deleted_at: string | null
           department: string | null
           display_name: string
           display_name_normalized: string | null
@@ -696,6 +735,7 @@ export type Database = {
           city?: string | null
           country?: string | null
           created_at?: string | null
+          deleted_at?: string | null
           department?: string | null
           display_name: string
           display_name_normalized?: string | null
@@ -726,6 +766,7 @@ export type Database = {
           city?: string | null
           country?: string | null
           created_at?: string | null
+          deleted_at?: string | null
           department?: string | null
           display_name?: string
           display_name_normalized?: string | null
@@ -1786,6 +1827,7 @@ export type Database = {
           status: string
           subscribed_at: string
           subspecialties: Json
+          title: string | null
           unsubscribe_token: string | null
           unsubscribed_at: string | null
           updated_at: string
@@ -1821,6 +1863,7 @@ export type Database = {
           status?: string
           subscribed_at?: string
           subspecialties?: Json
+          title?: string | null
           unsubscribe_token?: string | null
           unsubscribed_at?: string | null
           updated_at?: string
@@ -1856,6 +1899,7 @@ export type Database = {
           status?: string
           subscribed_at?: string
           subspecialties?: Json
+          title?: string | null
           unsubscribe_token?: string | null
           unsubscribed_at?: string | null
           updated_at?: string
@@ -2254,6 +2298,15 @@ export type Database = {
         Args: { p_master_id: string; p_slave_ids: string[] }
         Returns: undefined
       }
+      merge_authors_user: {
+        Args: {
+          p_primary_id: string
+          p_resolved_fields?: Json
+          p_slave_ids: string[]
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       recalculate_tagging_rule_combos: {
         Args: { p_include_c1?: boolean; p_specialty: string }
         Returns: undefined
@@ -2283,6 +2336,7 @@ export type Database = {
       search_articles_by_mesh: { Args: { p_term: string }; Returns: string[] }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      unaccent: { Args: { "": string }; Returns: string }
       unlinked_author_slots_for_import_logs: {
         Args: { p_ids: string[] }
         Returns: {

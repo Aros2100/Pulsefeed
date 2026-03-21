@@ -268,9 +268,6 @@ export async function runAILocationParsing(
     );
   }
 
-  console.log(
-    `[geo/ai-parse] Done: ${processed} processed, ${upgraded} upgraded, ${conflicted} conflicted, ${failed} failed`
-  );
 
   return { processed, upgraded, conflicted, failed };
 }

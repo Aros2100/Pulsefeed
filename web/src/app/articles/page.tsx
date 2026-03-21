@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
 import { REGION_MAP, getContinent } from "@/lib/geo/continent-map";
-import Header from "@/components/Header";
 import ArticleListClient from "./ArticleListClient";
 
 const PAGE_SIZE = 25;
@@ -167,7 +166,6 @@ export default async function ArticlesPage({
 
   return (
     <div style={{ background: "#f5f7fa", minHeight: "100vh" }}>
-      <Header />
       <ArticleListClient
         articles={articles ?? []}
         specialtyLabel={specialtyLabel}

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import VersionSelector from "./VersionSelector";
+import VersionSelector from "@/components/lab/VersionSelector";
 import PromptDrawer, { type ModelVersion } from "@/components/lab/PromptDrawer";
 import { ARTICLE_TYPE_DISAGREEMENT_THRESHOLD } from "@/lib/lab/article-type-options";
 
