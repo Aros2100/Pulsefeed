@@ -35,7 +35,8 @@ export default async function TaggingPage() {
     p_specialty: specialty,
   });
 
-  const kpis = (kpiData as { total_pending: number; no_mesh: number; single_ready: number; combo_ready: number; no_match: number } | null) ?? {
+  const kpiRow = Array.isArray(kpiData) ? kpiData[0] : kpiData;
+  const kpis = (kpiRow as { total_pending: number; no_mesh: number; single_ready: number; combo_ready: number; no_match: number } | null) ?? {
     total_pending: 0, no_mesh: 0, single_ready: 0, combo_ready: 0, no_match: 0,
   };
 

@@ -289,6 +289,7 @@ export default function TaggingClient({
   const [busySave, setBusySave] = useState(false);
   const [busyArticleId, setBusyArticleId] = useState<string | null>(null);
   const [busyBatchApprove, setBusyBatchApprove] = useState(false);
+  const [approveProgress, setApproveProgress] = useState<{ done: number; total: number } | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
@@ -343,25 +344,35 @@ export default function TaggingClient({
 
   async function handleBatchApprove() {
     if (selected.size === 0) return;
+    const ids = [...selected];
+    const total = ids.length;
     setBusyBatchApprove(true);
+    setApproveProgress({ done: 0, total });
+    let totalApproved = 0;
     try {
-      const res = await fetch("/api/admin/tagging/batch-approve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ articleIds: [...selected], specialty }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        showToast(data.error ?? "Fejl ved godkendelse", false);
-        return;
+      for (let i = 0; i < ids.length; i += 500) {
+        const chunk = ids.slice(i, i + 500);
+        const res = await fetch("/api/admin/tagging/batch-approve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ articleIds: chunk, specialty }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          showToast(data.error ?? "Fejl ved godkendelse", false);
+          return;
+        }
+        totalApproved += data.approved;
+        setApproveProgress({ done: Math.min(i + 500, total), total });
       }
-      showToast(`${data.approved} artikler godkendt`, true);
+      showToast(`${totalApproved} artikler godkendt`, true);
       setSelected(new Set());
       setTimeout(() => router.refresh(), 1000);
     } catch {
       showToast("Netværksfejl", false);
     } finally {
       setBusyBatchApprove(false);
+      setApproveProgress(null);
     }
   }
 
@@ -733,7 +744,9 @@ export default function TaggingClient({
                   cursor: busyBatchApprove ? "not-allowed" : "pointer",
                 }}
               >
-                {busyBatchApprove ? "Godkender…" : `Godkend ${selected.size} artikel${selected.size > 1 ? "er" : ""}`}
+                {busyBatchApprove && approveProgress
+                  ? `Godkender… ${approveProgress.done}/${approveProgress.total}`
+                  : `Godkend ${selected.size} artikel${selected.size > 1 ? "er" : ""}`}
               </button>
             )}
           </div>

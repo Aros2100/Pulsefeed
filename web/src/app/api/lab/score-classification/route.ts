@@ -38,6 +38,7 @@ async function classifyWithRetry(
 ) {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
+      console.log("[score-classification] article id:", article.id);
       return await scoreClassification(article, specialty, activePrompt);
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;

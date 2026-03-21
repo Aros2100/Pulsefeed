@@ -1,28 +1,27 @@
 "use client";
-
+import Link from "next/link";
 import { useState } from "react";
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 
-type TaskPeriodData = {
-  cost: number;
-  articles: number;
-  calls: number;
-  dailySeries: { date: string; cost: number }[];
-  labCosts: { simulate: number; refine: number; pattern: number };
+type DashRow = {
+  task:     string;
+  is_lab:   boolean;
+  lab_step: string | null;
+  forbrug:  number;
+  artikler: number;
+  kald:     number;
 };
 
-export type TaskData = {
-  key: string;
-  label: string;
-  color: string;
-  model: string;
-  week:  TaskPeriodData;
-  month: TaskPeriodData;
-  all:   TaskPeriodData;
-  isGeo: boolean;
-};
+type Period = "today" | "week" | "month" | "all";
 
-type Period = "week" | "month" | "all";
+const TASKS = [
+  { key: "specialty",      label: "Speciale",     color: "#3B8BD4" },
+  { key: "classification", label: "Subspeciale",  color: "#1D9E75" },
+  { key: "article_type",   label: "Artikel type", color: "#D85A30" },
+  { key: "condensation",   label: "Kondensering", color: "#7F77DD" },
+  { key: "geo",            label: "Geo",          color: "#888780" },
+];
+
+const LAB_STEPS = ["analyse", "prompt-forbedring", "simulering"];
 
 const SHADOW = "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)";
 
@@ -34,180 +33,187 @@ function fmt$(n: number, decimals = 2): string {
 
 function nFmt(v: number) { return v.toLocaleString("da-DK"); }
 
-export default function CostChart({ tasks }: { tasks: TaskData[] }) {
-  const [period, setPeriod] = useState<Period>("month");
+function getDrift(rows: DashRow[], taskKey: string) {
+  const r = rows.find((r) => r.task === taskKey && !r.is_lab);
+  return r ?? { forbrug: 0, artikler: 0, kald: 0 };
+}
+
+function getLab(rows: DashRow[], taskKey: string, step: string) {
+  const r = rows.find((r) => r.task === taskKey && r.is_lab && r.lab_step === step);
+  return r?.forbrug ?? 0;
+}
+
+const card: React.CSSProperties = {
+  background: "#fff", borderRadius: "10px",
+  boxShadow: SHADOW, overflow: "hidden",
+};
+
+const thStyle: React.CSSProperties = {
+  padding: "10px 20px", textAlign: "left", fontSize: "11px",
+  fontWeight: 700, color: "#5a6a85", textTransform: "uppercase",
+  letterSpacing: "0.06em", borderBottom: "1px solid #dde3ed", background: "#f8f9fb",
+};
+
+const thR: React.CSSProperties = { ...thStyle, textAlign: "right" };
+const td: React.CSSProperties = { padding: "12px 20px", borderBottom: "1px solid #f1f3f7", fontSize: "13px", color: "#1a1a1a" };
+const tdR: React.CSSProperties = { ...td, textAlign: "right", fontVariantNumeric: "tabular-nums" };
+const tdTotal: React.CSSProperties = { ...tdR, fontWeight: 700, background: "#f8f9fb", borderBottom: "none" };
+const tdTotalL: React.CSSProperties = { ...td, fontWeight: 700, background: "#f8f9fb", borderBottom: "none" };
+
+export default function CostChart({ today, week, month, all }: {
+  today: DashRow[]; week: DashRow[]; month: DashRow[]; all: DashRow[];
+}) {
+  const [period, setPeriod] = useState<Period>("today");
+  const rows = { today, week, month, all }[period];
 
   const tabs: { key: Period; label: string }[] = [
+    { key: "today", label: "I dag"       },
     { key: "week",  label: "Denne uge"   },
     { key: "month", label: "Denne måned" },
     { key: "all",   label: "Alt tid"     },
   ];
 
+  const totalDrift     = TASKS.reduce((s, t) => s + getDrift(rows, t.key).forbrug, 0);
+  const totalLab       = rows.filter((r) => r.is_lab).reduce((s, r) => s + Number(r.forbrug), 0);
+  const totalForbrug   = totalDrift + totalLab;
+  const totalArtikler  = TASKS.reduce((s, t) => s + getDrift(rows, t.key).artikler, 0);
+  const prisPerArtikler = totalArtikler > 0 ? totalDrift / totalArtikler : 0;
+
   return (
-    <div style={{ marginBottom: "28px" }}>
-      {/* Period tabs */}
-      <div style={{ display: "flex", gap: "4px", marginBottom: "16px", justifyContent: "flex-end" }}>
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setPeriod(t.key)}
-            style={{
-              fontSize: "11px",
-              fontWeight: 600,
-              padding: "4px 12px",
-              borderRadius: "6px",
-              border: "1px solid",
-              cursor: "pointer",
-              borderColor: period === t.key ? "#1a1a1a" : "#dde3ed",
-              background:  period === t.key ? "#1a1a1a" : "transparent",
-              color:        period === t.key ? "#fff"    : "#5a6a85",
-              fontFamily:  "inherit",
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+    <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
+      <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
-      {/* Task cards */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-        {tasks.map((task) => {
-          const data = task[period];
-          const costPerArticle = data.articles > 0 ? data.cost / data.articles : 0;
-          const maxLabCost = Math.max(data.labCosts.simulate, data.labCosts.refine, data.labCosts.pattern, 0.0001);
-          const labEntries = [
-            { label: "Simulering",     value: data.labCosts.simulate },
-            { label: "Refinement",     value: data.labCosts.refine   },
-            { label: "Mønsteranalyse", value: data.labCosts.pattern  },
-          ];
-          const kpiItems = [
-            { label: "Forbrug",      value: fmt$(data.cost, 2) },
-            ...(!task.isGeo ? [
-              { label: "Artikler",    value: nFmt(data.articles) },
-              { label: "Pris/artikel", value: data.articles > 0 ? fmt$(costPerArticle, 4) : "—" },
-              { label: "Kald",        value: nFmt(data.calls) },
-            ] : [
-              { label: "Kald",        value: nFmt(data.calls) },
-            ]),
-          ];
+        <div style={{ marginBottom: "8px" }}>
+          <Link href="/admin/system" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>← System</Link>
+        </div>
 
-          return (
-            <div key={task.key} style={{ background: "#fff", borderRadius: "10px", boxShadow: SHADOW, overflow: "hidden" }}>
-              {/* Header */}
-              <div style={{
-                background: "#EEF2F7",
-                borderBottom: "1px solid #dde3ed",
-                padding: "10px 20px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: task.color, flexShrink: 0 }} />
-                  <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#5a6a85" }}>
-                    {task.label}
-                  </span>
-                </div>
-                <span style={{ fontSize: "11px", color: "#94a3b8", fontFamily: "monospace" }}>{task.model}</span>
-              </div>
-
-              {/* KPI row */}
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: `repeat(${kpiItems.length}, 1fr)`,
-                borderBottom: "1px solid #f1f3f7",
-              }}>
-                {kpiItems.map((kpi, i) => (
-                  <div key={kpi.label} style={{
-                    padding: "14px 20px",
-                    borderRight: i < kpiItems.length - 1 ? "1px solid #f1f3f7" : "none",
-                  }}>
-                    <div style={{ fontSize: "10px", color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: "4px" }}>
-                      {kpi.label}
-                    </div>
-                    <div style={{ fontSize: "16px", fontWeight: 700 }}>{kpi.value}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Content: chart + lab eval */}
-              <div style={{ display: "flex" }}>
-                {/* Left: daily bar chart */}
-                <div style={{ flex: task.isGeo ? 1 : "0 0 58%", padding: "16px 16px 12px" }}>
-                  {data.dailySeries.length === 0 ? (
-                    <div style={{ height: "100px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#94a3b8" }}>
-                      Ingen data
-                    </div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={100}>
-                      <BarChart data={data.dailySeries} barCategoryGap="30%">
-                        <XAxis
-                          dataKey="date"
-                          tick={{ fontSize: 10, fill: "#94a3b8" }}
-                          tickLine={false}
-                          axisLine={false}
-                          tickFormatter={(v: string) => {
-                            const parts = v.split("-");
-                            return `${parts[2]}/${parts[1]}`;
-                          }}
-                        />
-                        <Tooltip
-                          cursor={{ fill: "#f1f5f9" }}
-                          content={(props) => {
-                            const { active, payload, label } = props as unknown as {
-                              active?: boolean;
-                              payload?: Array<{ value: number }>;
-                              label?: string;
-                            };
-                            if (!active || !payload?.length) return null;
-                            return (
-                              <div style={{ background: "#fff", border: "1px solid #dde3ed", borderRadius: "6px", padding: "8px 12px", fontSize: "11px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-                                <div style={{ fontWeight: 700, marginBottom: "4px", color: "#1a1a1a" }}>{label}</div>
-                                <div style={{ color: task.color }}>{fmt$(payload[0].value, 4)}</div>
-                              </div>
-                            );
-                          }}
-                        />
-                        <Bar dataKey="cost" fill={task.color} radius={[2, 2, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
-
-                {/* Right: prompt-evaluering (not for Geo) */}
-                {!task.isGeo && (
-                  <>
-                    <div style={{ width: "1px", background: "#f1f3f7", margin: "12px 0" }} />
-                    <div style={{ flex: 1, padding: "16px 20px" }}>
-                      <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "10px" }}>
-                        Prompt-evaluering
-                      </div>
-                      {labEntries.map((entry) => (
-                        <div key={entry.label} style={{ marginBottom: "8px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "3px" }}>
-                            <span style={{ color: "#5a6a85" }}>{entry.label}</span>
-                            <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{fmt$(entry.value, 2)}</span>
-                          </div>
-                          <div style={{ height: "4px", background: "#f1f3f7", borderRadius: "2px" }}>
-                            <div style={{
-                              height: "100%",
-                              borderRadius: "2px",
-                              background: task.color,
-                              width: `${Math.round((entry.value / maxLabCost) * 100)}%`,
-                              opacity: 0.7,
-                              minWidth: entry.value > 0 ? "3px" : "0",
-                            }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "28px" }}>
+          <div>
+            <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
+              System · Cost
             </div>
-          );
-        })}
+            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>AI API Cost</h1>
+          </div>
+          <div style={{ display: "flex", gap: "4px" }}>
+            {tabs.map((t) => (
+              <button key={t.key} type="button" onClick={() => setPeriod(t.key)} style={{
+                fontSize: "11px", fontWeight: 600, padding: "4px 12px", borderRadius: "6px",
+                border: "1px solid", cursor: "pointer", fontFamily: "inherit",
+                borderColor: period === t.key ? "#1a1a1a" : "#dde3ed",
+                background:  period === t.key ? "#1a1a1a" : "transparent",
+                color:       period === t.key ? "#fff"    : "#5a6a85",
+              }}>{t.label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* KPI row */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "28px" }}>
+          {[
+            { label: "Drift",        value: fmt$(totalDrift) },
+            { label: "Lab",          value: fmt$(totalLab) },
+            { label: "Total",        value: fmt$(totalForbrug) },
+            { label: "Pris/artikel", value: totalArtikler > 0 ? fmt$(prisPerArtikler, 4) : "—" },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ ...card, padding: "20px 22px" }}>
+              <div style={{ fontSize: "11px", color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: "6px" }}>{label}</div>
+              <div style={{ fontSize: "22px", fontWeight: 700 }}>{value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Drift table */}
+        <div style={{ ...card, marginBottom: "20px" }}>
+          <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 20px", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#5a6a85" }}>Drift</div>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>Task</th>
+                <th style={thR}>Total</th>
+                <th style={thR}>Artikler</th>
+                <th style={thR}>Pris/artikel</th>
+                <th style={thR}>Kald</th>
+                <th style={thR}>Pris/kald</th>
+              </tr>
+            </thead>
+            <tbody>
+              {TASKS.map((task) => {
+                const d = getDrift(rows, task.key);
+                const ppa = d.artikler > 0 ? d.forbrug / d.artikler : null;
+                const ppk = d.kald > 0     ? d.forbrug / d.kald     : null;
+                return (
+                  <tr key={task.key}>
+                    <td style={td}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: task.color }} />
+                        <span style={{ fontWeight: 600 }}>{task.label}</span>
+                      </div>
+                    </td>
+                    <td style={{ ...tdR, fontWeight: 600 }}>{fmt$(Number(d.forbrug))}</td>
+                    <td style={tdR}>{d.artikler > 0 ? nFmt(d.artikler) : <span style={{ color: "#94a3b8" }}>—</span>}</td>
+                    <td style={tdR}>{ppa ? fmt$(ppa, 4) : <span style={{ color: "#94a3b8" }}>—</span>}</td>
+                    <td style={tdR}>{d.kald > 0 ? nFmt(d.kald) : <span style={{ color: "#94a3b8" }}>—</span>}</td>
+                    <td style={tdR}>{ppk ? fmt$(ppk, 4) : <span style={{ color: "#94a3b8" }}>—</span>}</td>
+                  </tr>
+                );
+              })}
+              <tr>
+                <td style={tdTotalL}>Total</td>
+                <td style={tdTotal}>{fmt$(totalDrift)}</td>
+                <td style={tdTotal}>{totalArtikler > 0 ? nFmt(totalArtikler) : ""}</td>
+                <td style={tdTotal}>{totalArtikler > 0 ? fmt$(totalDrift / totalArtikler, 4) : ""}</td>
+                <td style={tdTotal}>{nFmt(TASKS.reduce((s, t) => s + getDrift(rows, t.key).kald, 0))}</td>
+                <td style={tdTotal}></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Lab table */}
+        <div style={{ ...card, marginBottom: "28px" }}>
+          <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 20px", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#5a6a85" }}>Lab</div>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>Task</th>
+                <th style={thR}>Total</th>
+                <th style={thR}>Analyse</th>
+                <th style={thR}>Prompt-forbedring</th>
+                <th style={thR}>Simulering</th>
+              </tr>
+            </thead>
+            <tbody>
+              {TASKS.filter((t) => t.key !== "geo").map((task) => {
+                const analyse    = getLab(rows, task.key, "analyse");
+                const forbedring = getLab(rows, task.key, "prompt-forbedring");
+                const simulering = getLab(rows, task.key, "simulering");
+                const total      = analyse + forbedring + simulering;
+                return (
+                  <tr key={task.key}>
+                    <td style={td}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: task.color }} />
+                        <span style={{ fontWeight: 600 }}>{task.label}</span>
+                      </div>
+                    </td>
+                    <td style={{ ...tdR, fontWeight: 600 }}>{fmt$(total)}</td>
+                    <td style={tdR}>{fmt$(analyse)}</td>
+                    <td style={tdR}>{fmt$(forbedring)}</td>
+                    <td style={tdR}>{fmt$(simulering)}</td>
+                  </tr>
+                );
+              })}
+              <tr>
+                <td style={tdTotalL}>Total</td>
+                <td style={tdTotal}>{fmt$(totalLab)}</td>
+                <td style={tdTotal}>{fmt$(TASKS.filter(t => t.key !== "geo").reduce((s, t) => s + getLab(rows, t.key, "analyse"), 0))}</td>
+                <td style={tdTotal}>{fmt$(TASKS.filter(t => t.key !== "geo").reduce((s, t) => s + getLab(rows, t.key, "prompt-forbedring"), 0))}</td>
+                <td style={tdTotal}>{fmt$(TASKS.filter(t => t.key !== "geo").reduce((s, t) => s + getLab(rows, t.key, "simulering"), 0))}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
       </div>
     </div>
   );

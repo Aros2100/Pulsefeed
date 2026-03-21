@@ -16,7 +16,7 @@ const articleScoreSchema = z.object({
 });
 
 const schema = z.object({
-  articleIds: z.array(z.string().uuid()).min(1).max(500),
+  articleIds: z.array(z.string().uuid()).min(1).max(5000),
   specialty: z.string(),
   articleScores: z.record(z.string().uuid(), articleScoreSchema).optional(),
 });
