@@ -1013,8 +1013,8 @@ export default function CombosClient({
                     </td>
                   </tr>
                 )}
-                {pendingArticles.map((article) => (
-                  <tr key={article.article_id} style={{ borderBottom: "1px solid #f1f3f7" }}>
+                {pendingArticles.map((article, i) => (
+                  <tr key={`${article.article_id}-${i}`} style={{ borderBottom: "1px solid #f1f3f7" }}>
                     <td style={{ ...tdStyle, textAlign: "center" }}>
                       <input
                         type="checkbox"
