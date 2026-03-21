@@ -162,18 +162,54 @@ export async function PUT(request: NextRequest) {
   const { specialty, terms, max_results } = result.data;
   const admin = createAdminClient();
 
-  const { error: deleteErr } = await admin
+  // Fetch existing affiliation rows for this specialty
+  const { data: existing, error: fetchErr } = await admin
     .from("circle_2_sources")
-    .delete()
+    .select("id, value")
     .eq("specialty", specialty)
     .eq("type", "affiliation");
 
-  if (deleteErr) {
-    return NextResponse.json({ ok: false, error: deleteErr.message }, { status: 500 });
+  if (fetchErr) {
+    return NextResponse.json({ ok: false, error: fetchErr.message }, { status: 500 });
   }
 
-  if (terms.length > 0) {
-    const rows = terms.map((t) => ({
+  const existingMap = new Map((existing ?? []).map((r) => [r.value.trim(), r.id]));
+  const incomingSet = new Set(terms.map((t) => t.trim()));
+
+  // Deactivate rows no longer in the list (instead of deleting)
+  const toDeactivate = (existing ?? [])
+    .filter((r) => !incomingSet.has(r.value.trim()))
+    .map((r) => r.id);
+
+  if (toDeactivate.length > 0) {
+    const { error: deactivateErr } = await admin
+      .from("circle_2_sources")
+      .update({ active: false })
+      .in("id", toDeactivate);
+    if (deactivateErr) {
+      return NextResponse.json({ ok: false, error: deactivateErr.message }, { status: 500 });
+    }
+  }
+
+  // Update existing rows that are in the list (reactivate + set max_results)
+  const toUpdate = (existing ?? [])
+    .filter((r) => incomingSet.has(r.value.trim()))
+    .map((r) => r.id);
+
+  if (toUpdate.length > 0) {
+    const { error: updateErr } = await admin
+      .from("circle_2_sources")
+      .update({ active: true, ...(max_results !== undefined ? { max_results } : {}) })
+      .in("id", toUpdate);
+    if (updateErr) {
+      return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 });
+    }
+  }
+
+  // Insert genuinely new rows
+  const newTerms = terms.filter((t) => !existingMap.has(t.trim()));
+  if (newTerms.length > 0) {
+    const rows = newTerms.map((t) => ({
       specialty,
       type: "affiliation" as const,
       value: t.trim(),
