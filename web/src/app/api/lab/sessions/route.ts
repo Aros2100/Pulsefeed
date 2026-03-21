@@ -55,11 +55,11 @@ export async function POST(request: NextRequest) {
   const articleIds = verdicts.map((v) => v.article_id);
   const { data: freshArticles } = await admin
     .from("articles")
-    .select("id, ai_decision, specialty_confidence")
+    .select("id, ai_decision, specialty_confidence, specialty_reasoning")
     .in("id", articleIds);
 
   const freshMap = new Map(
-    (freshArticles ?? []).map((a) => [a.id as string, a as { id: string; ai_decision: string | null; specialty_confidence: number | null }])
+    (freshArticles ?? []).map((a) => [a.id as string, a as { id: string; ai_decision: string | null; specialty_confidence: number | null; specialty_reasoning: string | null }])
   );
 
   // Auth is enforced above via requireAdmin.
@@ -118,6 +118,7 @@ export async function POST(request: NextRequest) {
     decision: v.verdict,
     ai_decision: (freshMap.get(v.article_id)?.ai_decision ?? null) as "approved" | "rejected" | null,
     ai_confidence: freshMap.get(v.article_id)?.specialty_confidence ?? null,
+    ai_reasoning: freshMap.get(v.article_id)?.specialty_reasoning ?? null,
     disagreement_reason: v.disagreement_reason ?? null,
     model_version: modelVersion,
   }));
