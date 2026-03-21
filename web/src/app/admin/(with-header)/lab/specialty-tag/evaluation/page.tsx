@@ -32,6 +32,7 @@ interface DisagreementRow {
   ai_confidence:        number | null;
   decided_at:           string | null;
   disagreement_reason:  string | null;
+  ai_reasoning:         string | null;
 }
 
 interface ArticleDetail {
@@ -45,6 +46,7 @@ function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDe
   const title      = article?.title ?? row.article_id ?? "Unknown";
   const journal    = article?.journal_abbr ?? "—";
   const abstract   = article?.abstract;
+  const reasoning  = row.ai_reasoning;
   const confidence = row.ai_confidence ?? article?.specialty_confidence;
 
   return (
@@ -107,6 +109,17 @@ function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDe
           </div>
         </details>
       )}
+
+      {reasoning && (
+        <details style={{ marginTop: "6px" }}>
+          <summary style={{ fontSize: "12px", color: "#7c3aed", cursor: "pointer", userSelect: "none", listStyle: "none" }}>
+            ▶ AI reasoning
+          </summary>
+          <div style={{ marginTop: "8px", fontSize: "13px", color: "#444", lineHeight: 1.6, padding: "10px 12px", background: "#faf9ff", borderRadius: "6px", borderLeft: "3px solid #c4b5fd" }}>
+            {reasoning}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
@@ -152,7 +165,7 @@ export default async function EvaluationPage({ searchParams }: Props) {
   // All decisions where AI gave a verdict (filtered by selected model version)
   const baseQuery = admin
     .from("lab_decisions")
-    .select("article_id, decision, decided_at, ai_decision, ai_confidence, disagreement_reason")
+    .select("article_id, decision, decided_at, ai_decision, ai_confidence, disagreement_reason, ai_reasoning")
     .eq("specialty", specialty)
     .eq("module", "specialty_tag")
     .not("ai_decision", "is", null)
