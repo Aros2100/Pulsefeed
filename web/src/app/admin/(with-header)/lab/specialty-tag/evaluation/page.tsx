@@ -175,7 +175,7 @@ export default async function EvaluationPage({ searchParams }: Props) {
     ? await baseQuery.eq("model_version", selectedVersion)
     : await baseQuery;
 
-  const allDecisions = (rawDecisions ?? []) as DisagreementRow[];
+  const allDecisions = (rawDecisions ?? []) as unknown as DisagreementRow[];
   const disagreements = allDecisions.filter((d) => d.decision !== d.ai_decision);
 
   // Fetch article details only for disagreements (avoids loading all abstracts)
