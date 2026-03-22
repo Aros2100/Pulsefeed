@@ -65,7 +65,7 @@ function fmt(iso: string | null) {
   });
 }
 
-function num(v: number) { return v.toLocaleString("da-DK"); }
+function num(v: number | undefined | null) { return (v ?? 0).toLocaleString("da-DK"); }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -151,7 +151,7 @@ export default function DataQualityPage() {
     fetch("/api/admin/system/data-quality")
       .then((r) => r.json())
       .then((d: DQData) => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch((e) => { console.error("[data-quality] fetch error:", e); setLoading(false); });
   }, []);
 
   if (loading || !data) {
