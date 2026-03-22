@@ -33,7 +33,8 @@ type DQData = {
     with_city_pct: number;
     no_geo: number;
     no_geo_pct: number;
-    affiliation_no_geo: number;
+    affiliation_no_geo_parser: number;
+    affiliation_no_geo_openalex: number;
   };
   openalex: {
     with_ror_id: number;
@@ -214,12 +215,13 @@ export default function DataQualityPage() {
 
         {/* 3 · Geo extraction */}
         <SectionCard number="3" title="Geo-udtræk" timestamp="Kumulativt · alle forfattere">
-          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(4, 1fr)" }}>
+          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(5, 1fr)" }}>
             <MetricCard label="Med land"       value={num(geo_extraction.with_country)}  sub={`${geo_extraction.with_country_pct}%`} highlight="green" />
             <MetricCard label="Med by"         value={num(geo_extraction.with_city)}     sub={`${geo_extraction.with_city_pct}%`} />
             <MetricCard label="Ingen geo"      value={num(geo_extraction.no_geo)}        sub={`${geo_extraction.no_geo_pct}%`}
               highlight={geo_extraction.no_geo_pct > 30 ? "amber" : undefined} />
-            <MetricCard label="Affiliering, ingen geo" value={num(geo_extraction.affiliation_no_geo)} />
+            <MetricCard label="Affiliering, ingen geo (parser)"   value={num(geo_extraction.affiliation_no_geo_parser)} />
+            <MetricCard label="Affiliering, ingen geo (OpenAlex)" value={num(geo_extraction.affiliation_no_geo_openalex)} />
           </div>
         </SectionCard>
 

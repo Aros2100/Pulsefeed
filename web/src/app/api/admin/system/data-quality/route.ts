@@ -56,7 +56,8 @@ export async function GET() {
     { count: with_country },
     { count: with_city },
     { count: no_geo },
-    { count: affiliation_no_geo },
+    { count: affiliation_no_geo_parser },
+    { count: affiliation_no_geo_openalex },
   ] = await Promise.all([
     admin.from("authors").select("*", { count: "exact", head: true })
       .is("deleted_at", null)
@@ -70,7 +71,13 @@ export async function GET() {
     admin.from("authors").select("*", { count: "exact", head: true })
       .is("deleted_at", null)
       .not("affiliations", "is", null)
-      .is("country", null),
+      .is("country", null)
+      .eq("geo_source", "parser"),
+    admin.from("authors").select("*", { count: "exact", head: true })
+      .is("deleted_at", null)
+      .not("affiliations", "is", null)
+      .is("country", null)
+      .eq("geo_source", "openalex"),
   ]);
 
   // with_country + no_geo = all non-deleted authors (exact, since every author either has country or doesn't)
@@ -141,9 +148,10 @@ export async function GET() {
       with_country_pct:   pct(with_country ?? 0, totalA),
       with_city:          with_city        ?? 0,
       with_city_pct:      pct(with_city    ?? 0, totalA),
-      no_geo:             no_geo           ?? 0,
-      no_geo_pct:         pct(no_geo       ?? 0, totalA),
-      affiliation_no_geo: affiliation_no_geo ?? 0,
+      no_geo:                     no_geo                      ?? 0,
+      no_geo_pct:                 pct(no_geo                  ?? 0, totalA),
+      affiliation_no_geo_parser:  affiliation_no_geo_parser   ?? 0,
+      affiliation_no_geo_openalex: affiliation_no_geo_openalex ?? 0,
     },
     openalex: {
       with_ror_id:              with_ror_id              ?? 0,
