@@ -32,7 +32,7 @@ for (const line of readFileSync(envPath, "utf8").split("\n")) {
 // but missing specialty_reasoning (no lab_decision yet).
 // Or hardcode specific IDs to rescore only those.
 const ARTICLE_IDS: string[] = [
-  "cb95450c-b1b8-49c6-8ef6-f422233bfb33",
+  "affd84fe-2db4-49c4-99d1-5a46f5671f34",
 ];
 
 // The specialty slug used to look up the active prompt:
