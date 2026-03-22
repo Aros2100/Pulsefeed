@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { SPECIALTIES } from "@/lib/auth/specialties";
 import VersionSelector from "@/components/lab/VersionSelector";
 import PromptDrawer, { type ModelVersion } from "@/components/lab/PromptDrawer";
+import FlipVerdictButton from "@/components/lab/FlipVerdictButton";
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
@@ -26,6 +27,7 @@ function CardHeader({ label, count, color }: { label: string; count: number; col
 }
 
 interface DisagreementRow {
+  id:                   string;
   article_id:           string | null;
   decision:             string;
   ai_decision:          string | null;
@@ -42,7 +44,7 @@ interface ArticleDetail {
   specialty_confidence: number | null;
 }
 
-function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDetail | undefined }) {
+function ArticleRow({ row, article, specialty }: { row: DisagreementRow; article: ArticleDetail | undefined; specialty: string }) {
   const title      = article?.title ?? row.article_id ?? "Unknown";
   const journal    = article?.journal_abbr ?? "—";
   const abstract   = article?.abstract;
@@ -96,6 +98,14 @@ function ArticleRow({ row, article }: { row: DisagreementRow; article: ArticleDe
             <span style={{ fontSize: "11px", color: "#7c3aed", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "4px", padding: "2px 8px" }}>
               {row.disagreement_reason}
             </span>
+          )}
+          {row.article_id && (
+            <FlipVerdictButton
+              decisionId={row.id}
+              articleId={row.article_id}
+              currentVerdict={row.decision}
+              specialty={specialty}
+            />
           )}
         </div>
       </div>
@@ -165,7 +175,7 @@ export default async function EvaluationPage({ searchParams }: Props) {
   // All decisions where AI gave a verdict (filtered by selected model version)
   const baseQuery = admin
     .from("lab_decisions")
-    .select("article_id, decision, decided_at, ai_decision, ai_confidence, disagreement_reason, ai_reasoning")
+    .select("id, article_id, decision, decided_at, ai_decision, ai_confidence, disagreement_reason, ai_reasoning")
     .eq("specialty", specialty)
     .eq("module", "specialty_tag")
     .not("ai_decision", "is", null)
@@ -342,7 +352,7 @@ export default async function EvaluationPage({ searchParams }: Props) {
             <div style={{ padding: "24px", fontSize: "14px", color: "#888" }}>No false negatives — AI approved everything the human approved</div>
           ) : (
             falseNegatives.map((row) => (
-              <ArticleRow key={`${row.article_id}-${row.decided_at}`} row={row} article={row.article_id ? articleMap[row.article_id] : undefined} />
+              <ArticleRow key={`${row.article_id}-${row.decided_at}`} row={row} article={row.article_id ? articleMap[row.article_id] : undefined} specialty={specialty} />
             ))
           )}
         </div>
@@ -357,7 +367,7 @@ export default async function EvaluationPage({ searchParams }: Props) {
             <div style={{ padding: "24px", fontSize: "14px", color: "#888" }}>No false positives — AI rejected everything the human rejected</div>
           ) : (
             falsePositives.map((row) => (
-              <ArticleRow key={`${row.article_id}-${row.decided_at}`} row={row} article={row.article_id ? articleMap[row.article_id] : undefined} />
+              <ArticleRow key={`${row.article_id}-${row.decided_at}`} row={row} article={row.article_id ? articleMap[row.article_id] : undefined} specialty={specialty} />
             ))
           )}
         </div>
