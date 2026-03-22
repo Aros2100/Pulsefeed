@@ -18,12 +18,10 @@ export async function GET() {
   // ── Overview ───────────────────────────────────────────────────────────────
   const [
     { count: total_articles },
-    { count: total_authors },
     { data: lastImport },
     { data: lastLinking },
   ] = await Promise.all([
     admin.from("articles").select("*", { count: "exact", head: true }),
-    admin.from("authors").select("*", { count: "exact", head: true }).is("deleted_at", null),
     admin.from("import_logs")
       .select("completed_at, articles_imported")
       .eq("status", "completed")
@@ -75,7 +73,8 @@ export async function GET() {
       .is("country", null),
   ]);
 
-  const totalA = total_authors ?? 0;
+  // with_country + no_geo = all non-deleted authors (exact, since every author either has country or doesn't)
+  const totalA = (with_country ?? 0) + (no_geo ?? 0);
 
   // ── OpenAlex ───────────────────────────────────────────────────────────────
   const [
@@ -118,8 +117,8 @@ export async function GET() {
 
   return NextResponse.json({
     overview: {
-      total_articles:         total_articles  ?? 0,
-      total_authors:          total_authors   ?? 0,
+      total_articles:         total_articles ?? 0,
+      total_authors:          totalA,
       last_import_at:         latestImport?.completed_at    ?? null,
       last_author_linking_at: latestLinking?.completed_at   ?? null,
     },
