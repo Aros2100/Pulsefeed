@@ -69,7 +69,8 @@ export default function SystemCards({ hasAlerts }: { hasAlerts: boolean }) {
 <Card href="/admin/system/auto-tagging" emoji="🏷️" label="Auto-Tagging" sub="MeSH auto-tagging rules" />
         <Card href="/admin/system/alerts"  emoji="🔔" label="Alerts"  sub="System-beskeder til brugere" badge={hasAlerts} />
         <Card href="/admin/system/cost"    emoji="💰" label="Cost"    sub="AI API-forbrug" />
-        <Card href="/admin/datarens"       emoji="🧹" label="Datarens" sub="Geo-validering og deduplicering" />
+        <Card href="/admin/datarens"       emoji="🧹" label="Datarens"     sub="Geo-validering og deduplicering" />
+        <Card href="/admin/system/data-quality" emoji="📊" label="Data quality" sub="Artikler, forfattere og geo" />
       </div>
     </div>
   );
