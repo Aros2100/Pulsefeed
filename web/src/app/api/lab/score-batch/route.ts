@@ -6,7 +6,6 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { getActivePrompt, scoreArticle, type ActivePrompt } from "@/lib/lab/scorer";
 import { logArticleEvent } from "@/lib/article-events";
-import { applyUnscoredFilters } from "@/lib/lab/article-filters";
 
 const CONCURRENCY  = 1;    // sequential to avoid bursting the 50 req/min limit
 const DELAY_MS     = 1300; // 1300ms between requests ≈ 46 req/min, safely under 50
@@ -68,7 +67,8 @@ export async function POST(request: NextRequest) {
   }
 
   const { specialty, scoreAll } = result.data;
-  const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
 
   let activePrompt;
   try {
@@ -101,24 +101,43 @@ export async function POST(request: NextRequest) {
   }
 
   const v = activePrompt.version;
-  const { data: articles, error: fetchError } = scoreAll
-    // scoreAll=true (model activation): re-score articles with different/null model version.
+
+  // Fetch article IDs from article_specialties based on scoring need
+  const { data: pendingIds } = scoreAll
+    // scoreAll=true: re-score articles not yet scored OR scored with a different model version
     ? await admin
-        .from("articles")
-        .select("id, title, abstract, specialty_tags")
-        .eq("status", "pending")
-        .contains("specialty_tags", [specialty])
-        .or(`specialty_scored_at.is.null,model_version.is.null,model_version.neq.${v}`)
-        .order("circle", { ascending: false, nullsFirst: false })
-        .limit(BATCH_LIMIT)
-    // scoreAll=false (normal): only unscored articles, fill up to remaining slots.
-    : await applyUnscoredFilters(
-        admin.from("articles").select("id, title, abstract, specialty_tags"),
-        "specialty_tag",
-        specialty,
-      )
-        .order("circle", { ascending: false, nullsFirst: false })
-        .limit(remaining);
+        .from("article_specialties")
+        .select("article_id")
+        .eq("specialty", specialty)
+        .or(`specialty_match.is.null,scored_by.neq.${v}`)
+    // scoreAll=false: only articles not yet scored
+    : await admin
+        .from("article_specialties")
+        .select("article_id")
+        .eq("specialty", specialty)
+        .is("specialty_match", null);
+
+  const ids = (pendingIds ?? []).map((r: { article_id: string }) => r.article_id);
+
+  if (ids.length === 0) {
+    const emptyStream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, scored: 0, failed: 0, total: 0 })}\n\n`));
+        controller.close();
+      },
+    });
+    return new Response(emptyStream, {
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+    });
+  }
+
+  const { data: articles, error: fetchError } = await admin
+    .from("articles")
+    .select("id, title, abstract, specialty_tags")
+    .in("id", ids)
+    .order("circle", { ascending: false, nullsFirst: false })
+    .limit(scoreAll ? BATCH_LIMIT : remaining);
 
   if (fetchError) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
@@ -155,6 +174,15 @@ export async function POST(request: NextRequest) {
                   })
                   .eq("id", article.id);
                 if (error) throw new Error(error.message);
+                await admin
+                  .from("article_specialties")
+                  .update({
+                    specialty_match: score.ai_decision === "approved" ? true : false,
+                    scored_by:       score.version,
+                    scored_at:       new Date().toISOString(),
+                  })
+                  .eq("article_id", article.id)
+                  .eq("specialty", specialty);
                 void logArticleEvent(article.id, "enriched", {
                   ai_decision:          score.ai_decision,
                   specialty_confidence: score.confidence,

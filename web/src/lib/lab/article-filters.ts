@@ -43,19 +43,36 @@ export type ModuleKey = keyof typeof MODULE_FILTERS;
 
 /**
  * Apply standard filters to an articles query for a given module.
- * Returns articles that are ELIGIBLE for scoring (not yet scored).
+ * Returns a query for articles ELIGIBLE for scoring (not yet scored),
+ * or null if there are no eligible articles (early-exit signal).
+ *
+ * For modules that require approved articles, uses article_specialties as
+ * source of truth (specialty_match = true) instead of articles.status.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function applyUnscoredFilters(
+export async function applyUnscoredFilters(
   query: any, // eslint-disable-line @typescript-eslint/no-explicit-any
   module: ModuleKey,
   specialty: string,
-) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any,
+): Promise<any | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
   const config = MODULE_FILTERS[module];
 
   let q = query.contains("specialty_tags", [specialty]);
 
-  q = q.eq("status", config.filters.status);
+  if (config.filters.status === "approved") {
+    // Use article_specialties as source of truth for approved articles
+    const { data: approvedIds } = await admin
+      .from("article_specialties")
+      .select("article_id")
+      .eq("specialty", specialty)
+      .eq("specialty_match", true);
+    const ids = (approvedIds ?? []).map((r: { article_id: string }) => r.article_id);
+    if (ids.length === 0) return null;
+    q = q.in("id", ids);
+  } else {
+    q = q.eq("status", config.filters.status);
+  }
 
   if (config.filters.circle !== null) {
     q = q.eq("circle", config.filters.circle);

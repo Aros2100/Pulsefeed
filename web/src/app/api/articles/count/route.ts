@@ -21,10 +21,18 @@ export async function GET(request: NextRequest) {
     default:      since = new Date(now.getTime() - 7   * 24 * 60 * 60 * 1000); break;
   }
 
+  // Fetch approved article IDs from article_specialties (source of truth for approval status)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: approvedIdRows } = await (supabase as any)
+    .from("article_specialties")
+    .select("article_id")
+    .eq("specialty_match", true);
+  const approvedArticleIds = (approvedIdRows ?? []).map((r: { article_id: string }) => r.article_id);
+
   let query = supabase
     .from("articles")
     .select("*", { count: "exact", head: true })
-    .eq("status", "approved");
+    .in("id", approvedArticleIds.length > 0 ? approvedArticleIds : ["00000000-0000-0000-0000-000000000000"]);
 
   if (period !== "alle") {
     query = query.gte("imported_at", since.toISOString());

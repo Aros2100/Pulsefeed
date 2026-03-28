@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 
-const ALLOWED_SORT = ["title", "journal_abbr", "published_date", "imported_at", "circle", "status", "verified", "evidence_score"] as const;
+const ALLOWED_SORT = ["title", "journal_abbr", "published_date", "imported_at", "circle", "verified", "evidence_score"] as const;
 
 export async function GET(request: Request) {
   const auth = await requireAdmin();
@@ -47,7 +47,19 @@ export async function GET(request: Request) {
     .select("id, title, journal_abbr, published_date, imported_at, authors, status, circle, specialty_tags, verified, abstract, evidence_score", { count: "exact" });
 
   if (circle)    query = query.eq("circle", parseInt(circle, 10));
-  if (status)    query = query.eq("status", status);
+  if (status) {
+    const matchVal = status === "approved" ? true : status === "rejected" ? false : null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const asQuery = (admin as any).from("article_specialties").select("article_id");
+    const { data: statusIds } = matchVal === null
+      ? await asQuery.is("specialty_match", null)
+      : await asQuery.eq("specialty_match", matchVal);
+    const filteredIds = (statusIds ?? []).map((r: { article_id: string }) => r.article_id);
+    if (filteredIds.length === 0) {
+      return NextResponse.json({ ok: true, rows: [], total: 0 });
+    }
+    query = query.in("id", filteredIds);
+  }
   if (subspecialty) query = query.contains("specialty_tags", [subspecialty]);
   if (verified === "true")  query = query.eq("verified", true);
   if (verified === "false") query = query.eq("verified", false);

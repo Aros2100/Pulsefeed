@@ -52,6 +52,8 @@ export async function runAutoTag(
   specialty: string
 ): Promise<{ tagged: number; skipped: number }> {
   const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = admin as any;
 
   const { data: rules, error: rulesErr } = await admin
     .from("tagging_rules")
@@ -73,13 +75,22 @@ export async function runAutoTag(
   const PAGE_SIZE = 500;
 
   for (let from = 0; ; ) {
-    const { data: articles } = await admin
-      .from("articles")
-      .select("id, mesh_terms")
-      .eq("status", "pending")
-      .contains("specialty_tags", [specialty])
-      .is("auto_tagged_at", null)
+    // Get pending article IDs from article_specialties (specialty_match IS NULL = not yet scored)
+    const { data: pendingIdRows } = await db
+      .from("article_specialties")
+      .select("article_id")
+      .eq("specialty", specialty)
+      .is("specialty_match", null)
       .range(from, from + PAGE_SIZE - 1);
+    const pendingIds = (pendingIdRows ?? []).map((r: { article_id: string }) => r.article_id);
+
+    const { data: articles } = pendingIds.length > 0
+      ? await admin
+          .from("articles")
+          .select("id, mesh_terms")
+          .in("id", pendingIds)
+          .is("auto_tagged_at", null)
+      : { data: [] };
 
     if (!articles || articles.length === 0) break;
 
@@ -92,12 +103,15 @@ export async function runAutoTag(
       }
 
       if (result.score >= 95) {
-        const { error: updateErr } = await admin
+        const now = new Date().toISOString();
+        const { error: asErr } = await db
+          .from("article_specialties")
+          .update({ specialty_match: true, scored_by: "auto_tagger", scored_at: now })
+          .eq("article_id", article.id)
+          .eq("specialty", specialty);
+        const { error: updateErr } = asErr ? { error: asErr } : await admin
           .from("articles")
-          .update({
-            status: "approved",
-            auto_tagged_at: new Date().toISOString(),
-          })
+          .update({ auto_tagged_at: now })
           .eq("id", article.id);
 
         if (!updateErr) {

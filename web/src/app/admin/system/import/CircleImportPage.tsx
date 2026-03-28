@@ -19,7 +19,8 @@ interface ImportLog {
 interface CircleStats {
   total: number;
   pending: number;
-  approved: number;
+  included: number;
+  excluded: number;
 }
 
 /* ═══ Per-circle config ═══════════════════════════════════════════════════════ */

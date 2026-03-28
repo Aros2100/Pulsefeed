@@ -33,10 +33,25 @@ export async function GET(request: NextRequest) {
   const from = (page - 1) * PAGE_SIZE;
   const to   = from + PAGE_SIZE - 1;
 
+  // Fetch approved article IDs from article_specialties (source of truth for approval status)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+  const { data: approvedIdRows } = specialtySlugs.length > 0
+    ? await db
+        .from("article_specialties")
+        .select("article_id")
+        .in("specialty", specialtySlugs)
+        .eq("specialty_match", true)
+    : await db
+        .from("article_specialties")
+        .select("article_id")
+        .eq("specialty_match", true);
+  const approvedArticleIds = (approvedIdRows ?? []).map((r: { article_id: string }) => r.article_id);
+
   let query = supabase
     .from("articles")
     .select("id, title, journal_abbr, published_date, authors, publication_types, news_value, clinical_relevance, enriched_at, imported_at", { count: "exact" })
-    .eq("status", "approved")
+    .in("id", approvedArticleIds.length > 0 ? approvedArticleIds : ["00000000-0000-0000-0000-000000000000"])
     .order("imported_at", { ascending: false })
     .range(from, to);
 

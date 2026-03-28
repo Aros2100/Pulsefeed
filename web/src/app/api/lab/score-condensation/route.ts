@@ -96,19 +96,25 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const { data: articles, error: fetchError } = await applyUnscoredFilters(
+  const filteredQuery = await applyUnscoredFilters(
     admin.from("articles").select("id, title, abstract"),
     "condensation",
     specialty,
-  )
-    .order("published_date", { ascending: false })
-    .limit(remaining);
+    admin,
+  );
 
-  if (fetchError) {
-    return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
+  let articles: Article[] = [];
+  if (filteredQuery) {
+    const res = await filteredQuery
+      .order("published_date", { ascending: false })
+      .limit(remaining);
+    if (res.error) {
+      return NextResponse.json({ ok: false, error: res.error.message }, { status: 500 });
+    }
+    articles = (res.data ?? []) as Article[];
   }
 
-  const toScore = (articles ?? []) as Article[];
+  const toScore = articles;
 
   const stream = new ReadableStream({
     async start(controller) {

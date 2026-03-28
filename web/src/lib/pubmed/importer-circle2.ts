@@ -233,6 +233,21 @@ export async function runImportCircle2(
               }))
             )
           );
+
+          if (upsertedRows && upsertedRows.length > 0) {
+            const specialtyRows = upsertedRows.map((row) => ({
+              article_id:      row.id,
+              specialty:       specialty,
+              specialty_match: null,
+              source:          'c2_filter',
+              scored_by:       null,
+              scored_at:       new Date().toISOString(),
+            }));
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (admin as any)
+              .from('article_specialties')
+              .upsert(specialtyRows, { onConflict: 'article_id,specialty', ignoreDuplicates: true });
+          }
         }
 
         if (i + BATCH_SIZE < articles.length) await sleep(RATE_LIMIT_MS);

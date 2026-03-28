@@ -15,20 +15,44 @@ export async function GET(request: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
-  const countQ = (status: string) =>
-    admin.from("articles").select("id", { count: "exact", head: true })
-      .eq("circle", circle).eq("status", status) as Promise<{ count: number | null }>;
+  // Count total articles in this circle
+  const { count: totalCount } = await admin
+    .from("articles")
+    .select("id", { count: "exact", head: true })
+    .eq("circle", circle);
+  const total = totalCount ?? 0;
 
-  const [approvedRes, pendingRes, rejectedRes] = await Promise.all([
-    countQ("approved"),
-    countQ("pending"),
-    countQ("rejected"),
-  ]);
+  if (total === 0) {
+    return NextResponse.json({ ok: true, total: 0, included: 0, pending: 0, excluded: 0 });
+  }
 
-  const approved = (approvedRes as { count: number | null }).count ?? 0;
-  const pending = (pendingRes as { count: number | null }).count ?? 0;
-  const rejected = (rejectedRes as { count: number | null }).count ?? 0;
-  const total = approved + pending + rejected;
+  // Get all article IDs for this circle (needed to filter article_specialties by circle)
+  const { data: circleArticleData } = await admin
+    .from("articles")
+    .select("id")
+    .eq("circle", circle);
+  const circleIds = (circleArticleData ?? []).map((r: { id: string }) => r.id);
 
-  return NextResponse.json({ ok: true, total, pending, approved });
+  // Count articles with at least one specialty_match=true (included)
+  const { data: includedData } = await admin
+    .from("article_specialties")
+    .select("article_id")
+    .in("article_id", circleIds)
+    .eq("specialty_match", true);
+  const includedSet = new Set((includedData ?? []).map((r: { article_id: string }) => r.article_id));
+  const included = includedSet.size;
+
+  // Count articles with at least one specialty_match=false and no true (excluded)
+  const { data: rejectedData } = await admin
+    .from("article_specialties")
+    .select("article_id")
+    .in("article_id", circleIds)
+    .eq("specialty_match", false);
+  const rejectedSet = new Set((rejectedData ?? []).map((r: { article_id: string }) => r.article_id));
+  for (const id of includedSet) rejectedSet.delete(id); // included overrides excluded
+  const excluded = rejectedSet.size;
+
+  const pending = total - included - excluded;
+
+  return NextResponse.json({ ok: true, total, included, pending, excluded });
 }

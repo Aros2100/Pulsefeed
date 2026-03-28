@@ -115,15 +115,22 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const res = await applyUnscoredFilters(
+    const filteredQuery = await applyUnscoredFilters(
       admin.from("articles").select("id, title, abstract"),
       "classification",
       specialty,
-    )
-      .order("circle", { ascending: false, nullsFirst: false })
-      .limit(remaining);
-    articles = res.data as Article[] | null;
-    fetchError = res.error;
+      admin,
+    );
+    if (!filteredQuery) {
+      articles = [];
+      fetchError = null;
+    } else {
+      const res = await filteredQuery
+        .order("circle", { ascending: false, nullsFirst: false })
+        .limit(remaining);
+      articles = res.data as Article[] | null;
+      fetchError = res.error;
+    }
   }
 
   if (fetchError) {
