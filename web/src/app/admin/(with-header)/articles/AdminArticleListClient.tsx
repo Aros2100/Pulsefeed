@@ -12,20 +12,20 @@ interface ArticleRow {
   published_date: string | null;
   imported_at: string;
   authors: unknown;
-  status: string | null;
+  specialty_match: boolean | null;
   circle: number | null;
   specialty_tags: string[];
   abstract: string | null;
   evidence_score: number | null;
 }
 
-type SortField = "title" | "journal_abbr" | "published_date" | "imported_at" | "circle" | "status" | "evidence_score";
+type SortField = "title" | "journal_abbr" | "published_date" | "imported_at" | "circle" | "evidence_score";
 
 interface Filters {
   search: string;
   mesh_term: string;
   circle: string;
-  status: string;
+  specialty_match: string;
   subspecialty: string;
   approval_method: string;
   has_abstract: string;
@@ -60,10 +60,10 @@ const CONTINENTS = [
   "South America",
 ] as const;
 
-const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
-  approved: { bg: "#f0fdf4", color: "#15803d" },
-  rejected:  { bg: "#fef2f2", color: "#b91c1c" },
-  pending:   { bg: "#fffbeb", color: "#d97706" },
+const MATCH_STYLE: Record<string, { bg: string; color: string; label: string }> = {
+  "true":  { bg: "#f0fdf4", color: "#15803d", label: "Included" },
+  "false": { bg: "#fef2f2", color: "#b91c1c", label: "Excluded" },
+  "null":  { bg: "#fffbeb", color: "#d97706", label: "Pending"  },
 };
 
 function fmt(iso: string | null): string {
@@ -108,7 +108,7 @@ function SelectFilter({ value, onChange, options, placeholder, disabled }: {
   );
 }
 
-const SORT_FIELDS = ["title", "journal_abbr", "published_date", "imported_at", "circle", "status", "evidence_score"] as const;
+const SORT_FIELDS = ["title", "journal_abbr", "published_date", "imported_at", "circle", "evidence_score"] as const;
 
 function filtersFromParams(sp: URLSearchParams): Filters {
   const sortBy = sp.get("sort_by") ?? "imported_at";
@@ -117,7 +117,7 @@ function filtersFromParams(sp: URLSearchParams): Filters {
     search:          sp.get("search")          ?? "",
     mesh_term:       sp.get("mesh_term")       ?? "",
     circle:          sp.get("circle")          ?? "",
-    status:          sp.get("status")          ?? "",
+    specialty_match: sp.get("specialty_match") ?? "",
     subspecialty:    sp.get("subspecialty")    ?? "",
     approval_method: sp.get("approval_method") ?? "",
     has_abstract:    sp.get("has_abstract")    ?? "",
@@ -146,7 +146,7 @@ function filtersToParams(f: Filters): URLSearchParams {
   if (f.search)          p.set("search",          f.search);
   if (f.mesh_term)       p.set("mesh_term",       f.mesh_term);
   if (f.circle)          p.set("circle",          f.circle);
-  if (f.status)          p.set("status",          f.status);
+  if (f.specialty_match) p.set("specialty_match", f.specialty_match);
   if (f.subspecialty)    p.set("subspecialty",    f.subspecialty);
   if (f.approval_method) p.set("approval_method", f.approval_method);
   if (f.has_abstract)    p.set("has_abstract",    f.has_abstract);
@@ -171,7 +171,7 @@ function filtersToParams(f: Filters): URLSearchParams {
 }
 
 const EMPTY_FILTERS: Filters = {
-  search: "", mesh_term: "", circle: "", status: "", subspecialty: "",
+  search: "", mesh_term: "", circle: "", specialty_match: "", subspecialty: "",
   approval_method: "", has_abstract: "", date_from: "", date_to: "",
   geo_continent: "", geo_region: "", geo_country: "", geo_state: "", geo_city: "",
   missing_geo: false, no_region: false, no_country: false, no_state: false, no_city: false, not_parsed: false, suspect_city: false,
@@ -207,9 +207,14 @@ export default function AdminArticleListClient() {
 
     try {
       const res = await fetch(`/api/admin/articles?${params.toString()}`);
-      const json = await res.json() as { ok: boolean; rows?: ArticleRow[]; total?: number; error?: string };
+      const json = await res.json() as { ok: boolean; rows?: (Omit<ArticleRow, "specialty_match"> & { status?: string | null })[] ; total?: number; error?: string };
       if (json.ok) {
-        setRows(json.rows ?? []);
+        // Map legacy status field to specialty_match until API is fully migrated
+        const mapped: ArticleRow[] = (json.rows ?? []).map((r) => ({
+          ...r,
+          specialty_match: r.status === "approved" ? true : r.status === "rejected" ? false : null,
+        }));
+        setRows(mapped);
         setTotal(json.total ?? 0);
       } else {
         setError(json.error ?? "Unknown error");
@@ -315,7 +320,7 @@ export default function AdminArticleListClient() {
   }
 
   const hasActiveFilters = !!(
-    filters.circle || filters.status || filters.subspecialty || filters.approval_method ||
+    filters.circle || filters.specialty_match || filters.subspecialty || filters.approval_method ||
     filters.has_abstract || filters.date_from || filters.date_to || filters.search ||
     filters.mesh_term || filters.geo_continent || filters.geo_region || filters.geo_country || filters.geo_state ||
     filters.geo_city || filters.missing_geo
@@ -335,8 +340,7 @@ export default function AdminArticleListClient() {
     { key: "title",          label: "Titel",        sortable: true },
     { key: "journal_abbr",   label: "Tidsskrift",   sortable: true },
     { key: "published_date", label: "Publiceret",   sortable: true },
-    { key: "status",         label: "Status",       sortable: true },
-    { key: "evidence_score", label: "Evidence",     sortable: true },
+    { key: "evidence_score", label: "Specialty",    sortable: false },
     { key: "imported_at",    label: "Importeret",   sortable: true },
   ];
 
@@ -418,13 +422,13 @@ export default function AdminArticleListClient() {
             ]}
           />
           <SelectFilter
-            value={filters.status}
-            onChange={(v) => setFilter("status", v)}
-            placeholder="Status: Alle"
+            value={filters.specialty_match}
+            onChange={(v) => setFilter("specialty_match", v)}
+            placeholder="Specialty: Alle"
             options={[
-              { value: "pending",  label: "Afventer" },
-              { value: "approved", label: "Godkendt" },
-              { value: "rejected", label: "Afvist" },
+              { value: "null",  label: "Pending" },
+              { value: "true",  label: "Included" },
+              { value: "false", label: "Excluded" },
             ]}
           />
           <SelectFilter
@@ -556,8 +560,8 @@ export default function AdminArticleListClient() {
               </thead>
               <tbody>
                 {rows.map((a, i) => {
-                  const st = a.status ?? "pending";
-                  const s = STATUS_STYLE[st] ?? STATUS_STYLE.pending;
+                  const matchKey = a.specialty_match === true ? "true" : a.specialty_match === false ? "false" : "null";
+                  const s = MATCH_STYLE[matchKey];
                   const count = authorCount(a.authors);
                   return (
                     <tr key={a.id} style={{ background: i % 2 === 0 ? "#fff" : "#fafbfc" }}>
@@ -579,22 +583,8 @@ export default function AdminArticleListClient() {
                       </td>
                       <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7" }}>
                         <span style={{ fontSize: "11px", fontWeight: 600, borderRadius: "999px", padding: "2px 8px", background: s.bg, color: s.color }}>
-                          {st}
+                          {s.label}
                         </span>
-                      </td>
-                      <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", whiteSpace: "nowrap" }}>
-                        {a.evidence_score != null ? (
-                          <span style={{
-                            display: "inline-block", fontSize: "12px", fontWeight: 700,
-                            borderRadius: "6px", padding: "2px 9px",
-                            background: a.evidence_score >= 70 ? "#f0fdf4" : a.evidence_score >= 40 ? "#fffbeb" : "#fef2f2",
-                            color:      a.evidence_score >= 70 ? "#15803d" : a.evidence_score >= 40 ? "#d97706" : "#b91c1c",
-                          }}>
-                            {a.evidence_score}
-                          </span>
-                        ) : (
-                          <span style={{ color: "#ccc", fontSize: "12px" }}>—</span>
-                        )}
                       </td>
                       <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", fontSize: "12px", color: "#5a6a85", whiteSpace: "nowrap" }}>
                         {fmt(a.imported_at)}
