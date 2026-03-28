@@ -86,6 +86,18 @@ function isPostalCode(segment: string): boolean {
   if (/^\d{3,5}\s+[A-Z]{1,3}$/i.test(s)) return true;
   // Patterns like "71-252"
   if (/^\d{2,3}-\d{2,4}$/.test(s)) return true;
+  // Japanese address format: "8-35-1 Sakuragaoka", "1-6-10 Miyahara"
+  if (/^\d+-\d+-\d+\s+\S/.test(s)) return true;
+  // Street address: "1000 10th Ave", "130 E 77th St"
+  if (/^\d+\s+.*\b(Ave|St|Rd|Blvd|Dr|Ln|Pl|Ct|Floor|Fl|Str)\b/i.test(s)) return true;
+  // Brazilian CEP prefix: "CEP 14090-062"
+  if (/^CEP\s+[\d\-]+$/i.test(s)) return true;
+  // Japanese postal symbol: "〒650-0017"
+  if (/^〒\d{3}-\d{4}$/.test(s)) return true;
+  // Canadian postal codes: "H3T 1P1", "M5T 1P5", "V6T 1Z3"
+  if (/^[A-Z]\d[A-Z]\s*\d[A-Z]\d$/.test(s)) return true;
+  // Province + Canadian postal: "QC H3T 1P1", "BC V6T 1Z3", "ON M5G 2G3"
+  if (/^[A-Z]{2}\s+[A-Z]\d[A-Z]\s*\d[A-Z]\d$/.test(s)) return true;
   return false;
 }
 
@@ -141,12 +153,34 @@ function cleanCity(raw: string, cityNames: Set<string>): string {
   city = city.replace(/^[A-Z]{1,2}[-\s]?\d{3,6}\s+/i, "").trim();
   // Strip leading pure digit postal codes: "8200 Aarhus" → "Aarhus", "93 Lodz" → "Lodz"
   city = city.replace(/^\d{2,5}[-\s]+/, "").trim();
+  // Strip leading Irish Eircode: "D09 V2N0 Dublin" → "Dublin"
+  city = city.replace(/^[A-Z]\d{2}\s+[A-Z0-9]{4}\s+/, "").trim();
+  // Strip INSERM/institution number prefix: "INSERM 1033 Lyon" → "Lyon"
+  city = city.replace(/^INSERM\s+\d+\s+/i, "").trim();
+  // Strip trailing country-prefixed postal codes: "Copenhagen DK-2100" → "Copenhagen", "Caen F-14000" → "Caen"
+  city = city.replace(/\s+[A-Z]{1,2}-\d{3,6}$/, "").trim();
+  // Strip trailing CEP codes: "São Paulo 04039-032" → "São Paulo"
+  city = city.replace(/\s+\d{5}-\d{3}$/, "").trim();
+  // Strip trailing alphanumeric postal codes: "Rotterdam 3015 GD" → "Rotterdam"
+  city = city.replace(/\s+\d{4}\s+[A-Z]{2}$/, "").trim();
   // Strip embedded postal-like patterns: "Beyrouth 11-5076" → "Beyrouth"
   city = city.replace(/\s+\d{1,3}[-]\d{3,5}$/, "").trim();
   // Strip trailing 4-6 digit postcodes: "Seongnam-si 13488" → "Seongnam-si", "Manisa 45000" → "Manisa"
   city = city.replace(/\s+\d{4,6}$/, "").trim();
   // Strip trailing UK postcodes: "London WC1E 6DE", "London SE5 9RS", "Oxford OX1 3QT"
   city = city.replace(/\s+[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i, "").trim();
+  // Strip trailing Canadian postal codes: "Montreal H3A 0G4" → "Montreal"
+  city = city.replace(/\s+[A-Z]\d[A-Z]\s*\d[A-Z]\d$/, "").trim();
+  // Strip trailing Irish Eircode suffixes: "Dublin D02 YN77" → "Dublin"
+  city = city.replace(/\s+[A-Z]\d{2}\s+[A-Z0-9]{4}$/, "").trim();
+  // Strip French Cedex suffixes: "Lyon Cedex 03" → "Lyon", "Toulon cedex 9" → "Toulon"
+  city = city.replace(/\s+[Cc]edex\b.*$/i, "").trim();
+  // Strip French CEDEX with diacritic: "Nîmes Cédex 9" → "Nîmes"
+  city = city.replace(/\s+[Cc]é?dex\b.*$/i, "").trim();
+  // Strip bare "Cedex N" if that's the entire value
+  if (/^[Cc]é?dex\b/i.test(city)) city = "";
+  // Re-strip trailing digits exposed by Cedex removal: "Paris 75940 CEDEX 19" → "Paris 75940" → "Paris"
+  city = city.replace(/\s+\d{4,6}$/, "").trim();
   // Strip trailing postal district letter (including Nordic: Ø, Ö, Ü, Æ, Å)
   const withoutSuffix = city.replace(/\s+[A-ZØÖÜÆÅ]$/u, "");
   if (withoutSuffix.length >= 3) {

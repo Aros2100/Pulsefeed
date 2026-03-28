@@ -12,7 +12,7 @@
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { createClient } from "@supabase/supabase-js";
-import { parseAffiliation } from "../src/lib/geo/affiliation-utils";
+import { parseAffiliation } from "../src/lib/geo/affiliation-parser";
 
 // ── Load .env.local ────────────────────────────────────────────────────────
 const envPath = resolve(process.cwd(), ".env.local");
@@ -100,13 +100,13 @@ async function main() {
 
   for (const r of shuffled) {
     const raw = r.affiliations![0];
-    const parsed = parseAffiliation([raw]);
+    const parsed = await parseAffiliation(raw);
 
     const changed =
-      diff(r.department, parsed.department) ||
-      diff(r.hospital, parsed.hospital) ||
-      diff(r.city, parsed.city) ||
-      diff(r.country, parsed.country);
+      diff(r.department, parsed?.department ?? null) ||
+      diff(r.hospital, parsed?.institution ?? null) ||
+      diff(r.city, parsed?.city ?? null) ||
+      diff(r.country, parsed?.country ?? null);
 
     if (changed) changedCount++;
 
@@ -114,13 +114,13 @@ async function main() {
       r.display_name,
       raw,
       r.department,
-      parsed.department,
+      parsed?.department ?? null,
       r.hospital,
-      parsed.hospital,
+      parsed?.institution ?? null,
       r.city,
-      parsed.city,
+      parsed?.city ?? null,
       r.country,
-      parsed.country,
+      parsed?.country ?? null,
       changed ? "ja" : "nej",
     ].map(csvEscape);
 

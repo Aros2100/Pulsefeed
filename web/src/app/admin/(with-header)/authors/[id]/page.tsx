@@ -90,6 +90,8 @@ interface AuthorRow {
   city: string | null;
   state: string | null;
   country: string | null;
+  region: string | null;
+  continent: string | null;
   affiliations: string[] | null;
   author_score: number | null;
 }
@@ -318,7 +320,8 @@ export default function AdminAuthorDetailPage() {
         .select(`id, display_name, article_count, orcid, openalex_id, ror_id,
                  openalex_enriched_at, orcid_enriched_at, ror_enriched_at,
                  created_at, updated_at,
-                 department, hospital, city, state, country, affiliations, author_score`)
+                 department, hospital, city, state, country, region, continent,
+                 affiliations, author_score`)
         .eq("id", id)
         .single();
 
@@ -532,6 +535,8 @@ export default function AdminAuthorDetailPage() {
                         {author.city       && <FactRow label="By"          value={author.city} />}
                         {author.state      && <FactRow label="Stat/Region" value={author.state} />}
                         {author.country    && <FactRow label="Land"        value={author.country} />}
+                        {author.region     && <FactRow label="Region"      value={author.region} />}
+                        {author.continent  && <FactRow label="Continent"   value={author.continent} />}
                       </>
                     )}
                   </div>

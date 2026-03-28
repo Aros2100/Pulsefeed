@@ -1,0 +1,3 @@
+ALTER TABLE authors
+  ADD COLUMN IF NOT EXISTS region    TEXT,
+  ADD COLUMN IF NOT EXISTS continent TEXT;

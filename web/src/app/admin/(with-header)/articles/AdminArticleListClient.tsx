@@ -37,6 +37,12 @@ interface Filters {
   geo_state: string;
   geo_city: string;
   missing_geo: boolean;
+  no_region:   boolean;
+  no_country:  boolean;
+  no_state:    boolean;
+  no_city:     boolean;
+  not_parsed:   boolean;
+  suspect_city: boolean;
   sort_by: SortField;
   sort_dir: "asc" | "desc";
   page: number;
@@ -74,20 +80,24 @@ function SortArrow({ field, sortBy, sortDir }: { field: SortField; sortBy: SortF
   return <span style={{ color: "#E83B2A", marginLeft: "4px" }}>{sortDir === "asc" ? "↑" : "↓"}</span>;
 }
 
-function SelectFilter({ value, onChange, options, placeholder }: {
+function SelectFilter({ value, onChange, options, placeholder, disabled }: {
   value: string;
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
   placeholder: string;
+  disabled?: boolean;
 }) {
   return (
     <select
       value={value}
+      disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
       style={{
-        padding: "6px 10px", fontSize: "12px", border: "1px solid #dde3ed",
-        borderRadius: "6px", background: "#fff", color: value ? "#1a1a1a" : "#888",
-        cursor: "pointer", outline: "none",
+        padding: "6px 10px", fontSize: "12px",
+        border: `1px solid ${disabled ? "#eef0f4" : "#dde3ed"}`,
+        borderRadius: "6px", background: disabled ? "#f8f9fb" : "#fff",
+        color: disabled ? "#bbb" : value ? "#1a1a1a" : "#888",
+        cursor: disabled ? "default" : "pointer", outline: "none",
       }}
     >
       <option value="">{placeholder}</option>
@@ -119,6 +129,12 @@ function filtersFromParams(sp: URLSearchParams): Filters {
     geo_state:       sp.get("geo_state")       ?? "",
     geo_city:        sp.get("geo_city")        ?? "",
     missing_geo:     sp.get("missing_geo")     === "true",
+    no_region:       sp.get("no_region")       === "true",
+    no_country:      sp.get("no_country")      === "true",
+    no_state:        sp.get("no_state")        === "true",
+    no_city:         sp.get("no_city")         === "true",
+    not_parsed:      sp.get("not_parsed")      === "true",
+    suspect_city:    sp.get("suspect_city")    === "true",
     sort_by:         (SORT_FIELDS as readonly string[]).includes(sortBy) ? sortBy as SortField : "imported_at",
     sort_dir:        sortDir === "asc" ? "asc" : "desc",
     page:            Math.max(1, parseInt(sp.get("page") ?? "1", 10)),
@@ -142,6 +158,12 @@ function filtersToParams(f: Filters): URLSearchParams {
   if (f.geo_state)       p.set("geo_state",       f.geo_state);
   if (f.geo_city)        p.set("geo_city",        f.geo_city);
   if (f.missing_geo)     p.set("missing_geo",     "true");
+  if (f.no_region)       p.set("no_region",       "true");
+  if (f.no_country)      p.set("no_country",      "true");
+  if (f.no_state)        p.set("no_state",        "true");
+  if (f.no_city)         p.set("no_city",         "true");
+  if (f.not_parsed)      p.set("not_parsed",      "true");
+  if (f.suspect_city)    p.set("suspect_city",    "true");
   if (f.sort_by !== "imported_at") p.set("sort_by", f.sort_by);
   if (f.sort_dir !== "desc")       p.set("sort_dir", f.sort_dir);
   if (f.page > 1)                  p.set("page", String(f.page));
@@ -152,7 +174,8 @@ const EMPTY_FILTERS: Filters = {
   search: "", mesh_term: "", circle: "", status: "", subspecialty: "",
   approval_method: "", has_abstract: "", date_from: "", date_to: "",
   geo_continent: "", geo_region: "", geo_country: "", geo_state: "", geo_city: "",
-  missing_geo: false, sort_by: "imported_at", sort_dir: "desc", page: 1,
+  missing_geo: false, no_region: false, no_country: false, no_state: false, no_city: false, not_parsed: false, suspect_city: false,
+  sort_by: "imported_at", sort_dir: "desc", page: 1,
 };
 
 export default function AdminArticleListClient() {
@@ -166,13 +189,12 @@ export default function AdminArticleListClient() {
   const [error, setError] = useState<string | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const meshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [searchInput, setSearchInput] = useState(() => searchParams.get("search") ?? "");
   const [meshInput, setMeshInput] = useState(() => searchParams.get("mesh_term") ?? "");
-  const [cityInput, setCityInput] = useState(() => searchParams.get("geo_city") ?? "");
   const [geoRegions, setGeoRegions] = useState<string[]>([]);
   const [geoCountries, setGeoCountries] = useState<string[]>([]);
   const [geoStates, setGeoStates] = useState<string[]>([]);
+  const [geoCities, setGeoCities] = useState<string[]>([]);
 
   const fetchArticles = useCallback(async (f: Filters) => {
     setLoading(true);
@@ -242,12 +264,21 @@ export default function AdminArticleListClient() {
       .catch(() => { setGeoStates([]); });
   }, [filters.geo_country]);
 
+  // Reload city list when country (or state) changes; clear when no country selected
+  useEffect(() => {
+    if (!filters.geo_country) { setGeoCities([]); return; }
+    const params = new URLSearchParams({ field: "geo_city", country: filters.geo_country });
+    if (filters.geo_state) params.set("state", filters.geo_state);
+    fetch(`/api/admin/articles/geo-options?${params}`)
+      .then((r) => r.json())
+      .then((d: { ok: boolean; options?: string[] }) => {
+        if (d.ok) setGeoCities(d.options ?? []);
+      })
+      .catch(() => { setGeoCities([]); });
+  }, [filters.geo_country, filters.geo_state]);
+
   /** Set any filter; geo parents cascade-clear their children. */
   function setFilter<K extends keyof Filters>(key: K, value: Filters[K]) {
-    // Reset city text input whenever a geo parent changes
-    if (key === "geo_continent" || key === "geo_region" || key === "geo_country" || key === "geo_state") {
-      setCityInput("");
-    }
     setFiltersState((prev) => {
       const next: Filters = { ...prev, [key]: value, page: key !== "page" ? 1 : (value as number) };
       if (key === "geo_continent") { next.geo_region = ""; next.geo_country = ""; next.geo_state = ""; next.geo_city = ""; }
@@ -271,14 +302,6 @@ export default function AdminArticleListClient() {
     if (meshTimer.current) clearTimeout(meshTimer.current);
     meshTimer.current = setTimeout(() => {
       setFiltersState((prev) => ({ ...prev, mesh_term: v, page: 1 }));
-    }, 350);
-  }
-
-  function handleCityChange(v: string) {
-    setCityInput(v);
-    if (cityTimer.current) clearTimeout(cityTimer.current);
-    cityTimer.current = setTimeout(() => {
-      setFiltersState((prev) => ({ ...prev, geo_city: v, page: 1 }));
     }, 350);
   }
 
@@ -373,16 +396,12 @@ export default function AdminArticleListClient() {
               options={geoStates.map((s) => ({ value: s, label: s }))}
             />
           )}
-          <input
-            type="text"
-            placeholder="City…"
-            value={cityInput}
-            onChange={(e) => handleCityChange(e.target.value)}
-            style={{
-              padding: "6px 10px", fontSize: "12px", border: "1px solid #dde3ed",
-              borderRadius: "6px", outline: "none", width: "130px",
-              color: cityInput ? "#1a1a1a" : "#888",
-            }}
+          <SelectFilter
+            value={filters.geo_city}
+            onChange={(v) => setFilter("geo_city", v)}
+            placeholder={filters.geo_country ? "City: Alle" : "Select country first"}
+            options={geoCities.map((c) => ({ value: c, label: c }))}
+            disabled={!filters.geo_country}
           />
         </div>
 
@@ -478,7 +497,6 @@ export default function AdminArticleListClient() {
               onClick={() => {
                 setSearchInput("");
                 setMeshInput("");
-                setCityInput("");
                 setFiltersState(EMPTY_FILTERS);
               }}
               style={{ fontSize: "12px", color: "#E83B2A", background: "none", border: "none", cursor: "pointer", padding: "5px 0", textDecoration: "underline" }}

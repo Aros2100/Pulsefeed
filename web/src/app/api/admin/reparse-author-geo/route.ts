@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseAffiliation } from "@/lib/geo/affiliation-parser";
-import { normalizeCity } from "@/lib/geo/normalize";
+import { resolveCityAlias } from "@/lib/geo/city-aliases";
 
 const BATCH_SIZE = 50;
 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         .update({
           department: parsed?.department ?? null,
           hospital: parsed?.institution ?? null,
-          city: parsed?.city ? normalizeCity(parsed.city) : null,
+          city: parsed?.city ? await resolveCityAlias(parsed.city, parsed?.country ?? "") : null,
           country: parsed?.country ?? null,
           geo_source: "parser",
         })

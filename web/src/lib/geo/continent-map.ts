@@ -248,14 +248,12 @@ const REGION_TO_CONTINENT: Record<string, string> = {
   "south asia": "Asia",
   "southeast asia": "Asia",
   "middle east": "Asia",
-  "western asia": "Asia",
   "russia & central asia": "Asia",
   // Africa
   "north africa": "Africa",
   "sub-saharan africa": "Africa",
   // Oceania
   "oceania": "Oceania",
-  "australia and new zealand": "Oceania",
 };
 
 /** Maps a region name to its continent. Case-insensitive. Returns null for unknown regions. */

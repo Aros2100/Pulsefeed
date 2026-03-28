@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { normalizeCity } from "@/lib/geo/normalize";
+import { resolveCityAlias } from "@/lib/geo/city-aliases";
 
 const INST_KEYWORDS = [
   "hospital", "university", "institute", "medical", "clinic",
@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
   await (admin as any)
     .from("authors")
     .update({
-      city:        normalizeCity(newData.city),
+      city:        await resolveCityAlias(newData.city, newData.country ?? ""),
       country:     newData.country,
       hospital:    newData.hospital,
       department:  newData.department,

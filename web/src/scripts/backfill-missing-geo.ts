@@ -178,6 +178,12 @@ async function main() {
   console.log(`  updated  : ${updated}`);
   console.log(`  skipped  : ${skipped}  (single/no affs, or parser gave nothing)`);
   console.log(`  failed   : ${failed}`);
+
+  if (!DRY_RUN && updated > 0) {
+    const { data: normRows, error: normErr } = await db.rpc("normalize_geo_city");
+    if (normErr) console.error("[backfill-missing-geo] normalize_geo_city failed:", normErr.message);
+    else console.log(`  normalize_geo_city : ${normRows ?? 0} rows updated`);
+  }
 }
 
 main().catch((err) => {

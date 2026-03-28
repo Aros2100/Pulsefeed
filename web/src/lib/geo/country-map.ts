@@ -322,6 +322,7 @@ const RAW_COUNTRY_MAP: Record<string, string> = {
   "colombia": "Colombia",
   "chile": "Chile",
   "taiwan": "Taiwan",
+  "r.o.c": "Taiwan",   // Republic of China — lookupCountry strips trailing dot before lookup
   "singapore": "Singapore",
   "hong kong": "Hong Kong",
   "thailand": "Thailand",
@@ -330,6 +331,8 @@ const RAW_COUNTRY_MAP: Record<string, string> = {
   "philippines": "Philippines",
   "vietnam": "Vietnam",
   "new zealand": "New Zealand",
+  "new caledonia": "New Caledonia",
+  "greenland": "Greenland",
   "ireland": "Ireland",
   "belgium": "Belgium",
   "switzerland": "Switzerland",
@@ -490,11 +493,13 @@ import {
 } from "./continent-map";
 
 const EXTRA_COUNTRY_REGION: Record<string, string> = {
-  "hong kong":  "East Asia",
-  "macao":      "East Asia",
-  "taiwan":     "East Asia",
-  "puerto rico": "Central America & Caribbean",
-  "curaçao":    "Central America & Caribbean",
+  "hong kong":      "East Asia",
+  "macao":          "East Asia",
+  "taiwan":         "East Asia",
+  "puerto rico":    "Central America & Caribbean",
+  "curaçao":        "Central America & Caribbean",
+  "new caledonia":  "Oceania",
+  "greenland":      "North America",
 };
 
 /**

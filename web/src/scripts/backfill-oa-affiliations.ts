@@ -247,6 +247,12 @@ async function main() {
   console.log(`  affiliations patched: ${affiliationPatched}`);
   console.log(`  geo updated         : ${geoUpdated}`);
   console.log(`  geo skipped         : ${geoSkipped}  (no country found or error)`);
+
+  if (!DRY_RUN && geoUpdated > 0) {
+    const { data: normRows, error: normErr } = await db.rpc("normalize_geo_city");
+    if (normErr) console.error("[oa-affiliations-backfill] normalize_geo_city failed:", normErr.message);
+    else console.log(`  normalize_geo_city  : ${normRows ?? 0} rows updated`);
+  }
 }
 
 main().catch((err) => {

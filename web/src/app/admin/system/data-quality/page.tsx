@@ -27,32 +27,41 @@ type DQData = {
     articles_without_authors: number;
     articles_with_mismatch: number;
   };
-  geo_extraction: {
+  author_location?: {
+    with_region: number;
+    with_region_pct: number;
     with_country: number;
     with_country_pct: number;
+    with_state: number;
+    with_state_pct: number;
     with_city: number;
-    with_city_pct: number;
+    distinct_regions: number;
+    no_region: number;
     no_country: number;
+    no_state: number;
     no_city: number;
     no_geo: number;
     affiliation_too_long: number;
-  };
-  geo_quality: {
     suspect_city_values: number;
-    suspect_country_values: number;
-    country_alias_pairs: number;
-    city_alias_pairs: number;
+    source_openalex: number;
+    source_parser: number;
+    verified_human: number;
   };
   article_location?: {
+    with_region: number;
+    with_region_pct: number;
+    no_region: number;
     with_country: number;
     with_country_pct: number;
-    with_city: number;
-    with_city_pct: number;
     no_country: number;
+    with_state: number;
+    with_state_pct: number;
+    no_state: number;
+    with_city: number;
     no_city: number;
     not_parsed: number;
-    high_confidence: number;
-    low_confidence: number;
+    suspect_city_values: number;
+    distinct_regions: number;
   };
 };
 
@@ -107,16 +116,25 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
   );
 }
 
-function MetricCard({ label, value, sub, highlight }: { label: string; value: string; sub?: string; highlight?: "green" | "amber" | "red" }) {
+function MetricCard({ label, value, sub, sub2, highlight, subHighlight, sub2Highlight }: {
+  label: string; value: string;
+  sub?: string; sub2?: string;
+  highlight?: "green" | "amber" | "red";
+  subHighlight?: "green" | "amber" | "red";
+  sub2Highlight?: "green" | "amber" | "red";
+}) {
   const colors: Record<string, string> = { green: "#15803d", amber: "#d97706", red: "#dc2626" };
   const valueColor = highlight ? colors[highlight] : "#1a1a1a";
+  const subColor = subHighlight ? colors[subHighlight] : "#94a3b8";
+  const sub2Color = sub2Highlight ? colors[sub2Highlight] : "#94a3b8";
   return (
-    <div style={{ background: "#f8f9fb", borderRadius: "8px", padding: "16px 18px" }}>
+    <div style={{ background: "#f8f9fb", borderRadius: "8px", padding: "16px 18px", height: "100%", boxSizing: "border-box" }}>
       <div style={{ fontSize: "11px", color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: "4px" }}>
         {label}
       </div>
       <div style={{ fontSize: "20px", fontWeight: 700, color: valueColor }}>{value}</div>
-      {sub && <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>{sub}</div>}
+      {sub  && <div style={{ fontSize: "11px", color: subColor,  marginTop: "2px" }}>{sub}</div>}
+      {sub2 && <div style={{ fontSize: "11px", color: sub2Color, marginTop: "1px" }}>{sub2}</div>}
     </div>
   );
 }
@@ -165,11 +183,34 @@ export default function DataQualityPage() {
     );
   }
 
-  const { overview, import: imp, author_linking, geo_extraction, geo_quality } = data;
-  const article_location = data.article_location ?? {
-    with_country: 0, with_country_pct: 0, with_city: 0, with_city_pct: 0,
-    no_country: 0, no_city: 0, not_parsed: 0, high_confidence: 0, low_confidence: 0,
+  const { overview, import: imp, author_linking } = data;
+  const author_location = data.author_location ?? {
+    with_region: 0, with_region_pct: 0,
+    with_country: 0, with_country_pct: 0,
+    with_state: 0, with_state_pct: 0,
+    with_city: 0, distinct_regions: 0,
+    no_region: 0, no_country: 0, no_state: 0, no_city: 0, no_geo: 0,
+    affiliation_too_long: 0, suspect_city_values: 0,
+    source_openalex: 0, source_parser: 0, verified_human: 0,
   };
+  const article_location = data.article_location ?? {
+    with_region: 0, with_region_pct: 0, no_region: 0,
+    with_country: 0, with_country_pct: 0, no_country: 0,
+    with_state: 0, with_state_pct: 0, no_state: 0,
+    with_city: 0, no_city: 0,
+    not_parsed: 0, suspect_city_values: 0, distinct_regions: 0,
+  };
+
+  const totalA   = overview.total_authors;
+  const totalArt = overview.total_articles;
+
+  const cleanAuthorCities    = author_location.with_city - author_location.suspect_city_values;
+  const cleanAuthorCitiesPct = totalA > 0 ? Math.round((cleanAuthorCities / totalA) * 1000) / 10 : 0;
+  const authorSuspectCount   = author_location.suspect_city_values;
+
+  const cleanCities    = article_location.with_city - article_location.suspect_city_values;
+  const cleanCitiesPct = totalArt > 0 ? Math.round((cleanCities / totalArt) * 1000) / 10 : 0;
+  const suspectCount   = article_location.suspect_city_values;
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -204,6 +245,11 @@ export default function DataQualityPage() {
             <MetricCard label="Awaiting linking"   value={num(imp.awaiting_linking)}
               highlight={imp.awaiting_linking > 500 ? "amber" : imp.awaiting_linking > 0 ? undefined : "green"} />
           </div>
+          <div style={{ padding: "0 20px 16px", textAlign: "right" }}>
+            <Link href="/admin/system/docs/pubmed-import" style={{ fontSize: "12px", color: "#5a6a85", textDecoration: "none" }}>
+              → PubMed import pipeline documentation
+            </Link>
+          </div>
         </SectionCard>
 
         {/* 2 · Author linking */}
@@ -220,69 +266,191 @@ export default function DataQualityPage() {
             <MetricCard label="Articles missing authors"          value={num(author_linking.articles_with_mismatch)}
               highlight={author_linking.articles_with_mismatch > 0 ? "amber" : undefined} />
           </div>
+          <div style={{ padding: "0 20px 16px", textAlign: "right" }}>
+            <Link href="/admin/system/docs/author-linking" style={{ fontSize: "12px", color: "#5a6a85", textDecoration: "none" }}>
+              → Author linking pipeline documentation
+            </Link>
+          </div>
         </SectionCard>
 
-        {/* 3 · Geo extraction */}
-        <SectionCard number="3" title="Author location data coverage" timestamp="Cumulative · all authors">
-          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(6, 1fr)" }}>
-            <MetricCard label="With country"       value={num(geo_extraction.with_country)} sub={`${geo_extraction.with_country_pct}%`} highlight="green" />
-            <MetricCard label="With city"          value={num(geo_extraction.with_city)}    sub={`${geo_extraction.with_city_pct}%`} />
+        {/* 3 · Author location data */}
+        <SectionCard number="3" title="Author location data" timestamp="Cumulative · all authors">
+          {/* Row 1 — Coverage */}
+          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(4, 1fr)", alignItems: "stretch" }}>
+            <MetricCard
+              label="Region coverage"
+              value={num(author_location.with_region)}
+              highlight="green"
+              sub={`${author_location.with_region_pct}%`}
+              sub2={`${num(author_location.distinct_regions)} / 15 regioner`}
+              sub2Highlight={author_location.distinct_regions >= 15 ? "green" : author_location.distinct_regions >= 10 ? "amber" : "red"}
+            />
+            <MetricCard
+              label="Country coverage"
+              value={num(author_location.with_country)}
+              highlight="green"
+              sub={`${author_location.with_country_pct}%`}
+              sub2="0 urene"
+              sub2Highlight="green"
+            />
+            <MetricCard
+              label="State coverage"
+              value={num(author_location.with_state)}
+              highlight="green"
+              sub={`${author_location.with_state_pct}%`}
+              sub2="0 urene"
+              sub2Highlight="green"
+            />
+            <Link href="/admin/authors?suspect_city=true" style={{ textDecoration: "none" }}>
+              <MetricCard
+                label="City coverage"
+                value={num(cleanAuthorCities)}
+                highlight="green"
+                sub={`${cleanAuthorCitiesPct}%`}
+                sub2={`${num(authorSuspectCount)} urene`}
+                sub2Highlight={authorSuspectCount > 50 ? "red" : authorSuspectCount > 0 ? "amber" : "green"}
+              />
+            </Link>
+          </div>
+          {/* Row 2 — Missing */}
+          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(4, 1fr)", alignItems: "stretch", paddingTop: 0 }}>
+            <Link href="/admin/authors?filter=no_region" style={{ textDecoration: "none" }}>
+              <MetricCard
+                label="No region"
+                value={num(author_location.no_region)}
+                highlight={author_location.no_region > 0 ? "amber" : "green"}
+              />
+            </Link>
             <Link href="/admin/authors?filter=no_country" style={{ textDecoration: "none" }}>
-              <MetricCard label="No country"       value={num(geo_extraction.no_country)} />
+              <MetricCard
+                label="No country"
+                value={num(author_location.no_country)}
+                highlight={author_location.no_country > 0 ? "amber" : "green"}
+              />
+            </Link>
+            <Link href="/admin/authors?filter=no_state" style={{ textDecoration: "none" }}>
+              <MetricCard
+                label="No state"
+                value={num(author_location.no_state)}
+                highlight={author_location.no_state > 0 ? "amber" : "green"}
+              />
             </Link>
             <Link href="/admin/authors?filter=no_city" style={{ textDecoration: "none" }}>
-              <MetricCard label="No city"          value={num(geo_extraction.no_city)} />
-            </Link>
-            <Link href="/admin/authors?filter=no_geo" style={{ textDecoration: "none" }}>
-              <MetricCard label="No geo"           value={num(geo_extraction.no_geo)} />
-            </Link>
-            <Link href="/admin/authors?filter=affiliation_too_long" style={{ textDecoration: "none" }}>
-              <MetricCard label="Affiliation too long" value={num(geo_extraction.affiliation_too_long)} />
+              <MetricCard
+                label="No city"
+                value={num(author_location.no_city)}
+                highlight={author_location.no_city > 0 ? "amber" : "green"}
+              />
             </Link>
           </div>
-        </SectionCard>
-
-        {/* 4 · Author location data quality */}
-        <SectionCard number="4" title="Author location data quality" timestamp="Cumulative · all authors">
-          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(4, 1fr)" }}>
+          {/* Row 3 — Meta */}
+          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(4, 1fr)", paddingTop: 0 }}>
+            <MetricCard label="Source: OpenAlex" value={num(author_location.source_openalex)} sub="primær kilde" />
+            <MetricCard label="Source: Parser"   value={num(author_location.source_parser)}   sub="fallback" />
             <Link href="/admin/authors?filter=suspect_city" style={{ textDecoration: "none" }}>
-              <MetricCard label="Suspect city values"    value={num(geo_quality.suspect_city_values)}
-                highlight={geo_quality.suspect_city_values > 0 ? "amber" : "green"} />
+              <MetricCard
+                label="Suspect city values"
+                value={num(author_location.suspect_city_values)}
+                highlight={authorSuspectCount > 50 ? "red" : authorSuspectCount > 0 ? "amber" : "green"}
+              />
             </Link>
-            <Link href="/admin/authors?filter=suspect_country" style={{ textDecoration: "none" }}>
-              <MetricCard label="Suspect country values" value={num(geo_quality.suspect_country_values)}
-                highlight={geo_quality.suspect_country_values > 0 ? "amber" : undefined} />
-            </Link>
-            <Link href="/admin/authors?filter=country_alias" style={{ textDecoration: "none" }}>
-              <MetricCard label="Country alias pairs"    value={num(geo_quality.country_alias_pairs)}
-                highlight={geo_quality.country_alias_pairs > 0 ? "amber" : undefined} />
-            </Link>
-            <Link href="/admin/authors?filter=city_alias" style={{ textDecoration: "none" }}>
-              <MetricCard label="City alias pairs"       value={num(geo_quality.city_alias_pairs)}
-                highlight={geo_quality.city_alias_pairs > 0 ? "amber" : undefined} />
+            <MetricCard
+              label="Verified by human"
+              value={num(author_location.verified_human)}
+              highlight={author_location.verified_human > 0 ? "green" : undefined}
+            />
+          </div>
+          <div style={{ padding: "0 20px 16px", textAlign: "right" }}>
+            <Link href="/admin/system/docs/author-geo" style={{ fontSize: "12px", color: "#5a6a85", textDecoration: "none" }}>
+              → Author geo pipeline documentation
             </Link>
           </div>
         </SectionCard>
 
-        {/* 5 · Article location data coverage */}
-        <SectionCard number="5" title="Article location data coverage" timestamp="Cumulative · all articles">
-          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(4, 1fr)" }}>
-            <MetricCard label="With country"     value={num(article_location.with_country)} sub={`${article_location.with_country_pct}%`} highlight="green" />
-            <MetricCard label="With city"        value={num(article_location.with_city)}    sub={`${article_location.with_city_pct}%`} />
-            <Link href="/admin/articles?filter=no_country" style={{ textDecoration: "none" }}>
-              <MetricCard label="No country"     value={num(article_location.no_country)}
-                highlight={article_location.no_country > 0 ? "amber" : "green"} />
+        {/* 4 · Article location data coverage */}
+        <SectionCard number="4" title="Article location data coverage" timestamp="Cumulative · all articles">
+          {/* Row 1 — Coverage */}
+          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(4, 1fr)", alignItems: "stretch" }}>
+            <MetricCard
+              label="Region coverage"
+              value={num(article_location.with_region)}
+              highlight="green"
+              sub={`${article_location.with_region_pct}%`}
+              sub2={`${num(article_location.distinct_regions)} / 15 regioner`}
+              sub2Highlight={article_location.distinct_regions >= 15 ? "green" : article_location.distinct_regions >= 10 ? "amber" : "red"}
+            />
+            <MetricCard
+              label="Country coverage"
+              value={num(article_location.with_country)}
+              highlight="green"
+              sub={`${article_location.with_country_pct}%`}
+              sub2="0 urene"
+              sub2Highlight="green"
+            />
+            <MetricCard
+              label="State coverage"
+              value={num(article_location.with_state)}
+              highlight="green"
+              sub={`${article_location.with_state_pct}%`}
+              sub2="0 urene"
+              sub2Highlight="green"
+            />
+            <Link href="/admin/articles?suspect_city=true" style={{ textDecoration: "none" }}>
+              <MetricCard
+                label="City coverage"
+                value={num(cleanCities)}
+                highlight="green"
+                sub={`${cleanCitiesPct}%`}
+                sub2={`${num(suspectCount)} urene`}
+                sub2Highlight={suspectCount > 50 ? "red" : suspectCount > 0 ? "amber" : "green"}
+              />
             </Link>
-            <MetricCard label="No city"          value={num(article_location.no_city)} />
           </div>
-          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(3, 1fr)", paddingTop: 0 }}>
-            <Link href="/admin/articles?filter=not_parsed" style={{ textDecoration: "none" }}>
-              <MetricCard label="Not parsed"     value={num(article_location.not_parsed)}
-                highlight={article_location.not_parsed > 0 ? "amber" : "green"} />
+          {/* Row 2 — Missing */}
+          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(4, 1fr)", alignItems: "stretch", paddingTop: 0 }}>
+            <Link href="/admin/articles?no_region=true" style={{ textDecoration: "none" }}>
+              <MetricCard
+                label="No region"
+                value={num(article_location.no_region)}
+                highlight={article_location.no_region > 0 ? "amber" : "green"}
+              />
             </Link>
-            <MetricCard label="High confidence" value={num(article_location.high_confidence)} highlight="green" />
-            <MetricCard label="Low confidence"  value={num(article_location.low_confidence)}
-              highlight={article_location.low_confidence > 0 ? "amber" : undefined} />
+            <Link href="/admin/articles?no_country=true" style={{ textDecoration: "none" }}>
+              <MetricCard
+                label="No country"
+                value={num(article_location.no_country)}
+                highlight={article_location.no_country > 0 ? "amber" : "green"}
+              />
+            </Link>
+            <Link href="/admin/articles?no_state=true" style={{ textDecoration: "none" }}>
+              <MetricCard
+                label="No state"
+                value={num(article_location.no_state)}
+                highlight={article_location.no_state > 0 ? "amber" : "green"}
+              />
+            </Link>
+            <Link href="/admin/articles?no_city=true" style={{ textDecoration: "none" }}>
+              <MetricCard
+                label="No city"
+                value={num(article_location.no_city)}
+                highlight={article_location.no_city > 0 ? "amber" : "green"}
+              />
+            </Link>
+          </div>
+          {/* Row 3 — Meta */}
+          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(4, 1fr)", paddingTop: 0 }}>
+            <Link href="/admin/articles?not_parsed=true" style={{ textDecoration: "none" }}>
+              <MetricCard
+                label="Not parsed"
+                value={num(article_location.not_parsed)}
+                highlight={article_location.not_parsed > 0 ? "amber" : "green"}
+              />
+            </Link>
+          </div>
+          <div style={{ padding: "0 20px 16px", textAlign: "right" }}>
+            <Link href="/admin/system/docs/article-geo" style={{ fontSize: "12px", color: "#5a6a85", textDecoration: "none" }}>
+              → Geo pipeline documentation
+            </Link>
           </div>
         </SectionCard>
 

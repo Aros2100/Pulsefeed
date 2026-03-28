@@ -130,7 +130,7 @@ export async function runLocationParsing(limit = 500): Promise<{
         article_countries: [],
         article_cities: [],
         location_parsed_at: now,
-        ...buildGeoFields(null, null),
+        ...await buildGeoFields(null, null),
       });
       continue;
     }
@@ -159,7 +159,7 @@ export async function runLocationParsing(limit = 500): Promise<{
       { region: lastRegion, country: lastParsed?.country ?? null, city: lastParsed?.city ?? null, institution: lastParsed?.institution ?? null },
     );
 
-    const geoFields = buildGeoFields(firstParsed, lastParsed);
+    const geoFields = await buildGeoFields(firstParsed, lastParsed);
 
     updates.push({
       id: article.id,
@@ -178,7 +178,7 @@ export async function runLocationParsing(limit = 500): Promise<{
       article_countries: [],
       article_cities: [],
       location_parsed_at: new Date().toISOString(),
-      ...buildGeoFields(null, null),
+      ...await buildGeoFields(null, null),
     });
   }
 
@@ -270,7 +270,7 @@ export async function reparseLowConfidence(cutoffDate: string, limit = 500): Pro
       { region: lastRegionR, country: lastParsed?.country ?? null, city: lastParsed?.city ?? null, institution: lastParsed?.institution ?? null },
     );
 
-    const geoFieldsR = buildGeoFields(firstParsed, lastParsed);
+    const geoFieldsR = await buildGeoFields(firstParsed, lastParsed);
 
     updates.push({
       id: article.id,

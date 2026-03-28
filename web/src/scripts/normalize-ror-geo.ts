@@ -20,7 +20,7 @@ for (const line of readFileSync(".env.local", "utf8").split("\n")) {
 }
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { normalizeCity } from "@/lib/geo/normalize";
+import { resolveCityAlias } from "@/lib/geo/city-aliases";
 
 const BATCH_SIZE     = 50;
 const BATCH_DELAY_MS = 500;
@@ -34,6 +34,7 @@ interface AuthorRow {
   city: string | null;
   state: string | null;
   country: string | null;
+  verified_by: string | null;
 }
 
 interface RorGeonamesDetails {
@@ -90,7 +91,7 @@ async function main() {
 
     const { data: authors, error } = await admin
       .from("authors")
-      .select("id, display_name, ror_id, city, state, country")
+      .select("id, display_name, ror_id, city, state, country, verified_by")
       .not("ror_id", "is", null)
       .order("created_at", { ascending: true })
       .range(offset, offset + BATCH_SIZE - 1) as unknown as {
@@ -109,6 +110,11 @@ async function main() {
 
     for (const author of authors) {
       totalProcessed++;
+
+      if (author.verified_by === "human") {
+        totalSkipped++;
+        continue;
+      }
 
       const org = await fetchRorOrg(author.ror_id);
 
@@ -130,9 +136,12 @@ async function main() {
       const updates: Record<string, any> = {};
       const changes: string[] = [];
 
-      if (geo.name && normalizeCity(geo.name) !== author.city) {
-        updates.city = normalizeCity(geo.name);
-        changes.push(`city: ${author.city ?? "(null)"} -> ${geo.name}`);
+      if (geo.name) {
+        const resolvedCity = await resolveCityAlias(geo.name, geo.country_name ?? author.country ?? "");
+        if (resolvedCity !== author.city) {
+          updates.city = resolvedCity;
+          changes.push(`city: ${author.city ?? "(null)"} -> ${resolvedCity ?? "(null)"}`);
+        }
       }
       if (geo.country_subdivision_name && geo.country_subdivision_name !== author.state) {
         updates.state = geo.country_subdivision_name;
@@ -161,6 +170,13 @@ async function main() {
           totalFailed++;
           continue;
         }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (admin as any).from("author_events").insert({
+          author_id:  author.id,
+          event_type: "geo_updated",
+          payload:    { ...updates, source: "ror" },
+        });
       }
 
       batchUpdated++;
@@ -181,6 +197,26 @@ async function main() {
   console.log(`  Already correct:   ${totalSkipped}`);
   console.log(`  No ROR data:       ${totalFailed}`);
   console.log(`  Batches:           ${batchNum}`);
+
+  if (!DRY_RUN && totalUpdated > 0) {
+    const admin2 = createAdminClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: normRows, error: normErr } = await (admin2 as any).rpc("normalize_author_geo_city");
+    if (normErr) {
+      console.error("  normalize_author_geo_city failed:", normErr.message);
+    } else {
+      const rowsUpdated = Number(normRows ?? 0);
+      console.log(`  normalize_author_geo_city: ${rowsUpdated} rows updated`);
+      if (rowsUpdated > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (admin2 as any).from("author_events").insert({
+          author_id:  null,
+          event_type: "geo_updated",
+          payload:    { source: "normalize_city", rows_updated: rowsUpdated },
+        });
+      }
+    }
+  }
 }
 
 main().catch((e) => {

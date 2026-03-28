@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { aiParseAffiliation } from "@/lib/geo/ai-location-parser";
-import { normalizeCity } from "@/lib/geo/normalize";
+import { resolveCityAlias } from "@/lib/geo/city-aliases";
 
 const BATCH_SIZE = 200;
 const DELAY_MS = 1300;
@@ -68,7 +68,7 @@ export async function POST() {
           await (admin as any)
             .from("authors")
             .update({
-              city: normalizeCity(result.city),
+              city: await resolveCityAlias(result.city, result.country ?? ""),
               country: result.country,
               hospital: result.institution,
               department: result.department,

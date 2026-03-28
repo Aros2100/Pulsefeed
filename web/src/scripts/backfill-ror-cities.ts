@@ -19,7 +19,7 @@ for (const line of readFileSync(".env.local", "utf8").split("\n")) {
 }
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { normalizeCity } from "@/lib/geo/normalize";
+import { resolveCityAlias } from "@/lib/geo/city-aliases";
 
 const BATCH_SIZE     = 50;
 const BATCH_DELAY_MS = 500;
@@ -132,7 +132,7 @@ async function main() {
       const updates: Record<string, any> = {};
 
       if (geo.name) {
-        updates.city = normalizeCity(geo.name);
+        updates.city = await resolveCityAlias(geo.name, geo.country_name ?? author.country ?? "");
         batchCity++;
       }
 
@@ -193,6 +193,25 @@ async function main() {
   console.log(`  State added:           ${totalState}`);
   console.log(`  Country added:         ${totalCountry}`);
   console.log(`  Batches processed:     ${batchNum}`);
+
+  if (!DRY_RUN && totalCity > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: normRows, error: normErr } = await (admin as any).rpc("normalize_author_geo_city");
+    if (normErr) {
+      console.error("  normalize_author_geo_city failed:", normErr.message);
+    } else {
+      const rowsUpdated = Number(normRows ?? 0);
+      console.log(`  normalize_author_geo_city: ${rowsUpdated} rows updated`);
+      if (rowsUpdated > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (admin as any).from("author_events").insert({
+          author_id:  null,
+          event_type: "geo_updated",
+          payload:    { source: "normalize_city", rows_updated: rowsUpdated },
+        });
+      }
+    }
+  }
 }
 
 main().catch((e) => {

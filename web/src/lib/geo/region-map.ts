@@ -89,7 +89,11 @@ const PROVINCE_CODES = new Set([
   // Brazilian
   "SP", "RJ", "MG", "RS", "PR", "SC", "BA", "CE", "PE", "GO", "PA", "MA", "MT", "MS", "AM", "ES", "PB", "RN", "AL", "SE", "PI", "DF",
   // Australian
-  "NSW", "VIC", "QLD", "SA", "WA", "TAS", "ACT",
+  "NSW", "VIC", "QLD", "SA", "WA", "TAS", "ACT", "NT",
+  // German Bundesländer
+  "NRW", "BW", "BY", "BE", "BB", "HB", "HH", "HE", "MV", "NI", "RP", "SL", "SN", "ST", "SH", "TH",
+  // Others
+  "KPK", "BKK", "OKC", "DZA", "SLV", "CRI", "CUZ", "SAR", "PV", "TO", "UD",
   // Indian
   "MH", "KA", "TN", "DL", "UP", "GJ", "RJ", "WB", "AP", "TS", "KL", "MP", "HR", "PB", "BR", "OR", "JH", "CG", "UK", "GA", "HP", "JK", "MN", "ML", "MZ", "NL", "SK", "TR", "AR", "AS",
 ]);

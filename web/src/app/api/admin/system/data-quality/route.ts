@@ -53,84 +53,40 @@ export async function GET() {
   const { data: articlesWithMismatchData } = await (admin as any).rpc("count_articles_with_mismatch");
   const articles_with_mismatch = (articlesWithMismatchData as number) ?? 0;
 
-  // ── Geo extraction ─────────────────────────────────────────────────────────
-  const [
-    { count: with_country },
-    { count: with_city },
-    { count: no_country },
-    { count: no_city },
-    { count: no_geo },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { data: affiliation_too_long_data },
-  ] = await Promise.all([
-    admin.from("authors").select("*", { count: "exact", head: true })
-      .is("deleted_at", null)
-      .not("country", "is", null),
-    admin.from("authors").select("*", { count: "exact", head: true })
-      .is("deleted_at", null)
-      .not("city", "is", null),
-    admin.from("authors").select("*", { count: "exact", head: true })
-      .is("deleted_at", null)
-      .is("country", null),
-    admin.from("authors").select("*", { count: "exact", head: true })
-      .is("deleted_at", null)
-      .is("city", null),
-    admin.from("authors").select("*", { count: "exact", head: true })
-      .is("deleted_at", null)
-      .is("country", null)
-      .is("city", null),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (admin as any).rpc("count_affiliation_too_long"),
-  ]);
-  const affiliation_too_long = (affiliation_too_long_data as number) ?? 0;
-
-  // with_country + no_country = all non-deleted authors (exact, since every author either has country or doesn't)
-  const totalA = (with_country ?? 0) + (no_country ?? 0);
+  // ── Author location stats ─────────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: authorStatsRows } = await (admin as any).rpc("get_author_location_stats");
+  const authorStats = authorStatsRows?.[0] ?? {};
+  const totalA      = Number(authorStats.total_authors) || 0;
 
   // ── Article location coverage ─────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = admin as any;
   const [
     { count: art_with_country },
+    { count: art_with_region },
     { count: art_with_city },
+    { count: art_with_state },
     { count: art_not_parsed },
-    { count: art_high_confidence },
-    { count: art_low_confidence },
+    { count: art_has_country_no_state },
+    { count: art_has_country_no_city },
+    { data: artSuspectCityData },
+    { data: distinctRegionsData },
   ] = await Promise.all([
     db.from("articles").select("*", { count: "exact", head: true }).not("geo_country", "is", null),
+    db.from("articles").select("*", { count: "exact", head: true }).not("geo_region",  "is", null),
     db.from("articles").select("*", { count: "exact", head: true }).not("geo_city",    "is", null),
+    db.from("articles").select("*", { count: "exact", head: true }).not("geo_state",   "is", null),
     db.from("articles").select("*", { count: "exact", head: true }).is("location_parsed_at", null),
-    db.from("articles").select("*", { count: "exact", head: true }).eq("location_confidence", "high"),
-    db.from("articles").select("*", { count: "exact", head: true }).eq("location_confidence", "low"),
+    db.from("articles").select("*", { count: "exact", head: true }).not("geo_country", "is", null).is("geo_state", null),
+    db.from("articles").select("*", { count: "exact", head: true }).not("geo_country", "is", null).is("geo_city",  null),
+    db.rpc("count_article_suspect_city_values"),
+    db.rpc("count_distinct_geo_regions"),
   ]);
-  const totalArt = total_articles ?? 0;
+  const totalArt         = total_articles ?? 0;
+  const art_suspect_city = (artSuspectCityData  as number) ?? 0;
+  const distinct_regions = (distinctRegionsData as number) ?? 0;
 
-  // ── Geo quality ───────────────────────────────────────────────────────────
-  const [
-    { count: suspect_city_values },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { data: suspectCountryData },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { data: countryAliasData },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { data: cityAliasData },
-  ] = await Promise.all([
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (admin as any).from("authors")
-      .select("*", { count: "exact", head: true })
-      .is("deleted_at", null)
-      .not("city", "is", null)
-      .or("city.ilike.%0%,city.ilike.%1%,city.ilike.%2%,city.ilike.%3%,city.ilike.%4%,city.ilike.%5%,city.ilike.%6%,city.ilike.%7%,city.ilike.%8%,city.ilike.%9%"),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (admin as any).rpc("count_suspect_country_values"),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (admin as any).rpc("count_country_alias_pairs"),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (admin as any).rpc("count_city_alias_pairs"),
-  ]);
-  const suspect_country_values = (suspectCountryData as number) ?? 0;
-  const country_alias_pairs    = (countryAliasData   as number) ?? 0;
-  const city_alias_pairs       = (cityAliasData      as number) ?? 0;
 
 
   return NextResponse.json({
@@ -155,32 +111,27 @@ export async function GET() {
       articles_without_authors: articles_without_authors ?? 0,
       articles_with_mismatch:   articles_with_mismatch,
     },
-    geo_extraction: {
-      with_country:        with_country     ?? 0,
-      with_country_pct:    pct(with_country ?? 0, totalA),
-      with_city:           with_city        ?? 0,
-      with_city_pct:       pct(with_city    ?? 0, totalA),
-      no_country:          no_country       ?? 0,
-      no_city:             no_city          ?? 0,
-      no_geo:              no_geo           ?? 0,
-      affiliation_too_long: affiliation_too_long,
-    },
-    geo_quality: {
-      suspect_city_values:    suspect_city_values    ?? 0,
-      suspect_country_values: suspect_country_values,
-      country_alias_pairs:    country_alias_pairs,
-      city_alias_pairs:       city_alias_pairs,
+    author_location: {
+      ...authorStats,
+      with_region_pct:  pct(Number(authorStats.with_region)  || 0, totalA),
+      with_country_pct: pct(Number(authorStats.with_country) || 0, totalA),
+      with_state_pct:   pct(Number(authorStats.with_state)   || 0, totalA),
     },
     article_location: {
-      with_country:     art_with_country     ?? 0,
-      with_country_pct: pct(art_with_country ?? 0, totalArt),
-      with_city:        art_with_city        ?? 0,
-      with_city_pct:    pct(art_with_city    ?? 0, totalArt),
+      with_region:      art_with_region         ?? 0,
+      with_region_pct:  pct(art_with_region     ?? 0, totalArt),
+      no_region:        totalArt - (art_with_region  ?? 0),
+      with_country:     art_with_country        ?? 0,
+      with_country_pct: pct(art_with_country    ?? 0, totalArt),
       no_country:       totalArt - (art_with_country ?? 0),
-      no_city:          totalArt - (art_with_city    ?? 0),
-      not_parsed:       art_not_parsed       ?? 0,
-      high_confidence:  art_high_confidence  ?? 0,
-      low_confidence:   art_low_confidence   ?? 0,
+      with_state:       art_with_state          ?? 0,
+      with_state_pct:   pct(art_with_state      ?? 0, totalArt),
+      no_state:         art_has_country_no_state ?? 0,
+      with_city:        art_with_city           ?? 0,
+      no_city:          art_has_country_no_city  ?? 0,
+      not_parsed:       art_not_parsed          ?? 0,
+      suspect_city_values: art_suspect_city,
+      distinct_regions,
     },
   });
   } catch (e) {

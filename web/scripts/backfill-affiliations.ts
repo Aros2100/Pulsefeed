@@ -12,7 +12,7 @@
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { createClient } from "@supabase/supabase-js";
-import { parseAffiliation } from "../src/lib/geo/affiliation-utils";
+import { parseAffiliation } from "../src/lib/geo/affiliation-parser";
 
 // ── Load .env.local ────────────────────────────────────────────────────────
 const envPath = resolve(process.cwd(), ".env.local");
@@ -111,12 +111,12 @@ async function main() {
     const updates: ({ id: string } & UpdatePayload)[] = [];
 
     for (const r of rows) {
-      const parsed = parseAffiliation(r.affiliations);
+      const parsed = await parseAffiliation(r.affiliations?.[0] ?? null);
       const next: UpdatePayload = {
-        department: parsed.department,
-        hospital:   parsed.hospital,
-        city:       parsed.city,
-        country:    parsed.country,
+        department: parsed?.department ?? null,
+        hospital:   parsed?.institution ?? null,
+        city:       parsed?.city ?? null,
+        country:    parsed?.country ?? null,
       };
 
       if (hasChanged(r, next)) {
@@ -150,6 +150,21 @@ async function main() {
           process.exit(1);
         }
         totalUpdated += batch.length;
+
+        await Promise.all(
+          batch.map((u) =>
+            db.from("author_events").insert({
+              author_id:  u.id,
+              event_type: "geo_updated",
+              payload: {
+                city:        u.city,
+                country:     u.country,
+                institution: u.hospital,
+                source:      "backfill",
+              },
+            })
+          )
+        );
       }
     }
 
@@ -172,6 +187,26 @@ async function main() {
     console.log(`Kør uden --dry-run for at opdatere ${totalChanged} forfattere.`);
   } else {
     console.log(`Opdateret i DB       : ${totalUpdated}`);
+    if (totalUpdated > 0) {
+      const { data: normRows, error: normErr } = await db.rpc("normalize_geo_city");
+      if (normErr) console.error("normalize_geo_city fejl:", normErr.message);
+      else console.log(`normalize_geo_city        : ${normRows ?? 0} rækker opdateret`);
+
+      const { data: normAuthRows, error: normAuthErr } = await db.rpc("normalize_author_geo_city");
+      if (normAuthErr) {
+        console.error("normalize_author_geo_city fejl:", normAuthErr.message);
+      } else {
+        const rowsUpdated = Number(normAuthRows ?? 0);
+        console.log(`normalize_author_geo_city : ${rowsUpdated} rækker opdateret`);
+        if (rowsUpdated > 0) {
+          await db.from("author_events").insert({
+            author_id:  null,
+            event_type: "geo_updated",
+            payload:    { source: "normalize_city", rows_updated: rowsUpdated },
+          });
+        }
+      }
+    }
   }
 }
 

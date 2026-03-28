@@ -240,6 +240,13 @@ async function main() {
   console.log(`  updated   : ${updated}`);
   console.log(`  skipped   : ${skipped}  (no affiliation text)`);
   console.log(`  failed    : ${failed}`);
+
+  if (!DRY_RUN && updated > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: normRows, error: normErr } = await (admin as any).rpc("normalize_geo_city");
+    if (normErr) console.error("[backfill-article-geo] normalize_geo_city failed:", normErr.message);
+    else console.log(`  normalize_geo_city : ${normRows ?? 0} rows updated`);
+  }
 }
 
 main().catch((err) => {

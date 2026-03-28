@@ -4,7 +4,7 @@ import { extractEmail, stripEmailFromAffiliation } from "@/lib/geo/affiliation-u
 import { parseAffiliation as geoParseAffiliation } from "@/lib/geo/affiliation-parser";
 import { lookupCountry } from "@/lib/geo/country-map";
 import { lookupState } from "@/lib/geo/state-map";
-import { normalizeCity } from "@/lib/geo/normalize";
+import { resolveCityAlias } from "@/lib/geo/city-aliases";
 import { runArticleChecks } from "@/lib/pubmed/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
 import { buildImportEventPayload } from "@/lib/article-events/import-payload";
@@ -376,7 +376,7 @@ async function mergeAuthor(
   const update: Record<string, any> = {};
   if (isGeoUpgrade(existing, parsed)) {
     if (parsed.country) update.country = parsed.country;
-    if (parsed.city) update.city = normalizeCity(parsed.city);
+    if (parsed.city) update.city = await resolveCityAlias(parsed.city, parsed.country ?? "");
     if (parsed.institution) update.hospital = parsed.institution;
     if (parsed.department) update.department = parsed.department;
   }
@@ -452,7 +452,7 @@ async function resolveAuthorFromOpenAlex(
         upgrades.institution_type = primaryInst.type;
         if (primaryInst.ror) {
           const rorGeo = await fetchRorGeo(primaryInst.ror);
-          if (rorGeo.city)                      upgrades.city    = normalizeCity(rorGeo.city);
+          if (rorGeo.city)                      upgrades.city    = await resolveCityAlias(rorGeo.city, rorGeo.country ?? countryName ?? "");
           if (rorGeo.state)                     upgrades.state   = rorGeo.state;
           if (rorGeo.country && !countryName)   upgrades.country = rorGeo.country;
         }
@@ -503,7 +503,7 @@ async function resolveAuthorFromOpenAlex(
       if (instDept) upgrades.department = instDept;
       if (primaryInst?.ror) {
         const rorGeo = await fetchRorGeo(primaryInst.ror);
-        if (rorGeo.city)                    upgrades.city  = normalizeCity(rorGeo.city);
+        if (rorGeo.city)                    upgrades.city  = await resolveCityAlias(rorGeo.city, rorGeo.country ?? countryName ?? "");
         if (rorGeo.state)                   upgrades.state = rorGeo.state;
         if (rorGeo.country && !countryName) upgrades.country = rorGeo.country;
       }
@@ -542,7 +542,7 @@ async function resolveAuthorFromOpenAlex(
     if (primaryInst?.ror && !resolved.ror_id) {
       enrichment.ror_id = primaryInst.ror;
       const rorGeo = await fetchRorGeo(primaryInst.ror);
-      if (rorGeo.city)    enrichment.city    = normalizeCity(rorGeo.city);
+      if (rorGeo.city)    enrichment.city    = await resolveCityAlias(rorGeo.city, rorGeo.country ?? "");
       if (rorGeo.state)   enrichment.state   = rorGeo.state;
       if (rorGeo.country) enrichment.country = rorGeo.country;
     }
@@ -861,12 +861,12 @@ async function createNewAuthor(
   }
 
   // Determine geo: ROR geo as primary, fall back to parser
-  let city = normalizeCity(parsed.city);
+  let city = await resolveCityAlias(parsed.city, parsed.country ?? "");
   let country = parsed.country;
   let state: string | null = null;
   if (oaInst?.ror) {
     const rorGeo = await fetchRorGeo(oaInst.ror);
-    if (rorGeo.city)    city    = normalizeCity(rorGeo.city);
+    if (rorGeo.city)    city    = await resolveCityAlias(rorGeo.city, rorGeo.country ?? country ?? "");
     if (rorGeo.state)   state   = rorGeo.state;
     if (rorGeo.country) country = rorGeo.country;
   }
@@ -1567,6 +1567,21 @@ export async function runImport(
       } catch (qcErr) {
         console.warn(`[import] Article checks threw for ${filterLogId}:`, qcErr);
       }
+    }
+  }
+
+  // 8. Normalize geo_city for all newly imported articles (once per run)
+  if (totalImported > 0) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: normRows, error: normErr } = await (admin as any).rpc("normalize_geo_city");
+      if (normErr) {
+        console.error("[import] normalize_geo_city failed:", normErr.message);
+      } else {
+        console.error(`[import] normalize_geo_city: ${normRows ?? 0} rows updated`);
+      }
+    } catch (normErr) {
+      console.error("[import] normalize_geo_city threw:", normErr);
     }
   }
 
