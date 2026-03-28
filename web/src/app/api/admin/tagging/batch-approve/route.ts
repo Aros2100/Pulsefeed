@@ -35,6 +35,8 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = admin as any;
   const now = new Date().toISOString();
   let approved = 0;
 
@@ -42,17 +44,22 @@ export async function POST(request: NextRequest) {
   const { articleIds, specialty, articleScores } = parsed.data;
   for (let i = 0; i < articleIds.length; i += 50) {
     const chunk = articleIds.slice(i, i + 50);
-    const { error } = await admin
-      .from("articles")
+    const { error } = await db
+      .from("article_specialties")
       .update({
-        status: "approved",
-        approval_method: "mesh_auto_tag",
-        auto_tagged_at: now,
+        specialty_match: true,
+        scored_by: "human",
+        scored_at: now,
       })
-      .in("id", chunk)
-      .eq("status", "pending");
+      .in("article_id", chunk)
+      .eq("specialty", specialty);
 
     if (!error) {
+      await admin
+        .from("articles")
+        .update({ approval_method: "mesh_auto_tag", auto_tagged_at: now })
+        .in("id", chunk);
+
       for (const id of chunk) {
         const score = articleScores?.[id];
         await logArticleEvent(id, "auto_tagged", {

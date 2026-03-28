@@ -30,23 +30,29 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient();
   const now = new Date().toISOString();
 
-  const updateFields: Record<string, unknown> = { status: decision };
-  if (decision === "approved") {
-    updateFields.approval_method = "mesh_combo_tag";
-    updateFields.auto_tagged_at = now;
-  }
-
-  const { error } = await admin
-    .from("articles")
-    .update(updateFields)
-    .eq("id", articleId)
-    .eq("status", "pending");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (admin as any)
+    .from("article_specialties")
+    .update({
+      specialty_match: decision === "approved" ? true : false,
+      scored_by: "human",
+      scored_at: now,
+    })
+    .eq("article_id", articleId)
+    .eq("specialty", specialty);
 
   if (error) {
     return NextResponse.json(
       { ok: false, error: error.message },
       { status: 500 }
     );
+  }
+
+  if (decision === "approved") {
+    await admin
+      .from("articles")
+      .update({ approval_method: "mesh_combo_tag", auto_tagged_at: now })
+      .eq("id", articleId);
   }
 
   await logArticleEvent(articleId, "auto_tagged", {
