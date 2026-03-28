@@ -12,9 +12,10 @@ const schema = z.object({
   ),
   module: z.enum(["condensation_text", "condensation_pico"]),
   decisions: z.array(z.object({
-    article_id: z.string().uuid(),
-    decision:   z.enum(["approved", "rejected"]),
-    comment:    z.string().optional().default(""),
+    article_id:     z.string().uuid(),
+    decision:       z.enum(["approved", "rejected"]),
+    comment:        z.string().optional().default(""),
+    reject_reasons: z.array(z.string()).optional().default([]),
   })).min(1),
 });
 
@@ -77,9 +78,11 @@ export async function POST(request: NextRequest) {
       specialty,
       module,
       decision:            d.decision,
+      comment:             d.comment,
       ai_decision:         "approved",
       ai_confidence:       null,
-      disagreement_reason: d.decision === "rejected" ? (d.comment || "rejected") : null,
+      disagreement_reason: null,
+      reject_reasons:      d.reject_reasons,
       model_version:       modelVersion,
     };
   });

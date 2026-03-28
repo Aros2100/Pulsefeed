@@ -95,7 +95,7 @@ export default function TextValidationClient({ specialty, label }: Props) {
   const [loading, setLoading]                 = useState(true);
   const [selectedId, setSelectedId]           = useState<string | null>(null);
 
-  const [verdicts, setVerdicts]               = useState<Record<string, { decision: "approved" | "rejected"; comment: string }>>({});
+  const [verdicts, setVerdicts]               = useState<Record<string, { decision: "approved" | "rejected"; comment: string; reasons: string[] }>>({});
   const [comments, setComments]               = useState<Record<string, string>>({});
   const [rejectMode, setRejectMode]           = useState(false);
   const [rejectReasons, setRejectReasons]    = useState<Set<string>>(new Set());
@@ -238,7 +238,7 @@ export default function TextValidationClient({ specialty, label }: Props) {
 
   function approveArticle(articleId: string) {
     setRejectMode(false);
-    setVerdicts((prev) => ({ ...prev, [articleId]: { decision: "approved", comment: "" } }));
+    setVerdicts((prev) => ({ ...prev, [articleId]: { decision: "approved", comment: "", reasons: [] } }));
   }
 
   function startReject() {
@@ -256,10 +256,15 @@ export default function TextValidationClient({ specialty, label }: Props) {
   }
 
   function confirmReject(articleId: string) {
-    const reasons = REJECT_REASONS.filter((r) => rejectReasons.has(r)).join(" | ");
-    const freeText = (comments[articleId] ?? "").trim();
-    const combined = freeText ? `${reasons} — ${freeText}` : reasons;
-    setVerdicts((prev) => ({ ...prev, [articleId]: { decision: "rejected", comment: combined } }));
+    const reasons = REJECT_REASONS.filter((r) => rejectReasons.has(r));
+    setVerdicts((prev) => ({
+      ...prev,
+      [articleId]: {
+        decision: "rejected",
+        comment:  (comments[articleId] ?? "").trim(),
+        reasons,
+      },
+    }));
     setRejectMode(false);
     setRejectReasons(new Set());
   }
@@ -313,9 +318,10 @@ export default function TextValidationClient({ specialty, label }: Props) {
     const toSave = articles
       .filter((a) => verdicts[a.id] != null)
       .map((a) => ({
-        article_id: a.id,
-        decision:   verdicts[a.id].decision,
-        comment:    getComment(a.id),
+        article_id:     a.id,
+        decision:       verdicts[a.id].decision,
+        comment:        verdicts[a.id].comment,
+        reject_reasons: verdicts[a.id].reasons,
       }));
 
     if (toSave.length === 0) return;
