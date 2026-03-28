@@ -6,9 +6,10 @@ import { logArticleEvent } from "@/lib/article-events";
 
 const schema = z.object({
   specialty_tags:  z.array(z.string()).optional(),
-  status:          z.enum(["pending", "approved", "rejected"]).optional(),
+  specialty_match: z.enum(["true", "false", "null"]).optional(),
+  specialty:       z.string().optional(),
   subspecialty_ai: z.array(z.string()).optional(),
-}).refine((d) => d.specialty_tags !== undefined || d.status !== undefined || d.subspecialty_ai !== undefined, {
+}).refine((d) => d.specialty_tags !== undefined || d.specialty_match !== undefined || d.subspecialty_ai !== undefined, {
   message: "At least one field must be provided",
 });
 
@@ -30,13 +31,13 @@ export async function PUT(
     return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
   }
 
-  const { specialty_tags, status, subspecialty_ai } = result.data;
+  const { specialty_tags, specialty_match, specialty, subspecialty_ai } = result.data;
   const admin = createAdminClient();
 
   // Fetch current article values for logging and for RPC args
   const { data: article } = await admin
     .from("articles")
-    .select("status, specialty_tags")
+    .select("specialty_tags")
     .eq("id", articleId)
     .maybeSingle();
 
@@ -50,7 +51,6 @@ export async function PUT(
     const { error } = await (admin as any).rpc("replace_article_specialty_tags", {
       p_article_id: articleId,
       p_tags:       specialty_tags,
-      p_status:     article.status ?? "pending",
     });
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -71,15 +71,19 @@ export async function PUT(
     }
   }
 
-  // Update status
-  if (status !== undefined) {
-    const { error } = await admin.from("articles").update({ status }).eq("id", articleId);
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    }
+  // Update specialty_match in article_specialties
+  if (specialty_match !== undefined && specialty !== undefined) {
+    const matchValue = specialty_match === "true" ? true : specialty_match === "false" ? false : null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (admin as any)
+      .from("article_specialties")
+      .update({ specialty_match: matchValue, scored_by: "human", scored_at: new Date().toISOString() })
+      .eq("article_id", articleId)
+      .eq("specialty", specialty);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     void logArticleEvent(articleId, "status_changed", {
-      from:       article.status ?? null,
-      to:         status,
+      specialty,
+      to:         specialty_match,
       changed_by: auth.userId,
     });
   }
