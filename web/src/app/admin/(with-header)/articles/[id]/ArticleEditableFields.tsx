@@ -22,25 +22,27 @@ function tagLabel(slug: string) { return TAG_LABEL[slug] ?? slug; }
 interface Props {
   articleId:             string;
   initialTags:           string[];
-  initialStatus:         string;
+  initialSpecialtyMatch: boolean | null;
+  initialSpecialty:      string;
   initialSubspecialties: string[];
 }
 
 export default function ArticleEditableFields({
   articleId,
   initialTags,
-  initialStatus,
+  initialSpecialtyMatch,
+  initialSpecialty,
   initialSubspecialties,
 }: Props) {
   const [tags,           setTags]           = useState<string[]>(initialTags);
   const [subspecialties, setSubspecialties] = useState<string[]>(initialSubspecialties);
-  const [status,         setStatus]         = useState(initialStatus);
+  const [specialtyMatch, setSpecialtyMatch] = useState<boolean | null>(initialSpecialtyMatch);
   const [input,          setInput]          = useState("");
   const [subInput,       setSubInput]       = useState("");
   const [saving,         setSaving]         = useState<string | null>(null);
   const [error,          setError]          = useState<string | null>(null);
 
-  async function save(patch: { specialty_tags?: string[]; status?: string; subspecialty_ai?: string[] }, key: string) {
+  async function save(patch: { specialty_tags?: string[]; specialty_match?: string; specialty?: string; subspecialty_ai?: string[] }, key: string) {
     setSaving(key);
     setError(null);
     try {
@@ -88,14 +90,15 @@ export default function ArticleEditableFields({
     void save({ subspecialty_ai: next }, "subspecialty");
   }
 
-  function handleStatusChange(newStatus: string) {
-    setStatus(newStatus);
-    void save({ status: newStatus }, "status");
+  function handleSpecialtyMatchChange(val: string) {
+    const parsed = val === "true" ? true : val === "false" ? false : null;
+    setSpecialtyMatch(parsed);
+    void save({ specialty_match: val, specialty: initialSpecialty }, "specialty_match");
   }
 
-  const statusBg     = status === "approved" ? "#f0fdf4" : status === "rejected" ? "#fef2f2" : "#fffbeb";
-  const statusColor  = status === "approved" ? "#15803d" : status === "rejected" ? "#b91c1c" : "#92400e";
-  const statusBorder = status === "approved" ? "#bbf7d0" : status === "rejected" ? "#fecaca" : "#fde68a";
+  const matchBg     = specialtyMatch === true ? "#f0fdf4" : specialtyMatch === false ? "#fef2f2" : "#fffbeb";
+  const matchColor  = specialtyMatch === true ? "#15803d" : specialtyMatch === false ? "#b91c1c" : "#92400e";
+  const matchBorder = specialtyMatch === true ? "#bbf7d0" : specialtyMatch === false ? "#fecaca" : "#fde68a";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
@@ -176,19 +179,21 @@ export default function ArticleEditableFields({
         </div>
       </div>
 
-      {/* Status */}
+      {/* Specialty match */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        <span style={{ fontSize: "11px", fontWeight: 600, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em" }}>Status</span>
+        <span style={{ fontSize: "11px", fontWeight: 600, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          Specialty match
+        </span>
         <select
-          value={status}
-          onChange={(e) => handleStatusChange(e.target.value)}
-          style={{ fontSize: "12px", fontWeight: 600, padding: "4px 8px", borderRadius: "6px", border: `1px solid ${statusBorder}`, background: statusBg, color: statusColor, cursor: "pointer", outline: "none" }}
+          value={specialtyMatch === true ? "true" : specialtyMatch === false ? "false" : "null"}
+          onChange={(e) => handleSpecialtyMatchChange(e.target.value)}
+          style={{ fontSize: "12px", fontWeight: 600, padding: "4px 8px", borderRadius: "6px", border: `1px solid ${matchBorder}`, background: matchBg, color: matchColor, cursor: "pointer", outline: "none" }}
         >
-          <option value="pending">pending</option>
-          <option value="approved">approved</option>
-          <option value="rejected">rejected</option>
+          <option value="null">Pending</option>
+          <option value="true">Included</option>
+          <option value="false">Excluded</option>
         </select>
-        {saving === "status" && <span style={{ fontSize: "11px", color: "#9ca3af" }}>gemmer…</span>}
+        {saving === "specialty_match" && <span style={{ fontSize: "11px", color: "#9ca3af" }}>gemmer…</span>}
       </div>
 
       {error && (

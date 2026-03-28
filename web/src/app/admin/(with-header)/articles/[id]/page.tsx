@@ -418,14 +418,18 @@ export default async function AdminArticleLogPage({
   const { id } = await params;
   const admin = createAdminClient();
 
-  const [articleResult, eventsResult, authorLinksResult] = await Promise.all([
+  const [articleResult, eventsResult, authorLinksResult, specialtyResult] = await Promise.all([
     admin.from("articles").select("*").eq("id", id).maybeSingle(),
     admin.from("article_events").select("*").eq("article_id", id).order("sequence", { ascending: true }),
     admin.from("article_authors").select("author_id, position, authors(author_score, department, hospital, city, state, country, verified_by)").eq("article_id", id),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (admin as any).from("article_specialties").select("specialty, specialty_match").eq("article_id", id).order("specialty").limit(1).maybeSingle(),
   ]);
 
   const article = articleResult.data;
   if (!article) notFound();
+
+  const specialtyRow = specialtyResult.data as { specialty: string; specialty_match: boolean | null } | null;
 
   // Cast for typed access
   const a = article as unknown as ArticleData;
@@ -590,7 +594,8 @@ export default async function AdminArticleLogPage({
           <ArticleEditableFields
             articleId={id}
             initialTags={(a.specialty_tags as string[] | null) ?? []}
-            initialStatus={(raw.status as string | null) ?? "pending"}
+            initialSpecialtyMatch={specialtyRow?.specialty_match ?? null}
+            initialSpecialty={specialtyRow?.specialty ?? (a.specialty_tags as string[] | null)?.[0] ?? ""}
             initialSubspecialties={(Array.isArray(a.subspecialty_ai) ? a.subspecialty_ai : []) as string[]}
           />
         </CardBody>
