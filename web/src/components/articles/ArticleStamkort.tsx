@@ -54,7 +54,6 @@ export interface ArticleData {
   // Classification (computed)
   full_text_available: boolean | null;
   time_to_read: number | null;
-  geographic_region: string | null;
   trial_registration: string | null;
   patient_population: string | null;
   pmc_id: string | null;
@@ -143,9 +142,12 @@ export default function ArticleStamkort({ article, authorIdByPosition, authorSco
   const pubmedUrl = `https://pubmed.ncbi.nlm.nih.gov/${article.pubmed_id}/`;
   const doiUrl    = article.doi ? `https://doi.org/${article.doi}` : null;
 
-  const publishedDisplay = article.published_date
-    ? new Date(article.published_date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-    : article.published_year ? String(article.published_year) : null;
+  const MONTHS_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const publishedDisplay = (() => {
+    if (!article.published_date) return article.published_year ? String(article.published_year) : null;
+    const d = new Date(article.published_date);
+    return `${d.getUTCDate()} ${MONTHS_EN[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  })();
 
   const firstAuthorCitation = authors.length > 0
     ? `${authors[0].lastName ?? ""}${authors.length > 1 ? " et al." : ""}`

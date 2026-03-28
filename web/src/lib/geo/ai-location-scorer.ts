@@ -5,10 +5,11 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { aiParseAffiliation, type AIParsedLocation } from "./ai-location-parser";
-import { lookupCountry } from "./country-map";
-import { getRegion, getContinent } from "./continent-map";
+import { lookupCountry, getRegion, getContinent } from "./country-map";
 import { buildLocationSummary } from "./article-location-summary";
 import { lookupState } from "./state-map";
+import { getCityCache, normalizeCityKey } from "./city-cache";
+import { logGeoUpdatedEvent, type GeoSnapshot } from "@/lib/article-events";
 
 type AuthorEntry = {
   affiliation?: string | null;
@@ -97,7 +98,7 @@ export async function runAILocationParsing(
   const { data: articles, error } = await db
     .from("articles")
     .select(
-      "id, authors, first_author_city, first_author_country, first_author_department, first_author_institution, last_author_city, last_author_country, last_author_department, last_author_institution"
+      "id, authors, geo_city, geo_country, geo_department, geo_institution"
     )
     .eq("location_confidence", "low")
     .not("location_parsed_at", "is", null)
@@ -109,17 +110,24 @@ export async function runAILocationParsing(
   type ArticleRow = {
     id: string;
     authors: unknown;
-    first_author_city: string | null;
-    first_author_country: string | null;
-    first_author_department: string | null;
-    first_author_institution: string | null;
-    last_author_city: string | null;
-    last_author_country: string | null;
-    last_author_department: string | null;
-    last_author_institution: string | null;
+    geo_city: string | null;
+    geo_country: string | null;
+    geo_department: string | null;
+    geo_institution: string | null;
   };
 
   const rows = (articles ?? []) as ArticleRow[];
+
+  // Snapshot of previous geo state per article (for event logging)
+  const prevGeoMap = new Map<string, GeoSnapshot>();
+  for (const article of rows) {
+    prevGeoMap.set(article.id, {
+      geo_city: article.geo_city,
+      geo_country: article.geo_country,
+      geo_department: article.geo_department,
+      geo_institution: article.geo_institution,
+    });
+  }
 
   let processed = 0;
   let upgraded = 0;
@@ -160,39 +168,30 @@ export async function runAILocationParsing(
       await delay(200);
     }
 
-    // Cross-check first author
+    // Cross-check first author (geo_* fields hold first-author data)
     const firstCheck = firstAffiliation
       ? crossCheck(
           {
-            city: article.first_author_city,
-            country: article.first_author_country,
-            department: article.first_author_department,
-            institution: article.first_author_institution,
+            city: article.geo_city,
+            country: article.geo_country,
+            department: article.geo_department,
+            institution: article.geo_institution,
           },
           firstAI
         )
-      : { result: "skipped" as AuthorResult, fields: { department: article.first_author_department, institution: article.first_author_institution, city: article.first_author_city, country: article.first_author_country } };
+      : { result: "skipped" as AuthorResult, fields: { department: article.geo_department, institution: article.geo_institution, city: article.geo_city, country: article.geo_country } };
 
-    // Cross-check last author
-    const lastCheck = lastAffiliation
-      ? crossCheck(
-          {
-            city: article.last_author_city,
-            country: article.last_author_country,
-            department: article.last_author_department,
-            institution: article.last_author_institution,
-          },
-          lastAI
-        )
-      : { result: "skipped" as AuthorResult, fields: { department: article.last_author_department, institution: article.last_author_institution, city: article.last_author_city, country: article.last_author_country } };
+    // City→country fallback: if cross-check left country null but city is set, try city-cache
+    if (firstCheck.fields.city && !firstCheck.fields.country) {
+      const cityCache = await getCityCache();
+      const c = cityCache.countryMap.get(normalizeCityKey(firstCheck.fields.city));
+      if (c) firstCheck.fields.country = c;
+    }
 
-    // Determine overall outcome
-    const results = [firstCheck.result, lastCheck.result].filter(
-      (r) => r !== "skipped"
-    );
-    const hasConflict = results.includes("conflicted");
-    const hasResolved = results.includes("resolved");
-    const allFailed = results.every((r) => r === "failed");
+    // Determine overall outcome (first author only — last_author_* columns removed)
+    const hasConflict = firstCheck.result === "conflicted";
+    const hasResolved = firstCheck.result === "resolved";
+    const allFailed = firstCheck.result === "failed";
 
     let newConfidence: "high" | "low" = "low";
     if (hasResolved && !hasConflict) {
@@ -204,57 +203,37 @@ export async function runAILocationParsing(
       failed++;
     }
 
-    const firstRegionAI = getRegion(firstCheck.fields.country ?? "") ?? null;
-    const lastRegionAI = getRegion(lastCheck.fields.country ?? "") ?? null;
+    const firstRegionAI = firstCheck.fields.country ? getRegion(firstCheck.fields.country) : null;
     const summaryAI = buildLocationSummary(
       { region: firstRegionAI, country: firstCheck.fields.country, city: firstCheck.fields.city, institution: firstCheck.fields.institution },
-      { region: lastRegionAI, country: lastCheck.fields.country, city: lastCheck.fields.city, institution: lastCheck.fields.institution },
+      { region: null, country: null, city: null, institution: null },
     );
 
     // geo_* fields: derived from first author result
     const geoCountryAI = firstCheck.fields.country;
     const geoCityAI = firstCheck.fields.city;
     const geoInstitutionAI = firstCheck.fields.institution;
+    const geoDepartmentAI = firstCheck.fields.department;
     const geoRegionAI = firstRegionAI;
-    const geoContinentAI = firstRegionAI ? getContinent(firstRegionAI) : null;
+    const geoContinentAI = geoCountryAI ? getContinent(geoCountryAI) : null;
     // State: prefer AI result, fall back to state-map lookup
     const aiFirstState = firstAI?.state ?? null;
     const geoStateAI = aiFirstState ?? (geoCityAI && geoCountryAI ? lookupState(geoCityAI, geoCountryAI) : null);
 
-    // Certainty
-    const hasLastAuthorAI = lastCheck.result !== "skipped";
-    const geoCountryCertainAI = !hasLastAuthorAI || !lastCheck.fields.country || lastCheck.fields.country === firstCheck.fields.country;
-    const geoStateCertainAI = geoCountryCertainAI;
-    const geoCityCertainAI = geoCountryCertainAI && (!hasLastAuthorAI || !lastCheck.fields.city || lastCheck.fields.city === firstCheck.fields.city);
-    const geoInstitutionCertainAI = geoCityCertainAI && (!hasLastAuthorAI || !lastCheck.fields.institution || lastCheck.fields.institution === firstCheck.fields.institution);
-
     updates.push({
       id: article.id,
       fields: {
-        first_author_department: firstCheck.fields.department,
-        first_author_institution: firstCheck.fields.institution,
-        first_author_city: firstCheck.fields.city,
-        first_author_country: firstCheck.fields.country,
-        first_author_region: firstRegionAI,
-        last_author_department: lastCheck.fields.department,
-        last_author_institution: lastCheck.fields.institution,
-        last_author_city: lastCheck.fields.city,
-        last_author_country: lastCheck.fields.country,
-        last_author_region: lastRegionAI,
+        geo_department: geoDepartmentAI,
+        geo_institution: geoInstitutionAI,
+        geo_city: geoCityAI,
+        geo_country: geoCountryAI,
+        geo_region: geoRegionAI,
+        geo_continent: geoContinentAI,
+        geo_state: geoStateAI,
         ...summaryAI,
         location_confidence: newConfidence,
         location_parsed_at: new Date().toISOString(),
         ai_location_attempted: true,
-        geo_continent: geoContinentAI,
-        geo_region: geoRegionAI,
-        geo_country: geoCountryAI,
-        geo_state: geoStateAI,
-        geo_city: geoCityAI,
-        geo_institution: geoInstitutionAI,
-        geo_country_certain: geoCountryCertainAI,
-        geo_state_certain: geoStateCertainAI,
-        geo_city_certain: geoCityCertainAI,
-        geo_institution_certain: geoInstitutionCertainAI,
       },
     });
   }
@@ -268,6 +247,20 @@ export async function runAILocationParsing(
     );
   }
 
+  // Fire geo_updated events (fire-and-forget)
+  for (const u of updates) {
+    const f = u.fields as Record<string, string | null>;
+    const next: GeoSnapshot = {
+      geo_city: f.geo_city ?? null,
+      geo_country: f.geo_country ?? null,
+      geo_state: f.geo_state ?? null,
+      geo_region: f.geo_region ?? null,
+      geo_continent: f.geo_continent ?? null,
+      geo_institution: f.geo_institution ?? null,
+      geo_department: f.geo_department ?? null,
+    };
+    logGeoUpdatedEvent(u.id, "enrichment", prevGeoMap.get(u.id) ?? null, next);
+  }
 
   return { processed, upgraded, conflicted, failed };
 }

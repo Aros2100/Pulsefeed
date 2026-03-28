@@ -5,13 +5,14 @@ import { useState } from "react";
 interface Props {
   pubmed:    React.ReactNode;
   berigelse: React.ReactNode;
+  geo:       React.ReactNode;
   system:    React.ReactNode;
   historik:  React.ReactNode;
 }
 
-type Tab = "pubmed" | "berigelse" | "system" | "historik";
+type Tab = "pubmed" | "berigelse" | "geo" | "system" | "historik";
 
-export default function AdminArticleTabs({ pubmed, berigelse, system, historik }: Props) {
+export default function AdminArticleTabs({ pubmed, berigelse, geo, system, historik }: Props) {
   const [tab, setTab] = useState<Tab>("pubmed");
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
@@ -36,12 +37,14 @@ export default function AdminArticleTabs({ pubmed, berigelse, system, historik }
       <div style={{ display: "flex", borderBottom: "1px solid #dde3ed", marginBottom: "20px" }}>
         <button style={tabStyle(tab === "pubmed")}    onClick={() => setTab("pubmed")}>PubMed</button>
         <button style={tabStyle(tab === "berigelse")}  onClick={() => setTab("berigelse")}>Berigelse</button>
+        <button style={tabStyle(tab === "geo")}        onClick={() => setTab("geo")}>Geo</button>
         <button style={tabStyle(tab === "system")}     onClick={() => setTab("system")}>System</button>
-        <button style={tabStyle(tab === "historik")}    onClick={() => setTab("historik")}>Historik</button>
+        <button style={tabStyle(tab === "historik")}   onClick={() => setTab("historik")}>Historik</button>
       </div>
 
       {tab === "pubmed"    && pubmed}
       {tab === "berigelse" && berigelse}
+      {tab === "geo"       && geo}
       {tab === "system"    && system}
       {tab === "historik"  && historik}
     </div>

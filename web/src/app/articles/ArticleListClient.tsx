@@ -89,10 +89,10 @@ const selectStyle: React.CSSProperties = {
 };
 
 const PERIOD_BUTTONS = [
-  { value: "uge",   label: "Denne uge" },
-  { value: "måned", label: "Måned" },
-  { value: "år",    label: "År" },
-  { value: "alle",  label: "Alle" },
+  { value: "uge",   label: "This week" },
+  { value: "måned", label: "Month" },
+  { value: "år",    label: "Year" },
+  { value: "alle",  label: "All" },
 ];
 
 export default function ArticleListClient({
@@ -244,7 +244,7 @@ export default function ArticleListClient({
           <div style={{ padding: "16px 24px" }}>
             <div style={{ fontSize: "20px", fontWeight: 700, marginBottom: "4px" }}>Articles</div>
             <div style={{ fontSize: "13px", color: "#999" }}>
-              {totalCount} resultater
+              {totalCount} results
             </div>
           </div>
 
@@ -289,7 +289,7 @@ export default function ArticleListClient({
                 onChange={(e) => setParam("subspecialty", e.target.value || null)}
                 style={selectStyle}
               >
-                <option value="">Alle subspecialer</option>
+                <option value="">All subspecialties</option>
                 {subspecialtyOptions.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
@@ -424,7 +424,7 @@ export default function ArticleListClient({
                   cursor: isLoading ? "default" : "pointer",
                 }}
               >
-                {isLoading ? "Indlæser..." : "Vis flere resultater"}
+                {isLoading ? "Loading..." : "Load more"}
               </button>
             </div>
           )}
@@ -445,18 +445,18 @@ export default function ArticleListClient({
               disabled={currentPage === 1}
               style={navBtnStyle(currentPage === 1)}
             >
-              &laquo; Første
+              &laquo; First
             </button>
             <button
               onClick={() => navigatePage(currentPage - 1)}
               disabled={currentPage === 1}
               style={navBtnStyle(currentPage === 1)}
             >
-              &lsaquo; Forrige
+              &lsaquo; Previous
             </button>
 
             <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "#5a6a85" }}>
-              <span>Side</span>
+              <span>Page</span>
               <input
                 type="number"
                 min={1}
@@ -475,7 +475,7 @@ export default function ArticleListClient({
                   outline: "none",
                 }}
               />
-              <span>af {totalPages}</span>
+              <span>of {totalPages}</span>
             </div>
 
             <button
@@ -483,14 +483,14 @@ export default function ArticleListClient({
               disabled={currentPage >= totalPages}
               style={navBtnStyle(currentPage >= totalPages)}
             >
-              Næste &rsaquo;
+              Next &rsaquo;
             </button>
             <button
               onClick={() => navigatePage(totalPages)}
               disabled={currentPage >= totalPages}
               style={navBtnStyle(currentPage >= totalPages)}
             >
-              Sidste &raquo;
+              Last &raquo;
             </button>
           </div>
         )}

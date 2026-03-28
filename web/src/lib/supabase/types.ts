@@ -866,6 +866,48 @@ export type Database = {
         }
         Relationships: []
       }
+      city_aliases: {
+        Row: {
+          alias: string
+          canonical: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          alias: string
+          canonical: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          alias?: string
+          canonical?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      country_aliases: {
+        Row: {
+          alias: string
+          canonical: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          alias: string
+          canonical: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          alias?: string
+          canonical?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
       geo_cities: {
         Row: {
           admin1_code: string | null
@@ -2032,6 +2074,12 @@ export type Database = {
           hospital: string
           id: string
           state: string
+        }[]
+      }
+      get_authors_affiliation_too_long: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
         }[]
       }
       get_classification_not_validated_articles: {

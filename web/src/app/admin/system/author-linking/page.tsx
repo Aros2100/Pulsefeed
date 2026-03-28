@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 
 interface AuthorLinkingLog {
@@ -108,12 +108,17 @@ function fmtDuration(started: string, completed: string | null) {
 
 export default function AuthorLinkingPage() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
-  const [starting, setStarting] = useState(false);
+  const [autoRunning, setAutoRunning] = useState(false);
+  const [progressMsg, setProgressMsg] = useState("");
   const [resetting, setResetting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showRejected, setShowRejected] = useState(false);
   const [rejectedRows, setRejectedRows] = useState<RejectedRow[] | null>(null);
   const [loadingRejected, setLoadingRejected] = useState(false);
+
+  // Refs for auto-chaining logic (don't trigger re-renders)
+  const prevBatchStatusRef = useRef<string | undefined>(undefined);
+  const batchCountRef = useRef(0);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -131,27 +136,92 @@ export default function AuthorLinkingPage() {
 
   const isRunning = status?.latest?.status === "running";
 
+  // Polling interval — active while a batch is running OR while auto-chaining between batches
   useEffect(() => {
-    if (!isRunning) return;
+    if (!isRunning && !autoRunning) return;
     const id = setInterval(() => { void fetchAll(); }, 3000);
     return () => clearInterval(id);
-  }, [isRunning, fetchAll]);
+  }, [isRunning, autoRunning, fetchAll]);
+
+  // Auto-chaining: when a batch completes, re-trigger if articles remain unlinked
+  useEffect(() => {
+    if (!autoRunning) {
+      prevBatchStatusRef.current = undefined;
+      return;
+    }
+
+    const currentStatus = status?.latest?.status;
+    const prevStatus = prevBatchStatusRef.current;
+    prevBatchStatusRef.current = currentStatus;
+
+    if (prevStatus === "running" && currentStatus === "failed") {
+      setAutoRunning(false);
+      setActionError("Batch fejlede");
+      return;
+    }
+
+    if (prevStatus === "running" && currentStatus === "completed") {
+      const unlinked = status?.unlinkedCount ?? 0;
+
+      if (unlinked === 0) {
+        setAutoRunning(false);
+        setProgressMsg(`Færdig efter ${batchCountRef.current} batch${batchCountRef.current > 1 ? "es" : ""}`);
+        return;
+      }
+
+      // Still articles left — schedule next batch after short pause
+      setProgressMsg(`Batch ${batchCountRef.current} færdig — ${unlinked.toLocaleString("da-DK")} artikler tilbage`);
+      const timer = setTimeout(() => {
+        batchCountRef.current += 1;
+        setProgressMsg(`Starter batch ${batchCountRef.current}…`);
+        void fetch("/api/admin/author-linking/start", { method: "POST" })
+          .then((r) => r.json())
+          .then((json: { ok: boolean; error?: string }) => {
+            if (!json.ok) {
+              setAutoRunning(false);
+              setActionError(json.error ?? "Ukendt fejl");
+            } else {
+              void fetchAll(); // trigger immediate poll so isRunning picks up
+            }
+          })
+          .catch(() => {
+            setAutoRunning(false);
+            setActionError("Netværksfejl");
+          });
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+
+    // Update live progress while batch is running
+    if (currentStatus === "running") {
+      const remaining = status?.unlinkedCount ?? 0;
+      setProgressMsg(
+        `Kører batch ${batchCountRef.current}` +
+        (remaining > 0 ? ` — ${remaining.toLocaleString("da-DK")} artikler tilbage` : "…")
+      );
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, autoRunning]);
 
   async function handleStart() {
-    setStarting(true);
+    setAutoRunning(true);
     setActionError(null);
+    batchCountRef.current = 1;
+    setProgressMsg("Starter batch 1…");
+
     try {
       const res = await fetch("/api/admin/author-linking/start", { method: "POST" });
       const json = (await res.json()) as { ok: boolean; error?: string };
       if (!json.ok) {
+        setAutoRunning(false);
         setActionError(json.error ?? "Ukendt fejl");
       } else {
-        await fetchAll();
+        void fetchAll();
       }
     } catch {
+      setAutoRunning(false);
       setActionError("Netværksfejl");
-    } finally {
-      setStarting(false);
     }
   }
 
@@ -240,16 +310,16 @@ export default function AuthorLinkingPage() {
             )}
             <button
               onClick={() => { void handleStart(); }}
-              disabled={isRunning || starting}
+              disabled={isRunning || autoRunning}
               style={{
                 padding: "10px 24px", borderRadius: 8, fontSize: 14, fontWeight: 600,
-                background: isRunning || starting ? "#d1d5db" : "#E83B2A",
-                color: isRunning || starting ? "#374151" : "#fff",
+                background: isRunning || autoRunning ? "#d1d5db" : "#E83B2A",
+                color: isRunning || autoRunning ? "#374151" : "#fff",
                 border: "none",
-                cursor: isRunning || starting ? "default" : "pointer",
+                cursor: isRunning || autoRunning ? "default" : "pointer",
               }}
             >
-              {isRunning ? "Kører…" : starting ? "Starter…" : "Kør import nu"}
+              {autoRunning ? (progressMsg || "Starter…") : isRunning ? "Kører…" : "Kør import nu"}
             </button>
           </div>
         </div>

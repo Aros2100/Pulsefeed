@@ -24,34 +24,35 @@ type DQData = {
     new_authors: number;
     existing: number;
     rejected: number;
-    still_unlinked: number;
+    articles_without_authors: number;
+    articles_with_mismatch: number;
   };
   geo_extraction: {
     with_country: number;
     with_country_pct: number;
     with_city: number;
     with_city_pct: number;
+    no_country: number;
+    no_city: number;
     no_geo: number;
-    no_geo_pct: number;
-    affiliation_no_geo_parser: number;
-    affiliation_no_geo_openalex: number;
-  };
-  openalex: {
-    with_ror_id: number;
-    with_ror_id_pct: number;
-    geo_source_openalex: number;
-    geo_source_openalex_pct: number;
+    affiliation_too_long: number;
   };
   geo_quality: {
-    unique_cities: number;
     suspect_city_values: number;
-    country_no_city: number;
-    normalization: {
-      last_run_at: string | null;
-      authors_normalized: number;
-      duplicates_collapsed: number;
-      remaining_variants: number;
-    };
+    suspect_country_values: number;
+    country_alias_pairs: number;
+    city_alias_pairs: number;
+  };
+  article_location?: {
+    with_country: number;
+    with_country_pct: number;
+    with_city: number;
+    with_city_pct: number;
+    no_country: number;
+    no_city: number;
+    not_parsed: number;
+    high_confidence: number;
+    low_confidence: number;
   };
 };
 
@@ -158,13 +159,17 @@ export default function DataQualityPage() {
     return (
       <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", minHeight: "100vh" }}>
         <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px" }}>
-          <div style={{ color: "#94a3b8", fontSize: "14px" }}>Indlæser…</div>
+          <div style={{ color: "#94a3b8", fontSize: "14px" }}>Loading…</div>
         </div>
       </div>
     );
   }
 
-  const { overview, import: imp, author_linking, geo_extraction, openalex, geo_quality } = data;
+  const { overview, import: imp, author_linking, geo_extraction, geo_quality } = data;
+  const article_location = data.article_location ?? {
+    with_country: 0, with_country_pct: 0, with_city: 0, with_city_pct: 0,
+    no_country: 0, no_city: 0, not_parsed: 0, high_confidence: 0, low_confidence: 0,
+  };
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -185,80 +190,99 @@ export default function DataQualityPage() {
 
         {/* Top KPIs */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "20px" }}>
-          <KpiCard label="Total artikler"       value={num(overview.total_articles)} />
-          <KpiCard label="Total forfattere"     value={num(overview.total_authors)} />
-          <KpiCard label="Seneste import"       value={fmt(overview.last_import_at)} />
-          <KpiCard label="Seneste forfatter-link" value={fmt(overview.last_author_linking_at)} />
+          <KpiCard label="Total articles"       value={num(overview.total_articles)} />
+          <KpiCard label="Total authors"        value={num(overview.total_authors)} />
+          <KpiCard label="Last import"          value={fmt(overview.last_import_at)} />
+          <KpiCard label="Last author records run" value={fmt(overview.last_author_linking_at)} />
         </div>
 
         {/* 1 · Import */}
-        <SectionCard number="1" title="Import" timestamp={fmt(imp.last_run_at)}>
+        <SectionCard number="1" title="Importing articles from PubMed" timestamp={fmt(imp.last_run_at)}>
           <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(3, 1fr)" }}>
-            <MetricCard label="Artikler importeret" value={num(imp.articles_imported)} sub="seneste kørsel" />
-            <MetricCard label="Total i DB"           value={num(imp.total_articles)} />
-            <MetricCard label="Afventer linking"     value={num(imp.awaiting_linking)}
+            <MetricCard label="Articles imported" value={num(imp.articles_imported)} sub="latest run" />
+            <MetricCard label="Total in DB"        value={num(imp.total_articles)} />
+            <MetricCard label="Awaiting linking"   value={num(imp.awaiting_linking)}
               highlight={imp.awaiting_linking > 500 ? "amber" : imp.awaiting_linking > 0 ? undefined : "green"} />
           </div>
         </SectionCard>
 
         {/* 2 · Author linking */}
-        <SectionCard number="2" title="Forfatter-linking" timestamp={fmt(author_linking.last_run_at)}>
-          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(5, 1fr)" }}>
-            <MetricCard label="Artikler behandlet" value={num(author_linking.articles_processed)} sub="seneste kørsel" />
-            <MetricCard label="Nye forfattere"     value={num(author_linking.new_authors)} />
-            <MetricCard label="Eksisterende"       value={num(author_linking.existing)} />
-            <MetricCard label="Afvist"             value={num(author_linking.rejected)} />
-            <MetricCard label="Stadig ulinket"     value={num(author_linking.still_unlinked)}
-              highlight={author_linking.still_unlinked > 200 ? "amber" : undefined} />
+        <SectionCard number="2" title="Adding author records" timestamp={fmt(author_linking.last_run_at)}>
+          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(6, 1fr)" }}>
+            <MetricCard label="Articles processed" value={num(author_linking.articles_processed)} sub="latest run" />
+            <MetricCard label="New authors"        value={num(author_linking.new_authors)} />
+            <MetricCard label="Existing"           value={num(author_linking.existing)} />
+            <Link href="/admin/system/import" style={{ textDecoration: "none" }}>
+              <MetricCard label="Rejected"           value={num(author_linking.rejected)} />
+            </Link>
+            <MetricCard label="Articles without authors" value={num(author_linking.articles_without_authors)}
+              highlight={author_linking.articles_without_authors > 200 ? "amber" : undefined} />
+            <MetricCard label="Articles missing authors"          value={num(author_linking.articles_with_mismatch)}
+              highlight={author_linking.articles_with_mismatch > 0 ? "amber" : undefined} />
           </div>
         </SectionCard>
 
         {/* 3 · Geo extraction */}
-        <SectionCard number="3" title="Geo-udtræk" timestamp="Kumulativt · alle forfattere">
-          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(5, 1fr)" }}>
-            <MetricCard label="Med land"       value={num(geo_extraction.with_country)}  sub={`${geo_extraction.with_country_pct}%`} highlight="green" />
-            <MetricCard label="Med by"         value={num(geo_extraction.with_city)}     sub={`${geo_extraction.with_city_pct}%`} />
-            <MetricCard label="Ingen geo"      value={num(geo_extraction.no_geo)}        sub={`${geo_extraction.no_geo_pct}%`}
-              highlight={geo_extraction.no_geo_pct > 30 ? "amber" : undefined} />
-            <MetricCard label="Affiliering, ingen geo (parser)"   value={num(geo_extraction.affiliation_no_geo_parser)} />
-            <MetricCard label="Affiliering, ingen geo (OpenAlex)" value={num(geo_extraction.affiliation_no_geo_openalex)} />
+        <SectionCard number="3" title="Author location data coverage" timestamp="Cumulative · all authors">
+          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(6, 1fr)" }}>
+            <MetricCard label="With country"       value={num(geo_extraction.with_country)} sub={`${geo_extraction.with_country_pct}%`} highlight="green" />
+            <MetricCard label="With city"          value={num(geo_extraction.with_city)}    sub={`${geo_extraction.with_city_pct}%`} />
+            <Link href="/admin/authors?filter=no_country" style={{ textDecoration: "none" }}>
+              <MetricCard label="No country"       value={num(geo_extraction.no_country)} />
+            </Link>
+            <Link href="/admin/authors?filter=no_city" style={{ textDecoration: "none" }}>
+              <MetricCard label="No city"          value={num(geo_extraction.no_city)} />
+            </Link>
+            <Link href="/admin/authors?filter=no_geo" style={{ textDecoration: "none" }}>
+              <MetricCard label="No geo"           value={num(geo_extraction.no_geo)} />
+            </Link>
+            <Link href="/admin/authors?filter=affiliation_too_long" style={{ textDecoration: "none" }}>
+              <MetricCard label="Affiliation too long" value={num(geo_extraction.affiliation_too_long)} />
+            </Link>
           </div>
         </SectionCard>
 
-        {/* 4 · OpenAlex */}
-        <SectionCard number="4" title="OpenAlex-berigelse" timestamp="Kumulativt · alle forfattere">
-          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(2, 1fr)" }}>
-            <MetricCard label="Med ROR ID"       value={num(openalex.with_ror_id)}         sub={`${openalex.with_ror_id_pct}%`} />
-            <MetricCard label="Geo-kilde: OpenAlex" value={num(openalex.geo_source_openalex)} sub={`${openalex.geo_source_openalex_pct}%`} />
+        {/* 4 · Author location data quality */}
+        <SectionCard number="4" title="Author location data quality" timestamp="Cumulative · all authors">
+          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(4, 1fr)" }}>
+            <Link href="/admin/authors?filter=suspect_city" style={{ textDecoration: "none" }}>
+              <MetricCard label="Suspect city values"    value={num(geo_quality.suspect_city_values)}
+                highlight={geo_quality.suspect_city_values > 0 ? "amber" : "green"} />
+            </Link>
+            <Link href="/admin/authors?filter=suspect_country" style={{ textDecoration: "none" }}>
+              <MetricCard label="Suspect country values" value={num(geo_quality.suspect_country_values)}
+                highlight={geo_quality.suspect_country_values > 0 ? "amber" : undefined} />
+            </Link>
+            <Link href="/admin/authors?filter=country_alias" style={{ textDecoration: "none" }}>
+              <MetricCard label="Country alias pairs"    value={num(geo_quality.country_alias_pairs)}
+                highlight={geo_quality.country_alias_pairs > 0 ? "amber" : undefined} />
+            </Link>
+            <Link href="/admin/authors?filter=city_alias" style={{ textDecoration: "none" }}>
+              <MetricCard label="City alias pairs"       value={num(geo_quality.city_alias_pairs)}
+                highlight={geo_quality.city_alias_pairs > 0 ? "amber" : undefined} />
+            </Link>
           </div>
         </SectionCard>
 
-        {/* 5 · Geo data quality */}
-        <SectionCard number="5" title="Geo-datakvalitet" timestamp="Kumulativt · alle forfattere">
-          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(3, 1fr)" }}>
-            <MetricCard label="Unikke byer"       value={num(geo_quality.unique_cities)} />
-            <MetricCard label="Suspekte bynavne"  value={num(geo_quality.suspect_city_values)}
-              highlight={geo_quality.suspect_city_values > 0 ? "amber" : "green"} />
-            <MetricCard label="Land, ingen by"    value={num(geo_quality.country_no_city)} />
+        {/* 5 · Article location data coverage */}
+        <SectionCard number="5" title="Article location data coverage" timestamp="Cumulative · all articles">
+          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(4, 1fr)" }}>
+            <MetricCard label="With country"     value={num(article_location.with_country)} sub={`${article_location.with_country_pct}%`} highlight="green" />
+            <MetricCard label="With city"        value={num(article_location.with_city)}    sub={`${article_location.with_city_pct}%`} />
+            <Link href="/admin/articles?filter=no_country" style={{ textDecoration: "none" }}>
+              <MetricCard label="No country"     value={num(article_location.no_country)}
+                highlight={article_location.no_country > 0 ? "amber" : "green"} />
+            </Link>
+            <MetricCard label="No city"          value={num(article_location.no_city)} />
           </div>
-
-          {/* Normalization subsection */}
-          <div style={{ borderTop: "1px solid #f1f3f7", margin: "0 20px" }} />
-          <div style={{ padding: "12px 20px 4px" }}>
-            <div style={{ ...sectionLabel, color: "#5a6a85", marginBottom: "12px" }}>
-              By-normalisering
-              {geo_quality.normalization.last_run_at && (
-                <span style={{ fontWeight: 400, marginLeft: "8px", color: "#94a3b8" }}>
-                  {fmt(geo_quality.normalization.last_run_at)}
-                </span>
-              )}
-            </div>
-          </div>
-          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(3, 1fr)", paddingTop: "0" }}>
-            <MetricCard label="Forfattere normaliseret" value={num(geo_quality.normalization.authors_normalized)} />
-            <MetricCard label="Dubletter kollapset"     value={num(geo_quality.normalization.duplicates_collapsed)} />
-            <MetricCard label="Resterende varianter"    value={num(geo_quality.normalization.remaining_variants)}
-              highlight={geo_quality.normalization.remaining_variants === 0 ? "green" : "amber"} />
+          <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(3, 1fr)", paddingTop: 0 }}>
+            <Link href="/admin/articles?filter=not_parsed" style={{ textDecoration: "none" }}>
+              <MetricCard label="Not parsed"     value={num(article_location.not_parsed)}
+                highlight={article_location.not_parsed > 0 ? "amber" : "green"} />
+            </Link>
+            <MetricCard label="High confidence" value={num(article_location.high_confidence)} highlight="green" />
+            <MetricCard label="Low confidence"  value={num(article_location.low_confidence)}
+              highlight={article_location.low_confidence > 0 ? "amber" : undefined} />
           </div>
         </SectionCard>
 

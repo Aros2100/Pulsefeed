@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   const region       = params.get("region");
   const country      = params.get("country");
   const city         = params.get("city");
-  const institution  = params.get("institution");
+  const institution  = params.get("hospital");
   const page         = Math.max(1, parseInt(params.get("page") ?? "1", 10));
 
   const from = (page - 1) * PAGE_SIZE;
@@ -48,11 +48,11 @@ export async function GET(request: NextRequest) {
     query = query.gte("imported_at", periodSince(period ?? "uge"));
   }
 
-  if (subspecialty) query = query.contains("subspecialty_ai",      [subspecialty]);
-  if (region)       query = query.contains("article_regions",      [region]);
-  if (country)      query = query.contains("article_countries",    [country]);
-  if (city)         query = query.contains("article_cities",       [city]);
-  if (institution)  query = query.contains("article_institutions", [institution]);
+  if (subspecialty) query = query.contains("subspecialty_ai",   [subspecialty]);
+  if (region)       query = query.eq("geo_region",               region);
+  if (country)      query = query.contains("article_countries",  [country]);
+  if (city)         query = query.contains("article_cities",     [city]);
+  if (institution)  query = query.eq("geo_institution",          institution);
 
   const { data: articles, count, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

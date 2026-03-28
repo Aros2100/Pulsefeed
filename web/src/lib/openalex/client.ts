@@ -148,6 +148,39 @@ export async function fetchWorkByDoi(
   }
 }
 
+export async function fetchWorkById(
+  workId: string // short ID, e.g. "W2741809807"
+): Promise<OpenAlexWork | null> {
+  try {
+    const params = buildParams();
+    params.set("select", "id,authorships");
+    const url = `${OPENALEX_BASE}/works/${workId}?${params}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+
+    const res = await fetch(url, {
+      headers: { "User-Agent": `pulsefeed/1.0 (mailto:${mailto()})` },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      console.warn(`[openalex] fetchWorkById ${workId}: HTTP ${res.status}`);
+      return null;
+    }
+
+    const data = await res.json();
+    return parseWork(data);
+  } catch (err) {
+    console.warn(
+      `[openalex] fetchWorkById ${workId}: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return null;
+  }
+}
+
 const CHUNK_SIZE = 50;
 const CHUNK_DELAY_MS = 200;
 

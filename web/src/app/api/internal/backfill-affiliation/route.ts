@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { parseAffiliation } from "@/lib/affiliations";
+import { parseAffiliation } from "@/lib/geo/affiliation-parser";
 import { normalizeCity } from "@/lib/geo/normalize";
 
 const BATCH_SIZE = 50;
@@ -17,11 +17,13 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient();
 
   // Only process authors that have at least one affiliation but haven't been
-  // parsed yet (country IS NULL acts as the sentinel).
+  // geo-resolved yet. Filter by geo_source='parser' AND country IS NULL so
+  // human-set geo is never overwritten.
   const { data: authors, error, count } = await admin
     .from("authors")
     .select("id, affiliations", { count: "exact" })
     .not("affiliations", "eq", "{}")
+    .eq("geo_source", "parser")
     .is("country", null)
     .range(offset, offset + BATCH_SIZE - 1)
     .order("created_at", { ascending: true });
@@ -44,15 +46,16 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const parsed = parseAffiliation(affiliations);
+      const parsed = await parseAffiliation(affiliations[0]);
 
       await admin
         .from("authors")
         .update({
-          department: parsed.department,
-          hospital: parsed.hospital,
-          city: normalizeCity(parsed.city),
-          country: parsed.country,
+          department: parsed?.department ?? null,
+          hospital: parsed?.institution ?? null,
+          city: parsed?.city ? normalizeCity(parsed.city) : null,
+          country: parsed?.country ?? null,
+          geo_source: "parser",
         })
         .eq("id", author.id);
 

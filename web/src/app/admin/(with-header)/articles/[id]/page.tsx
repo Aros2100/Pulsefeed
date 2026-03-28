@@ -599,7 +599,7 @@ export default async function AdminArticleLogPage({
       {/* Klassificering */}
       {(a.subspecialty_ai ||
         a.patient_population || a.time_to_read != null || a.full_text_available != null ||
-        a.trial_registration || a.geographic_region) && (() => {
+        a.trial_registration || (raw.geo_region as string | null)) && (() => {
         const POPULATION_COLORS: Record<string, { bg: string; color: string; border: string }> = {
           adult:         { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
           pediatric:     { bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
@@ -667,7 +667,7 @@ export default async function AdminArticleLogPage({
               ? <span style={{ color: "#888" }}>Kun abstract</span>
               : null
           ),
-          clsFr("Region", a.geographic_region),
+          clsFr("Region", raw.geo_region as string | null),
           ["Trial Reg.", a.trial_registration
             ? (
                 <a href={trialUrl!} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
@@ -720,43 +720,6 @@ export default async function AdminArticleLogPage({
           </Card>
         );
       })()}
-
-      {/* Geo-lokation */}
-      {[
-        "geo_continent", "geo_region", "geo_country", "geo_state", "geo_city", "geo_institution",
-        "first_author_country", "first_author_city", "first_author_institution",
-        "last_author_country", "last_author_city", "last_author_institution",
-        "location_confidence",
-      ].some((f) => raw[f] != null) && (
-        <GeoCard
-          articleId={id}
-          geoContinent={raw.geo_continent as string | null}
-          geoRegion={raw.geo_region as string | null}
-          geoCountry={raw.geo_country as string | null}
-          geoState={raw.geo_state as string | null}
-          geoCity={raw.geo_city as string | null}
-          geoInstitution={raw.geo_institution as string | null}
-          geoCountryCertain={raw.geo_country_certain as boolean | null}
-          geoStateCertain={raw.geo_state_certain as boolean | null}
-          geoCityCertain={raw.geo_city_certain as boolean | null}
-          geoInstitutionCertain={raw.geo_institution_certain as boolean | null}
-          firstAuthor={{
-            institution: raw.first_author_institution as string | null,
-            department: raw.first_author_department as string | null,
-            city: raw.first_author_city as string | null,
-            country: raw.first_author_country as string | null,
-          }}
-          lastAuthor={{
-            institution: raw.last_author_institution as string | null,
-            department: raw.last_author_department as string | null,
-            city: raw.last_author_city as string | null,
-            country: raw.last_author_country as string | null,
-          }}
-          locationConfidence={raw.location_confidence as string | null}
-          aiLocationAttempted={raw.ai_location_attempted as boolean | null}
-          locationParsedAt={raw.location_parsed_at as string | null}
-        />
-      )}
 
       {/* Kondensering */}
       <Card>
@@ -871,6 +834,44 @@ export default async function AdminArticleLogPage({
           )}
         </CardBody>
       </Card>
+    </div>
+  );
+
+  // ── Geo tab ─────────────────────────────────────────────────────────────────
+
+  const _firstAuthor = (raw.authors as Array<{ affiliations?: string[]; affiliation?: string | null }>)?.[0];
+  const firstAuthorRawAffiliation = _firstAuthor?.affiliations?.[0] ?? _firstAuthor?.affiliation ?? null;
+
+  const geoTab = (
+    <div style={{ padding: "4px 0 80px" }}>
+      {/* Rå affiliationstekst */}
+      <Card>
+        <CardHeader label="Rå affiliationstekst (første forfatter)" />
+        <CardBody>
+          {firstAuthorRawAffiliation ? (
+            <div style={{ fontSize: "13px", lineHeight: 1.6, color: "#2a2a2a", fontFamily: "monospace", background: "#f8f9fb", borderRadius: "6px", padding: "12px", border: "1px solid #e5e7eb", wordBreak: "break-word" }}>
+              {firstAuthorRawAffiliation}
+            </div>
+          ) : (
+            <div style={{ fontSize: "13px", color: "#aaa" }}>Ingen affiliationstekst</div>
+          )}
+        </CardBody>
+      </Card>
+
+      {/* GeoCard */}
+      <GeoCard
+        articleId={id}
+        geoContinent={raw.geo_continent as string | null}
+        geoRegion={raw.geo_region as string | null}
+        geoCountry={raw.geo_country as string | null}
+        geoState={raw.geo_state as string | null}
+        geoCity={raw.geo_city as string | null}
+        geoDepartment={raw.geo_department as string | null}
+        geoInstitution={raw.geo_institution as string | null}
+        locationConfidence={raw.location_confidence as string | null}
+        aiLocationAttempted={raw.ai_location_attempted as boolean | null}
+        locationParsedAt={raw.location_parsed_at as string | null}
+      />
     </div>
   );
 
@@ -1037,6 +1038,7 @@ export default async function AdminArticleLogPage({
         <AdminArticleTabs
           pubmed={pubmedTab}
           berigelse={berigelseTab}
+          geo={geoTab}
           system={systemTab}
           historik={historikTab}
         />

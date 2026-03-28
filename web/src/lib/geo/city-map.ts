@@ -152,6 +152,23 @@ export const CITY_TO_COUNTRY: Record<string, CityInfo> = {
   "paris": { city: "Paris", country: "France" },
   "umeå": { city: "Umeå", country: "Sweden" },
   "utrecht": { city: "Utrecht", country: "Netherlands" },
+  "naples": { city: "Naples", country: "Italy" },
+  "lille": { city: "Lille", country: "France" },
+  "milan": { city: "Milan", country: "Italy" },
+  "milano": { city: "Milan", country: "Italy" },
+  "lausanne": { city: "Lausanne", country: "Switzerland" },
+  "geneva": { city: "Geneva", country: "Switzerland" },
+  "genève": { city: "Geneva", country: "Switzerland" },
+
+  // === Africa / Middle East ===
+  "oujda": { city: "Oujda", country: "Morocco" },
+  "dakar": { city: "Dakar", country: "Senegal" },
+  "cotonou": { city: "Cotonou", country: "Benin" },
+  "kinshasa": { city: "Kinshasa", country: "Democratic Republic of the Congo" },
+
+  // === Asia ===
+  "hanoi": { city: "Hanoi", country: "Vietnam" },
+  "bangalore": { city: "Bangalore", country: "India" },
 };
 
 /** Case-insensitive city lookup. Returns city + country or null. */

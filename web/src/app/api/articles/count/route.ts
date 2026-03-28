@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
   if (subspecialty) query = query.contains("subspecialty_ai",   [subspecialty]);
   if (country)      query = query.contains("article_countries", [country]);
   if (city)         query = query.contains("article_cities",    [city]);
-  if (region)       query = query.contains("article_regions",   [region]);
+  if (region)       query = query.eq("geo_region",              region);
 
   const { count, error } = await query;
   if (error) return NextResponse.json({ count: 0 }, { status: 500 });

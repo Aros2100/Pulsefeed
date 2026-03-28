@@ -234,24 +234,31 @@ export function getRegion(country: string): string | null {
 }
 
 const REGION_TO_CONTINENT: Record<string, string> = {
-  "Scandinavia": "Europe",
-  "Western Europe": "Europe",
-  "Southern Europe": "Europe",
-  "Eastern Europe": "Europe",
-  "North America": "North America",
-  "Central America & Caribbean": "North America",
-  "South America": "South America",
-  "East Asia": "Asia",
-  "South Asia": "Asia",
-  "Southeast Asia": "Asia",
-  "Middle East": "Asia",
-  "Russia & Central Asia": "Asia",
-  "North Africa": "Africa",
-  "Sub-Saharan Africa": "Africa",
-  "Oceania": "Oceania",
+  // Europe
+  "scandinavia": "Europe",
+  "western europe": "Europe",
+  "southern europe": "Europe",
+  "eastern europe": "Europe",
+  // Americas
+  "north america": "North America",
+  "central america & caribbean": "North America",
+  "south america": "South America",
+  // Asia
+  "east asia": "Asia",
+  "south asia": "Asia",
+  "southeast asia": "Asia",
+  "middle east": "Asia",
+  "western asia": "Asia",
+  "russia & central asia": "Asia",
+  // Africa
+  "north africa": "Africa",
+  "sub-saharan africa": "Africa",
+  // Oceania
+  "oceania": "Oceania",
+  "australia and new zealand": "Oceania",
 };
 
-/** Maps a region name to its continent. Returns null for unknown regions. */
+/** Maps a region name to its continent. Case-insensitive. Returns null for unknown regions. */
 export function getContinent(region: string): string | null {
-  return REGION_TO_CONTINENT[region] ?? null;
+  return REGION_TO_CONTINENT[region.trim().toLowerCase()] ?? null;
 }

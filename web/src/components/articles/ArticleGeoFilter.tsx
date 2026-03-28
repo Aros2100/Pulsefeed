@@ -137,7 +137,7 @@ export default function ArticleGeoFilter({ geoMap, userHospital }: ArticleGeoFil
       {/* Geo free-text search */}
       <input
         type="text"
-        placeholder="Geo-søgning…"
+        placeholder="Search geo…"
         value={geoInput}
         onChange={(e) => setGeoInput(e.target.value)}
         style={{
@@ -151,12 +151,12 @@ export default function ArticleGeoFilter({ geoMap, userHospital }: ArticleGeoFil
       {/* Row: Continent, Region, Country */}
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" as const }}>
         <select value={continent} onChange={(e) => setGeoParam("continent", e.target.value || null)} style={sel}>
-          <option value="">Alle verdensdele</option>
+          <option value="">All continents</option>
           {effectiveContinents.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
 
         <select value={region} onChange={(e) => setGeoParam("region", e.target.value || null)} style={sel}>
-          <option value="">Alle regioner</option>
+          <option value="">All regions</option>
           {regionOptions.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
 
@@ -166,7 +166,7 @@ export default function ArticleGeoFilter({ geoMap, userHospital }: ArticleGeoFil
           disabled={!region}
           style={{ ...sel, opacity: !region ? 0.4 : 1 }}
         >
-          <option value="">Alle lande</option>
+          <option value="">All countries</option>
           {countryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
@@ -179,7 +179,7 @@ export default function ArticleGeoFilter({ geoMap, userHospital }: ArticleGeoFil
           disabled={!country}
           style={{ ...sel, opacity: !country ? 0.4 : 1 }}
         >
-          <option value="">Alle byer</option>
+          <option value="">All cities</option>
           {cityOptions.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
 
@@ -189,7 +189,7 @@ export default function ArticleGeoFilter({ geoMap, userHospital }: ArticleGeoFil
           disabled={!city}
           style={{ ...sel, opacity: !city ? 0.4 : 1 }}
         >
-          <option value="">Alle institutioner</option>
+          <option value="">All institutions</option>
           {hospitalOptions.map((h) => <option key={h} value={h}>{h}</option>)}
         </select>
       </div>
@@ -221,7 +221,7 @@ export default function ArticleGeoFilter({ geoMap, userHospital }: ArticleGeoFil
               fontFamily: "inherit",
             }}
           >
-            Nulstil alle
+            Clear all
           </button>
         </div>
       )}

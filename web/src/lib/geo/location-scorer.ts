@@ -5,9 +5,11 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseAffiliation, type ParsedAffiliation } from "./affiliation-parser";
-import { getRegion, getContinent } from "./continent-map";
+import { getRegion } from "./continent-map";
 import { buildLocationSummary } from "./article-location-summary";
-import { lookupState } from "./state-map";
+import { buildGeoFields, type GeoFields } from "./affiliation-utils";
+import { getCityCache, normalizeCityKey } from "./city-cache";
+import { logGeoUpdatedEvent, type GeoSnapshot } from "@/lib/article-events";
 
 type AuthorEntry = {
   affiliation?: string | null;
@@ -22,6 +24,24 @@ function getAffiliationString(author: AuthorEntry): string | null {
     return author.affiliations[0] ?? null;
   }
   return null;
+}
+
+/** Collects all unique affiliation strings across every author. */
+function getAllUniqueAffiliations(authors: AuthorEntry[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const author of authors) {
+    const affs = Array.isArray(author.affiliations)
+      ? author.affiliations
+      : typeof author.affiliation === "string" && author.affiliation.trim()
+        ? [author.affiliation]
+        : [];
+    for (const aff of affs) {
+      const t = aff.trim();
+      if (t && !seen.has(t)) { seen.add(t); result.push(t); }
+    }
+  }
+  return result;
 }
 
 export async function runLocationParsing(limit = 500): Promise<{
@@ -60,33 +80,10 @@ export async function runLocationParsing(limit = 500): Promise<{
   // Build update payloads
   type UpdatePayload = {
     id: string;
-    first_author_department: string | null;
-    first_author_institution: string | null;
-    first_author_city: string | null;
-    first_author_country: string | null;
-    first_author_region: string | null;
-    last_author_department: string | null;
-    last_author_institution: string | null;
-    last_author_city: string | null;
-    last_author_country: string | null;
-    last_author_region: string | null;
-    article_regions: string[];
     article_countries: string[];
     article_cities: string[];
-    article_institutions: string[];
     location_parsed_at: string;
-    location_confidence: "high" | "low" | null;
-    geo_continent: string | null;
-    geo_region: string | null;
-    geo_country: string | null;
-    geo_state: string | null;
-    geo_city: string | null;
-    geo_institution: string | null;
-    geo_country_certain: boolean | null;
-    geo_state_certain: boolean | null;
-    geo_city_certain: boolean | null;
-    geo_institution_certain: boolean | null;
-  };
+  } & GeoFields;
 
   const updates: UpdatePayload[] = [];
 
@@ -95,10 +92,33 @@ export async function runLocationParsing(limit = 500): Promise<{
     const firstAuthor = authors[0];
     const lastAuthor = authors.length > 1 ? authors[authors.length - 1] : null;
 
-    const firstParsed = await parseAffiliation(getAffiliationString(firstAuthor));
-    const lastParsed = lastAuthor
+    let firstParsed = await parseAffiliation(getAffiliationString(firstAuthor));
+    let lastParsed = lastAuthor
       ? await parseAffiliation(getAffiliationString(lastAuthor))
       : null;
+
+    // Fallback: if first author gave no city/country, try all unique affiliations combined
+    if (!firstParsed?.city && !firstParsed?.country) {
+      const allAffs = getAllUniqueAffiliations(authors);
+      if (allAffs.length > 1) {
+        const fallback = await parseAffiliation(allAffs.join("\n"));
+        if (fallback?.country) firstParsed = fallback;
+      }
+    }
+
+    // City→country fallback: if parser found city but not country, try city-cache
+    const needsCacheLookup = (firstParsed?.city && !firstParsed?.country) || (lastParsed?.city && !lastParsed?.country);
+    if (needsCacheLookup) {
+      const cityCache = await getCityCache();
+      if (firstParsed?.city && !firstParsed?.country) {
+        const c = cityCache.countryMap.get(normalizeCityKey(firstParsed.city));
+        if (c) firstParsed = { ...firstParsed, country: c };
+      }
+      if (lastParsed?.city && !lastParsed?.country) {
+        const c = cityCache.countryMap.get(normalizeCityKey(lastParsed.city));
+        if (c) lastParsed = { ...lastParsed, country: c };
+      }
+    }
 
     const now = new Date().toISOString();
 
@@ -107,37 +127,15 @@ export async function runLocationParsing(limit = 500): Promise<{
       skipped++;
       updates.push({
         id: article.id,
-        first_author_department: null,
-        first_author_institution: null,
-        first_author_city: null,
-        first_author_country: null,
-        first_author_region: null,
-        last_author_department: null,
-        last_author_institution: null,
-        last_author_city: null,
-        last_author_country: null,
-        last_author_region: null,
-        article_regions: [],
         article_countries: [],
         article_cities: [],
-        article_institutions: [],
         location_parsed_at: now,
-        location_confidence: null,
-        geo_continent: null,
-        geo_region: null,
-        geo_country: null,
-        geo_state: null,
-        geo_city: null,
-        geo_institution: null,
-        geo_country_certain: null,
-        geo_state_certain: null,
-        geo_city_certain: null,
-        geo_institution_certain: null,
+        ...buildGeoFields(null, null),
       });
       continue;
     }
 
-    // Determine overall confidence
+    // Determine overall confidence for counter tracking
     let overallConfidence: "high" | "low";
     if (firstParsed && lastParsed) {
       overallConfidence =
@@ -161,46 +159,13 @@ export async function runLocationParsing(limit = 500): Promise<{
       { region: lastRegion, country: lastParsed?.country ?? null, city: lastParsed?.city ?? null, institution: lastParsed?.institution ?? null },
     );
 
-    // geo_* fields: always derived from first author
-    const geoCountry = firstParsed?.country ?? null;
-    const geoCity = firstParsed?.city ?? null;
-    const geoInstitution = firstParsed?.institution ?? null;
-    const geoRegion = firstRegion;
-    const geoContinent = firstRegion ? getContinent(firstRegion) : null;
-    const geoState = geoCity && geoCountry ? lookupState(geoCity, geoCountry) : null;
-
-    // Certainty: true when last author is null (single author) or matches first author
-    const hasLastAuthor = lastParsed !== null;
-    const geoCountryCertain = !hasLastAuthor || lastParsed.country == null || lastParsed.country === firstParsed?.country;
-    const geoStateCertain = geoCountryCertain;
-    const geoCityCertain = geoCountryCertain && (!hasLastAuthor || lastParsed.city == null || lastParsed.city === firstParsed?.city);
-    const geoInstitutionCertain = geoCityCertain && (!hasLastAuthor || lastParsed.institution == null || lastParsed.institution === firstParsed?.institution);
+    const geoFields = buildGeoFields(firstParsed, lastParsed);
 
     updates.push({
       id: article.id,
-      first_author_department: firstParsed?.department ?? null,
-      first_author_institution: firstParsed?.institution ?? null,
-      first_author_city: firstParsed?.city ?? null,
-      first_author_country: firstParsed?.country ?? null,
-      first_author_region: firstRegion,
-      last_author_department: lastParsed?.department ?? null,
-      last_author_institution: lastParsed?.institution ?? null,
-      last_author_city: lastParsed?.city ?? null,
-      last_author_country: lastParsed?.country ?? null,
-      last_author_region: lastRegion,
       ...summary,
       location_parsed_at: now,
-      location_confidence: overallConfidence,
-      geo_continent: geoContinent,
-      geo_region: geoRegion,
-      geo_country: geoCountry,
-      geo_state: geoState,
-      geo_city: geoCity,
-      geo_institution: geoInstitution,
-      geo_country_certain: geoCountryCertain,
-      geo_state_certain: geoStateCertain,
-      geo_city_certain: geoCityCertain,
-      geo_institution_certain: geoInstitutionCertain,
+      ...geoFields,
     });
   }
 
@@ -210,32 +175,10 @@ export async function runLocationParsing(limit = 500): Promise<{
     skipped++;
     updates.push({
       id: article.id,
-      first_author_department: null,
-      first_author_institution: null,
-      first_author_city: null,
-      first_author_country: null,
-      first_author_region: null,
-      last_author_department: null,
-      last_author_institution: null,
-      last_author_city: null,
-      last_author_country: null,
-      last_author_region: null,
-      article_regions: [],
       article_countries: [],
       article_cities: [],
-      article_institutions: [],
       location_parsed_at: new Date().toISOString(),
-      location_confidence: null,
-      geo_continent: null,
-      geo_region: null,
-      geo_country: null,
-      geo_state: null,
-      geo_city: null,
-      geo_institution: null,
-      geo_country_certain: null,
-      geo_state_certain: null,
-      geo_city_certain: null,
-      geo_institution_certain: null,
+      ...buildGeoFields(null, null),
     });
   }
 
@@ -249,6 +192,20 @@ export async function runLocationParsing(limit = 500): Promise<{
         return db.from("articles").update(fields).eq("id", id);
       })
     );
+  }
+
+  // Fire geo_updated events (fire-and-forget; previous=null — first parse)
+  for (const u of updates) {
+    const next: GeoSnapshot = {
+      geo_city: u.geo_city,
+      geo_country: u.geo_country,
+      geo_state: u.geo_state,
+      geo_region: u.geo_region,
+      geo_continent: u.geo_continent,
+      geo_institution: u.geo_institution,
+      geo_department: u.geo_department,
+    };
+    logGeoUpdatedEvent(u.id, "parser", null, next);
   }
 
   return { parsed, highConfidence, lowConfidence, skipped };
@@ -313,45 +270,14 @@ export async function reparseLowConfidence(cutoffDate: string, limit = 500): Pro
       { region: lastRegionR, country: lastParsed?.country ?? null, city: lastParsed?.city ?? null, institution: lastParsed?.institution ?? null },
     );
 
-    // geo_* fields: always derived from first author
-    const geoCountryR = firstParsed?.country ?? null;
-    const geoCityR = firstParsed?.city ?? null;
-    const geoInstitutionR = firstParsed?.institution ?? null;
-    const geoContinentR = firstRegionR ? getContinent(firstRegionR) : null;
-    const geoStateR = geoCityR && geoCountryR ? lookupState(geoCityR, geoCountryR) : null;
-
-    const hasLastAuthorR = lastParsed !== null;
-    const geoCountryCertainR = !hasLastAuthorR || lastParsed.country == null || lastParsed.country === firstParsed?.country;
-    const geoStateCertainR = geoCountryCertainR;
-    const geoCityCertainR = geoCountryCertainR && (!hasLastAuthorR || lastParsed.city == null || lastParsed.city === firstParsed?.city);
-    const geoInstitutionCertainR = geoCityCertainR && (!hasLastAuthorR || lastParsed.institution == null || lastParsed.institution === firstParsed?.institution);
+    const geoFieldsR = buildGeoFields(firstParsed, lastParsed);
 
     updates.push({
       id: article.id,
       fields: {
-        first_author_department: firstParsed?.department ?? null,
-        first_author_institution: firstParsed?.institution ?? null,
-        first_author_city: firstParsed?.city ?? null,
-        first_author_country: firstParsed?.country ?? null,
-        first_author_region: firstRegionR,
-        last_author_department: lastParsed?.department ?? null,
-        last_author_institution: lastParsed?.institution ?? null,
-        last_author_city: lastParsed?.city ?? null,
-        last_author_country: lastParsed?.country ?? null,
-        last_author_region: lastRegionR,
         ...summaryR,
         location_parsed_at: new Date().toISOString(),
-        location_confidence: overallConfidence,
-        geo_continent: geoContinentR,
-        geo_region: firstRegionR,
-        geo_country: geoCountryR,
-        geo_state: geoStateR,
-        geo_city: geoCityR,
-        geo_institution: geoInstitutionR,
-        geo_country_certain: geoCountryCertainR,
-        geo_state_certain: geoStateCertainR,
-        geo_city_certain: geoCityCertainR,
-        geo_institution_certain: geoInstitutionCertainR,
+        ...geoFieldsR,
       },
     });
   }

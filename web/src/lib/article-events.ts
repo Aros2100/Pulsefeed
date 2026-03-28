@@ -10,7 +10,8 @@ export type ArticleEventType =
   | "verified"
   | "author_linked"
   | "quality_check"
-  | "auto_tagged";
+  | "auto_tagged"
+  | "geo_updated";
 
 export async function logArticleEvent(
   articleId: string,
@@ -33,4 +34,48 @@ export async function logArticleEvent(
   } catch (err) {
     console.error(`[article-events] Unexpected error logging ${eventType} for article ${articleId}:`, err);
   }
+}
+
+// ── Geo update logging ────────────────────────────────────────────────────────
+
+export type GeoUpdateSource = "parser" | "backfill" | "author_linker" | "enrichment" | "manual";
+
+export type GeoSnapshot = {
+  geo_city?: string | null;
+  geo_country?: string | null;
+  geo_state?: string | null;
+  geo_region?: string | null;
+  geo_continent?: string | null;
+  geo_institution?: string | null;
+  geo_department?: string | null;
+};
+
+const GEO_KEYS: (keyof GeoSnapshot)[] = [
+  "geo_city", "geo_country", "geo_state",
+  "geo_region", "geo_continent", "geo_institution", "geo_department",
+];
+
+/**
+ * Fire-and-forget: log a geo_updated event.
+ * Only logs fields whose new value is non-null and differs from previous.
+ * Skips entirely if nothing changed.
+ */
+export function logGeoUpdatedEvent(
+  articleId: string,
+  source: GeoUpdateSource,
+  previous: GeoSnapshot | null,
+  next: GeoSnapshot,
+): void {
+  const fieldsUpdated = GEO_KEYS.filter((k) => {
+    const n = next[k] ?? null;
+    const p = previous ? (previous[k] ?? null) : null;
+    return n !== null && n !== p;
+  });
+  if (fieldsUpdated.length === 0) return;
+  void logArticleEvent(articleId, "geo_updated", {
+    source,
+    fields_updated: fieldsUpdated,
+    previous: previous ?? null,
+    new: next,
+  });
 }

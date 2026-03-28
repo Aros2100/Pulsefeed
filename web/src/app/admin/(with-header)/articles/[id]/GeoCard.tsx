@@ -9,23 +9,8 @@ interface GeoCardProps {
   geoCountry: string | null;
   geoState: string | null;
   geoCity: string | null;
+  geoDepartment: string | null;
   geoInstitution: string | null;
-  geoCountryCertain: boolean | null;
-  geoStateCertain: boolean | null;
-  geoCityCertain: boolean | null;
-  geoInstitutionCertain: boolean | null;
-  firstAuthor: {
-    institution: string | null;
-    department: string | null;
-    city: string | null;
-    country: string | null;
-  };
-  lastAuthor: {
-    institution: string | null;
-    department: string | null;
-    city: string | null;
-    country: string | null;
-  };
   locationConfidence: string | null;
   aiLocationAttempted: boolean | null;
   locationParsedAt: string | null;
@@ -155,11 +140,8 @@ export default function GeoCard(props: GeoCardProps) {
     country: props.geoCountry,
     state: props.geoState,
     city: props.geoCity,
+    department: props.geoDepartment,
     institution: props.geoInstitution,
-    countryCertain: props.geoCountryCertain,
-    stateCertain: props.geoStateCertain,
-    cityCertain: props.geoCityCertain,
-    institutionCertain: props.geoInstitutionCertain,
   });
 
   const [form, setForm] = useState({
@@ -200,11 +182,8 @@ export default function GeoCard(props: GeoCardProps) {
           country: form.country || null,
           state: form.state || null,
           city: form.city || null,
+          department: geo.department,
           institution: form.institution || null,
-          countryCertain: true,
-          stateCertain: true,
-          cityCertain: true,
-          institutionCertain: true,
         });
         setEditing(false);
         setSavedMsg(true);
@@ -217,54 +196,9 @@ export default function GeoCard(props: GeoCardProps) {
     }
   }
 
-  // ── Certainty badge ──
-  const certainBadge = (certain: boolean | null) => {
-    if (certain === true)
-      return (
-        <span
-          style={{
-            display: "inline-block",
-            padding: "1px 6px",
-            borderRadius: "999px",
-            fontSize: "10px",
-            fontWeight: 600,
-            background: "#f0fdf4",
-            color: "#15803d",
-            border: "1px solid #bbf7d0",
-            marginLeft: "6px",
-          }}
-        >
-          ✓
-        </span>
-      );
-    if (certain === false)
-      return (
-        <span
-          style={{
-            display: "inline-block",
-            padding: "1px 6px",
-            borderRadius: "999px",
-            fontSize: "10px",
-            fontWeight: 600,
-            background: "#fff7ed",
-            color: "#c2410c",
-            border: "1px solid #fed7aa",
-            marginLeft: "6px",
-          }}
-        >
-          ⚠ usikker
-        </span>
-      );
-    return null;
-  };
-
   // ── Read-only geo row ──
-  const geoRow = (
-    label: string,
-    value: string | null,
-    certainty: boolean | null | undefined
-  ) => {
-    const display = value != null ? value : "—";
+  const geoRow = (label: string, value: string | null) => {
+    if (value == null) return null;
     return (
       <div
         style={{
@@ -276,10 +210,7 @@ export default function GeoCard(props: GeoCardProps) {
         }}
       >
         <span style={{ color: "#888" }}>{label}</span>
-        <span style={{ color: value != null ? "#1a1a1a" : "#ccc" }}>
-          {display}
-          {value != null ? certainBadge(certainty ?? null) : null}
-        </span>
+        <span style={{ color: "#1a1a1a" }}>{value}</span>
       </div>
     );
   };
@@ -325,24 +256,6 @@ export default function GeoCard(props: GeoCardProps) {
     </div>
   );
 
-  // ── Author row ──
-  const authorRow = (label: string, value: string | null) => {
-    if (!value) return null;
-    return (
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "120px 1fr",
-          padding: "7px 0",
-          borderBottom: "1px solid #f5f5f5",
-        }}
-      >
-        <span style={{ color: "#888" }}>{label}</span>
-        <span style={{ color: "#1a1a1a" }}>{value}</span>
-      </div>
-    );
-  };
-
   const ghostBtn: React.CSSProperties = {
     padding: "4px 10px",
     borderRadius: "5px",
@@ -379,7 +292,11 @@ export default function GeoCard(props: GeoCardProps) {
           }
         />
         <CardBody>
-          {editing ? (
+          {!editing && !geo.department && !geo.institution && !geo.city && !geo.state && !geo.country && !geo.region && !geo.continent ? (
+            <p style={{ margin: 0, fontSize: "13px", color: "#9ca3af", fontStyle: "italic" }}>
+              Location data not available — affiliation text could not be parsed.
+            </p>
+          ) : editing ? (
             <div
               style={{
                 display: "flex",
@@ -387,7 +304,7 @@ export default function GeoCard(props: GeoCardProps) {
                 gap: "4px",
               }}
             >
-              {/* Verdensdel + Region: auto-calculated, shown as info */}
+              {/* Continent + Region: auto-calculated, shown as info */}
               <div
                 style={{
                   display: "grid",
@@ -396,17 +313,9 @@ export default function GeoCard(props: GeoCardProps) {
                   alignItems: "center",
                 }}
               >
-                <span style={{ color: "#888", fontSize: "14px" }}>
-                  Verdensdel
-                </span>
-                <span
-                  style={{
-                    fontSize: "14px",
-                    color: "#9ca3af",
-                    fontStyle: "italic",
-                  }}
-                >
-                  Beregnes fra land
+                <span style={{ color: "#888", fontSize: "14px" }}>Continent</span>
+                <span style={{ fontSize: "14px", color: "#9ca3af", fontStyle: "italic" }}>
+                  Auto-calculated from country
                 </span>
               </div>
               <div
@@ -418,20 +327,14 @@ export default function GeoCard(props: GeoCardProps) {
                 }}
               >
                 <span style={{ color: "#888", fontSize: "14px" }}>Region</span>
-                <span
-                  style={{
-                    fontSize: "14px",
-                    color: "#9ca3af",
-                    fontStyle: "italic",
-                  }}
-                >
-                  Beregnes fra land
+                <span style={{ fontSize: "14px", color: "#9ca3af", fontStyle: "italic" }}>
+                  Auto-calculated from country
                 </span>
               </div>
-              {editRow("Land", "country")}
-              {editRow("Stat", "state")}
-              {editRow("By", "city")}
-              {editRow("Hospital", "institution")}
+              {editRow("Country", "country")}
+              {editRow("State", "state")}
+              {editRow("City", "city")}
+              {editRow("Institution", "institution")}
               <div
                 style={{
                   display: "flex",
@@ -471,76 +374,19 @@ export default function GeoCard(props: GeoCardProps) {
             </div>
           ) : (
             <>
-              {geoRow("Verdensdel", geo.continent, geo.countryCertain)}
-              {geoRow("Region", geo.region, geo.countryCertain)}
-              {geoRow("Land", geo.country, geo.countryCertain)}
-              {geoRow(
-                "Stat",
-                geo.state,
-                geo.state != null ? geo.stateCertain : undefined
-              )}
-              {geoRow("By", geo.city, geo.cityCertain)}
-              {geoRow("Hospital", geo.institution, geo.institutionCertain)}
+              {geoRow("Department", geo.department)}
+              {geoRow("Institution", geo.institution)}
+              {geoRow("City", geo.city)}
+              {geoRow("State", geo.state)}
+              {geoRow("Country", geo.country)}
+              {geoRow("Region", geo.region)}
+              {geoRow("Continent", geo.continent)}
             </>
           )}
         </CardBody>
       </Card>
 
-      {/* Sektion 2: Forfatter-data (always read-only) */}
-      <Card>
-        <CardHeader label="Forfatter-data" />
-        <CardBody>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 0,
-              fontSize: "14px",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: "10px",
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  color: "#1d4ed8",
-                  marginBottom: "8px",
-                }}
-              >
-                Første forfatter
-              </div>
-              {authorRow("Institution", props.firstAuthor.institution)}
-              {authorRow("Department", props.firstAuthor.department)}
-              {authorRow("By", props.firstAuthor.city)}
-              {authorRow("Land", props.firstAuthor.country)}
-            </div>
-            <div
-              style={{ borderLeft: "1px solid #f0f0f0", paddingLeft: "20px" }}
-            >
-              <div
-                style={{
-                  fontSize: "10px",
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  color: "#5a6a85",
-                  marginBottom: "8px",
-                }}
-              >
-                Sidste forfatter
-              </div>
-              {authorRow("Institution", props.lastAuthor.institution)}
-              {authorRow("Department", props.lastAuthor.department)}
-              {authorRow("By", props.lastAuthor.city)}
-              {authorRow("Land", props.lastAuthor.country)}
-            </div>
-          </div>
-        </CardBody>
-      </Card>
-
-      {/* Sektion 3: Parser (always read-only) */}
+      {/* Sektion 2: Parser (always read-only) */}
       <Card>
         <CardHeader label="Parser" />
         <CardBody>

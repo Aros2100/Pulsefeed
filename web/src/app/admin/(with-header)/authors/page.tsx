@@ -71,6 +71,7 @@ export default function AdminAuthorsPage() {
   const hospital       = searchParams.get("hospital")   ?? "";
   const geoSearch      = searchParams.get("geo_search") ?? "";
   const filterImported = searchParams.get("imported")   ?? "";
+  const filter         = searchParams.get("filter")     ?? "";
   const page           = parseInt(searchParams.get("page") ?? "0", 10);
 
   const [inputValue, setInputValue] = useState(query);
@@ -122,51 +123,85 @@ export default function AdminAuthorsPage() {
 
   // Main data fetch
   useEffect(() => {
-    const supabase = createClient();
-    const from = page * PAGE_SIZE;
-    const to   = from + PAGE_SIZE - 1;
-    setLoading(true);
+    void (async () => {
+      const supabase = createClient();
+      const from = page * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      setLoading(true);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let req: any = supabase
-      .from("authors")
-      .select("id, display_name, affiliations, article_count, author_score, created_at", { count: "exact" })
-      .order("created_at", { ascending: false, nullsFirst: false })
-      .range(from, to);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let req: any = supabase
+        .from("authors")
+        .select("id, display_name, affiliations, article_count, author_score, created_at", { count: "exact" })
+        .order("created_at", { ascending: false, nullsFirst: false })
+        .range(from, to);
 
-    if (query.trim().length >= 2) {
-      req = req.ilike("display_name", `%${query.trim()}%`);
-    }
-    if (continent) {
-      const cList = Object.entries(REGION_MAP)
-        .filter(([, r]) => getContinent(r) === continent)
-        .map(([c]) => titleCase(c));
-      if (cList.length > 0) req = req.in("country", cList);
-    }
-    if (region) {
-      const cList = Object.entries(REGION_MAP)
-        .filter(([, r]) => r === region)
-        .map(([c]) => titleCase(c));
-      if (cList.length > 0) req = req.in("country", cList);
-    }
-    if (country)   req = req.eq("country", country);
-    if (state)     req = req.eq("state", state);
-    if (city)      req = req.eq("city", city);
-    if (hospital)  req = req.ilike("hospital", `%${hospital}%`);
-    if (geoSearch) req = req.or(
-      `country.ilike.%${geoSearch}%,city.ilike.%${geoSearch}%,hospital.ilike.%${geoSearch}%`,
-    );
-    if (filterImported) {
-      const cutoff = importedCutoff(filterImported);
-      if (cutoff) req = req.gte("created_at", cutoff);
-    }
+      if (query.trim().length >= 2) {
+        req = req.ilike("display_name", `%${query.trim()}%`);
+      }
+      if (continent) {
+        const cList = Object.entries(REGION_MAP)
+          .filter(([, r]) => getContinent(r) === continent)
+          .map(([c]) => titleCase(c));
+        if (cList.length > 0) req = req.in("country", cList);
+      }
+      if (region) {
+        const cList = Object.entries(REGION_MAP)
+          .filter(([, r]) => r === region)
+          .map(([c]) => titleCase(c));
+        if (cList.length > 0) req = req.in("country", cList);
+      }
+      if (country)   req = req.eq("country", country);
+      if (state)     req = req.eq("state", state);
+      if (city)      req = req.eq("city", city);
+      if (hospital)  req = req.ilike("hospital", `%${hospital}%`);
+      if (geoSearch) req = req.or(
+        `country.ilike.%${geoSearch}%,city.ilike.%${geoSearch}%,hospital.ilike.%${geoSearch}%`,
+      );
+      if (filterImported) {
+        const cutoff = importedCutoff(filterImported);
+        if (cutoff) req = req.gte("created_at", cutoff);
+      }
+      if (filter === "no_geo")      req = req.is("country", null);
+      if (filter === "no_country")  req = req.is("country", null);
+      if (filter === "no_city")     req = req.is("city", null);
+      if (filter === "affiliation_too_long") {
+        const { data: rows } = await supabase.rpc("get_authors_affiliation_too_long");
+        const ids = (rows ?? []).map((r: { id: string }) => r.id);
+        if (ids.length > 0) req = req.in("id", ids);
+        else { setAuthors([]); setTotal(0); setLoading(false); return; }
+      }
+      if (filter === "suspect_city") req = req
+        .not("city", "is", null)
+        .or("city.ilike.%0%,city.ilike.%1%,city.ilike.%2%,city.ilike.%3%,city.ilike.%4%,city.ilike.%5%,city.ilike.%6%,city.ilike.%7%,city.ilike.%8%,city.ilike.%9%");
+      if (filter === "suspect_country") req = req
+        .not("country", "is", null)
+        .or(
+          "country.ilike.%0%,country.ilike.%1%,country.ilike.%2%,country.ilike.%3%," +
+          "country.ilike.%4%,country.ilike.%5%,country.ilike.%6%,country.ilike.%7%," +
+          "country.ilike.%8%,country.ilike.%9%," +
+          "country.ilike.Region%,country.ilike.Province%,country.ilike.District%," +
+          "country.ilike.Republic%,country.ilike.State%,country.ilike.Territory%",
+        );
+      if (filter === "country_alias") {
+        const { data: aliasRows } = await supabase.from("country_aliases").select("alias");
+        const aliases = (aliasRows ?? []).map((r: { alias: string }) => r.alias);
+        if (aliases.length > 0) req = req.in("country", aliases);
+        else { setAuthors([]); setTotal(0); setLoading(false); return; }
+      }
+      if (filter === "city_alias") {
+        const { data: aliasRows } = await supabase.from("city_aliases").select("alias");
+        const aliases = (aliasRows ?? []).map((r: { alias: string }) => r.alias);
+        if (aliases.length > 0) req = req.in("city", aliases);
+        else { setAuthors([]); setTotal(0); setLoading(false); return; }
+      }
 
-    void (req as Promise<{ data: unknown; count: number | null }>).then(({ data, count }) => {
+      const { data, count } = await (req as Promise<{ data: unknown; count: number | null }>);
       setAuthors((data as unknown as Author[]) ?? []);
       setTotal(count ?? null);
       setLoading(false);
-    });
-  }, [query, page, continent, region, country, state, city, hospital, geoSearch, filterImported]);
+    })();
+  }, [query, page, continent, region, country, state, city, hospital, geoSearch, filterImported, filter]);
 
   const totalPages = total !== null ? Math.ceil(total / PAGE_SIZE) : null;
 

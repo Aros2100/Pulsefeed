@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ReparseAuthorGeoButton } from "./ReparseAuthorGeoButton";
+import { ParseArticleLocationsButton } from "./ParseArticleLocationsButton";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -422,6 +424,11 @@ export default async function ImportDashboardPage() {
             { label: "OpenAlex",         today: openalexToday, week: openalexWeek, month: openalexMonth, year: openalexYear, total: openalexTotal },
             { label: "Geo-uverificeret", today: uverToday, week: uverWeek, month: uverMonth, year: uverYear, total: uverTotal },
           ]} />
+
+          <div style={{ padding: "12px 24px", borderTop: "1px solid #eef0f4", display: "flex", gap: "16px", flexWrap: "wrap" }}>
+            <ReparseAuthorGeoButton />
+            <ParseArticleLocationsButton />
+          </div>
 
           <div style={{ padding: "20px 24px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
             {[

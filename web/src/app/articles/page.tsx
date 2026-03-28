@@ -79,14 +79,14 @@ export default async function ArticlesPage({
         .filter(([, r]) => getContinent(r) === continent)
         .map(([, r]) => r),
     )];
-    if (regions.length > 0) articlesQuery = articlesQuery.overlaps("article_regions", regions);
+    if (regions.length > 0) articlesQuery = articlesQuery.in("geo_region", regions);
   }
-  if (region)     articlesQuery = articlesQuery.contains("article_regions",      [region]);
-  if (country)    articlesQuery = articlesQuery.contains("article_countries",    [country]);
-  if (city)       articlesQuery = articlesQuery.contains("article_cities",       [city]);
-  if (hospital)   articlesQuery = articlesQuery.contains("article_institutions", [hospital]);
+  if (region)     articlesQuery = articlesQuery.eq("geo_region",         region);
+  if (country)    articlesQuery = articlesQuery.contains("article_countries", [country]);
+  if (city)       articlesQuery = articlesQuery.contains("article_cities",    [city]);
+  if (hospital)   articlesQuery = articlesQuery.eq("geo_institution",     hospital);
   if (geo_search) articlesQuery = articlesQuery.or(
-    `article_countries.cs.{${geo_search}},article_cities.cs.{${geo_search}},article_institutions.cs.{${geo_search}}`,
+    `article_countries.cs.{${geo_search}},article_cities.cs.{${geo_search}},geo_institution.ilike.%${geo_search}%`,
   );
 
   const [
@@ -99,9 +99,9 @@ export default async function ArticlesPage({
     supabase.from("saved_articles").select("article_id, project_id").eq("user_id", user.id),
     supabase.from("projects").select("id, name").eq("user_id", user.id).order("created_at", { ascending: false }),
     supabase.from("articles")
-      .select("article_regions, article_countries, article_cities, article_institutions")
+      .select("geo_region, article_countries, article_cities, geo_institution")
       .eq("status", "approved")
-      .not("article_regions", "is", null),
+      .not("geo_region", "is", null),
   ]);
 
   const totalPages = Math.ceil((totalCount ?? 0) / PAGE_SIZE);
@@ -118,10 +118,10 @@ export default async function ArticlesPage({
 
   // Build cascading geo maps from location rows
   type LocationRow = {
-    article_regions:      string[] | null;
-    article_countries:    string[] | null;
-    article_cities:       string[] | null;
-    article_institutions: string[] | null;
+    geo_region:        string | null;
+    article_countries: string[] | null;
+    article_cities:    string[] | null;
+    geo_institution:   string | null;
   };
   const locationData = (locationRows ?? []) as unknown as LocationRow[];
 
@@ -131,19 +131,17 @@ export default async function ArticlesPage({
   const cityToInstitutions:  Record<string, Set<string>> = {};
 
   for (const row of locationData) {
-    for (const reg of row.article_regions ?? []) {
-      allRegions.add(reg);
-      if (!regionToCountries[reg]) regionToCountries[reg] = new Set();
-      for (const c of row.article_countries ?? []) {
-        regionToCountries[reg].add(c);
-        if (!countryToCities[c]) countryToCities[c] = new Set();
-        for (const ci of row.article_cities ?? []) {
-          countryToCities[c].add(ci);
-          if (!cityToInstitutions[ci]) cityToInstitutions[ci] = new Set();
-          for (const inst of row.article_institutions ?? []) {
-            cityToInstitutions[ci].add(inst);
-          }
-        }
+    const reg = row.geo_region;
+    if (!reg) continue;
+    allRegions.add(reg);
+    if (!regionToCountries[reg]) regionToCountries[reg] = new Set();
+    for (const c of row.article_countries ?? []) {
+      regionToCountries[reg].add(c);
+      if (!countryToCities[c]) countryToCities[c] = new Set();
+      for (const ci of row.article_cities ?? []) {
+        countryToCities[c].add(ci);
+        if (!cityToInstitutions[ci]) cityToInstitutions[ci] = new Set();
+        if (row.geo_institution) cityToInstitutions[ci].add(row.geo_institution);
       }
     }
   }

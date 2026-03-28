@@ -55,6 +55,138 @@ const RAW_COUNTRY_MAP: Record<string, string> = {
   "holland": "Netherlands",
   "netherlands": "Netherlands",
 
+  // === ISO 3166-1 alpha-2 codes ===
+  // (GeoNames geo_cities.country uses these — must translate to full names)
+  "af": "Afghanistan",
+  "al": "Albania",
+  "dz": "Algeria",
+  "am": "Armenia",
+  "ar": "Argentina",
+  "at": "Austria",
+  "au": "Australia",
+  "az": "Azerbaijan",
+  "bh": "Bahrain",
+  "bd": "Bangladesh",
+  "by": "Belarus",
+  "be": "Belgium",
+  "bo": "Bolivia",
+  "ba": "Bosnia and Herzegovina",
+  "br": "Brazil",
+  "bg": "Bulgaria",
+  "kh": "Cambodia",
+  "cm": "Cameroon",
+  "ca": "Canada",
+  "cl": "Chile",
+  "cn": "China",
+  "co": "Colombia",
+  "cr": "Costa Rica",
+  "hr": "Croatia",
+  "cu": "Cuba",
+  "cw": "Curaçao",
+  "cy": "Cyprus",
+  "cz": "Czech Republic",
+  "dk": "Denmark",
+  "do": "Dominican Republic",
+  "ec": "Ecuador",
+  "eg": "Egypt",
+  "sv": "El Salvador",
+  "ee": "Estonia",
+  "et": "Ethiopia",
+  "fi": "Finland",
+  "fr": "France",
+  "ge": "Georgia",
+  "de": "Germany",
+  "gh": "Ghana",
+  "gr": "Greece",
+  "gt": "Guatemala",
+  "hk": "Hong Kong",
+  "hn": "Honduras",
+  "hu": "Hungary",
+  "is": "Iceland",
+  "in": "India",
+  "id": "Indonesia",
+  "ir": "Iran",
+  "iq": "Iraq",
+  "ie": "Ireland",
+  "il": "Israel",
+  "it": "Italy",
+  "jm": "Jamaica",
+  "jp": "Japan",
+  "jo": "Jordan",
+  "kz": "Kazakhstan",
+  "ke": "Kenya",
+  "xk": "Kosovo",
+  "kw": "Kuwait",
+  "kg": "Kyrgyzstan",
+  "la": "Laos",
+  "lv": "Latvia",
+  "lb": "Lebanon",
+  "ly": "Libya",
+  "lt": "Lithuania",
+  "lu": "Luxembourg",
+  "mo": "Macao",
+  "mk": "North Macedonia",
+  "my": "Malaysia",
+  "mt": "Malta",
+  "mx": "Mexico",
+  "md": "Moldova",
+  "mn": "Mongolia",
+  "me": "Montenegro",
+  "ma": "Morocco",
+  "mz": "Mozambique",
+  "mm": "Myanmar",
+  "np": "Nepal",
+  "nl": "Netherlands",
+  "nz": "New Zealand",
+  "ni": "Nicaragua",
+  "ng": "Nigeria",
+  "no": "Norway",
+  "om": "Oman",
+  "pk": "Pakistan",
+  "pa": "Panama",
+  "py": "Paraguay",
+  "pe": "Peru",
+  "ph": "Philippines",
+  "pl": "Poland",
+  "pt": "Portugal",
+  "pr": "Puerto Rico",
+  "qa": "Qatar",
+  "ro": "Romania",
+  "ru": "Russia",
+  "rw": "Rwanda",
+  "sa": "Saudi Arabia",
+  "sn": "Senegal",
+  "rs": "Serbia",
+  "sg": "Singapore",
+  "sk": "Slovakia",
+  "si": "Slovenia",
+  "za": "South Africa",
+  "kr": "South Korea",
+  "es": "Spain",
+  "lk": "Sri Lanka",
+  "sd": "Sudan",
+  "se": "Sweden",
+  "ch": "Switzerland",
+  "sy": "Syria",
+  "tw": "Taiwan",
+  "tj": "Tajikistan",
+  "tz": "Tanzania",
+  "th": "Thailand",
+  "tn": "Tunisia",
+  "tr": "Turkey",
+  "tm": "Turkmenistan",
+  "ug": "Uganda",
+  "ua": "Ukraine",
+  "ae": "United Arab Emirates",
+  "gb": "United Kingdom",
+  "uy": "Uruguay",
+  "uz": "Uzbekistan",
+  "ve": "Venezuela",
+  "vn": "Vietnam",
+  "ye": "Yemen",
+  "zm": "Zambia",
+  "zw": "Zimbabwe",
+
   // === ISO 3166-1 alpha-3 codes ===
   "arg": "Argentina",
   "are": "United Arab Emirates",
@@ -122,6 +254,14 @@ const RAW_COUNTRY_MAP: Record<string, string> = {
   "zaf": "South Africa",
 
   // === Local language names ===
+  "maroc": "Morocco",
+  "belgique": "Belgium",
+  "viet nam": "Vietnam",
+  "cod": "Democratic Republic of the Congo",
+  "dom": "Dominican Republic",
+  "algérie": "Algeria",
+  "côte d'ivoire": "Ivory Coast",
+  "suisse": "Switzerland",
   "deutschland": "Germany",
   "méxico": "Mexico",
   "perú": "Peru",
@@ -338,6 +478,44 @@ export function lookupCountry(raw: string): string | null {
 
 /** All canonical country names (unique values) for substring matching */
 export const CANONICAL_COUNTRIES: string[] = [...new Set(Object.values(RAW_COUNTRY_MAP))];
+
+// ── Country → region / continent ──────────────────────────────────────────────
+// continent-map.ts covers ~190 countries. A handful of canonical names used in
+// this file (Hong Kong, Macao, Taiwan, Puerto Rico, Curaçao) are not in that map.
+// We patch them here so all names reachable via lookupCountry have full coverage.
+
+import {
+  getRegion as _getRegionBase,
+  getContinent as _getContinentFromRegion,
+} from "./continent-map";
+
+const EXTRA_COUNTRY_REGION: Record<string, string> = {
+  "hong kong":  "East Asia",
+  "macao":      "East Asia",
+  "taiwan":     "East Asia",
+  "puerto rico": "Central America & Caribbean",
+  "curaçao":    "Central America & Caribbean",
+};
+
+/**
+ * Maps a canonical country name to its UN region.
+ * Case-insensitive. Covers all names reachable via lookupCountry().
+ * Returns null for unknown countries.
+ */
+export function getRegion(country: string): string | null {
+  const key = country.trim().toLowerCase();
+  return EXTRA_COUNTRY_REGION[key] ?? _getRegionBase(key) ?? null;
+}
+
+/**
+ * Maps a canonical country name directly to its continent.
+ * Case-insensitive. Returns null for unknown countries.
+ * (Distinct from continent-map.getContinent which takes a region name.)
+ */
+export function getContinent(country: string): string | null {
+  const region = getRegion(country);
+  return region ? _getContinentFromRegion(region) : null;
+}
 
 /** US state abbreviations → full name */
 export const US_STATES: Record<string, string> = {

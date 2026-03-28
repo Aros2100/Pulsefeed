@@ -12,7 +12,7 @@
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { createClient } from "@supabase/supabase-js";
-import { parseAffiliation } from "../src/lib/affiliations";
+import { parseAffiliation } from "../src/lib/geo/affiliation-utils";
 
 // ── Load .env.local ────────────────────────────────────────────────────────
 const envPath = resolve(process.cwd(), ".env.local");

@@ -1,6 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { extractEmail, stripEmailFromAffiliation } from "@/lib/affiliations";
+import { extractEmail, stripEmailFromAffiliation } from "@/lib/geo/affiliation-utils";
 import { parseAffiliation as geoParseAffiliation } from "@/lib/geo/affiliation-parser";
 import { lookupCountry } from "@/lib/geo/country-map";
 import { lookupState } from "@/lib/geo/state-map";
@@ -997,38 +997,20 @@ export async function linkAuthorsToArticle(
       : await resolveAuthorId(admin, author, articleId, preResolvedOAMap.get(i));
     console.error(`[import] resolve "${authorName}": ${Date.now() - tResolve}ms (${oaAuthorship ? "openalex" : "parser"})`);
 
-    // Capture geo data including state from the resolved author
+    // Capture geo data for article from parser — always, regardless of OpenAlex match
     if (i === 0 || (i === authors.length - 1 && authors.length > 1)) {
-      let geoForArticle: AuthorGeo | null = null;
+      const linkPrimaryAff = author.affiliations[0] ?? null;
+      const geoParsed = linkPrimaryAff ? await geoParseAffiliation(linkPrimaryAff) : null;
 
-      if (oaAuthorship && oaAuthorship.institutions.length > 0) {
-        const inst = oaAuthorship.institutions[0];
-        const country = countryCodeToName(inst.countryCode);
-        geoForArticle = {
-          department: null,
-          institution: inst.displayName,
-          city: null,
-          country: country,
-          state: null,
-          confidence: "high",
-        };
-        // Try to get city from parser as supplement
-        const linkPrimaryAff = author.affiliations[0] ?? null;
-        const geoParsed = linkPrimaryAff ? await geoParseAffiliation(linkPrimaryAff) : null;
-        if (geoParsed?.city) geoForArticle.city = geoParsed.city;
-        if (geoParsed?.department) geoForArticle.department = geoParsed.department;
-      } else {
-        const linkPrimaryAff = author.affiliations[0] ?? null;
-        const geoParsed = linkPrimaryAff ? await geoParseAffiliation(linkPrimaryAff) : null;
-        if (geoParsed) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { data: authorRow } = await (admin as any)
-            .from("authors")
-            .select("state")
-            .eq("id", authorId)
-            .maybeSingle();
-          geoForArticle = { ...geoParsed, state: (authorRow?.state as string | null) ?? null };
-        }
+      let geoForArticle: AuthorGeo | null = null;
+      if (geoParsed) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: authorRow } = await (admin as any)
+          .from("authors")
+          .select("state")
+          .eq("id", authorId)
+          .maybeSingle();
+        geoForArticle = { ...geoParsed, state: (authorRow?.state as string | null) ?? null };
       }
 
       if (geoForArticle) {

@@ -95,7 +95,7 @@ export default function GeoExplorer({
 
   // Build breadcrumb segments
   const crumbs: { label: string; href: string }[] = [
-    { label: "Alle", href: "/geo" },
+    { label: "All", href: "/geo" },
   ];
   if (continent) {
     crumbs.push({
@@ -150,7 +150,7 @@ export default function GeoExplorer({
             marginBottom: "16px",
           }}
         >
-          ← Tilbage
+          ← Back
         </Link>
       )}
 
@@ -188,12 +188,12 @@ export default function GeoExplorer({
             textTransform: "uppercase",
             fontWeight: 700,
           }}>
-            {level === 1 && "Verdensdele"}
-            {level === 2 && `Regioner i ${continent}`}
-            {level === 3 && `Lande i ${region}`}
-            {level === 4 && `Stater i ${country}`}
-            {level === 5 && (state ? `Byer i ${state}, ${country}` : `Byer i ${country}`)}
-            {level === 6 && `Artikler fra ${city}`}
+            {level === 1 && "Continents"}
+            {level === 2 && `Regions in ${continent}`}
+            {level === 3 && `Countries in ${region}`}
+            {level === 4 && `States in ${country}`}
+            {level === 5 && (state ? `Cities in ${state}, ${country}` : `Cities in ${country}`)}
+            {level === 6 && `Articles from ${city}`}
           </div>
         </div>
 
@@ -202,7 +202,7 @@ export default function GeoExplorer({
           {level === 1 && (
             continents.length === 0 ? (
               <div style={{ padding: "12px 0", fontSize: "14px", color: "#888" }}>
-                Ingen geo-data denne uge.
+                No geo data found.
               </div>
             ) : (
               continents.map((c) => (
@@ -222,7 +222,7 @@ export default function GeoExplorer({
           {level === 2 && (
             regions.length === 0 ? (
               <div style={{ padding: "12px 0", fontSize: "14px", color: "#888" }}>
-                Ingen regioner fundet for denne verdensdel.
+                No regions found for this continent.
               </div>
             ) : (
               regions.map((r) => (
@@ -242,7 +242,7 @@ export default function GeoExplorer({
           {level === 3 && (
             countries.length === 0 ? (
               <div style={{ padding: "12px 0", fontSize: "14px", color: "#888" }}>
-                Ingen lande fundet for denne region.
+                No countries found for this region.
               </div>
             ) : (
               countries.map((c) => (
@@ -262,7 +262,7 @@ export default function GeoExplorer({
           {level === 4 && (
             states.length === 0 ? (
               <div style={{ padding: "12px 0", fontSize: "14px", color: "#888" }}>
-                Ingen stater fundet for dette land.
+                No states found for this country.
               </div>
             ) : (
               states.map((s) => (
@@ -282,7 +282,7 @@ export default function GeoExplorer({
           {level === 5 && (
             cities.length === 0 ? (
               <div style={{ padding: "12px 0", fontSize: "14px", color: "#888" }}>
-                Ingen byer fundet.
+                No cities found.
               </div>
             ) : (
               cities.map((c) => {
@@ -307,7 +307,7 @@ export default function GeoExplorer({
           {level === 6 && (
             articles.length === 0 ? (
               <div style={{ padding: "12px 0", fontSize: "14px", color: "#888" }}>
-                Ingen artikler fundet for denne by.
+                No articles found for this city.
               </div>
             ) : (
               articles.map((a, i) => (

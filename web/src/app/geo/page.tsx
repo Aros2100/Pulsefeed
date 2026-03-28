@@ -56,22 +56,6 @@ export default async function GeoPage({ searchParams }: Props) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
-  // Dynamic since-date: max(indexed_date) - 7 days
-  const { data: maxRow } = await admin
-    .from("articles")
-    .select("indexed_date")
-    .not("indexed_date", "is", null)
-    .order("indexed_date", { ascending: false })
-    .limit(1)
-    .single();
-
-  let since: string | null = null;
-  if (maxRow?.indexed_date) {
-    const maxDate = new Date(maxRow.indexed_date);
-    maxDate.setDate(maxDate.getDate() - 7);
-    since = maxDate.toISOString().slice(0, 10); // date only
-  }
-
   let continents: GeoContinent[] = [];
   let regions: GeoRegion[] = [];
   let countries: GeoCountry[] = [];
@@ -81,33 +65,33 @@ export default async function GeoPage({ searchParams }: Props) {
 
   if (!continent && !region && !country && !state && !city) {
     // Level 1: continents
-    const res = await admin.rpc("get_geo_continents", { p_since: since });
+    const res = await admin.rpc("get_geo_continents");
     continents = (res.data ?? []) as GeoContinent[];
   } else if (continent && !region && !country && !state && !city) {
     // Level 2: regions within continent
-    const res = await admin.rpc("get_geo_regions", { p_since: since, p_continent: continent });
+    const res = await admin.rpc("get_geo_regions", { p_continent: continent });
     regions = (res.data ?? []) as GeoRegion[];
   } else if (continent && region && !country && !state && !city) {
     // Level 3: countries within region
-    const res = await admin.rpc("get_geo_countries", { p_since: since, p_region: region });
+    const res = await admin.rpc("get_geo_countries", { p_region: region });
     countries = (res.data ?? []) as GeoCountry[];
   } else if (continent && region && country && !state && !city) {
     // Level 4: states within country (if any), otherwise cities
-    const stateRes = await admin.rpc("get_geo_states", { p_since: since, p_country: country });
+    const stateRes = await admin.rpc("get_geo_states", { p_country: country });
     const stateRows = (stateRes.data ?? []) as GeoState[];
     if (stateRows.length > 0) {
       states = stateRows;
     } else {
-      const cityRes = await admin.rpc("get_geo_cities", { p_since: since, p_country: country, p_state: null });
+      const cityRes = await admin.rpc("get_geo_cities", { p_country: country, p_state: null });
       cities = (cityRes.data ?? []) as GeoCity[];
     }
   } else if (continent && region && country && state && !city) {
     // Level 5: cities within state
-    const res = await admin.rpc("get_geo_cities", { p_since: since, p_country: country, p_state: state });
+    const res = await admin.rpc("get_geo_cities", { p_country: country, p_state: state });
     cities = (res.data ?? []) as GeoCity[];
   } else if (city) {
     // Level 6: articles in city
-    const res = await admin.rpc("get_geo_articles", { p_since: since, p_city: city });
+    const res = await admin.rpc("get_geo_articles", { p_city: city });
     articles = (res.data ?? []) as GeoArticle[];
   }
 

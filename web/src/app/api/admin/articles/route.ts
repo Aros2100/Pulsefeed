@@ -21,8 +21,14 @@ export async function GET(request: Request) {
   const hasAbstract     = searchParams.get("has_abstract");
   const dateFrom = searchParams.get("date_from");
   const dateTo   = searchParams.get("date_to");
-  const meshTerm = searchParams.get("mesh_term")?.trim() ?? "";
-  const search   = searchParams.get("search")?.trim() ?? "";
+  const meshTerm     = searchParams.get("mesh_term")?.trim() ?? "";
+  const search       = searchParams.get("search")?.trim() ?? "";
+  const geoCountry   = searchParams.get("geo_country")?.trim() ?? "";
+  const geoContinent = searchParams.get("geo_continent")?.trim() ?? "";
+  const geoRegion    = searchParams.get("geo_region")?.trim() ?? "";
+  const geoState     = searchParams.get("geo_state")?.trim() ?? "";
+  const geoCity      = searchParams.get("geo_city")?.trim() ?? "";
+  const missingGeo   = searchParams.get("missing_geo") === "true";
   const sortBy   = searchParams.get("sort_by") ?? "imported_at";
   const sortAsc  = searchParams.get("sort_dir") === "asc";
 
@@ -45,8 +51,14 @@ export async function GET(request: Request) {
   if (hasAbstract === "false") query = query.is("abstract", null);
   if (dateFrom) query = query.gte("imported_at", dateFrom);
   if (dateTo)   query = query.lte("imported_at", dateTo);
-  if (meshTerm) query = query.ilike("mesh_terms_text", `%${meshTerm}%`);
-  if (search)   query = query.or(`title.ilike.%${search}%,journal_abbr.ilike.%${search}%`);
+  if (meshTerm)     query = query.filter("mesh_terms::text", "ilike", `%${meshTerm}%`);
+  if (search)       query = query.or(`title.ilike.%${search}%,journal_abbr.ilike.%${search}%`);
+  if (geoCountry)   query = query.eq("geo_country", geoCountry);
+  if (geoContinent) query = query.eq("geo_continent", geoContinent);
+  if (geoRegion)    query = query.eq("geo_region", geoRegion);
+  if (geoState)     query = query.eq("geo_state", geoState);
+  if (geoCity)      query = query.ilike("geo_city", `%${geoCity}%`);
+  if (missingGeo)   query = query.is("geo_country", null).is("geo_city", null);
 
   const { data, error, count } = await query
     .order(safeSortBy, { ascending: sortAsc })

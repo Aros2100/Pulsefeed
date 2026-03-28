@@ -28,15 +28,11 @@ export function buildLocationSummary(
   first: AuthorLocation,
   last: AuthorLocation
 ): {
-  article_regions: string[];
   article_countries: string[];
   article_cities: string[];
-  article_institutions: string[];
 } {
   return {
-    article_regions: dedup([first.region, last.region]),
     article_countries: dedup([first.country, last.country]),
     article_cities: dedup([first.city, last.city]),
-    article_institutions: dedup([first.institution, last.institution]),
   };
 }

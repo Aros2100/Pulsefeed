@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getRegion, getContinent } from "@/lib/geo/continent-map";
+import { getRegion, getContinent } from "@/lib/geo/country-map";
+import { logGeoUpdatedEvent, type GeoSnapshot } from "@/lib/article-events";
 
 export async function POST(
   req: Request,
@@ -20,10 +21,19 @@ export async function POST(
   };
 
   const region = country ? getRegion(country) : null;
-  const continent = region ? getContinent(region) : null;
+  const continent = country ? getContinent(country) : null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
+
+  // Fetch previous geo for event logging
+  const { data: prevData } = await admin
+    .from("articles")
+    .select("geo_city, geo_country, geo_state, geo_region, geo_continent, geo_institution, geo_department")
+    .eq("id", id)
+    .single();
+  const prevGeo: GeoSnapshot | null = prevData ?? null;
+
   const { error } = await admin
     .from("articles")
     .update({
@@ -33,16 +43,21 @@ export async function POST(
       geo_institution: institution || null,
       geo_region: region,
       geo_continent: continent,
-      geo_country_certain: true,
-      geo_state_certain: true,
-      geo_city_certain: true,
-      geo_institution_certain: true,
     })
     .eq("id", id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  logGeoUpdatedEvent(id, "manual", prevGeo, {
+    geo_country: country || null,
+    geo_state: state || null,
+    geo_city: city || null,
+    geo_institution: institution || null,
+    geo_region: region,
+    geo_continent: continent,
+  });
 
   return NextResponse.json({ ok: true, region, continent });
 }

@@ -174,17 +174,72 @@ function cleanCity(raw: string, cityNames: Set<string>): string {
   return city;
 }
 
-export async function parseAffiliation(raw: string | null): Promise<ParsedAffiliation | null> {
-  // Step 1: Handle null/empty
-  if (!raw || !raw.trim()) return null;
+// ── Missing-comma normalizer ────────────────────────────────────────────────────
 
-  const { names: cityNames, countryMap: cityCountryMap } = await getCityCache();
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
-  // Step 1b: Strip trailing author initials from raw string BEFORE splitting on ";"
-  let text = raw.replace(/\s*\([A-Za-z][A-Za-z.\-,\s]{2,}\)\s*\.?\s*$/, "").trim();
+// Lazy-compiled regex: inserts a comma before a bare country name not already
+// preceded by a comma. "Taiyuan China" → "Taiyuan, China".
+// Sorted by descending length so multi-word names match before substrings.
+let _countryCommaRe: RegExp | null = null;
+function countryCommaRe(): RegExp {
+  if (!_countryCommaRe) {
+    const names = [...CANONICAL_COUNTRIES]
+      .sort((a, b) => b.length - a.length)
+      .map(escapeRegExp);
+    // Common country aliases absent from the canonical list
+    names.push("USA", "U\\.S\\.A\\.", "U\\.S\\.");
+    _countryCommaRe = new RegExp(
+      `(?<!,)\\s+(${names.join("|")})(?=[,.]|$)`,
+      "g"
+    );
+  }
+  return _countryCommaRe;
+}
 
-  // Step 2: Take first affiliation only (split on "; " or ".; ")
-  text = text.split(/\.\s*;\s*|;\s+/)[0].trim();
+// Lazy-compiled regex: inserts a comma before a 2-letter US state abbreviation
+// when immediately followed by a US country name variant.
+// "Ann Arbor MI USA" → "Ann Arbor, MI, USA".
+let _stateCommaRe: RegExp | null = null;
+function stateCommaRe(): RegExp {
+  if (!_stateCommaRe) {
+    const abbrevs = Object.keys(US_STATES)
+      .filter((k) => k.length === 2)
+      .map(escapeRegExp);
+    const usVariants = "United\\s+States|USA|U\\.S\\.A\\.|U\\.S\\.";
+    _stateCommaRe = new RegExp(
+      `(?<!,)\\s+(${abbrevs.join("|")})(?=\\s+(?:${usVariants})[,.]?)`,
+      "g"
+    );
+  }
+  return _stateCommaRe;
+}
+
+/** Insert commas before bare country names and US state+country sequences. */
+function normalizeCommas(text: string): string {
+  text = text.replace(countryCommaRe(), ", $1");
+  text = text.replace(stateCommaRe(), ", $1");
+  return text;
+}
+
+// ── Single-segment parser ───────────────────────────────────────────────────────
+
+/**
+ * Parse one clean affiliation segment (no semicolons) into structured geo fields.
+ * Called by parseAffiliation for each semicolon-separated part.
+ */
+function parseSingleSegment(
+  rawText: string,
+  cityNames: Set<string>,
+  cityCountryMap: Map<string, string>
+): ParsedAffiliation | null {
+  let text = rawText;
+
+  // Step 2b: Insert missing commas before country names / US state abbreviations.
+  // "Taiyuan China" → "Taiyuan, China"; "Ann Arbor MI USA" → "Ann Arbor, MI, USA"
+  text = normalizeCommas(text);
 
   // Step 3: Clean
   text = text.replace(/\.\s*Electronic address:.*$/i, "").trim();
@@ -535,4 +590,35 @@ export async function parseAffiliation(raw: string | null): Promise<ParsedAffili
   }
 
   return { department, institution, city, country, confidence };
+}
+
+// ── Public API ──────────────────────────────────────────────────────────────────
+
+export async function parseAffiliation(raw: string | null): Promise<ParsedAffiliation | null> {
+  // Step 1: Handle null/empty
+  if (!raw || !raw.trim()) return null;
+
+  const { names: cityNames, countryMap: cityCountryMap } = await getCityCache();
+
+  // Step 1b: Strip trailing author initials from raw string BEFORE splitting on ";"
+  let text = raw.replace(/\s*\([A-Za-z][A-Za-z.\-,\s]{2,}\)\s*\.?\s*$/, "").trim();
+
+  // Step 1c: Strip parenthetic author-initial blocks anywhere in the string,
+  // e.g. "(SZ, HY, YL, RH)" or "(AB, CD)". These are contribution lists, not locations.
+  text = text.replace(/\([A-Z]{1,3}(?:,\s*[A-Z]{1,3})+\)/g, "").trim();
+
+  // Step 2: Split on semicolons and try each part in order.
+  // Returns the first part that resolves a country; falls back to the first
+  // non-null result if none resolve a country.
+  // Example: "...Fukui; and.; 2Dept..., Kyoto, Japan." — first part has no
+  // country, second part does → returns Kyoto/Japan.
+  const parts = text.split(/\.\s*;\s*|;\s+/).map((p) => p.trim()).filter(Boolean);
+
+  let bestResult: ParsedAffiliation | null = null;
+  for (const part of parts) {
+    const result = parseSingleSegment(part, cityNames, cityCountryMap);
+    if (result?.country) return result;
+    if (!bestResult && result) bestResult = result;
+  }
+  return bestResult;
 }

@@ -115,6 +115,63 @@ export const RAW_INSTITUTIONS: [string, InstitutionInfo][] = [
   // France
   ["université paris cité", { institution: "Université Paris Cité", city: "Paris", country: "France" }],
   ["universite paris cite", { institution: "Université Paris Cité", city: "Paris", country: "France" }],
+
+  // United States
+  ["duke university school of medicine", { institution: "Duke University School of Medicine", city: "Durham", country: "United States" }],
+  ["duke university medical center", { institution: "Duke University Medical Center", city: "Durham", country: "United States" }],
+  ["medical university of south carolina", { institution: "Medical University of South Carolina", city: "Charleston", country: "United States" }],
+
+  // China
+  ["shanghai changzheng hospital", { institution: "Shanghai Changzheng Hospital", city: "Shanghai", country: "China" }],
+  ["naval medical university", { institution: "Naval Medical University", city: "Shanghai", country: "China" }],
+
+  // Belgium
+  ["chu liège", { institution: "CHU de Liège", city: "Liège", country: "Belgium" }],
+  ["chu liege", { institution: "CHU de Liège", city: "Liège", country: "Belgium" }],
+
+  // Senegal
+  ["chu fann", { institution: "CHU Fann", city: "Dakar", country: "Senegal" }],
+
+  // Morocco
+  ["chu mohammed vi", { institution: "CHU Mohammed VI", city: "Oujda", country: "Morocco" }],
+  ["chu mohammed-vi", { institution: "CHU Mohammed VI", city: "Oujda", country: "Morocco" }],
+
+  // Switzerland
+  ["neurorestore", { institution: "NeuroRestore", city: "Lausanne", country: "Switzerland" }],
+  ["hôpitaux universitaires de genève", { institution: "Hôpitaux Universitaires de Genève", city: "Geneva", country: "Switzerland" }],
+  ["hopitaux universitaires de geneve", { institution: "Hôpitaux Universitaires de Genève", city: "Geneva", country: "Switzerland" }],
+  ["école polytechnique fédérale de lausanne", { institution: "École Polytechnique Fédérale de Lausanne", city: "Lausanne", country: "Switzerland" }],
+  ["ecole polytechnique federale de lausanne", { institution: "École Polytechnique Fédérale de Lausanne", city: "Lausanne", country: "Switzerland" }],
+
+  // Italy
+  ["università degli studi di napoli federico ii", { institution: "Università degli Studi di Napoli Federico II", city: "Naples", country: "Italy" }],
+  ["university of napoli federico ii", { institution: "Università degli Studi di Napoli Federico II", city: "Naples", country: "Italy" }],
+
+  // Benin
+  ["safna", { institution: "SAFNA", city: "Cotonou", country: "Benin" }],
+
+  // Democratic Republic of the Congo
+  ["clinique ngaliema", { institution: "Clinique Ngaliema", city: "Kinshasa", country: "Democratic Republic of the Congo" }],
+
+  // Vietnam
+  ["military central hospital 108", { institution: "Military Central Hospital 108", city: "Hanoi", country: "Vietnam" }],
+
+  // Algeria
+  ["université de bejaia", { institution: "Université de Bejaia", city: "Bejaia", country: "Algeria" }],
+  ["universite de bejaia", { institution: "Université de Bejaia", city: "Bejaia", country: "Algeria" }],
+
+  // India
+  ["manipal hospital", { institution: "Manipal Hospital", city: "Bangalore", country: "India" }],
+
+  // Denmark
+  ["danish clinical quality program", { institution: "Danish Clinical Quality Program", city: "Copenhagen", country: "Denmark" }],
+
+  // France
+  ["chru lille", { institution: "CHRU de Lille", city: "Lille", country: "France" }],
+  ["roger-salengro", { institution: "Hôpital Roger Salengro", city: "Lille", country: "France" }],
+
+  // Italy
+  ["agenzia di tutela della salute", { institution: "Agenzia di Tutela della Salute", city: "Milan", country: "Italy" }],
 ];
 
 /**

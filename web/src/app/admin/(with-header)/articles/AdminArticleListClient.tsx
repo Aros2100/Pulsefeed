@@ -31,12 +31,28 @@ interface Filters {
   has_abstract: string;
   date_from: string;
   date_to: string;
+  geo_continent: string;
+  geo_region: string;
+  geo_country: string;
+  geo_state: string;
+  geo_city: string;
+  missing_geo: boolean;
   sort_by: SortField;
   sort_dir: "asc" | "desc";
   page: number;
 }
 
 const PAGE_SIZE = 50;
+
+// Hardcoded — independent of DB
+const CONTINENTS = [
+  "Africa",
+  "Asia",
+  "Europe",
+  "North America",
+  "Oceania",
+  "South America",
+] as const;
 
 const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
   approved: { bg: "#f0fdf4", color: "#15803d" },
@@ -97,6 +113,12 @@ function filtersFromParams(sp: URLSearchParams): Filters {
     has_abstract:    sp.get("has_abstract")    ?? "",
     date_from:       sp.get("date_from")       ?? "",
     date_to:         sp.get("date_to")         ?? "",
+    geo_continent:   sp.get("geo_continent")   ?? "",
+    geo_region:      sp.get("geo_region")      ?? "",
+    geo_country:     sp.get("geo_country")     ?? "",
+    geo_state:       sp.get("geo_state")       ?? "",
+    geo_city:        sp.get("geo_city")        ?? "",
+    missing_geo:     sp.get("missing_geo")     === "true",
     sort_by:         (SORT_FIELDS as readonly string[]).includes(sortBy) ? sortBy as SortField : "imported_at",
     sort_dir:        sortDir === "asc" ? "asc" : "desc",
     page:            Math.max(1, parseInt(sp.get("page") ?? "1", 10)),
@@ -114,25 +136,43 @@ function filtersToParams(f: Filters): URLSearchParams {
   if (f.has_abstract)    p.set("has_abstract",    f.has_abstract);
   if (f.date_from)       p.set("date_from",       f.date_from);
   if (f.date_to)         p.set("date_to",         f.date_to);
+  if (f.geo_continent)   p.set("geo_continent",   f.geo_continent);
+  if (f.geo_region)      p.set("geo_region",      f.geo_region);
+  if (f.geo_country)     p.set("geo_country",     f.geo_country);
+  if (f.geo_state)       p.set("geo_state",       f.geo_state);
+  if (f.geo_city)        p.set("geo_city",        f.geo_city);
+  if (f.missing_geo)     p.set("missing_geo",     "true");
   if (f.sort_by !== "imported_at") p.set("sort_by", f.sort_by);
   if (f.sort_dir !== "desc")       p.set("sort_dir", f.sort_dir);
   if (f.page > 1)                  p.set("page", String(f.page));
   return p;
 }
 
+const EMPTY_FILTERS: Filters = {
+  search: "", mesh_term: "", circle: "", status: "", subspecialty: "",
+  approval_method: "", has_abstract: "", date_from: "", date_to: "",
+  geo_continent: "", geo_region: "", geo_country: "", geo_state: "", geo_city: "",
+  missing_geo: false, sort_by: "imported_at", sort_dir: "desc", page: 1,
+};
+
 export default function AdminArticleListClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const [filters, setFilters] = useState<Filters>(() => filtersFromParams(searchParams));
+  const [filters, setFiltersState] = useState<Filters>(() => filtersFromParams(searchParams));
   const [rows, setRows] = useState<ArticleRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const meshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [searchInput, setSearchInput] = useState(() => searchParams.get("search") ?? "");
   const [meshInput, setMeshInput] = useState(() => searchParams.get("mesh_term") ?? "");
+  const [cityInput, setCityInput] = useState(() => searchParams.get("geo_city") ?? "");
+  const [geoRegions, setGeoRegions] = useState<string[]>([]);
+  const [geoCountries, setGeoCountries] = useState<string[]>([]);
+  const [geoStates, setGeoStates] = useState<string[]>([]);
 
   const fetchArticles = useCallback(async (f: Filters) => {
     setLoading(true);
@@ -165,15 +205,64 @@ export default function AdminArticleListClient() {
     router.replace(`?${qs}`, { scroll: false });
   }, [filters, fetchArticles, router]);
 
+  // Reload region list when continent changes
+  useEffect(() => {
+    const params = new URLSearchParams({ field: "geo_region" });
+    if (filters.geo_continent) params.set("continent", filters.geo_continent);
+    fetch(`/api/admin/articles/geo-options?${params}`)
+      .then((r) => r.json())
+      .then((d: { ok: boolean; options?: string[] }) => {
+        if (d.ok) setGeoRegions(d.options ?? []);
+      })
+      .catch(() => {});
+  }, [filters.geo_continent]);
+
+  // Reload country list when continent or region changes
+  useEffect(() => {
+    const params = new URLSearchParams({ field: "geo_country" });
+    if (filters.geo_continent) params.set("continent", filters.geo_continent);
+    if (filters.geo_region)    params.set("region",    filters.geo_region);
+    fetch(`/api/admin/articles/geo-options?${params}`)
+      .then((r) => r.json())
+      .then((d: { ok: boolean; options?: string[] }) => {
+        if (d.ok) setGeoCountries(d.options ?? []);
+      })
+      .catch(() => {});
+  }, [filters.geo_continent, filters.geo_region]);
+
+  // Reload state list when country changes; clear when no country selected
+  useEffect(() => {
+    if (!filters.geo_country) { setGeoStates([]); return; }
+    const params = new URLSearchParams({ field: "geo_state", country: filters.geo_country });
+    fetch(`/api/admin/articles/geo-options?${params}`)
+      .then((r) => r.json())
+      .then((d: { ok: boolean; options?: string[] }) => {
+        if (d.ok) setGeoStates(d.options ?? []);
+      })
+      .catch(() => { setGeoStates([]); });
+  }, [filters.geo_country]);
+
+  /** Set any filter; geo parents cascade-clear their children. */
   function setFilter<K extends keyof Filters>(key: K, value: Filters[K]) {
-    setFilters((prev) => ({ ...prev, [key]: value, page: key !== "page" ? 1 : (value as number) }));
+    // Reset city text input whenever a geo parent changes
+    if (key === "geo_continent" || key === "geo_region" || key === "geo_country" || key === "geo_state") {
+      setCityInput("");
+    }
+    setFiltersState((prev) => {
+      const next: Filters = { ...prev, [key]: value, page: key !== "page" ? 1 : (value as number) };
+      if (key === "geo_continent") { next.geo_region = ""; next.geo_country = ""; next.geo_state = ""; next.geo_city = ""; }
+      if (key === "geo_region")    { next.geo_country = ""; next.geo_state = ""; next.geo_city = ""; }
+      if (key === "geo_country")   { next.geo_state = ""; next.geo_city = ""; }
+      if (key === "geo_state")     { next.geo_city = ""; }
+      return next;
+    });
   }
 
   function handleSearchChange(v: string) {
     setSearchInput(v);
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
-      setFilters((prev) => ({ ...prev, search: v, page: 1 }));
+      setFiltersState((prev) => ({ ...prev, search: v, page: 1 }));
     }, 350);
   }
 
@@ -181,18 +270,33 @@ export default function AdminArticleListClient() {
     setMeshInput(v);
     if (meshTimer.current) clearTimeout(meshTimer.current);
     meshTimer.current = setTimeout(() => {
-      setFilters((prev) => ({ ...prev, mesh_term: v, page: 1 }));
+      setFiltersState((prev) => ({ ...prev, mesh_term: v, page: 1 }));
+    }, 350);
+  }
+
+  function handleCityChange(v: string) {
+    setCityInput(v);
+    if (cityTimer.current) clearTimeout(cityTimer.current);
+    cityTimer.current = setTimeout(() => {
+      setFiltersState((prev) => ({ ...prev, geo_city: v, page: 1 }));
     }, 350);
   }
 
   function handleSort(field: SortField) {
-    setFilters((prev) => ({
+    setFiltersState((prev) => ({
       ...prev,
       sort_by: field,
       sort_dir: prev.sort_by === field && prev.sort_dir === "desc" ? "asc" : "desc",
       page: 1,
     }));
   }
+
+  const hasActiveFilters = !!(
+    filters.circle || filters.status || filters.subspecialty || filters.approval_method ||
+    filters.has_abstract || filters.date_from || filters.date_to || filters.search ||
+    filters.mesh_term || filters.geo_continent || filters.geo_region || filters.geo_country || filters.geo_state ||
+    filters.geo_city || filters.missing_geo
+  );
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const { sort_by, sort_dir, page } = filters;
@@ -226,35 +330,63 @@ export default function AdminArticleListClient() {
         flexDirection: "column",
         gap: "10px",
       }}>
-        {/* Row 1: title/journal search */}
-        <div>
+        {/* Title / journal search */}
+        <input
+          type="text"
+          placeholder="Søg titel eller tidsskrift…"
+          value={searchInput}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          style={{
+            width: "100%", padding: "7px 12px",
+            border: "1px solid #dde3ed", borderRadius: "6px",
+            fontSize: "13px", outline: "none", boxSizing: "border-box",
+          }}
+        />
+
+        {/* Geo row: Continent → Region → Country → State (conditional) → City */}
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+          <SelectFilter
+            value={filters.geo_continent}
+            onChange={(v) => setFilter("geo_continent", v)}
+            placeholder="Continent: Alle"
+            options={CONTINENTS.map((c) => ({ value: c, label: c }))}
+          />
+          {geoRegions.length > 0 && (
+            <SelectFilter
+              value={filters.geo_region}
+              onChange={(v) => setFilter("geo_region", v)}
+              placeholder="Region: Alle"
+              options={geoRegions.map((r) => ({ value: r, label: r }))}
+            />
+          )}
+          <SelectFilter
+            value={filters.geo_country}
+            onChange={(v) => setFilter("geo_country", v)}
+            placeholder="Country: Alle"
+            options={geoCountries.map((c) => ({ value: c, label: c }))}
+          />
+          {filters.geo_country && geoStates.length > 0 && (
+            <SelectFilter
+              value={filters.geo_state}
+              onChange={(v) => setFilter("geo_state", v)}
+              placeholder="State: Alle"
+              options={geoStates.map((s) => ({ value: s, label: s }))}
+            />
+          )}
           <input
             type="text"
-            placeholder="Søg titel eller tidsskrift…"
-            value={searchInput}
-            onChange={(e) => handleSearchChange(e.target.value)}
+            placeholder="City…"
+            value={cityInput}
+            onChange={(e) => handleCityChange(e.target.value)}
             style={{
-              width: "100%", padding: "7px 12px",
-              border: "1px solid #dde3ed", borderRadius: "6px",
-              fontSize: "13px", outline: "none",
+              padding: "6px 10px", fontSize: "12px", border: "1px solid #dde3ed",
+              borderRadius: "6px", outline: "none", width: "130px",
+              color: cityInput ? "#1a1a1a" : "#888",
             }}
           />
         </div>
-        {/* Row 2: MeSH term search */}
-        <div>
-          <input
-            type="text"
-            placeholder="Søg MeSH term…"
-            value={meshInput}
-            onChange={(e) => handleMeshChange(e.target.value)}
-            style={{
-              width: "100%", padding: "7px 12px",
-              border: "1px solid #dde3ed", borderRadius: "6px",
-              fontSize: "13px", outline: "none",
-            }}
-          />
-        </div>
-        {/* Row 3: all dropdown/date filters */}
+
+        {/* Status / meta filters row */}
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
           <SelectFilter
             value={filters.circle}
@@ -293,6 +425,17 @@ export default function AdminArticleListClient() {
               { value: "null",          label: "Pending" },
             ]}
           />
+          <input
+            type="text"
+            placeholder="MeSH term…"
+            value={meshInput}
+            onChange={(e) => handleMeshChange(e.target.value)}
+            style={{
+              padding: "6px 10px", fontSize: "12px", border: "1px solid #dde3ed",
+              borderRadius: "6px", outline: "none", width: "130px",
+              color: meshInput ? "#1a1a1a" : "#888",
+            }}
+          />
           <SelectFilter
             value={filters.has_abstract}
             onChange={(v) => setFilter("has_abstract", v)}
@@ -303,7 +446,6 @@ export default function AdminArticleListClient() {
             ]}
           />
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{ fontSize: "12px", color: "#888" }}>Importeret:</span>
             <span style={{ fontSize: "12px", color: "#888" }}>Fra</span>
             <input
               type="date"
@@ -319,12 +461,25 @@ export default function AdminArticleListClient() {
               style={{ padding: "5px 8px", fontSize: "12px", border: "1px solid #dde3ed", borderRadius: "6px", outline: "none" }}
             />
           </div>
-          {(filters.circle || filters.status || filters.subspecialty || filters.approval_method || filters.has_abstract || filters.date_from || filters.date_to || filters.search || filters.mesh_term) && (
+          <button
+            onClick={() => setFilter("missing_geo", !filters.missing_geo)}
+            style={{
+              padding: "5px 10px", fontSize: "12px", borderRadius: "6px", cursor: "pointer",
+              background: filters.missing_geo ? "#fef2f2" : "#fff",
+              color:      filters.missing_geo ? "#b91c1c" : "#5a6a85",
+              border:     `1px solid ${filters.missing_geo ? "#fecaca" : "#dde3ed"}`,
+              fontWeight: filters.missing_geo ? 700 : 400,
+            }}
+          >
+            Missing geo
+          </button>
+          {hasActiveFilters && (
             <button
               onClick={() => {
                 setSearchInput("");
                 setMeshInput("");
-                setFilters({ search: "", mesh_term: "", circle: "", status: "", subspecialty: "", approval_method: "", has_abstract: "", date_from: "", date_to: "", sort_by: "imported_at", sort_dir: "desc", page: 1 });
+                setCityInput("");
+                setFiltersState(EMPTY_FILTERS);
               }}
               style={{ fontSize: "12px", color: "#E83B2A", background: "none", border: "none", cursor: "pointer", padding: "5px 0", textDecoration: "underline" }}
             >
@@ -387,11 +542,7 @@ export default function AdminArticleListClient() {
                   const s = STATUS_STYLE[st] ?? STATUS_STYLE.pending;
                   const count = authorCount(a.authors);
                   return (
-                    <tr
-                      key={a.id}
-                      style={{ background: i % 2 === 0 ? "#fff" : "#fafbfc" }}
-                    >
-                      {/* Title */}
+                    <tr key={a.id} style={{ background: i % 2 === 0 ? "#fff" : "#fafbfc" }}>
                       <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", maxWidth: "340px" }}>
                         <Link href={`/admin/articles/${a.id}`} style={{ textDecoration: "none", color: "inherit" }}>
                           <div style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
@@ -402,21 +553,17 @@ export default function AdminArticleListClient() {
                           )}
                         </Link>
                       </td>
-                      {/* Journal */}
                       <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", fontSize: "12px", color: "#5a6a85", whiteSpace: "nowrap" }}>
                         {a.journal_abbr ?? "—"}
                       </td>
-                      {/* Published */}
                       <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", fontSize: "12px", color: "#5a6a85", whiteSpace: "nowrap" }}>
                         {fmt(a.published_date)}
                       </td>
-                      {/* Status */}
                       <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7" }}>
                         <span style={{ fontSize: "11px", fontWeight: 600, borderRadius: "999px", padding: "2px 8px", background: s.bg, color: s.color }}>
                           {st}
                         </span>
                       </td>
-                      {/* Evidence */}
                       <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", whiteSpace: "nowrap" }}>
                         {a.evidence_score != null ? (
                           <span style={{
@@ -431,7 +578,6 @@ export default function AdminArticleListClient() {
                           <span style={{ color: "#ccc", fontSize: "12px" }}>—</span>
                         )}
                       </td>
-                      {/* Imported */}
                       <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", fontSize: "12px", color: "#5a6a85", whiteSpace: "nowrap" }}>
                         {fmt(a.imported_at)}
                       </td>
@@ -443,7 +589,6 @@ export default function AdminArticleListClient() {
           </div>
         )}
 
-        {/* Pagination */}
         {!loading && totalPages > 1 && (
           <div style={{ padding: "14px 20px", borderTop: "1px solid #eef0f4", display: "flex", justifyContent: "center", alignItems: "center", gap: "6px" }}>
             <PageButton label="«" disabled={page === 1} onClick={() => setFilter("page", 1)} />

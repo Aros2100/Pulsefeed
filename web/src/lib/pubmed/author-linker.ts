@@ -2,14 +2,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/types";
 import { linkAuthorsToArticle, decodeHtmlEntities, type Author } from "@/lib/pubmed/importer";
 import { runLinkingChecks } from "@/lib/pubmed/quality-checks";
-import { logArticleEvent } from "@/lib/article-events";
+import { logArticleEvent, logGeoUpdatedEvent, type GeoSnapshot } from "@/lib/article-events";
 import { notifyFollowedAuthorPublications } from "@/lib/notifications/followedAuthorNotify";
-import { getRegion, getContinent } from "@/lib/geo/continent-map";
+import { getRegion, getContinent } from "@/lib/geo/country-map";
 import { lookupState } from "@/lib/geo/state-map";
+import { getCityCache, normalizeCityKey } from "@/lib/geo/city-cache";
 import { fetchWorksByDois, type OpenAlexWork } from "@/lib/openalex/client";
 import pLimit from "p-limit";
 
-const BATCH_SIZE = 10;
+const BATCH_SIZE = 100;
 const LINK_CONCURRENCY = 3;
 
 export async function runAuthorLinking(logId: string, importLogId?: string): Promise<void> {
@@ -90,6 +91,31 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
 
           const articleDoi = (article.doi as string | null);
           const oaWork = articleDoi ? oaWorksMap.get(articleDoi.toLowerCase()) ?? null : null;
+
+          // Fill missing affiliations from OpenAlex raw_affiliation_strings (index-matched).
+          // Never overwrite existing PubMed affiliation data.
+          if (oaWork && oaWork.authorships.length > 0) {
+            let oaPatched = false;
+            const patchedRaw = rawAuthors.map((ra, i) => {
+              const hasAff =
+                (Array.isArray(ra.affiliations) && (ra.affiliations as string[]).length > 0) ||
+                ra.affiliation != null;
+              if (!hasAff) {
+                const oaAff = oaWork.authorships[i]?.rawAffiliationStrings[0];
+                if (oaAff) {
+                  oaPatched = true;
+                  authors[i] = { ...authors[i], affiliations: [oaAff] };
+                  return { ...ra, affiliation: oaAff };
+                }
+              }
+              return ra;
+            });
+            if (oaPatched) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (admin as any).from("articles").update({ authors: patchedRaw }).eq("id", article.id);
+            }
+          }
+
           console.error(`[author-linker] calling linkAuthorsToArticle for PMID ${article.pubmed_id} (${authors.length} authors, oaWork=${oaWork ? 'yes' : 'no'})`);
           await linkAuthorsToArticle(admin, article.id, authors, oaWork)
             .then(async (result) => {
@@ -102,44 +128,58 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
 
               // Populate article geo fields from first/last author affiliation
               if (result.firstAuthorGeo || result.lastAuthorGeo) {
+                // Guard: if article already has geo_country, the deterministic parser
+                // has already set correct geo — skip the author-linker write.
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const { data: existingGeo } = await (admin as any)
+                  .from("articles")
+                  .select("geo_country")
+                  .eq("id", article.id)
+                  .single();
+                if (existingGeo?.geo_country) {
+                  // Parser geo takes precedence — do not overwrite
+                } else {
+
                 const first = result.firstAuthorGeo;
                 const last = result.lastAuthorGeo;
 
-                const firstRegion = first?.country ? getRegion(first.country) : null;
-                const lastRegion = last?.country ? getRegion(last.country) : null;
-                const firstContinent = firstRegion ? getContinent(firstRegion) : null;
-                const firstState = first?.state ?? (first?.city && first?.country ? lookupState(first.city, first.country) : null);
+                // City→country fallback: if parser found city but not country, try city-cache
+                let effectiveCountry = first?.country ?? null;
+                if (!effectiveCountry && first?.city) {
+                  const cityCache = await getCityCache();
+                  effectiveCountry = cityCache.countryMap.get(normalizeCityKey(first.city)) ?? null;
+                }
 
-                const geoCountryCertain = !last || !last.country || last.country === first?.country;
-                const geoCityCertain = geoCountryCertain && (!last || !last.city || last.city === first?.city);
-                const geoInstitutionCertain = geoCityCertain && (!last || !last.institution || last.institution === first?.institution);
+                const firstRegion = effectiveCountry ? getRegion(effectiveCountry) : null;
+                const firstContinent = effectiveCountry ? getContinent(effectiveCountry) : null;
+                const firstState = first?.state ?? (first?.city && effectiveCountry ? lookupState(first.city, effectiveCountry) : null);
+                void last; // last author geo no longer written to separate columns
 
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const db = admin as any;
-                await db.from("articles").update({
-                  first_author_department: first?.department ?? null,
-                  first_author_institution: first?.institution ?? null,
-                  first_author_city: first?.city ?? null,
-                  first_author_country: first?.country ?? null,
-                  first_author_region: firstRegion,
-                  last_author_department: last?.department ?? null,
-                  last_author_institution: last?.institution ?? null,
-                  last_author_city: last?.city ?? null,
-                  last_author_country: last?.country ?? null,
-                  last_author_region: lastRegion,
+                const geoUpdate = {
+                  geo_department: first?.department ?? null,
                   geo_continent: firstContinent,
                   geo_region: firstRegion,
-                  geo_country: first?.country ?? null,
+                  geo_country: effectiveCountry,
                   geo_state: firstState,
                   geo_city: first?.city ?? null,
                   geo_institution: first?.institution ?? null,
-                  geo_country_certain: geoCountryCertain,
-                  geo_state_certain: geoCountryCertain,
-                  geo_city_certain: geoCityCertain,
-                  geo_institution_certain: geoInstitutionCertain,
                   location_parsed_at: new Date().toISOString(),
                   location_confidence: first?.confidence ?? (last?.confidence ?? null),
-                }).eq("id", article.id);
+                };
+                await db.from("articles").update(geoUpdate).eq("id", article.id);
+                const geoNext: GeoSnapshot = {
+                  geo_department: geoUpdate.geo_department,
+                  geo_continent: geoUpdate.geo_continent,
+                  geo_region: geoUpdate.geo_region,
+                  geo_country: geoUpdate.geo_country,
+                  geo_state: geoUpdate.geo_state,
+                  geo_city: geoUpdate.geo_city,
+                  geo_institution: geoUpdate.geo_institution,
+                };
+                logGeoUpdatedEvent(article.id, "author_linker", null, geoNext);
+                } // end else (no existing geo_country)
               }
 
               if (rejectedAuthors.length > 0) {
