@@ -898,16 +898,22 @@ async function createNewAuthor(
     rorId = oaInst.ror ?? null;
   }
 
-  // Determine geo: ROR geo as primary, fall back to parser
-  let city = await resolveCityAlias(parsed.city, parsed.country ?? "");
-  let country = parsed.country;
+  // Determine geo: ROR is authoritative, parser fills gaps only
+  let city: string | null = null;
+  let country: string | null = null;
   let state: string | null = null;
+
   if (oaInst?.ror) {
     const rorGeo = await fetchRorGeo(oaInst.ror);
-    if (rorGeo.city)    city    = await resolveCityAlias(rorGeo.city, rorGeo.country ?? country ?? "");
+    if (rorGeo.city)    city    = rorGeo.city;
     if (rorGeo.state)   state   = rorGeo.state;
     if (rorGeo.country) country = rorGeo.country;
   }
+
+  // Parser as fallback — only fills what ROR did not provide
+  if (!city)    city    = parsed.city ? await resolveCityAlias(parsed.city, parsed.country ?? "") : null;
+  if (!country) country = parsed.country ?? null;
+
   if (!state) {
     state = await resolveState(admin, city, country);
   }
