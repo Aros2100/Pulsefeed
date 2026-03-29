@@ -39,7 +39,7 @@ export default async function CombosPage() {
     p_min_count: 3,
   });
 
-  const typedCoOccurrences = (coOccurrences ?? []) as {
+  const typedCoOccurrences = (coOccurrences ?? []) as unknown as {
     term_1: string;
     term_2: string;
     pair_count: number;
