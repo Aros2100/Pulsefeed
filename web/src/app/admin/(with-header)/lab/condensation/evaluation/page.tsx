@@ -38,8 +38,6 @@ interface RejectionRow {
   ai_confidence:        number | null;
   decided_at:           string | null;
   disagreement_reason:  string | null;
-  reject_reasons:       string[] | null;
-  comment:              string | null;
 }
 
 interface ArticleDetail {
@@ -87,28 +85,6 @@ function ArticleRow({ row, article, tab }: { row: RejectionRow; article: Article
           </span>
         )}
       </div>
-
-      {row.decision === "rejected" && (row.reject_reasons?.length || row.comment) && (
-        <div style={{ marginTop: "8px", fontSize: "12px", color: "#444" }}>
-          {row.reject_reasons && row.reject_reasons.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: row.comment ? "6px" : 0 }}>
-              {row.reject_reasons.map((r) => (
-                <span key={r} style={{
-                  fontSize: "11px", fontWeight: 600, borderRadius: "4px", padding: "2px 7px",
-                  background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca",
-                }}>
-                  {r}
-                </span>
-              ))}
-            </div>
-          )}
-          {row.comment && (
-            <div style={{ fontSize: "12px", color: "#555", fontStyle: "italic", lineHeight: 1.5 }}>
-              {row.comment}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Show rejected condensation content */}
       {article && tab === "text" && (article.short_headline || article.short_resume || article.bottom_line) && (
@@ -204,7 +180,7 @@ export default async function CondensationEvaluationPage({ searchParams }: Props
   // Fetch decisions for selected module + optional version filter
   const baseQuery = admin
     .from("lab_decisions")
-    .select("article_id, decision, decided_at, ai_decision, ai_confidence, disagreement_reason, reject_reasons, comment")
+    .select("article_id, decision, decided_at, ai_decision, ai_confidence, disagreement_reason")
     .eq("specialty", specialty)
     .eq("module", activeModule)
     .not("ai_decision", "is", null)
