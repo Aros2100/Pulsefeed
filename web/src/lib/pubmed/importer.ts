@@ -599,7 +599,9 @@ async function resolveAuthorId(
   const cleanAffiliation = affiliations[0] ?? null;
   const geoParsed = cleanAffiliation ? await geoParseAffiliation(cleanAffiliation) : null;
   const parsed = {
-    city: geoParsed?.city ?? null,
+    city: geoParsed?.city
+      ? await resolveCityAlias(geoParsed.city, geoParsed.country ?? "")
+      : null,
     country: normalizeCountry(geoParsed?.country) ?? null,
     institution: geoParsed?.institution ?? null,
     department: geoParsed?.department ?? null,
