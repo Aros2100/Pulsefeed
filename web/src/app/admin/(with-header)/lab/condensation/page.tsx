@@ -261,8 +261,8 @@ export default async function CondensationOverviewPage() {
               sub: `af ${m.total} beslutninger`,
             })).concat([{
               label: "Threshold",
-              value: "50",
-              sub: "pr. modul",
+              value: "0",
+              sub: "altid tilstrækkelig data",
             }])}
             actionLabel="Evaluér prompt →"
             actionHref="/admin/lab/condensation/evaluation"

@@ -71,13 +71,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
   }
 
-  const rows = ((rawData ?? []) as unknown as DisagreementRow[])
-    .filter((d) => d.decision !== d.ai_decision);
-
   const isClassification = module === "classification_subspecialty";
+  const isCondensation   = module.startsWith("condensation");
 
-  const falsePositives = isClassification ? [] : rows.filter((d) => d.ai_decision === "approved" && d.decision === "rejected");
-  const falseNegatives = isClassification ? [] : rows.filter((d) => d.ai_decision === "rejected"  && d.decision === "approved");
+  // Condensation: all rejections are quality issues (ai_decision is always "approved")
+  // Others: disagreements (human != AI)
+  const rows = ((rawData ?? []) as unknown as DisagreementRow[])
+    .filter((d) => isCondensation
+      ? d.decision === "rejected"
+      : d.decision !== d.ai_decision
+    );
+
+  const falsePositives = (isClassification || isCondensation) ? [] : rows.filter((d) => d.ai_decision === "approved" && d.decision === "rejected");
+  const falseNegatives = (isClassification || isCondensation) ? [] : rows.filter((d) => d.ai_decision === "rejected"  && d.decision === "approved");
 
   // Fetch active prompt
   let activePrompt: { prompt: string; version: string };
@@ -118,6 +124,39 @@ Analyze the TRENDS — not individual articles. Identify:
 2. What subspecialties does the AI under-assign or miss? (max 5 patterns, put in false_negative_patterns)
 3. What specific changes to the prompt would improve classification accuracy?
 4. Write an improved prompt. Must use {{title}}, {{abstract}}, and {{subspecialty_list}} as placeholders.
+
+Respond in JSON only — no markdown, no backticks:
+{
+  "false_positive_patterns": ["pattern 1", ...],
+  "false_negative_patterns": ["pattern 1", ...],
+  "recommended_changes": "...",
+  "improved_prompt": "..."
+}`;
+  } else if (isCondensation) {
+    const rejectionList = rows.slice(0, 50).map((d, i) => {
+      const title    = d.articles?.title ?? "Unknown title";
+      const abstract = d.articles?.abstract
+        ? d.articles.abstract.slice(0, 300) + (d.articles.abstract.length > 300 ? "…" : "")
+        : "No abstract";
+      const reason   = d.disagreement_reason ? `\n  Reason: ${d.disagreement_reason}` : "";
+      return `${i + 1}. ${title}${reason}\n  Abstract: ${abstract}`;
+    }).join("\n\n");
+
+    userMessage = `You are analyzing cases where an AI condensation model's output was rejected by a human expert neurosurgeon.
+
+The AI used this prompt (version: ${activePrompt.version}):
+<current_prompt>
+${promptForOptimization}
+</current_prompt>
+
+REJECTED CONDENSATIONS — Human expert rejected the AI's condensed output (${rows.length} cases):
+${rejectionList}
+
+Analyze the TRENDS — not individual articles. Identify:
+1. What quality issues appear most often in rejected condensations? (max 5 patterns, put in false_positive_patterns)
+2. What content gaps or missing elements caused rejections? (max 5 patterns, put in false_negative_patterns)
+3. What specific changes to the prompt would reduce rejections?
+4. Write an improved prompt. Must use {{title}} and {{abstract}} as placeholders.
 
 Respond in JSON only — no markdown, no backticks:
 {
@@ -176,8 +215,8 @@ Respond in JSON only — no markdown, no backticks:
           module,
           base_version:        activePrompt.version,
           total_decisions:     rows.length,
-          fp_count:            isClassification ? rows.length : falsePositives.length,
-          fn_count:            isClassification ? rows.length : falseNegatives.length,
+          fp_count:            isClassification ? rows.length : isCondensation ? rows.length : falsePositives.length,
+          fn_count:            isClassification ? rows.length : isCondensation ? 0            : falseNegatives.length,
           fp_patterns:         result.false_positive_patterns,
           fn_patterns:         result.false_negative_patterns,
           recommended_changes: result.recommended_changes,

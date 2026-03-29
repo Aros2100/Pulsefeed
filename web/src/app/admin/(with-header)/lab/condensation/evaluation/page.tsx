@@ -38,6 +38,8 @@ interface RejectionRow {
   ai_confidence:        number | null;
   decided_at:           string | null;
   disagreement_reason:  string | null;
+  reject_reasons:       string[] | null;
+  comment:              string | null;
 }
 
 interface ArticleDetail {
@@ -85,6 +87,28 @@ function ArticleRow({ row, article, tab }: { row: RejectionRow; article: Article
           </span>
         )}
       </div>
+
+      {row.decision === "rejected" && (row.reject_reasons?.length || row.comment) && (
+        <div style={{ marginTop: "8px", fontSize: "12px", color: "#444" }}>
+          {row.reject_reasons && row.reject_reasons.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: row.comment ? "6px" : 0 }}>
+              {row.reject_reasons.map((r) => (
+                <span key={r} style={{
+                  fontSize: "11px", fontWeight: 600, borderRadius: "4px", padding: "2px 7px",
+                  background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca",
+                }}>
+                  {r}
+                </span>
+              ))}
+            </div>
+          )}
+          {row.comment && (
+            <div style={{ fontSize: "12px", color: "#555", fontStyle: "italic", lineHeight: 1.5 }}>
+              {row.comment}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Show rejected condensation content */}
       {article && tab === "text" && (article.short_headline || article.short_resume || article.bottom_line) && (
@@ -180,7 +204,7 @@ export default async function CondensationEvaluationPage({ searchParams }: Props
   // Fetch decisions for selected module + optional version filter
   const baseQuery = admin
     .from("lab_decisions")
-    .select("article_id, decision, decided_at, ai_decision, ai_confidence, disagreement_reason")
+    .select("article_id, decision, decided_at, ai_decision, ai_confidence, disagreement_reason, reject_reasons, comment")
     .eq("specialty", specialty)
     .eq("module", activeModule)
     .not("ai_decision", "is", null)
@@ -247,10 +271,8 @@ export default async function CondensationEvaluationPage({ searchParams }: Props
   const approvalRate  = total > 0 ? Math.round(((total - totalRejected) / total) * 100) : null;
 
   // Data sufficiency
-  const hasSufficientData = totalRejected >= 50;
-  const dataBanner = totalRejected < 50
-    ? { bg: "#fef2f2", border: "#fecaca", dot: "#dc2626", text: "#b91c1c", msg: `Utilstrækkelig data — mindst 50 afvisninger nødvendige for pålidelige trends (${totalRejected} indtil videre)` }
-    : { bg: "#f0fdf4", border: "#bbf7d0", dot: "#15803d", text: "#14532d", msg: `Tilstrækkelig data til pålidelig trendanalyse (${totalRejected} afvisninger)` };
+  const hasSufficientData = true;
+  const dataBanner = { bg: "#f0fdf4", border: "#bbf7d0", dot: "#15803d", text: "#14532d", msg: `${totalRejected} afvisninger` };
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -316,9 +338,17 @@ export default async function CondensationEvaluationPage({ searchParams }: Props
         </div>
 
         {/* Data sufficiency banner */}
-        <div style={{ background: dataBanner.bg, border: `1px solid ${dataBanner.border}`, borderRadius: "8px", padding: "10px 16px", marginBottom: "20px", display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: dataBanner.dot, flexShrink: 0, display: "inline-block" }} />
-          <span style={{ fontSize: "13px", color: dataBanner.text, fontWeight: 500 }}>{dataBanner.msg}</span>
+        <div style={{ background: dataBanner.bg, border: `1px solid ${dataBanner.border}`, borderRadius: "8px", padding: "10px 16px", marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: dataBanner.dot, flexShrink: 0, display: "inline-block" }} />
+            <span style={{ fontSize: "13px", color: dataBanner.text, fontWeight: 500 }}>{dataBanner.msg}</span>
+          </div>
+          <Link
+            href="/admin/lab/condensation/optimize"
+            style={{ flexShrink: 0, fontSize: "13px", fontWeight: 700, background: "#059669", color: "#fff", borderRadius: "7px", padding: "7px 16px", textDecoration: "none", whiteSpace: "nowrap" }}
+          >
+            Optimér prompt →
+          </Link>
         </div>
 
         {/* Summary stats */}
