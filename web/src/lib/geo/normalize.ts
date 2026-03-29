@@ -15,3 +15,24 @@ export function normalizeCity(value: string | null | undefined): string | null {
     .trim()
     .replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
 }
+
+/**
+ * Normalize a country name to a canonical form.
+ * Resolves known variants produced by OpenAlex and the ROR API
+ * to the standard name used throughout PulseFeed.
+ *
+ * Add new entries here whenever a new variant is discovered.
+ */
+const COUNTRY_ALIASES: Record<string, string> = {
+  "the netherlands": "Netherlands",
+  "türkiye":         "Turkey",
+  "turkiye":         "Turkey",
+};
+
+export function normalizeCountry(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const key = trimmed.toLowerCase();
+  return COUNTRY_ALIASES[key] ?? trimmed;
+}

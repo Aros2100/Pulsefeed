@@ -5,6 +5,7 @@ import { parseAffiliation as geoParseAffiliation } from "@/lib/geo/affiliation-p
 import { lookupCountry } from "@/lib/geo/country-map";
 import { lookupState } from "@/lib/geo/state-map";
 import { resolveCityAlias } from "@/lib/geo/city-aliases";
+import { normalizeCountry } from "@/lib/geo/normalize";
 import { runArticleChecks } from "@/lib/pubmed/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
 import { buildImportEventPayload } from "@/lib/article-events/import-payload";
@@ -415,7 +416,9 @@ async function resolveAuthorFromOpenAlex(
     [pubmedAuthor.foreName, pubmedAuthor.lastName].filter(Boolean).join(" ").trim();
   const normalized = normalizeAuthorName(displayName || "Unknown");
   const primaryInst = oaAuthorship.institutions[0] ?? null;
-  const countryName = primaryInst?.countryCode ? countryCodeToName(primaryInst.countryCode) : null;
+  const countryName = primaryInst?.countryCode
+    ? normalizeCountry(countryCodeToName(primaryInst.countryCode))
+    : null;
 
   // 1. Match on existing openalex_id
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -462,7 +465,7 @@ async function resolveAuthorFromOpenAlex(
           const rorGeo = await fetchRorGeo(primaryInst.ror);
           if (rorGeo.city)                      upgrades.city    = await resolveCityAlias(rorGeo.city, rorGeo.country ?? countryName ?? "");
           if (rorGeo.state)                     upgrades.state   = rorGeo.state;
-          if (rorGeo.country && !countryName)   upgrades.country = rorGeo.country;
+          if (rorGeo.country && !countryName)   upgrades.country = normalizeCountry(rorGeo.country);
         }
       }
       await admin.from("authors").update(upgrades).eq("id", orcidMatch.id);
@@ -513,7 +516,7 @@ async function resolveAuthorFromOpenAlex(
         const rorGeo = await fetchRorGeo(primaryInst.ror);
         if (rorGeo.city)                    upgrades.city  = await resolveCityAlias(rorGeo.city, rorGeo.country ?? countryName ?? "");
         if (rorGeo.state)                   upgrades.state = rorGeo.state;
-        if (rorGeo.country && !countryName) upgrades.country = rorGeo.country;
+        if (rorGeo.country && !countryName) upgrades.country = normalizeCountry(rorGeo.country);
       }
       await admin.from("authors").update(upgrades).eq("id", nameMatch.id);
       void logAuthorEvent(nameMatch.id, "openalex_enriched", {
@@ -552,7 +555,7 @@ async function resolveAuthorFromOpenAlex(
       const rorGeo = await fetchRorGeo(primaryInst.ror);
       if (rorGeo.city)    enrichment.city    = await resolveCityAlias(rorGeo.city, rorGeo.country ?? "");
       if (rorGeo.state)   enrichment.state   = rorGeo.state;
-      if (rorGeo.country) enrichment.country = rorGeo.country;
+      if (rorGeo.country) enrichment.country = normalizeCountry(rorGeo.country);
     }
     if (primaryInst?.type) enrichment.institution_type = primaryInst.type;
     if (resolved.geo_source !== "manual") enrichment.geo_source = "openalex";
@@ -597,7 +600,7 @@ async function resolveAuthorId(
   const geoParsed = cleanAffiliation ? await geoParseAffiliation(cleanAffiliation) : null;
   const parsed = {
     city: geoParsed?.city ?? null,
-    country: geoParsed?.country ?? null,
+    country: normalizeCountry(geoParsed?.country) ?? null,
     institution: geoParsed?.institution ?? null,
     department: geoParsed?.department ?? null,
   };
