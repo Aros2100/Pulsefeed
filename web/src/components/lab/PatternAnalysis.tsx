@@ -30,6 +30,8 @@ interface Props {
   threshold?: number;      // default: 50
   simulatePath?: string;   // default: "/admin/lab/specialty-tag/simulate"
   placeholder?: string;    // default: specialty-tag placeholder text
+  fpLabel?: string;        // default: "Fejlgodkendelser — AI for lempelig"
+  fnLabel?: string;        // default: "Fejlafvisninger — AI for streng"
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
@@ -148,6 +150,8 @@ export default function PatternAnalysis({
   threshold    = 50,
   simulatePath = "/admin/lab/specialty-tag/simulate",
   placeholder  = "Fx: 'Godkend TBI-artikler selvom de ikke er kirurgiske' eller 'Vær strengere på ren neurologi'",
+  fpLabel      = "Fejlgodkendelser — AI for lempelig",
+  fnLabel      = "Fejlafvisninger — AI for streng",
 }: Props) {
   const [loading,      setLoading]      = useState(false);
   const [result,       setResult]       = useState<PatternAnalysisResult | null>(
@@ -303,7 +307,7 @@ export default function PatternAnalysis({
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
             <div>
-              <div style={labelStyle}>Fejlgodkendelser — AI for lempelig</div>
+              <div style={labelStyle}>{fpLabel}</div>
               <ul style={{ margin: 0, paddingLeft: "18px", display: "flex", flexDirection: "column", gap: "4px" }}>
                 {result.false_positive_patterns.map((p, i) => (
                   <li key={i} style={{ fontSize: "13px", color: "#2a2a2a", lineHeight: 1.5 }}>{p}</li>
@@ -312,7 +316,7 @@ export default function PatternAnalysis({
             </div>
 
             <div>
-              <div style={labelStyle}>Fejlafvisninger — AI for streng</div>
+              <div style={labelStyle}>{fnLabel}</div>
               <ul style={{ margin: 0, paddingLeft: "18px", display: "flex", flexDirection: "column", gap: "4px" }}>
                 {result.false_negative_patterns.map((p, i) => (
                   <li key={i} style={{ fontSize: "13px", color: "#2a2a2a", lineHeight: 1.5 }}>{p}</li>

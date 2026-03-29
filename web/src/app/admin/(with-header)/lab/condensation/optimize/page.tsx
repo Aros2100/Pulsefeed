@@ -115,6 +115,8 @@ export default async function CondensationOptimizePage() {
           threshold={0}
           simulatePath="/admin/lab/condensation/simulate"
           placeholder="Fx: 'Vær mere neutral i formuleringen' eller 'Undgå at fortolke statistik'"
+          fpLabel="Kvalitetsproblemer — tilbagevendende fejl"
+          fnLabel="Indholdsgab — hvad AI'en overser"
         />
 
       </div>
