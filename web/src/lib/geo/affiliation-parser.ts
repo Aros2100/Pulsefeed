@@ -131,11 +131,13 @@ function extractCityFromSegment(segment: string, cityNames: Set<string>): string
     const w1blocked = CITY_EXTRACT_BLOCKLIST.has(words[i].toLowerCase());
     const w2blocked = CITY_EXTRACT_BLOCKLIST.has(words[i + 1].toLowerCase());
     if (w1blocked && w2blocked) continue;
-    if (cityNames.has(pair.toLowerCase())) return pair;
+    // Guard: pair skal optræde som sammenhængende streng i segmentet
+    if (!segment.includes(pair)) continue;
+    if (cityNames.has(pair.trim().toLowerCase())) return pair;
   }
   // Then single words (skip short generic words)
   for (const word of words) {
-    if (word.length >= 4 && !CITY_EXTRACT_BLOCKLIST.has(word.toLowerCase()) && cityNames.has(word.toLowerCase())) return word;
+    if (word.length >= 4 && !CITY_EXTRACT_BLOCKLIST.has(word.trim().toLowerCase()) && cityNames.has(word.trim().toLowerCase())) return word;
   }
   return null;
 }
@@ -363,6 +365,25 @@ function parseSingleSegment(
   for (let i = segments.length - 1; i >= Math.max(0, segments.length - 2); i--) {
     const instInfo = lookupInstitution(segments[i]);
     if (instInfo) {
+      // Guard: if the affiliation string contains an explicit city that differs
+      // from institution-map, trust the affiliation string over the map.
+      const explicitCityInText = segments.slice(0, i).some(seg => {
+        const cleaned = seg.replace(/\.+$/, "").trim();
+        return (
+          !looksLikeInstitution(cleaned) &&
+          !isAdministrativeRegion(cleaned) &&
+          !isPostalCode(cleaned) &&
+          !lookupCountry(cleaned) &&
+          cleaned.length >= 3 &&
+          cleaned.length < 50 &&
+          cityNames.has(cleaned.toLowerCase())
+        );
+      });
+      if (explicitCityInText) {
+        // Fall through to normal parsing — don't trust institution-map city
+        break; // exits the for-loop at Step 6, continues to Step 7+
+      }
+
       const hasCountryAfter = segments.slice(i + 1).some((s) => {
         const cleaned = s.replace(/\.+$/, "").trim();
         return lookupCountry(cleaned) !== null || US_STATES[cleaned.toUpperCase()] !== undefined;
@@ -469,99 +490,37 @@ function parseSingleSegment(
     }
   }
 
-  // Step 8: Extract city — walk right to left, skip administrative regions
-  if (!cityFromCountryFallback && segments.length > 0) {
-    // Find city: skip regions/postal codes/province codes from the right
+  // Step 8: Extract city
+  if (segments.length > 0) {
+    // Even if cityFromCountryFallback is set, check remaining segments
+    // for an explicit city that should take precedence over the province fallback
     let cityIdx = segments.length - 1;
     while (cityIdx >= 0) {
       const candidate = segments[cityIdx].replace(/\.+$/, "").trim();
-      // Also check region after stripping trailing postcodes: "Guangdong 510000" → "Guangdong"
       const candidateCleaned = candidate.replace(/\s+\d{4,6}$/, "").trim();
-      if (isAdministrativeRegion(candidate) || isAdministrativeRegion(candidateCleaned)) {
-        cityIdx--;
-        continue;
-      }
-      // Skip 2-4 letter province/state codes: ON, QC, BC, CA, TX, NSW, VIC, SASK, ALTA, etc.
-      if (candidate.length <= 4 && (US_STATES[candidate.toUpperCase()] || isProvinceCode(candidate))) {
-        cityIdx--;
-        continue;
-      }
-      // Also skip if it's a postal code that slipped through
-      if (isPostalCode(candidate)) {
-        cityIdx--;
-        continue;
-      }
-      // Skip segments that are country names/aliases (e.g., "England", "Scotland", "Wales")
-      if (lookupCountry(candidate) !== null) {
-        cityIdx--;
-        continue;
-      }
-      // Skip segments that look like department names (not cities)
-      if (matchesKeywords(candidate, DEPT_KEYWORDS)) {
-        cityIdx--;
-        continue;
-      }
+      console.log('candidate:', candidate,
+        '| isAdminRegion:', isAdministrativeRegion(candidate),
+        '| isPostal:', isPostalCode(candidate),
+        '| lookupCountry:', lookupCountry(candidate),
+        '| matchesDept:', matchesKeywords(candidate, DEPT_KEYWORDS),
+        '| inCityNames:', cityNames.has(candidate.trim().toLowerCase())
+      );
+      if (isAdministrativeRegion(candidate) || isAdministrativeRegion(candidateCleaned)) { cityIdx--; continue; }
+      if (candidate.length <= 4 && (US_STATES[candidate.toUpperCase()] || isProvinceCode(candidate))) { cityIdx--; continue; }
+      if (isPostalCode(candidate)) { cityIdx--; continue; }
+      if (lookupCountry(candidate) !== null) { cityIdx--; continue; }
+      if (matchesKeywords(candidate, DEPT_KEYWORDS)) { cityIdx--; continue; }
       break;
     }
 
     if (cityIdx >= 0) {
       const rawCity = cleanCity(segments[cityIdx], cityNames);
-
-      // Check if cleaned city is actually a country name (e.g. "Rwanda")
-      // but allow names that are also known cities (e.g. "Singapore")
-      if (rawCity && lookupCountry(rawCity) !== null && !cityNames.has(rawCity.toLowerCase())) {
-        segments.splice(cityIdx, 1);
-        cityIdx = -1;
-      }
-      if (cityIdx >= 0 && rawCity) {
-        // Check if the "city" actually looks like an institution
-        if (looksLikeInstitution(rawCity)) {
-          const instInfo = lookupInstitution(segments[cityIdx]);
-          if (instInfo) {
-            city = instInfo.city;
-            // Don't remove this segment — it will be picked up as institution in step 9
-          } else {
-            // Has institution keywords but not in institution-map → try extracting city from segment
-            const extracted = extractCityFromSegment(segments[cityIdx], cityNames);
-            city = extracted;
-            // Don't splice — leave for Step 9 to pick up as institution
-          }
-        } else {
-          // Also try institution-map even if keywords don't match (e.g. "Kliniken")
-          const instInfo2 = lookupInstitution(segments[cityIdx]);
-          if (instInfo2) {
-            city = instInfo2.city;
-            // Don't remove — will be picked up as institution in step 9
-          } else if (cityNames.has(rawCity.toLowerCase())) {
-            // Validated against GeoNames city set
-            city = rawCity;
-            segments.splice(cityIdx, 1);
-          } else if (rawCity.length >= 30) {
-            // Long unknown string — almost certainly an institution, not a city
-            city = null;
-            // Don't splice — leave for Step 9 to pick up as institution
-          } else {
-            // Short unknown — could be a small city not in GeoNames
-            confidence = "low";
-            city = rawCity;
-            segments.splice(cityIdx, 1);
-          }
-        }
-      } else if (cityIdx >= 0) {
-        confidence = "low";
+      if (rawCity && cityNames.has(rawCity.trim().toLowerCase())) {
+        // Explicit city found — overrides cityFromCountryFallback
+        city = rawCity;
         segments.splice(cityIdx, 1);
       }
-    }
-
-    // Also remove consumed region/province-code segments so they don't pollute dept/inst extraction
-    for (let i = segments.length - 1; i >= 0; i--) {
-      const seg = segments[i].replace(/\.+$/, "").trim();
-      const segCleaned = seg.replace(/\s+\d{4,6}$/, "").trim();
-      if (isAdministrativeRegion(seg) || isAdministrativeRegion(segCleaned)) {
-        segments.splice(i, 1);
-      } else if (seg.length <= 3 && (US_STATES[seg.toUpperCase()] || isProvinceCode(seg))) {
-        segments.splice(i, 1);
-      }
+      // If not found in cityNames, leave cityFromCountryFallback city as-is
     }
   }
 
@@ -623,6 +582,7 @@ function parseSingleSegment(
     confidence = "low";
   }
 
+  console.log('DEBUG city:', city, '| segments:', segments);
   return { department, institution, city, country, confidence };
 }
 

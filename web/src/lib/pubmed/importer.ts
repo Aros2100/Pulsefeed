@@ -371,6 +371,7 @@ async function mergeAuthor(
   displayName: string,
   reason: "orcid" | "geo" = "geo",
   articleId?: string | null,
+  debugName?: string,
 ): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const update: Record<string, any> = {};
@@ -382,6 +383,13 @@ async function mergeAuthor(
   }
   if (newOrcid && !existing.orcid) update.orcid = newOrcid;
   update.display_name_normalized = normalizeAuthorName(displayName);
+  if (debugName) {
+    console.log(`[GEO-DEBUG ${debugName}] mergeAuthor → authors.update id=${existingId} reason=${reason}`);
+    console.log(`[GEO-DEBUG ${debugName}] mergeAuthor → existing: city=${existing.city} country=${existing.country}`);
+    console.log(`[GEO-DEBUG ${debugName}] mergeAuthor → parsed: city=${parsed.city} country=${parsed.country} institution=${parsed.institution}`);
+    console.log(`[GEO-DEBUG ${debugName}] mergeAuthor → isGeoUpgrade=${isGeoUpgrade(existing, parsed)}`);
+    console.log(`[GEO-DEBUG ${debugName}] mergeAuthor → update object: ${JSON.stringify(update)}`);
+  }
   await admin.from("authors").update(update).eq("id", existingId);
   void logAuthorEvent(existingId, "merged", {
     reason,
@@ -578,6 +586,8 @@ async function resolveAuthorId(
   const normalized = normalizeAuthorName(displayName || "Unknown");
   const newOrcid = author.orcid ? normalizeOrcid(author.orcid) : null;
 
+  const debugName = author.lastName === "Roohollahi" ? "Roohollahi" : undefined;
+
   // Parse affiliations upfront
   const primaryAff = author.affiliations[0] ?? null;
   const affiliations = author.affiliations
@@ -592,6 +602,11 @@ async function resolveAuthorId(
     department: geoParsed?.department ?? null,
   };
 
+  if (debugName) {
+    console.log(`[GEO-DEBUG ${debugName}] resolveAuthorId: primaryAff="${primaryAff}"`);
+    console.log(`[GEO-DEBUG ${debugName}] resolveAuthorId: parsed geo = ${JSON.stringify(parsed)}`);
+  }
+
   // ── 1. ORCID exact match ───────────────────────────────────────────────────
   if (newOrcid) {
     const { data: orcidMatch } = await admin
@@ -601,7 +616,8 @@ async function resolveAuthorId(
       .maybeSingle();
 
     if (orcidMatch) {
-      await mergeAuthor(admin, orcidMatch.id, orcidMatch, parsed, newOrcid, displayName, "orcid", articleId);
+      if (debugName) console.log(`[GEO-DEBUG ${debugName}] resolveAuthorId: branch=1 (ORCID match) id=${orcidMatch.id}`);
+      await mergeAuthor(admin, orcidMatch.id, orcidMatch, parsed, newOrcid, displayName, "orcid", articleId, debugName);
       return { id: orcidMatch.id, outcome: "duplicate" };
     }
   }
@@ -645,26 +661,29 @@ async function resolveAuthorId(
     .limit(50);
 
   if (candidates && candidates.length > 0) {
+    if (debugName) console.log(`[GEO-DEBUG ${debugName}] resolveAuthorId: branch=2 (name match) candidates=${candidates.length}`);
     // 2a. ORCID conflict check — never merge if both have different ORCIDs
     //     Also find ORCID match among name candidates
     if (newOrcid) {
       const orcidMatch = candidates.find(c => c.orcid === newOrcid);
       if (orcidMatch) {
-        await mergeAuthor(admin, orcidMatch.id, orcidMatch, parsed, newOrcid, displayName, "orcid", articleId);
+        if (debugName) console.log(`[GEO-DEBUG ${debugName}] resolveAuthorId: branch=2a (ORCID in candidates) id=${orcidMatch.id}`);
+        await mergeAuthor(admin, orcidMatch.id, orcidMatch, parsed, newOrcid, displayName, "orcid", articleId, debugName);
         return { id: orcidMatch.id, outcome: "duplicate" };
       }
       // All candidates with a different ORCID → skip them, create new
       const withoutOrcidConflict = candidates.filter(c => !c.orcid);
       if (withoutOrcidConflict.length === 0) {
         // Every candidate has a different ORCID — create new author
-        return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution);
+        if (debugName) console.log(`[GEO-DEBUG ${debugName}] resolveAuthorId: branch=2a (all ORCID conflict → create new)`);
+        return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution, debugName);
       }
       // Continue matching only against candidates without ORCID
-      return await matchByGeo(admin, withoutOrcidConflict, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution);
+      return await matchByGeo(admin, withoutOrcidConflict, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution, debugName);
     }
 
     // No ORCID on new author — filter out candidates where ORCID conflict is impossible
-    return await matchByGeo(admin, candidates, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution);
+    return await matchByGeo(admin, candidates, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution, debugName);
   }
 
   // ── 2.5. Initial-match: "J Sørensen" → "Jens Sørensen" ─────────────────────
@@ -707,7 +726,8 @@ async function resolveAuthorId(
         if (matches.length === 1) {
           const match = matches[0];
           if (!(newOrcid && match.orcid && newOrcid !== match.orcid)) {
-            await mergeAuthor(admin, match.id, match, parsed, newOrcid, displayName, "geo", articleId);
+            if (debugName) console.log(`[GEO-DEBUG ${debugName}] resolveAuthorId: branch=2.5 (initial match) id=${match.id}`);
+            await mergeAuthor(admin, match.id, match, parsed, newOrcid, displayName, "geo", articleId, debugName);
             return { id: match.id, outcome: 'duplicate' };
           }
         }
@@ -751,7 +771,8 @@ async function resolveAuthorId(
         if (matches.length === 1) {
           const match = matches[0];
           if (!(newOrcid && match.orcid && newOrcid !== match.orcid)) {
-            await mergeAuthor(admin, match.id, match, parsed, newOrcid, displayName, "geo", articleId);
+            if (debugName) console.log(`[GEO-DEBUG ${debugName}] resolveAuthorId: branch=2.5r (reverse initial match) id=${match.id}`);
+            await mergeAuthor(admin, match.id, match, parsed, newOrcid, displayName, "geo", articleId, debugName);
             if (displayName.length > (match.display_name?.length ?? 0)) {
               await db.from('authors').update({
                 display_name: displayName,
@@ -766,7 +787,8 @@ async function resolveAuthorId(
   }
 
   // ── 3. No candidates — create new author ───────────────────────────────────
-  return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution);
+  if (debugName) console.log(`[GEO-DEBUG ${debugName}] resolveAuthorId: branch=3 (no candidates → create new)`);
+  return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution, debugName);
 }
 
 async function matchByGeo(
@@ -781,7 +803,12 @@ async function matchByGeo(
   openAlexId: string | null,
   articleId?: string | null,
   openAlexInstitution?: { displayName: string; ror: string | null; type: string } | null,
+  debugName?: string,
 ): Promise<{ id: string; outcome: AuthorOutcome }> {
+  if (debugName) {
+    console.log(`[GEO-DEBUG ${debugName}] matchByGeo: parsed city=${parsed.city} country=${parsed.country} candidates=${candidates.length}`);
+  }
+
   // 2b. Same name + same city + same country
   if (parsed.city && parsed.country) {
     const geoMatch = candidates.find(
@@ -789,7 +816,8 @@ async function matchByGeo(
         && c.country?.toLowerCase() === parsed.country!.toLowerCase()
     );
     if (geoMatch) {
-      await mergeAuthor(admin, geoMatch.id, geoMatch, parsed, newOrcid, displayName, "geo", articleId);
+      if (debugName) console.log(`[GEO-DEBUG ${debugName}] matchByGeo: branch=2b (same city+country) id=${geoMatch.id}`);
+      await mergeAuthor(admin, geoMatch.id, geoMatch, parsed, newOrcid, displayName, "geo", articleId, debugName);
       return { id: geoMatch.id, outcome: "duplicate" };
     }
   }
@@ -805,7 +833,8 @@ async function matchByGeo(
     if (sameCityCountry.length === 1) {
       const match = sameCityCountry[0];
       if (!(newOrcid && match.orcid && newOrcid !== match.orcid)) {
-        await mergeAuthor(admin, match.id, match, parsed, newOrcid, displayName, "geo", articleId);
+        if (debugName) console.log(`[GEO-DEBUG ${debugName}] matchByGeo: branch=2b2 (single same city+country) id=${match.id}`);
+        await mergeAuthor(admin, match.id, match, parsed, newOrcid, displayName, "geo", articleId, debugName);
         return { id: match.id, outcome: "duplicate" };
       }
     }
@@ -814,7 +843,8 @@ async function matchByGeo(
   // 2c. Same name + existing has no geo
   const noGeoMatch = candidates.find(c => !c.city && !c.country);
   if (noGeoMatch) {
-    await mergeAuthor(admin, noGeoMatch.id, noGeoMatch, parsed, newOrcid, displayName, "geo", articleId);
+    if (debugName) console.log(`[GEO-DEBUG ${debugName}] matchByGeo: branch=2c (no-geo candidate) id=${noGeoMatch.id}`);
+    await mergeAuthor(admin, noGeoMatch.id, noGeoMatch, parsed, newOrcid, displayName, "geo", articleId, debugName);
     return { id: noGeoMatch.id, outcome: "duplicate" };
   }
 
@@ -822,13 +852,15 @@ async function matchByGeo(
   if (!parsed.city && !parsed.country) {
     const firstWithGeo = candidates.find(c => c.city || c.country);
     if (firstWithGeo) {
-      await mergeAuthor(admin, firstWithGeo.id, firstWithGeo, parsed, newOrcid, displayName, "geo", articleId);
+      if (debugName) console.log(`[GEO-DEBUG ${debugName}] matchByGeo: branch=2d (new has no geo) id=${firstWithGeo.id}`);
+      await mergeAuthor(admin, firstWithGeo.id, firstWithGeo, parsed, newOrcid, displayName, "geo", articleId, debugName);
       return { id: firstWithGeo.id, outcome: "duplicate" };
     }
   }
 
   // 2e. No match — create new author
-  return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution);
+  if (debugName) console.log(`[GEO-DEBUG ${debugName}] matchByGeo: branch=2e (no match → create new)`);
+  return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution, debugName);
 }
 
 async function createNewAuthor(
@@ -842,6 +874,7 @@ async function createNewAuthor(
   resolvedOpenAlexId?: string | null,
   articleId?: string | null,
   resolvedOpenAlexInstitution?: { displayName: string; ror: string | null; type: string } | null,
+  debugName?: string,
 ): Promise<{ id: string; outcome: AuthorOutcome }> {
   await sleep(150);
   const openalexId = resolvedOpenAlexId ?? null;
@@ -878,6 +911,10 @@ async function createNewAuthor(
   const matchConfidence = orcid ? 1.0 : 0.8;
   const geoSource = openalexId ? "openalex" : "parser";
   const verifiedBy = openalexId ? "openalex" : "uverificeret";
+
+  if (debugName) {
+    console.log(`[GEO-DEBUG ${debugName}] createNewAuthor → authors.insert display_name="${displayName}" city=${city} country=${country} state=${state} hospital=${hospital} geo_source=${geoSource}`);
+  }
 
   const { data: created } = await admin
     .from("authors")
@@ -1000,7 +1037,13 @@ export async function linkAuthorsToArticle(
     // Capture geo data for article from parser — always, regardless of OpenAlex match
     if (i === 0 || (i === authors.length - 1 && authors.length > 1)) {
       const linkPrimaryAff = author.affiliations[0] ?? null;
+      if (author.lastName === "Roohollahi") {
+        console.log(`[GEO-DEBUG Roohollahi] affiliation string: "${linkPrimaryAff}"`);
+      }
       const geoParsed = linkPrimaryAff ? await geoParseAffiliation(linkPrimaryAff) : null;
+      if (author.lastName === "Roohollahi") {
+        console.log(`[GEO-DEBUG Roohollahi] parseAffiliation result:`, JSON.stringify(geoParsed));
+      }
 
       let geoForArticle: AuthorGeo | null = null;
       if (geoParsed) {
@@ -1013,6 +1056,9 @@ export async function linkAuthorsToArticle(
         geoForArticle = { ...geoParsed, state: (authorRow?.state as string | null) ?? null };
       }
 
+      if (author.lastName === "Roohollahi") {
+        console.log(`[GEO-DEBUG Roohollahi] geoForArticle (with state):`, JSON.stringify(geoForArticle));
+      }
       if (geoForArticle) {
         if (i === 0) firstAuthorGeo = geoForArticle;
         if (i === authors.length - 1 && authors.length > 1) lastAuthorGeo = geoForArticle;

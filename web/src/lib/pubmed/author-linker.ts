@@ -126,6 +126,12 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
               authorsProcessed += result.new + result.duplicates + result.rejected;
               console.error(`[author-linker] linked PMID ${article.pubmed_id} — new=${result.new} dup=${result.duplicates} rejected=${result.rejected}`);
 
+              const hasRoohollahi = authors.some(a => a.lastName === "Roohollahi");
+              if (hasRoohollahi) {
+                console.log(`[GEO-DEBUG Roohollahi] firstAuthorGeo after linkAuthorsToArticle:`, JSON.stringify(result.firstAuthorGeo));
+                console.log(`[GEO-DEBUG Roohollahi] lastAuthorGeo after linkAuthorsToArticle:`, JSON.stringify(result.lastAuthorGeo));
+              }
+
               // Populate article geo fields from first/last author affiliation
               if (result.firstAuthorGeo || result.lastAuthorGeo) {
                 // Guard: if article already has geo_country, the deterministic parser
@@ -168,6 +174,9 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
                   location_parsed_at: new Date().toISOString(),
                   location_confidence: first?.confidence ?? (last?.confidence ?? null),
                 };
+                if (hasRoohollahi) {
+                  console.log(`[GEO-DEBUG Roohollahi] writing to articles table:`, JSON.stringify(geoUpdate));
+                }
                 await db.from("articles").update(geoUpdate).eq("id", article.id);
                 const geoNext: GeoSnapshot = {
                   geo_department: geoUpdate.geo_department,

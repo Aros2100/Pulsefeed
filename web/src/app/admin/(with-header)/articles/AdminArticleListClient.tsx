@@ -12,7 +12,6 @@ interface ArticleRow {
   published_date: string | null;
   imported_at: string;
   authors: unknown;
-  specialty_match: boolean | null;
   circle: number | null;
   specialty_tags: string[];
   abstract: string | null;
@@ -24,10 +23,8 @@ type SortField = "title" | "journal_abbr" | "published_date" | "imported_at" | "
 interface Filters {
   search: string;
   mesh_term: string;
-  circle: string;
-  specialty_match: string;
+  specialty: string;
   subspecialty: string;
-  approval_method: string;
   has_abstract: string;
   date_from: string;
   date_to: string;
@@ -60,11 +57,6 @@ const CONTINENTS = [
   "South America",
 ] as const;
 
-const MATCH_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  "true":  { bg: "#f0fdf4", color: "#15803d", label: "Included" },
-  "false": { bg: "#fef2f2", color: "#b91c1c", label: "Excluded" },
-  "null":  { bg: "#fffbeb", color: "#d97706", label: "Pending"  },
-};
 
 function fmt(iso: string | null): string {
   if (!iso) return "—";
@@ -116,10 +108,8 @@ function filtersFromParams(sp: URLSearchParams): Filters {
   return {
     search:          sp.get("search")          ?? "",
     mesh_term:       sp.get("mesh_term")       ?? "",
-    circle:          sp.get("circle")          ?? "",
-    specialty_match: sp.get("specialty_match") ?? "",
+    specialty:       sp.get("specialty")       ?? "neurosurgery",
     subspecialty:    sp.get("subspecialty")    ?? "",
-    approval_method: sp.get("approval_method") ?? "",
     has_abstract:    sp.get("has_abstract")    ?? "",
     date_from:       sp.get("date_from")       ?? "",
     date_to:         sp.get("date_to")         ?? "",
@@ -145,10 +135,8 @@ function filtersToParams(f: Filters): URLSearchParams {
   const p = new URLSearchParams();
   if (f.search)          p.set("search",          f.search);
   if (f.mesh_term)       p.set("mesh_term",       f.mesh_term);
-  if (f.circle)          p.set("circle",          f.circle);
-  if (f.specialty_match) p.set("specialty_match", f.specialty_match);
+  if (f.specialty)       p.set("specialty",       f.specialty);
   if (f.subspecialty)    p.set("subspecialty",    f.subspecialty);
-  if (f.approval_method) p.set("approval_method", f.approval_method);
   if (f.has_abstract)    p.set("has_abstract",    f.has_abstract);
   if (f.date_from)       p.set("date_from",       f.date_from);
   if (f.date_to)         p.set("date_to",         f.date_to);
@@ -171,8 +159,8 @@ function filtersToParams(f: Filters): URLSearchParams {
 }
 
 const EMPTY_FILTERS: Filters = {
-  search: "", mesh_term: "", circle: "", specialty_match: "", subspecialty: "",
-  approval_method: "", has_abstract: "", date_from: "", date_to: "",
+  search: "", mesh_term: "", specialty: "neurosurgery", subspecialty: "",
+  has_abstract: "", date_from: "", date_to: "",
   geo_continent: "", geo_region: "", geo_country: "", geo_state: "", geo_city: "",
   missing_geo: false, no_region: false, no_country: false, no_state: false, no_city: false, not_parsed: false, suspect_city: false,
   sort_by: "imported_at", sort_dir: "desc", page: 1,
@@ -191,6 +179,7 @@ export default function AdminArticleListClient() {
   const meshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [searchInput, setSearchInput] = useState(() => searchParams.get("search") ?? "");
   const [meshInput, setMeshInput] = useState(() => searchParams.get("mesh_term") ?? "");
+  const [specialties, setSpecialties] = useState<{ value: string; label: string }[]>([]);
   const [geoRegions, setGeoRegions] = useState<string[]>([]);
   const [geoCountries, setGeoCountries] = useState<string[]>([]);
   const [geoStates, setGeoStates] = useState<string[]>([]);
@@ -207,14 +196,9 @@ export default function AdminArticleListClient() {
 
     try {
       const res = await fetch(`/api/admin/articles?${params.toString()}`);
-      const json = await res.json() as { ok: boolean; rows?: (Omit<ArticleRow, "specialty_match"> & { status?: string | null })[] ; total?: number; error?: string };
+      const json = await res.json() as { ok: boolean; rows?: ArticleRow[]; total?: number; error?: string };
       if (json.ok) {
-        // Map legacy status field to specialty_match until API is fully migrated
-        const mapped: ArticleRow[] = (json.rows ?? []).map((r) => ({
-          ...r,
-          specialty_match: r.status === "approved" ? true : r.status === "rejected" ? false : null,
-        }));
-        setRows(mapped);
+        setRows(json.rows ?? []);
         setTotal(json.total ?? 0);
       } else {
         setError(json.error ?? "Unknown error");
@@ -224,6 +208,20 @@ export default function AdminArticleListClient() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/admin/articles/specialties")
+      .then((r) => r.json())
+      .then((d: { ok: boolean; specialties?: string[] }) => {
+        if (d.ok && d.specialties) {
+          setSpecialties(d.specialties.map((s) => ({
+            value: s,
+            label: s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+          })));
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -290,6 +288,7 @@ export default function AdminArticleListClient() {
       if (key === "geo_region")    { next.geo_country = ""; next.geo_state = ""; next.geo_city = ""; }
       if (key === "geo_country")   { next.geo_state = ""; next.geo_city = ""; }
       if (key === "geo_state")     { next.geo_city = ""; }
+      if (key === "specialty" && value !== "neurosurgery") { next.subspecialty = ""; }
       return next;
     });
   }
@@ -320,7 +319,7 @@ export default function AdminArticleListClient() {
   }
 
   const hasActiveFilters = !!(
-    filters.circle || filters.specialty_match || filters.subspecialty || filters.approval_method ||
+    filters.subspecialty ||
     filters.has_abstract || filters.date_from || filters.date_to || filters.search ||
     filters.mesh_term || filters.geo_continent || filters.geo_region || filters.geo_country || filters.geo_state ||
     filters.geo_city || filters.missing_geo
@@ -340,7 +339,6 @@ export default function AdminArticleListClient() {
     { key: "title",          label: "Titel",        sortable: true },
     { key: "journal_abbr",   label: "Tidsskrift",   sortable: true },
     { key: "published_date", label: "Publiceret",   sortable: true },
-    { key: "evidence_score", label: "Specialty",    sortable: false },
     { key: "imported_at",    label: "Importeret",   sortable: true },
   ];
 
@@ -357,20 +355,41 @@ export default function AdminArticleListClient() {
         flexDirection: "column",
         gap: "10px",
       }}>
-        {/* Title / journal search */}
-        <input
-          type="text"
-          placeholder="Søg titel eller tidsskrift…"
-          value={searchInput}
-          onChange={(e) => handleSearchChange(e.target.value)}
-          style={{
-            width: "100%", padding: "7px 12px",
-            border: "1px solid #dde3ed", borderRadius: "6px",
-            fontSize: "13px", outline: "none", boxSizing: "border-box",
-          }}
-        />
+        {/* Række 0: Titel/tidsskrift-søgning + MeSH autocomplete */}
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <input
+            type="text"
+            placeholder="Søg titel eller tidsskrift…"
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            style={{
+              flex: 2, padding: "7px 12px",
+              border: "1px solid #dde3ed", borderRadius: "6px",
+              fontSize: "13px", outline: "none", boxSizing: "border-box",
+            }}
+          />
+          <MeshAutocomplete value={meshInput} onChange={handleMeshChange} />
+        </div>
 
-        {/* Geo row: Continent → Region → Country → State (conditional) → City */}
+        {/* Række 1: Specialty + Subspecialitet */}
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <SelectFilter
+            value={filters.specialty}
+            onChange={(v) => setFilter("specialty", v)}
+            placeholder="Specialty: Alle"
+            options={specialties}
+          />
+          {filters.specialty === "neurosurgery" && (
+            <SelectFilter
+              value={filters.subspecialty}
+              onChange={(v) => setFilter("subspecialty", v)}
+              placeholder="Subspecialitet: Alle"
+              options={SUBSPECIALTY_OPTIONS.map((t) => ({ value: t, label: t }))}
+            />
+          )}
+        </div>
+
+        {/* Række 2: Geo — Continent → Region → Country → State (conditional) → City */}
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
           <SelectFilter
             value={filters.geo_continent}
@@ -409,56 +428,8 @@ export default function AdminArticleListClient() {
           />
         </div>
 
-        {/* Status / meta filters row */}
+        {/* Række 3: Øvrige filtre */}
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-          <SelectFilter
-            value={filters.circle}
-            onChange={(v) => setFilter("circle", v)}
-            placeholder="Circle: Alle"
-            options={[
-              { value: "1", label: "Circle 1" },
-              { value: "2", label: "Circle 2" },
-              { value: "3", label: "Circle 3" },
-            ]}
-          />
-          <SelectFilter
-            value={filters.specialty_match}
-            onChange={(v) => setFilter("specialty_match", v)}
-            placeholder="Specialty: Alle"
-            options={[
-              { value: "null",  label: "Pending" },
-              { value: "true",  label: "Included" },
-              { value: "false", label: "Excluded" },
-            ]}
-          />
-          <SelectFilter
-            value={filters.subspecialty}
-            onChange={(v) => setFilter("subspecialty", v)}
-            placeholder="Subspecialitet: Alle"
-            options={SUBSPECIALTY_OPTIONS.map((t) => ({ value: t, label: t }))}
-          />
-          <SelectFilter
-            value={filters.approval_method}
-            onChange={(v) => setFilter("approval_method", v)}
-            placeholder="Approval: Alle"
-            options={[
-              { value: "journal",       label: "Journal" },
-              { value: "mesh_auto_tag", label: "MeSH-terms" },
-              { value: "human",         label: "Editor" },
-              { value: "null",          label: "Pending" },
-            ]}
-          />
-          <input
-            type="text"
-            placeholder="MeSH term…"
-            value={meshInput}
-            onChange={(e) => handleMeshChange(e.target.value)}
-            style={{
-              padding: "6px 10px", fontSize: "12px", border: "1px solid #dde3ed",
-              borderRadius: "6px", outline: "none", width: "130px",
-              color: meshInput ? "#1a1a1a" : "#888",
-            }}
-          />
           <SelectFilter
             value={filters.has_abstract}
             onChange={(v) => setFilter("has_abstract", v)}
@@ -560,8 +531,6 @@ export default function AdminArticleListClient() {
               </thead>
               <tbody>
                 {rows.map((a, i) => {
-                  const matchKey = a.specialty_match === true ? "true" : a.specialty_match === false ? "false" : "null";
-                  const s = MATCH_STYLE[matchKey];
                   const count = authorCount(a.authors);
                   return (
                     <tr key={a.id} style={{ background: i % 2 === 0 ? "#fff" : "#fafbfc" }}>
@@ -580,11 +549,6 @@ export default function AdminArticleListClient() {
                       </td>
                       <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", fontSize: "12px", color: "#5a6a85", whiteSpace: "nowrap" }}>
                         {fmt(a.published_date)}
-                      </td>
-                      <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7" }}>
-                        <span style={{ fontSize: "11px", fontWeight: 600, borderRadius: "999px", padding: "2px 8px", background: s.bg, color: s.color }}>
-                          {s.label}
-                        </span>
                       </td>
                       <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", fontSize: "12px", color: "#5a6a85", whiteSpace: "nowrap" }}>
                         {fmt(a.imported_at)}
@@ -613,6 +577,48 @@ export default function AdminArticleListClient() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function MeshAutocomplete({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [options, setOptions] = useState<string[]>([]);
+  const [open, setOpen] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleInput(v: string) {
+    onChange(v);
+    if (timer.current) clearTimeout(timer.current);
+    if (v.length < 2) { setOptions([]); setOpen(false); return; }
+    timer.current = setTimeout(async () => {
+      const r = await fetch(`/api/admin/articles/mesh-terms?q=${encodeURIComponent(v)}`);
+      const d = await r.json() as { ok: boolean; terms?: string[] };
+      if (d.ok) { setOptions(d.terms ?? []); setOpen(true); }
+    }, 300);
+  }
+
+  return (
+    <div style={{ position: "relative", flex: 1 }}>
+      <input
+        value={value}
+        onChange={(e) => handleInput(e.target.value)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="MeSH term…"
+        style={{ width: "100%", padding: "7px 12px", border: "1px solid #dde3ed", borderRadius: "6px", fontSize: "13px", outline: "none", boxSizing: "border-box" }}
+      />
+      {open && options.length > 0 && (
+        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", border: "1px solid #dde3ed", borderRadius: "6px", zIndex: 100, maxHeight: "200px", overflowY: "auto", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
+          {options.map((t) => (
+            <div key={t} onMouseDown={() => { onChange(t); setOpen(false); }}
+              style={{ padding: "8px 12px", fontSize: "12px", cursor: "pointer" }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f7fa")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "")}
+            >
+              {t}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -21,12 +21,12 @@ export async function getCityCache(): Promise<CityCache> {
   // PostgREST caps each request at 1000 rows regardless of .limit().
   // Paginate to load the full table.
   const PAGE = 1000;
-  const allData: { name: string; country: string | null }[] = [];
+  const allData: { name: string; country: string | null; population: number | null }[] = [];
   let offset = 0;
   while (true) {
     const { data: page, error } = await admin
       .from("geo_cities")
-      .select("name, country")
+      .select("name, country, population")
       .order("population", { ascending: false })
       .range(offset, offset + PAGE - 1);
     if (error) throw new Error(`Failed to load city cache: ${error.message}`);
@@ -42,8 +42,8 @@ export async function getCityCache(): Promise<CityCache> {
   const countryMap = new Map<string, string>();
 
   for (const row of data ?? []) {
-    if (!row.name || !row.country) continue;
-    const key = row.name.toLowerCase();
+    if (!row.name || !row.country || (row.population ?? 0) < 50000) continue;
+    const key = row.name.trim().toLowerCase();
     const keyUnaccented = unaccent(key);
     // geo_cities.country stores ISO 2-letter codes (GeoNames format);
     // translate to full English name so callers always get canonical names.

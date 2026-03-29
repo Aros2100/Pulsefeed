@@ -17,6 +17,8 @@ export const REGION_MAP: Record<string, string> = {
   "france": "Western Europe",
   "belgium": "Western Europe",
   "netherlands": "Western Europe",
+  "the netherlands": "Western Europe",
+  "liechtenstein": "Western Europe",
   "luxembourg": "Western Europe",
   "switzerland": "Western Europe",
   "austria": "Western Europe",
@@ -37,6 +39,7 @@ export const REGION_MAP: Record<string, string> = {
   // Eastern Europe
   "poland": "Eastern Europe",
   "czech republic": "Eastern Europe",
+  "czechia": "Eastern Europe",
   "slovakia": "Eastern Europe",
   "hungary": "Eastern Europe",
   "romania": "Eastern Europe",
@@ -90,6 +93,12 @@ export const REGION_MAP: Record<string, string> = {
   "bahamas": "Central America & Caribbean",
   "curaçao": "Central America & Caribbean",
   "puerto rico": "Central America & Caribbean",
+  "guadeloupe": "Central America & Caribbean",
+  "grenada": "Central America & Caribbean",
+  "antigua and barbuda": "Central America & Caribbean",
+  "sint maarten": "Central America & Caribbean",
+  "st kitts and nevis": "Central America & Caribbean",
+  "british virgin islands": "Central America & Caribbean",
 
   // South America
   "brazil": "South America",
@@ -104,9 +113,11 @@ export const REGION_MAP: Record<string, string> = {
   "uruguay": "South America",
   "guyana": "South America",
   "suriname": "South America",
+  "french guiana": "South America",
 
   // Middle East
   "turkey": "Middle East",
+  "türkiye": "Middle East",
   "iran": "Middle East",
   "iraq": "Middle East",
   "saudi arabia": "Middle East",
@@ -141,6 +152,7 @@ export const REGION_MAP: Record<string, string> = {
   "cameroon": "Sub-Saharan Africa",
   "senegal": "Sub-Saharan Africa",
   "democratic republic of the congo": "Sub-Saharan Africa",
+  "dr congo": "Sub-Saharan Africa",
   "mozambique": "Sub-Saharan Africa",
   "zimbabwe": "Sub-Saharan Africa",
   "zambia": "Sub-Saharan Africa",
@@ -163,6 +175,8 @@ export const REGION_MAP: Record<string, string> = {
   "somalia": "Sub-Saharan Africa",
   "malawi": "Sub-Saharan Africa",
   "gambia": "Sub-Saharan Africa",
+  "the gambia": "Sub-Saharan Africa",
+  "réunion": "Sub-Saharan Africa",
   "lesotho": "Sub-Saharan Africa",
   "eswatini": "Sub-Saharan Africa",
   "mauritius": "Sub-Saharan Africa",
@@ -177,6 +191,7 @@ export const REGION_MAP: Record<string, string> = {
   "south sudan": "Sub-Saharan Africa",
   "chad": "Sub-Saharan Africa",
   "republic of the congo": "Sub-Saharan Africa",
+  "congo republic": "Sub-Saharan Africa",
   "burundi": "Sub-Saharan Africa",
 
   // South Asia
@@ -230,7 +245,14 @@ export const REGION_MAP: Record<string, string> = {
 
 /** Case-insensitive country-to-region lookup. Returns null for unknown countries. */
 export function getRegion(country: string): string | null {
-  return REGION_MAP[country.trim().toLowerCase()] ?? null;
+  const key = country.trim().toLowerCase();
+  const direct = REGION_MAP[key] ?? null;
+  if (direct) return direct;
+  // Strip leading "the " and retry
+  if (key.startsWith("the ")) {
+    return REGION_MAP[key.slice(4)] ?? null;
+  }
+  return null;
 }
 
 const REGION_TO_CONTINENT: Record<string, string> = {
