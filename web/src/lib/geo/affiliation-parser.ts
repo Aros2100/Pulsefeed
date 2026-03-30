@@ -498,13 +498,6 @@ function parseSingleSegment(
     while (cityIdx >= 0) {
       const candidate = segments[cityIdx].replace(/\.+$/, "").trim();
       const candidateCleaned = candidate.replace(/\s+\d{4,6}$/, "").trim();
-      console.log('candidate:', candidate,
-        '| isAdminRegion:', isAdministrativeRegion(candidate),
-        '| isPostal:', isPostalCode(candidate),
-        '| lookupCountry:', lookupCountry(candidate),
-        '| matchesDept:', matchesKeywords(candidate, DEPT_KEYWORDS),
-        '| inCityNames:', cityNames.has(candidate.trim().toLowerCase())
-      );
       if (isAdministrativeRegion(candidate) || isAdministrativeRegion(candidateCleaned)) { cityIdx--; continue; }
       if (candidate.length <= 4 && (US_STATES[candidate.toUpperCase()] || isProvinceCode(candidate))) { cityIdx--; continue; }
       if (isPostalCode(candidate)) { cityIdx--; continue; }
@@ -582,7 +575,6 @@ function parseSingleSegment(
     confidence = "low";
   }
 
-  console.log('DEBUG city:', city, '| segments:', segments);
   return { department, institution, city, country, confidence };
 }
 
