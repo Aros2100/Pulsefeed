@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { runImportCircle3 } from "@/specialties/neurosurgery/filter-c3";
-import { runCitationFetch } from "@/lib/pubmed/fetch-citations";
+import { runCitationFetch } from "@/lib/import/fetch-citations";
 import { runAILocationParsing } from "@/lib/geo/ai-location-scorer";
 import { runPublicationTypeMapping } from "@/lib/tagging/publication-type-mapper";
 import { createAdminClient } from "@/lib/supabase/admin";

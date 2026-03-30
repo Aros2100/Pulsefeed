@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { runImpactFactorFetch } from "@/lib/pubmed/fetch-impact-factors";
+import { runImpactFactorFetch } from "@/lib/import/fetch-impact-factors";
 
 export async function POST() {
   const auth = await requireAdmin();

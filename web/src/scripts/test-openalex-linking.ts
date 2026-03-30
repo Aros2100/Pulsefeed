@@ -21,7 +21,7 @@ for (const line of readFileSync(".env.local", "utf8").split("\n")) {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchWorksByDois } from "@/lib/openalex/client";
 import { matchPubMedToOpenAlex } from "@/lib/openalex/match-authors";
-import { decodeHtmlEntities } from "@/lib/artikel-import/fetcher";
+import { decodeHtmlEntities } from "@/lib/import/artikel-import/fetcher";
 
 async function main() {
   const admin = createAdminClient();

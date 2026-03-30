@@ -3,8 +3,8 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
-import { type Author } from "@/lib/artikel-import/fetcher";
-import { linkAuthorsToArticle } from "@/lib/forfatter-import/find-or-create";
+import { type Author } from "@/lib/import/artikel-import/fetcher";
+import { linkAuthorsToArticle } from "@/lib/import/forfatter-import/find-or-create";
 import { logArticleEvent } from "@/lib/article-events";
 
 const TAG_REMAP: Record<string, string> = {

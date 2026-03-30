@@ -1,6 +1,6 @@
 import { createAdminClient } from './src/lib/supabase/admin';
-import { decodeHtmlEntities, type Author } from './src/lib/artikel-import/fetcher';
-import { linkAuthorsToArticle } from './src/lib/forfatter-import/find-or-create';
+import { decodeHtmlEntities, type Author } from './src/lib/import/artikel-import/fetcher';
+import { linkAuthorsToArticle } from './src/lib/import/forfatter-import/find-or-create';
 import { getRegion, getContinent } from './src/lib/geo/country-map';
 import { lookupState } from './src/lib/geo/state-map';
 import { getCityCache, normalizeCityKey } from './src/lib/geo/city-cache';
