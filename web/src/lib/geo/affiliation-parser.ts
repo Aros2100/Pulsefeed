@@ -570,6 +570,19 @@ function parseSingleSegment(
     department = null;
   }
 
+  // Step 10b: If city is still null, scan institution name for embedded city tokens
+  // e.g. "Shin Sapporo Neurosurgical Hospital" → token "Sapporo" → city = "Sapporo"
+  if (!city && institution) {
+    const tokens = institution.split(/\s+/);
+    for (const token of tokens) {
+      const info = lookupCity(token.replace(/\.+$/, "").trim());
+      if (info && (!country || info.country === country)) {
+        city = info.city;
+        break;
+      }
+    }
+  }
+
   // Step 11: City-to-country fallback
   if (city && !country) {
     const cityInfo = lookupCity(city);
