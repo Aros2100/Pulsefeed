@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { runAuthorLinking } from "@/lib/pubmed/author-linker";
+import { runAuthorLinking } from "@/lib/import/author-linker";
 
 const schema = z.object({
   import_log_id: z.string().uuid().optional(),

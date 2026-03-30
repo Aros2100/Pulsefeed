@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/types";
 import { decodeHtmlEntities, type Author } from "@/lib/import/artikel-import/fetcher";
 import { linkAuthorsToArticle } from "@/lib/import/forfatter-import/find-or-create";
-import { runLinkingChecks } from "@/lib/pubmed/quality-checks";
+import { runLinkingChecks } from "@/lib/import/quality-checks";
 import { logArticleEvent, logGeoUpdatedEvent, type GeoSnapshot } from "@/lib/article-events";
 import { notifyFollowedAuthorPublications } from "@/lib/notifications/followedAuthorNotify";
 import { getRegion, getContinent } from "@/lib/geo/country-map";
