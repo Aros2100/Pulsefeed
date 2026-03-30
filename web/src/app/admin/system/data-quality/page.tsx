@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -172,8 +172,10 @@ export default function DataQualityPage() {
   const [data, setData] = useState<DQData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [rorReset,   setRorReset]   = useState<RorResetState>({ status: "idle" });
-  const [rorRefresh, setRorRefresh] = useState<RorRefreshState>({ status: "idle", processed: 0, updated: 0, skipped: 0 });
+  const [rorReset,    setRorReset]    = useState<RorResetState>({ status: "idle" });
+  const [rorRefresh,  setRorRefresh]  = useState<RorRefreshState>({ status: "idle", processed: 0, updated: 0, skipped: 0 });
+  const [rorCountdown, setRorCountdown] = useState<number | null>(null);
+  const rorStopRef = useRef(false);
 
   async function handleRorReset() {
     if (!confirm("Dette nulstiller city, state, country, region, continent, geo_source og verified_by på alle forfattere med ROR-id. Er du sikker?")) return;
@@ -189,20 +191,25 @@ export default function DataQualityPage() {
   }
 
   async function handleRorRefresh() {
-    if (!confirm("Dette genberiger alle forfattere med ROR-id via ROR API. Kan tage lang tid. Fortsæt?")) return;
+    if (!confirm("Dette genberiger alle forfattere med ROR-id via ROR API. Jobbet pauser 5 min mellem batches pga. ROR rate limit. Kan tage lang tid. Fortsæt?")) return;
+    rorStopRef.current = false;
     setRorRefresh({ status: "running", processed: 0, updated: 0, skipped: 0 });
+    setRorCountdown(null);
     let offset = 0;
     let totalProcessed = 0, totalUpdated = 0, totalSkipped = 0;
+    const PAUSE_MS = 5 * 60 * 1000;
     try {
       while (true) {
+        if (rorStopRef.current) break;
         const res  = await fetch("/api/admin/authors/ror-geo-refresh", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ offset, limit: 500 }),
+          body: JSON.stringify({ offset, limit: 150 }),
         });
         const json = await res.json() as { ok: boolean; processed: number; updated: number; skipped: number; nextOffset: number; done: boolean; error?: string };
         if (!json.ok) {
           setRorRefresh({ status: "error", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped, error: json.error });
+          setRorCountdown(null);
           return;
         }
         totalProcessed += json.processed;
@@ -211,10 +218,24 @@ export default function DataQualityPage() {
         setRorRefresh({ status: "running", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped });
         if (json.done) break;
         offset = json.nextOffset;
+
+        // 5-minute countdown before next batch
+        const deadline = Date.now() + PAUSE_MS;
+        const tick = setInterval(() => {
+          const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+          setRorCountdown(remaining);
+          if (remaining === 0) clearInterval(tick);
+        }, 1000);
+        setRorCountdown(Math.ceil(PAUSE_MS / 1000));
+        await new Promise((r) => setTimeout(r, PAUSE_MS));
+        clearInterval(tick);
+        setRorCountdown(null);
       }
       setRorRefresh({ status: "done", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped });
+      setRorCountdown(null);
     } catch (e) {
       setRorRefresh({ status: "error", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped, error: String(e) });
+      setRorCountdown(null);
     }
   }
 
@@ -574,6 +595,11 @@ export default function DataQualityPage() {
                     {rorRefresh.processed.toLocaleString("da-DK")} behandlet
                     {" · "}{rorRefresh.updated.toLocaleString("da-DK")} opdateret
                     {" · "}{rorRefresh.skipped.toLocaleString("da-DK")} skippet
+                  </div>
+                )}
+                {rorCountdown !== null && (
+                  <div style={{ marginTop: "8px", fontSize: "13px", color: "#d97706", fontWeight: 500 }}>
+                    ⏳ Venter {Math.floor(rorCountdown / 60)}:{String(rorCountdown % 60).padStart(2, "0")} før næste batch (ROR rate limit)…
                   </div>
                 )}
                 {rorRefresh.status === "error" && (
