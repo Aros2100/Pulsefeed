@@ -515,7 +515,14 @@ function parseSingleSegment(
     while (cityIdx >= 0) {
       const candidate = segments[cityIdx].replace(/\.+$/, "").trim();
       const candidateCleaned = candidate.replace(/\s+\d{4,6}$/, "").trim();
-      if (isAdministrativeRegion(candidate) || isAdministrativeRegion(candidateCleaned)) { cityIdx--; continue; }
+      // Skip admin regions — but allow through if they are a known city (e.g. "New York" city
+      // after the state "New York" has already been consumed in Step 7).
+      const isAdmin = isAdministrativeRegion(candidate) || isAdministrativeRegion(candidateCleaned);
+      if (isAdmin) {
+        const adminKey = candidate.trim().toLowerCase();
+        const adminIsCity = cityNames.has(adminKey) || !!lookupCity(candidate);
+        if (!adminIsCity) { cityIdx--; continue; }
+      }
       if (candidate.length <= 4 && (US_STATES[candidate.toUpperCase()] || isProvinceCode(candidate))) { cityIdx--; continue; }
       if (isPostalCode(candidate)) { cityIdx--; continue; }
       // Allow city-state-country: if candidate is a country name but country is already set
