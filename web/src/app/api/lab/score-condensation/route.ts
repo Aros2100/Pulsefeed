@@ -5,7 +5,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
 import { getActivePrompt, scoreCondensation, type ActivePrompt } from "@/lib/lab/scorer";
-import { applyUnscoredFilters } from "@/lib/lab/article-filters";
 
 const CONCURRENCY  = 1;
 const DELAY_MS     = 1300;
@@ -96,25 +95,16 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const filteredQuery = await applyUnscoredFilters(
-    admin.from("articles").select("id, title, abstract"),
-    "condensation",
-    specialty,
-    admin,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: rpcData, error: fetchError } = await (admin as any).rpc(
+    "get_condensation_not_validated_articles",
+    { p_specialty: specialty, p_limit: remaining },
   );
-
-  let articles: Article[] = [];
-  if (filteredQuery) {
-    const res = await filteredQuery
-      .order("published_date", { ascending: false })
-      .limit(remaining);
-    if (res.error) {
-      return NextResponse.json({ ok: false, error: res.error.message }, { status: 500 });
-    }
-    articles = (res.data ?? []) as Article[];
+  if (fetchError) {
+    return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
   }
 
-  const toScore = articles;
+  const toScore = (rpcData ?? []) as Article[];
 
   const stream = new ReadableStream({
     async start(controller) {
