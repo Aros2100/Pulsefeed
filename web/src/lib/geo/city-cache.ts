@@ -51,8 +51,9 @@ export async function getCityCache(): Promise<CityCache> {
     names.add(key);
     if (!countryMap.has(key)) countryMap.set(key, country);
     // Also store unaccented form so "México" → "mexico" hits "Mexico" in cache
-    if (keyUnaccented !== key && !countryMap.has(keyUnaccented)) {
-      countryMap.set(keyUnaccented, country);
+    if (keyUnaccented !== key) {
+      names.add(keyUnaccented);
+      if (!countryMap.has(keyUnaccented)) countryMap.set(keyUnaccented, country);
     }
   }
 
