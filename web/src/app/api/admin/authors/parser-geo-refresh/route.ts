@@ -10,7 +10,7 @@ import { getRegion, getContinent } from "@/lib/geo/continent-map";
 
 const schema = z.object({
   offset: z.number().int().min(0).default(0),
-  limit:  z.number().int().min(1).max(500).default(200),
+  limit:  z.number().int().min(1).max(500).default(50),
 });
 
 export async function POST(request: NextRequest) {
