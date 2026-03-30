@@ -289,6 +289,8 @@ export const CITY_TO_COUNTRY: Record<string, CityInfo> = {
   "sevilla": { city: "Seville", country: "Spain" },
   "granada": { city: "Granada", country: "Spain" },
   "bilbao": { city: "Bilbao", country: "Spain" },
+  "donostia": { city: "San Sebastián", country: "Spain" },
+  "donostia-san sebastian": { city: "San Sebastián", country: "Spain" },
   "zaragoza": { city: "Zaragoza", country: "Spain" },
   "málaga": { city: "Málaga", country: "Spain" },
   "malaga": { city: "Málaga", country: "Spain" },
