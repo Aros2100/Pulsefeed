@@ -2,8 +2,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { extractEmail, stripEmailFromAffiliation } from "@/lib/geo/affiliation-utils";
 import { parseAffiliation as geoParseAffiliation } from "@/lib/geo/affiliation-parser";
 import { lookupCountry } from "@/lib/geo/country-map";
-import { resolveCityAlias } from "@/lib/geo/city-aliases";
 import { normalizeCountry } from "@/lib/geo/normalize";
+import { normalizeGeo } from "@/lib/geo/normalize-geo";
 import { logAuthorEvent } from "@/lib/author-events";
 import { matchPubMedToOpenAlex } from "@/lib/openalex/match-authors";
 import type { OpenAlexWork, OpenAlexAuthorship } from "@/lib/openalex/client";
@@ -14,16 +14,6 @@ import { resolveState } from "./geo-writer";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
-interface InitialCandidate {
-  id: string;
-  display_name: string;
-  display_name_normalized: string | null;
-  city: string | null;
-  country: string | null;
-  hospital: string | null;
-  department: string | null;
-  orcid: string | null;
-}
 
 export type AuthorGeo = {
   department: string | null;
@@ -124,7 +114,7 @@ async function mergeAuthor(
   const update: Record<string, any> = {};
   if (isGeoUpgrade(existing, parsed)) {
     if (parsed.country) update.country = parsed.country;
-    if (parsed.city) update.city = await resolveCityAlias(parsed.city, parsed.country ?? "");
+    if (parsed.city) update.city = normalizeGeo(parsed.city, parsed.country).city;
     if (parsed.institution) update.hospital = parsed.institution;
     if (parsed.department) update.department = parsed.department;
   }
@@ -339,12 +329,18 @@ export async function findOrCreateAuthor(
   const geoParsed = cleanAffiliation ? await geoParseAffiliation(cleanAffiliation) : null;
   const parsed = {
     city: geoParsed?.city
-      ? await resolveCityAlias(geoParsed.city, geoParsed.country ?? "")
+      ? normalizeGeo(geoParsed.city, geoParsed.country ?? null).city
       : null,
     country: normalizeCountry(geoParsed?.country) ?? null,
     institution: geoParsed?.institution ?? null,
     department: geoParsed?.department ?? null,
   };
+
+  if (!parsed.country && parsed.city) {
+    const enriched = normalizeGeo(parsed.city, null);
+    if (enriched.country) parsed.country = enriched.country;
+    if (enriched.city) parsed.city = enriched.city;
+  }
 
   if (debugName) {
     console.log(`[GEO-DEBUG ${debugName}] findOrCreateAuthor: primaryAff="${primaryAff}"`);
@@ -422,103 +418,6 @@ export async function findOrCreateAuthor(
     return await matchByGeo(admin, candidates, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution, debugName);
   }
 
-  // ── 2.5. Initial-match: "J Sørensen" → "Jens Sørensen" ─────────────────────
-  const firstPart = normalized.split(' ')[0] ?? '';
-  if (firstPart.length <= 2 && parsed.city && parsed.country) {
-    const lastNameNorm = normalized
-      .replace(/\b(von|van|de|del|della|di|du|le|la|el|al|bin|ibn)\b/g, '')
-      .trim()
-      .split(/\s+/)
-      .pop() ?? '';
-
-    if (lastNameNorm.length > 2) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = admin as any;
-      const { data: initialCandidates } = await db
-        .from('authors')
-        .select('id, display_name, display_name_normalized, city, country, hospital, department, orcid')
-        .eq('city', parsed.city)
-        .eq('country', parsed.country)
-        .neq('display_name_normalized', normalized)
-        .limit(50) as { data: InitialCandidate[] | null };
-
-      if (initialCandidates && initialCandidates.length > 0) {
-        const matches = initialCandidates.filter(c => {
-          const cNorm = c.display_name_normalized ?? '';
-          const cLastName = cNorm
-            .replace(/\b(von|van|de|del|della|di|du|le|la|el|al|bin|ibn)\b/g, '')
-            .trim()
-            .split(/\s+/)
-            .pop() ?? '';
-          const cFirstPart = cNorm.split(' ')[0] ?? '';
-          return cLastName === lastNameNorm
-            && cFirstPart.length > 2
-            && cFirstPart.startsWith(firstPart);
-        });
-
-        if (matches.length === 1) {
-          const match = matches[0];
-          if (!(newOrcid && match.orcid && newOrcid !== match.orcid)) {
-            if (debugName) console.log(`[GEO-DEBUG ${debugName}] findOrCreateAuthor: branch=2.5 (initial match) id=${match.id}`);
-            await mergeAuthor(admin, match.id, match, parsed, newOrcid, displayName, "geo", articleId, debugName);
-            return { id: match.id, outcome: 'duplicate' };
-          }
-        }
-      }
-    }
-  }
-
-  // Also check the reverse: new author has full name, existing has initials
-  if (firstPart.length > 2 && parsed.city && parsed.country) {
-    const lastNameNorm = normalized
-      .replace(/\b(von|van|de|del|della|di|du|le|la|el|al|bin|ibn)\b/g, '')
-      .trim()
-      .split(/\s+/)
-      .pop() ?? '';
-
-    if (lastNameNorm.length > 2) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = admin as any;
-      const { data: reverseCandidates } = await db
-        .from('authors')
-        .select('id, display_name, display_name_normalized, city, country, hospital, department, orcid')
-        .eq('city', parsed.city)
-        .eq('country', parsed.country)
-        .neq('display_name_normalized', normalized)
-        .limit(50) as { data: InitialCandidate[] | null };
-
-      if (reverseCandidates && reverseCandidates.length > 0) {
-        const matches = reverseCandidates.filter(c => {
-          const cNorm = c.display_name_normalized ?? '';
-          const cLastName = cNorm
-            .replace(/\b(von|van|de|del|della|di|du|le|la|el|al|bin|ibn)\b/g, '')
-            .trim()
-            .split(/\s+/)
-            .pop() ?? '';
-          const cFirstPart = cNorm.split(' ')[0] ?? '';
-          return cLastName === lastNameNorm
-            && cFirstPart.length <= 2
-            && firstPart.startsWith(cFirstPart);
-        });
-
-        if (matches.length === 1) {
-          const match = matches[0];
-          if (!(newOrcid && match.orcid && newOrcid !== match.orcid)) {
-            if (debugName) console.log(`[GEO-DEBUG ${debugName}] findOrCreateAuthor: branch=2.5r (reverse initial match) id=${match.id}`);
-            await mergeAuthor(admin, match.id, match, parsed, newOrcid, displayName, "geo", articleId, debugName);
-            if (displayName.length > (match.display_name?.length ?? 0)) {
-              await db.from('authors').update({
-                display_name: displayName,
-                display_name_normalized: normalized,
-              }).eq('id', match.id);
-            }
-            return { id: match.id, outcome: 'duplicate' };
-          }
-        }
-      }
-    }
-  }
-
   // ── 3. No candidates — create new author ───────────────────────────────────
   if (debugName) console.log(`[GEO-DEBUG ${debugName}] findOrCreateAuthor: branch=3 (no candidates → create new)`);
   return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution, debugName);
@@ -571,24 +470,6 @@ async function matchByGeo(
     }
   }
 
-  // 2c. Same name + existing has no geo
-  const noGeoMatch = candidates.find(c => !c.city && !c.country);
-  if (noGeoMatch) {
-    if (debugName) console.log(`[GEO-DEBUG ${debugName}] matchByGeo: branch=2c (no-geo candidate) id=${noGeoMatch.id}`);
-    await mergeAuthor(admin, noGeoMatch.id, noGeoMatch, parsed, newOrcid, displayName, "geo", articleId, debugName);
-    return { id: noGeoMatch.id, outcome: "duplicate" };
-  }
-
-  // 2d. Same name + new has no geo, existing has geo → merge into existing
-  if (!parsed.city && !parsed.country) {
-    const firstWithGeo = candidates.find(c => c.city || c.country);
-    if (firstWithGeo) {
-      if (debugName) console.log(`[GEO-DEBUG ${debugName}] matchByGeo: branch=2d (new has no geo) id=${firstWithGeo.id}`);
-      await mergeAuthor(admin, firstWithGeo.id, firstWithGeo, parsed, newOrcid, displayName, "geo", articleId, debugName);
-      return { id: firstWithGeo.id, outcome: "duplicate" };
-    }
-  }
-
   // 2e. No match — create new author
   if (debugName) console.log(`[GEO-DEBUG ${debugName}] matchByGeo: branch=2e (no match → create new)`);
   return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution, debugName);
@@ -636,7 +517,7 @@ async function createNewAuthor(
   }
 
   // Parser as fallback — only fills what ROR did not provide
-  if (!city)    city    = parsed.city ? await resolveCityAlias(parsed.city, parsed.country ?? "") : null;
+  if (!city)    city    = parsed.city ? normalizeGeo(parsed.city, parsed.country).city : null;
   if (!country) country = parsed.country ?? null;
 
   if (!state) {
