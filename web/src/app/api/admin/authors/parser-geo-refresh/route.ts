@@ -9,9 +9,8 @@ import { lookupState } from "@/lib/geo/state-map";
 import { getRegion, getContinent } from "@/lib/geo/continent-map";
 
 const schema = z.object({
-  offset:     z.number().int().min(0).default(0),
-  limit:      z.number().int().min(1).max(500).default(200),
-  resetFirst: z.boolean().default(false),
+  offset: z.number().int().min(0).default(0),
+  limit:  z.number().int().min(1).max(500).default(200),
 });
 
 export async function POST(request: NextRequest) {
@@ -27,28 +26,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
   }
 
-  const { offset, limit, resetFirst } = result.data;
+  const { offset, limit } = result.data;
   const admin = createAdminClient();
-
-  // Optional reset on first batch
-  if (resetFirst && offset === 0) {
-    const { error: resetError } = await admin
-      .from("authors")
-      .update({
-        city:        null,
-        state:       null,
-        country:     null,
-        region:      null,
-        continent:   null,
-        geo_source:  null,
-        verified_by: null,
-      })
-      .is("ror_id", null);
-
-    if (resetError) {
-      return NextResponse.json({ ok: false, error: resetError.message }, { status: 500 });
-    }
-  }
 
   // Fetch batch
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

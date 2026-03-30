@@ -246,24 +246,22 @@ export default function DataQualityPage() {
   }
 
   async function handleParserRefresh() {
-    if (!confirm("Dette nulstiller og re-beriger geo på alle forfattere UDEN ROR-id via affiliation-parseren. Er du sikker?")) return;
+    if (!confirm("Dette re-beriger geo på alle forfattere UDEN ROR-id via affiliation-parseren. Er du sikker?")) return;
     setParserRefresh({ status: "running", processed: 0, updated: 0, skipped: 0 });
     let offset = 0;
     let totalProcessed = 0, totalUpdated = 0, totalSkipped = 0;
-    let firstBatch = true;
     try {
       while (true) {
         const res  = await fetch("/api/admin/authors/parser-geo-refresh", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ offset, limit: 200, resetFirst: firstBatch }),
+          body: JSON.stringify({ offset, limit: 200 }),
         });
         const json = await res.json() as { ok: boolean; processed: number; updated: number; skipped: number; nextOffset: number; done: boolean; error?: string };
         if (!json.ok) {
           setParserRefresh({ status: "error", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped, error: json.error });
           return;
         }
-        firstBatch = false;
         totalProcessed += json.processed;
         totalUpdated   += json.updated;
         totalSkipped   += json.skipped;
@@ -569,7 +567,7 @@ export default function DataQualityPage() {
         <SectionCard number="6" title="Parser geo refresh (forfattere uden ROR-id)">
           <div style={{ padding: "20px 24px" }}>
             <p style={{ margin: "0 0 16px", fontSize: "14px", color: "#374151", lineHeight: 1.6 }}>
-              Nulstiller og re-beriger geo-data på alle forfattere <strong>uden</strong> ROR-id via affiliation-parseren.
+              Re-beriger geo-data på alle forfattere <strong>uden</strong> ROR-id via affiliation-parseren.
               Bruger det nye flow: <code style={{ fontSize: "12px", background: "#f1f3f7", borderRadius: "3px", padding: "1px 4px" }}>parseAffiliation → normalizeGeo → lookupState → getRegion/getContinent</code>.
             </p>
             <button
@@ -583,7 +581,7 @@ export default function DataQualityPage() {
                 color: "#1a1a1a",
               }}
             >
-              {parserRefresh.status === "running" ? "Kører…" : "Reset + Run parser geo refresh"}
+              {parserRefresh.status === "running" ? "Kører…" : "Run parser geo refresh"}
             </button>
             {(parserRefresh.status === "running" || parserRefresh.status === "done") && (
               <div style={{ marginTop: "10px", fontSize: "13px", color: parserRefresh.status === "done" ? "#15803d" : "#374151", fontWeight: parserRefresh.status === "done" ? 600 : 400 }}>
