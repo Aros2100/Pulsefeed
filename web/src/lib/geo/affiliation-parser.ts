@@ -205,6 +205,10 @@ function cleanCity(raw: string, cityNames: Set<string>): string {
       city = base;
     }
   }
+  // Strip Korean administrative suffixes: "Suwon-si" → "Suwon", "Gwangju-si" → "Gwangju"
+  city = city.replace(/-si$/i, "").trim();
+  city = city.replace(/-gu$/i, "").trim();
+  city = city.replace(/-do$/i, "").trim();
   // Strip trailing dots/whitespace
   city = city.replace(/[.\s]+$/, "").trim();
   return city;
