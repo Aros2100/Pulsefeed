@@ -45,8 +45,8 @@ export async function getCityCache(): Promise<CityCache> {
     if (!row.name || !row.country || (row.population ?? 0) < 50000) continue;
     const key = row.name.trim().toLowerCase();
     const keyUnaccented = unaccent(key);
-    // geo_cities.country stores ISO 2-letter codes (GeoNames format);
-    // translate to full English name so callers always get canonical names.
+    // geo_cities.country stores full English country names (not ISO codes).
+    // lookupCountry() expects ISO codes so will return null — fallback to row.country directly.
     const country = lookupCountry(row.country) ?? row.country;
     names.add(key);
     if (!countryMap.has(key)) countryMap.set(key, country);
