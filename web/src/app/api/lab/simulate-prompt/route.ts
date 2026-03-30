@@ -38,7 +38,7 @@ async function scoreWithPrompt(
 
   const message = await trackedCall("simulate_prompt", {
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 256,
+    max_tokens: 1024,
     messages: [{ role: "user", content }],
   }, article.id, specialty);
 
@@ -49,6 +49,9 @@ async function scoreWithPrompt(
     const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as {
       decision?: unknown;
       subspecialty?: unknown;
+      short_headline?: string;
+      short_resume?: string;
+      bottom_line?: string;
       confidence?: number;
       reason?: string;
     };
@@ -65,6 +68,10 @@ async function scoreWithPrompt(
       ai_decision = Array.isArray(parsed.subspecialty)
         ? JSON.stringify(parsed.subspecialty)
         : JSON.stringify([String(parsed.subspecialty)]);
+    } else if (parsed.short_headline !== undefined || parsed.short_resume !== undefined) {
+      // Condensation format: { short_headline, short_resume, bottom_line }
+      const hasContent = !!(parsed.short_headline?.trim() && parsed.short_resume?.trim() && parsed.bottom_line?.trim());
+      ai_decision = hasContent ? "approved" : "rejected";
     } else {
       ai_decision = "rejected";
     }
