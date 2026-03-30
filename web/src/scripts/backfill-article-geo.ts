@@ -30,7 +30,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { parseAffiliation as geoParseAffiliation } from "@/lib/geo/affiliation-parser";
 import { getRegion, getContinent } from "@/lib/geo/country-map";
 import { lookupState } from "@/lib/geo/state-map";
-import type { AuthorGeo } from "@/lib/pubmed/importer";
+import type { AuthorGeo } from "@/lib/forfatter-import/find-or-create";
 import { logGeoUpdatedEvent, type GeoSnapshot } from "@/lib/article-events";
 
 // ── Config ────────────────────────────────────────────────────────────────────

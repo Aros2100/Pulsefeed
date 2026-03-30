@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fetchPubMedIds, fetchArticleDetails } from "./importer";
+import { fetchPubMedIds, fetchArticleDetails, sleep } from "./fetcher";
 import { runArticleChecks } from "@/lib/pubmed/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
 import { buildImportEventPayload } from "@/lib/article-events/import-payload";
@@ -9,10 +9,6 @@ type AdminClient = ReturnType<typeof createAdminClient>;
 
 const BATCH_SIZE = 20;
 const RATE_LIMIT_MS = 110;
-
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 /**
  * Builds a PubMed query for Danish institutional sources.
@@ -62,7 +58,6 @@ export async function runImportCircle3(
   let totalFetched = 0;
   let totalAuthorSlots = 0;
 
-  // Log-rækken oprettes normalt af kalderen — fallback her hvis ingen logId givet
   let logId = existingLogId ?? null;
   if (!logId) {
     const { data: newLog } = await db
@@ -73,7 +68,6 @@ export async function runImportCircle3(
     logId = (newLog as { id: string } | null)?.id ?? null;
   }
 
-  // 1. Load active affiliation sources
   const { data: sources, error: sourcesErr } = await db
     .from("circle_3_sources")
     .select("id, value, max_results")
@@ -104,19 +98,16 @@ export async function runImportCircle3(
   }
 
   try {
-    // 2. Build combined query
     const terms = sources.map((s) => s.value);
     const query = buildC3Query(terms);
     const maxResults = Math.max(...sources.map((s) => s.max_results ?? 2000));
 
     await sleep(RATE_LIMIT_MS);
 
-    // 3. ESearch
     const pmids = await fetchPubMedIds(query, maxResults);
     totalFetched = pmids.length;
 
     if (pmids.length > 0) {
-      // 4. Deduplicate — chunk the IN query (Supabase default 1000-row limit + URL length)
       const DEDUP_CHUNK = 500;
       const existingPmidsList: string[] = [];
       for (let i = 0; i < pmids.length; i += DEDUP_CHUNK) {
@@ -132,13 +123,8 @@ export async function runImportCircle3(
       totalSkipped = pmids.length - newPmids.length;
 
       if (newPmids.length > 0) {
-        // 5. EFetch
         const fetched = await fetchArticleDetails(newPmids);
 
-        // 5b. Verify neurosurgical affiliation locally — PubMed [AD] matching is
-        //     not always precise and can match neurosurg* and a Danish hospital
-        //     name on DIFFERENT authors. Both conditions must appear on the SAME
-        //     author's affiliation string to qualify for circle 3.
         const danishHospitals = sources.map((s) => s.value);
         const danishPattern   = new RegExp(
           danishHospitals.map((h) => h.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"),
@@ -161,7 +147,6 @@ export async function runImportCircle3(
           totalSkipped += filteredOut;
         }
 
-        // 6 + 7. Upsert + log events
         for (let i = 0; i < articles.length; i += BATCH_SIZE) {
           const batch = articles.slice(i, i + BATCH_SIZE).map((a) => ({
             pubmed_id:         a.pubmedId,
@@ -196,7 +181,6 @@ export async function runImportCircle3(
             country:           "Denmark",
           }));
 
-          // ON CONFLICT (pubmed_id) DO NOTHING — never overwrite existing articles
           const { data: upsertedRows, error: upsertErr } = await admin
             .from("articles")
             .upsert(batch, { onConflict: "pubmed_id", ignoreDuplicates: true })
@@ -206,8 +190,6 @@ export async function runImportCircle3(
             errors.push(`Upsert batch error: ${upsertErr.message}`);
           } else {
             const inserted = (upsertedRows ?? []).length;
-            // Belt-and-suspenders: any batch rows not returned were DB-level duplicates
-            // that escaped the pre-fetch dedup (e.g. race condition or chunking gap)
             totalSkipped   += batch.length - inserted;
             totalImported  += inserted;
             totalAuthorSlots += batch.reduce((sum, a) => {
@@ -250,7 +232,6 @@ export async function runImportCircle3(
       }
     }
 
-    // 8. Update last_run_at for all sources
     await db
       .from("circle_3_sources")
       .update({ last_run_at: new Date().toISOString() })
@@ -260,7 +241,6 @@ export async function runImportCircle3(
     errors.push(err instanceof Error ? err.message : String(err));
   }
 
-  // Finalise log
   if (logId) {
     await admin.from("import_logs").update({
       status: errors.length > 0 && totalImported === 0 ? "failed" : "completed",

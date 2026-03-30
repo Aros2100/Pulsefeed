@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/types";
-import { linkAuthorsToArticle, decodeHtmlEntities, type Author } from "@/lib/pubmed/importer";
+import { decodeHtmlEntities, type Author } from "@/lib/artikel-import/fetcher";
+import { linkAuthorsToArticle } from "@/lib/forfatter-import/find-or-create";
 import { runLinkingChecks } from "@/lib/pubmed/quality-checks";
 import { logArticleEvent, logGeoUpdatedEvent, type GeoSnapshot } from "@/lib/article-events";
 import { notifyFollowedAuthorPublications } from "@/lib/notifications/followedAuthorNotify";

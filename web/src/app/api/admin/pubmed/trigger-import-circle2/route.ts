@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest, after } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
-import { runImportCircle2 } from "@/lib/pubmed/importer-circle2";
+import { runImportCircle2 } from "@/lib/artikel-import/filter-c2";
 import { runCitationFetch } from "@/lib/pubmed/fetch-citations";
 import { runAILocationParsing } from "@/lib/geo/ai-location-scorer";
 import { runPublicationTypeMapping } from "@/lib/tagging/publication-type-mapper";

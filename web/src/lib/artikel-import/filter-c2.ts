@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fetchPubMedIds, fetchArticleDetails } from "./importer";
+import { fetchPubMedIds, fetchArticleDetails, sleep } from "./fetcher";
 import { runArticleChecks } from "@/lib/pubmed/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
 import { buildImportEventPayload } from "@/lib/article-events/import-payload";
@@ -9,10 +9,6 @@ type AdminClient = ReturnType<typeof createAdminClient>;
 
 const BATCH_SIZE = 20;
 const RATE_LIMIT_MS = 110;
-
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 /**
  * Builds a PubMed [AD] query from affiliation terms.
@@ -59,7 +55,6 @@ export async function runImportCircle2(
   let totalFetched = 0;
   let totalAuthorSlots = 0;
 
-  // 1. Load active affiliation sources
   const { data: sources, error: sourcesErr } = await admin
     .from("circle_2_sources")
     .select("id, value, max_results")
@@ -67,9 +62,6 @@ export async function runImportCircle2(
     .eq("type", "affiliation")
     .eq("active", true);
 
-  // Log-rækken oprettes normalt af kalderen (trigger-import-circle2/route.ts) inden
-  // denne funktion kaldes — det sikrer at guarden mod concurrent imports virker.
-  // Hvis ingen logId er givet (f.eks. ved direkte kald) oprettes den her som fallback.
   let logId = existingLogId ?? null;
   if (!logId) {
     const { data: filter } = await admin
@@ -117,29 +109,20 @@ export async function runImportCircle2(
   }
 
   try {
-    // Track PMIDs seen across all source iterations to avoid double-importing
     const seenPmids = new Set<string>();
-
-    // Pre-load existing pubmed_ids from DB once (used for cross-source dedup)
-    // We'll refresh per-source to catch articles inserted in earlier iterations.
-
-    // Global cap: all sources share the same max_results value (set identically via the UI)
     const maxTotalResults = sources[0].max_results ?? 100;
 
-    // 2–7. Loop per source so each article gets its source_id populated
     for (const source of sources) {
       const query = buildAffiliationQuery([source.value]);
       const maxResults = source.max_results ?? 100;
 
       await sleep(RATE_LIMIT_MS);
 
-      // 3. ESearch for this source
       const pmids = await fetchPubMedIds(query, maxResults);
       totalFetched += pmids.length;
 
       if (pmids.length === 0) continue;
 
-      // 4. Deduplicate — against DB and already-seen PMIDs from earlier sources
       const unseenPmids = pmids.filter((id) => !seenPmids.has(id));
       if (unseenPmids.length === 0) {
         totalSkipped += pmids.length;
@@ -154,22 +137,18 @@ export async function runImportCircle2(
       let newPmids = unseenPmids.filter((id) => !existingSet.has(id));
       totalSkipped += pmids.length - newPmids.length;
 
-      // Apply global cap: never import more than maxTotalResults across all sources
       const remaining = maxTotalResults - totalImported;
       if (newPmids.length > remaining) {
         totalSkipped += newPmids.length - remaining;
         newPmids = newPmids.slice(0, remaining);
       }
 
-      // Mark all as seen (including already-existing) so later sources skip them
       for (const id of unseenPmids) seenPmids.add(id);
 
       if (newPmids.length === 0) continue;
 
-      // 5. EFetch
       const articles = await fetchArticleDetails(newPmids);
 
-      // 6 + 7. Upsert + link authors
       for (let i = 0; i < articles.length; i += BATCH_SIZE) {
         const batch = articles.slice(i, i + BATCH_SIZE).map((a) => ({
           pubmed_id:         a.pubmedId,
@@ -204,7 +183,6 @@ export async function runImportCircle2(
           source_id:         source.id,
         }));
 
-        // ON CONFLICT (pubmed_id) DO NOTHING — never overwrite status/verified/specialty_tags
         const { data: upsertedRows, error: upsertErr } = await admin
           .from("articles")
           .upsert(batch, { onConflict: "pubmed_id", ignoreDuplicates: true })
@@ -219,7 +197,6 @@ export async function runImportCircle2(
             return sum + authors.length;
           }, 0);
 
-          // Fire-and-forget — logArticleEvent catches its own errors
           void Promise.all(
             (upsertedRows ?? []).map((row) =>
               logArticleEvent(row.id, "imported", buildImportEventPayload({
@@ -253,7 +230,6 @@ export async function runImportCircle2(
         if (i + BATCH_SIZE < articles.length) await sleep(RATE_LIMIT_MS);
       }
 
-      // Update last_run_at for this source
       await admin
         .from("circle_2_sources")
         .update({ last_run_at: new Date().toISOString() })
@@ -266,7 +242,6 @@ export async function runImportCircle2(
     errors.push(err instanceof Error ? err.message : String(err));
   }
 
-  // Finalise log
   if (logId) {
     const finalizePayload = {
       status: errors.length > 0 && totalImported === 0 ? "failed" : "completed",
@@ -285,7 +260,6 @@ export async function runImportCircle2(
       console.error(`[import-circle2] Failed to finalize log ${logId}:`, finalizeErr.message);
     }
 
-    // Quality checks
     try {
       const qc = await runArticleChecks(logId);
       if (!qc.passed) {

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { runImport } from "@/lib/pubmed/importer";
+import { runImport } from "@/lib/artikel-import/filter-c1";
 
 // Allow up to 5 minutes for the import to complete
 export const maxDuration = 300;
