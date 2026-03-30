@@ -434,45 +434,45 @@ function parseSingleSegment(
     lastSeg = lastSeg.replace(/\s+and\s+.*$/i, "").trim();
     lastSeg = lastSeg.replace(/\s+-\s*$/, "").trim();
 
+    // Check US state (incl. full names like "Georgia", "Virginia") before country lookup
+    // to avoid "Georgia" matching the country Georgia instead of the US state.
+    const upperLast = lastSeg.toUpperCase();
     const directMatch = lookupCountry(lastSeg);
-    if (directMatch) {
+    if (US_STATES[upperLast]) {
+      country = "United States";
+      isUS = true;
+      segments.pop();
+    } else if (directMatch) {
       country = directMatch;
       if (directMatch === "United States") isUS = true;
       segments.pop();
     } else {
-      const upperLast = lastSeg.toUpperCase();
-      if (US_STATES[upperLast]) {
-        country = "United States";
-        isUS = true;
+      // City-to-country fallback: check if last segment is a known city/province
+      const cityMatch = lookupCity(lastSeg);
+      if (cityMatch) {
+        country = cityMatch.country;
+        city = cityMatch.city;
+        cityFromCountryFallback = true;
+        if (cityMatch.country === "United States") isUS = true;
         segments.pop();
       } else {
-        // City-to-country fallback: check if last segment is a known city/province
-        const cityMatch = lookupCity(lastSeg);
-        if (cityMatch) {
-          country = cityMatch.country;
-          city = cityMatch.city;
-          cityFromCountryFallback = true;
-          if (cityMatch.country === "United States") isUS = true;
+        const lowerLast = lastSeg.toLowerCase();
+        const found = CANONICAL_COUNTRIES.find((c) =>
+          lowerLast.includes(c.toLowerCase())
+        );
+        if (found) {
+          country = found;
+          if (found === "United States") isUS = true;
+          const countryIdx = lowerLast.lastIndexOf(found.toLowerCase());
+          const beforeCountry = lastSeg.slice(0, countryIdx).trim();
           segments.pop();
-        } else {
-          const lowerLast = lastSeg.toLowerCase();
-          const found = CANONICAL_COUNTRIES.find((c) =>
-            lowerLast.includes(c.toLowerCase())
-          );
-          if (found) {
-            country = found;
-            if (found === "United States") isUS = true;
-            const countryIdx = lowerLast.lastIndexOf(found.toLowerCase());
-            const beforeCountry = lastSeg.slice(0, countryIdx).trim();
-            segments.pop();
-            if (beforeCountry) {
-              segments.push(beforeCountry);
-            }
-          } else {
-            // Last segment is not a recognized country — don't use it as country
-            confidence = "low";
-            // Don't pop — leave segment for dept/inst extraction
+          if (beforeCountry) {
+            segments.push(beforeCountry);
           }
+        } else {
+          // Last segment is not a recognized country — don't use it as country
+          confidence = "low";
+          // Don't pop — leave segment for dept/inst extraction
         }
       }
     }
