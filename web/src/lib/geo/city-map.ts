@@ -106,6 +106,11 @@ export const CITY_TO_COUNTRY: Record<string, CityInfo> = {
   "sapporo": { city: "Sapporo", country: "Japan" },
   "sendai": { city: "Sendai", country: "Japan" },
   "tokyo": { city: "Tokyo", country: "Japan" },
+  "otsu": { city: "Otsu", country: "Japan" },
+  "ōtsu": { city: "Otsu", country: "Japan" },
+  "nara": { city: "Nara", country: "Japan" },
+  "tottori": { city: "Tottori", country: "Japan" },
+  "fukui": { city: "Fukui", country: "Japan" },
 
   // === Japan — prefectures ===
   "aichi": { city: "Nagoya", country: "Japan" },

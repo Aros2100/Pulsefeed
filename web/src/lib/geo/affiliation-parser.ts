@@ -205,6 +205,9 @@ function cleanCity(raw: string, cityNames: Set<string>): string {
       city = base;
     }
   }
+  // Strip Japanese -City suffix: "Kagoshima-City" → "Kagoshima", "Kagoshima City" → "Kagoshima"
+  city = city.replace(/-City$/i, "").trim();
+  city = city.replace(/\s+City$/i, "").trim();
   // Strip Korean administrative suffixes: "Suwon-si" → "Suwon", "Gwangju-si" → "Gwangju"
   city = city.replace(/-si$/i, "").trim();
   city = city.replace(/-gu$/i, "").trim();
