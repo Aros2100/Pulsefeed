@@ -1,6 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { runImportCircle3 } from "@/lib/artikel-import/filter-c3";
+import { runImportCircle3 } from "@/specialties/neurosurgery/filter-c3";
 import { runCitationFetch } from "@/lib/pubmed/fetch-citations";
 import { runAILocationParsing } from "@/lib/geo/ai-location-scorer";
 import { runPublicationTypeMapping } from "@/lib/tagging/publication-type-mapper";
