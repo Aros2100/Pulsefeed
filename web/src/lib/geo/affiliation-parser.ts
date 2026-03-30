@@ -501,10 +501,8 @@ function parseSingleSegment(
     }
   }
 
-  // Step 8: Extract city
+  // Step 8: Extract city — scan from right, continue if no city match at current segment
   if (segments.length > 0) {
-    // Even if cityFromCountryFallback is set, check remaining segments
-    // for an explicit city that should take precedence over the province fallback
     let cityIdx = segments.length - 1;
     while (cityIdx >= 0) {
       const candidate = segments[cityIdx].replace(/\.+$/, "").trim();
@@ -514,24 +512,24 @@ function parseSingleSegment(
       if (isPostalCode(candidate)) { cityIdx--; continue; }
       if (lookupCountry(candidate) !== null) { cityIdx--; continue; }
       if (matchesKeywords(candidate, DEPT_KEYWORDS)) { cityIdx--; continue; }
-      break;
-    }
 
-    if (cityIdx >= 0) {
+      // Candidate passed guards — try to match as city
       const rawCity = cleanCity(segments[cityIdx], cityNames);
       if (rawCity && cityNames.has(rawCity.trim().toLowerCase())) {
-        // Explicit city found — overrides cityFromCountryFallback
         city = rawCity;
         segments.splice(cityIdx, 1);
-      } else if (rawCity) {
-        // Fallback: check city-map (covers cities below 50k population threshold, e.g. Stanford, Otsu)
-        const cityInfo = lookupCity(rawCity);
-        if (cityInfo) {
-          city = cityInfo.city;
-          if (!country) country = cityInfo.country;
-          segments.splice(cityIdx, 1);
-        }
+        break;
       }
+      const cityInfo = rawCity ? lookupCity(rawCity) : null;
+      if (cityInfo) {
+        city = cityInfo.city;
+        if (!country) country = cityInfo.country;
+        segments.splice(cityIdx, 1);
+        break;
+      }
+
+      // No city match — continue scanning leftward
+      cityIdx--;
     }
   }
 
