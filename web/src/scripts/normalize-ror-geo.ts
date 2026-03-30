@@ -20,7 +20,6 @@ for (const line of readFileSync(".env.local", "utf8").split("\n")) {
 }
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { resolveCityAlias } from "@/lib/geo/city-aliases";
 
 const BATCH_SIZE     = 50;
 const BATCH_DELAY_MS = 500;
@@ -137,10 +136,10 @@ async function main() {
       const changes: string[] = [];
 
       if (geo.name) {
-        const resolvedCity = await resolveCityAlias(geo.name, geo.country_name ?? author.country ?? "");
-        if (resolvedCity !== author.city) {
-          updates.city = resolvedCity;
-          changes.push(`city: ${author.city ?? "(null)"} -> ${resolvedCity ?? "(null)"}`);
+        const rorCity = geo.name ?? null;
+        if (rorCity !== author.city) {
+          updates.city = rorCity;
+          changes.push(`city: ${author.city ?? "(null)"} -> ${rorCity ?? "(null)"}`);
         }
       }
       if (geo.country_subdivision_name && geo.country_subdivision_name !== author.state) {

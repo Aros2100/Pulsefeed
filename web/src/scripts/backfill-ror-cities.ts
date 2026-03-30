@@ -19,7 +19,6 @@ for (const line of readFileSync(".env.local", "utf8").split("\n")) {
 }
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { resolveCityAlias } from "@/lib/geo/city-aliases";
 
 const BATCH_SIZE     = 50;
 const BATCH_DELAY_MS = 500;
@@ -132,7 +131,7 @@ async function main() {
       const updates: Record<string, any> = {};
 
       if (geo.name) {
-        updates.city = await resolveCityAlias(geo.name, geo.country_name ?? author.country ?? "");
+        updates.city = geo.name ?? null;
         batchCity++;
       }
 
