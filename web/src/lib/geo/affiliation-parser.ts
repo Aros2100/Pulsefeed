@@ -289,6 +289,13 @@ function parseSingleSegment(
   // "Taiyuan China" → "Taiyuan, China"; "Ann Arbor MI USA" → "Ann Arbor, MI, USA"
   text = normalizeCommas(text);
 
+  // Step 2c: Split on country name directly followed by uppercase letter without separator.
+  // "Denmark Laboratory for..." → "Denmark; Laboratory for..."
+  text = text.replace(
+    new RegExp(`(${CANONICAL_COUNTRIES.map(escapeRegExp).join("|")})\\s+(?=[A-Z])`, "g"),
+    "$1; "
+  );
+
   // Step 3: Clean
   text = text.replace(/\.\s*Electronic address:.*$/i, "").trim();
   text = text.replace(/Electronic address:.*$/i, "").trim();
