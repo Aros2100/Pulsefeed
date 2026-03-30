@@ -81,8 +81,12 @@ export async function POST(request: NextRequest) {
           continent: continent ?? null,
         };
 
-        await admin.from("authors").update(update).eq("id", author.id);
-        updated++;
+        const { error: updateError } = await admin
+          .from("authors")
+          .update(update)
+          .eq("id", author.id);
+        console.log(`[parser-geo-refresh] id=${author.id} updateError=${JSON.stringify(updateError)} update=${JSON.stringify(update)}`);
+        if (!updateError) updated++;
       })
     )
   );
