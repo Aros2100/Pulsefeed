@@ -516,8 +516,15 @@ function parseSingleSegment(
         // Explicit city found — overrides cityFromCountryFallback
         city = rawCity;
         segments.splice(cityIdx, 1);
+      } else if (rawCity) {
+        // Fallback: check city-map (covers cities below 50k population threshold, e.g. Stanford, Otsu)
+        const cityInfo = lookupCity(rawCity);
+        if (cityInfo) {
+          city = cityInfo.city;
+          if (!country) country = cityInfo.country;
+          segments.splice(cityIdx, 1);
+        }
       }
-      // If not found in cityNames, leave cityFromCountryFallback city as-is
     }
   }
 
