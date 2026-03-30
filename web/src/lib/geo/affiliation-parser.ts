@@ -280,6 +280,10 @@ function parseSingleSegment(
 ): ParsedAffiliation | null {
   let text = rawText;
 
+  // Step 2a: Strip "the" before country names that take a definite article in English.
+  // "Rotterdam, the Netherlands" → "Rotterdam, Netherlands" (avoids comma-split into "the" + "Netherlands")
+  text = text.replace(/\bthe\s+(Netherlands|Philippines|Czech Republic|United Arab Emirates|United Kingdom|Gambia|Bahamas|Maldives|Comoros|Seychelles)\b/gi, "$1");
+
   // Step 2b: Insert missing commas before country names / US state abbreviations.
   // "Taiyuan China" → "Taiyuan, China"; "Ann Arbor MI USA" → "Ann Arbor, MI, USA"
   text = normalizeCommas(text);
