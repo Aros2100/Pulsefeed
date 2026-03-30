@@ -234,8 +234,9 @@ function countryCommaRe(): RegExp {
       .map(escapeRegExp);
     // Common country aliases absent from the canonical list
     names.push("USA", "U\\.S\\.A\\.", "U\\.S\\.");
+    // (?<! of) prevents splitting "University of Hong Kong" → "University of, Hong Kong"
     _countryCommaRe = new RegExp(
-      `(?<!,)\\s+(${names.join("|")})(?=[,.]|$)`,
+      `(?<!,)(?<! of)\\s+(${names.join("|")})(?=[,.]|$)`,
       "g"
     );
   }
@@ -510,7 +511,9 @@ function parseSingleSegment(
       if (isAdministrativeRegion(candidate) || isAdministrativeRegion(candidateCleaned)) { cityIdx--; continue; }
       if (candidate.length <= 4 && (US_STATES[candidate.toUpperCase()] || isProvinceCode(candidate))) { cityIdx--; continue; }
       if (isPostalCode(candidate)) { cityIdx--; continue; }
-      if (lookupCountry(candidate) !== null) { cityIdx--; continue; }
+      // Allow city-state-country: if candidate is a country name but country is already set
+      // and matches (e.g. "Hong Kong, Hong Kong"), treat it as city candidate.
+      if (lookupCountry(candidate) !== null && lookupCountry(candidate) !== country) { cityIdx--; continue; }
       if (matchesKeywords(candidate, DEPT_KEYWORDS)) { cityIdx--; continue; }
 
       // Candidate passed guards — try to match as city
