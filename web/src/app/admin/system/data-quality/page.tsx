@@ -167,6 +167,10 @@ type RorRefreshState = {
   status: "idle" | "running" | "done" | "error";
   processed: number; updated: number; skipped: number; error?: string;
 };
+type ParserRefreshState = {
+  status: "idle" | "running" | "done" | "error";
+  processed: number; updated: number; skipped: number; error?: string;
+};
 
 export default function DataQualityPage() {
   const [data, setData] = useState<DQData | null>(null);
@@ -176,6 +180,8 @@ export default function DataQualityPage() {
   const [rorRefresh,  setRorRefresh]  = useState<RorRefreshState>({ status: "idle", processed: 0, updated: 0, skipped: 0 });
   const [rorCountdown, setRorCountdown] = useState<number | null>(null);
   const rorStopRef = useRef(false);
+
+  const [parserRefresh, setParserRefresh] = useState<ParserRefreshState>({ status: "idle", processed: 0, updated: 0, skipped: 0 });
 
   async function handleRorReset() {
     if (!confirm("Dette nulstiller city, state, country, region, continent, geo_source og verified_by på alle forfattere med ROR-id. Er du sikker?")) return;
@@ -236,6 +242,38 @@ export default function DataQualityPage() {
     } catch (e) {
       setRorRefresh({ status: "error", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped, error: String(e) });
       setRorCountdown(null);
+    }
+  }
+
+  async function handleParserRefresh() {
+    if (!confirm("Dette nulstiller og re-beriger geo på alle forfattere UDEN ROR-id via affiliation-parseren. Er du sikker?")) return;
+    setParserRefresh({ status: "running", processed: 0, updated: 0, skipped: 0 });
+    let offset = 0;
+    let totalProcessed = 0, totalUpdated = 0, totalSkipped = 0;
+    let firstBatch = true;
+    try {
+      while (true) {
+        const res  = await fetch("/api/admin/authors/parser-geo-refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ offset, limit: 200, resetFirst: firstBatch }),
+        });
+        const json = await res.json() as { ok: boolean; processed: number; updated: number; skipped: number; nextOffset: number; done: boolean; error?: string };
+        if (!json.ok) {
+          setParserRefresh({ status: "error", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped, error: json.error });
+          return;
+        }
+        firstBatch = false;
+        totalProcessed += json.processed;
+        totalUpdated   += json.updated;
+        totalSkipped   += json.skipped;
+        setParserRefresh({ status: "running", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped });
+        if (json.done) break;
+        offset = json.nextOffset;
+      }
+      setParserRefresh({ status: "done", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped });
+    } catch (e) {
+      setParserRefresh({ status: "error", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped, error: String(e) });
     }
   }
 
@@ -524,6 +562,42 @@ export default function DataQualityPage() {
             <Link href="/admin/system/docs/article-geo" style={{ fontSize: "12px", color: "#5a6a85", textDecoration: "none" }}>
               → Geo pipeline documentation
             </Link>
+          </div>
+        </SectionCard>
+
+        {/* 6 · Parser geo refresh */}
+        <SectionCard number="6" title="Parser geo refresh (forfattere uden ROR-id)">
+          <div style={{ padding: "20px 24px" }}>
+            <p style={{ margin: "0 0 16px", fontSize: "14px", color: "#374151", lineHeight: 1.6 }}>
+              Nulstiller og re-beriger geo-data på alle forfattere <strong>uden</strong> ROR-id via affiliation-parseren.
+              Bruger det nye flow: <code style={{ fontSize: "12px", background: "#f1f3f7", borderRadius: "3px", padding: "1px 4px" }}>parseAffiliation → normalizeGeo → lookupState → getRegion/getContinent</code>.
+            </p>
+            <button
+              onClick={handleParserRefresh}
+              disabled={parserRefresh.status === "running"}
+              style={{
+                padding: "7px 16px", borderRadius: "6px", border: "1px solid #d1d5db",
+                background: parserRefresh.status === "running" ? "#f3f4f6" : "#fff",
+                fontSize: "13px", fontWeight: 600,
+                cursor: parserRefresh.status === "running" ? "not-allowed" : "pointer",
+                color: "#1a1a1a",
+              }}
+            >
+              {parserRefresh.status === "running" ? "Kører…" : "Reset + Run parser geo refresh"}
+            </button>
+            {(parserRefresh.status === "running" || parserRefresh.status === "done") && (
+              <div style={{ marginTop: "10px", fontSize: "13px", color: parserRefresh.status === "done" ? "#15803d" : "#374151", fontWeight: parserRefresh.status === "done" ? 600 : 400 }}>
+                {parserRefresh.status === "done" && "✓ "}
+                {parserRefresh.processed.toLocaleString("da-DK")} behandlet
+                {" · "}{parserRefresh.updated.toLocaleString("da-DK")} opdateret
+                {" · "}{parserRefresh.skipped.toLocaleString("da-DK")} skippet
+              </div>
+            )}
+            {parserRefresh.status === "error" && (
+              <div style={{ marginTop: "10px", fontSize: "13px", color: "#dc2626" }}>
+                Fejl: {parserRefresh.error}
+              </div>
+            )}
           </div>
         </SectionCard>
 
