@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const update: Record<string, any> = {
           geo_source:  "parser",
-          verified_by: "parser",
+          verified_by: "uverificeret",
           city:      city      ?? null,
           state:     state     ?? null,
           country:   country   ?? null,
@@ -85,7 +85,6 @@ export async function POST(request: NextRequest) {
           .from("authors")
           .update(update)
           .eq("id", author.id);
-        console.log(`[parser-geo-refresh] id=${author.id} updateError=${JSON.stringify(updateError)} update=${JSON.stringify(update)}`);
         if (!updateError) updated++;
       })
     )
