@@ -478,6 +478,7 @@ export const CITY_TO_COUNTRY: Record<string, CityInfo> = {
   "bogota": { city: "Bogotá", country: "Colombia" },
   "lima": { city: "Lima", country: "Peru" },
   "mexico city": { city: "Mexico City", country: "Mexico" },
+  "ciudad de mexico": { city: "Mexico City", country: "Mexico" },
   "ciudad de méxico": { city: "Mexico City", country: "Mexico" },
   "monterrey": { city: "Monterrey", country: "Mexico" },
   "guadalajara": { city: "Guadalajara", country: "Mexico" },
