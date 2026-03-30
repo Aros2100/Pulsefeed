@@ -158,7 +158,7 @@ export default function AuthorLinkingDocsPage() {
                   <li style={{ marginBottom: "4px" }}>Match på eksisterende <span style={mono}>openalex_id</span></li>
                   <li style={{ marginBottom: "4px" }}>Match på ORCID</li>
                   <li style={{ marginBottom: "4px" }}>Match på normaliseret navn + land (uden openalex_id)</li>
-                  <li>Fallback: <span style={mono}>resolveAuthorId()</span> — navn-baseret dedup via Levenshtein-distance</li>
+                  <li>Fallback: <span style={mono}>findOrCreateAuthor()</span> — navn-baseret dedup med geo-match</li>
                 </ol>
               </div>
             </div>
@@ -181,7 +181,10 @@ export default function AuthorLinkingDocsPage() {
               <div style={stepContent}>
                 <div style={stepTitle}>Affiliation parsing (fallback)</div>
                 <div style={{ color: "#374151", marginBottom: "6px" }}>
-                  Hvis OpenAlex ikke leverer geo: <span style={mono}>lib/geo/affiliation-parser.ts</span> parses affiliationsteksten og udtrækker city, state, country og institution. <span style={mono}>resolveCityAlias()</span> normaliserer by-navnet mod GeoNames.
+                  Hvis OpenAlex ikke leverer geo: <span style={mono}>lib/geo/affiliation-parser.ts</span> parses affiliationsteksten og udtrækker city, state, country og institution. <span style={mono}>normalizeGeo()</span> normaliserer by-navnet via <span style={mono}>city-map.ts</span> — mangler country, forsøger <span style={mono}>lookupCity()</span> som returnerer både kanonisk by og land.
+                </div>
+                <div style={{ color: "#374151", marginBottom: "6px" }}>
+                  Match kræver fuldt navn + city + country. Svage match-branches er fjernet: branch 2c (merger på navn alene når eksisterende mangler geo), 2d (merger på navn alene når ny mangler geo) og 2.5 (initial-match på initialer) eksisterer ikke længere.
                 </div>
                 <div style={{ color: "#374151" }}>
                   Event: <span style={mono}>geo_parsed</span> med payload <span style={mono}>{"{ city, country, institution, source: \"parser\" }"}</span>.
@@ -219,11 +222,14 @@ export default function AuthorLinkingDocsPage() {
           </div>
           <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: "8px" }}>
             {[
-              "lib/pubmed/importer.ts",
-              "lib/openalex/match-authors.ts",
+              "lib/import/forfatter-import/find-or-create.ts",
+              "lib/import/author-linker.ts",
+              "lib/geo/normalize-geo.ts",
+              "lib/geo/city-map.ts",
               "lib/geo/affiliation-parser.ts",
+              "lib/openalex/match-authors.ts",
               "lib/author-events.ts",
-              "app/api/admin/author-linking/route.ts",
+              "app/api/admin/author-linking/start/route.ts",
             ].map((f) => (
               <span key={f} style={fileLink}>{f}</span>
             ))}
