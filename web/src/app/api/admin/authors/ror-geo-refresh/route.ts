@@ -8,7 +8,7 @@ import { getRegion, getContinent } from "@/lib/geo/continent-map";
 
 const schema = z.object({
   offset: z.number().int().min(0).default(0),
-  limit:  z.number().int().min(1).max(500).default(500),
+  limit:  z.number().int().min(1).max(500).default(200),
 });
 
 export async function POST(request: NextRequest) {
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   }
 
   const rows = (authors ?? []) as { id: string; ror_id: string }[];
-  const limiter = pLimit(5);
+  const limiter = pLimit(2);
 
   let updated = 0;
   let skipped = 0;
@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
   await Promise.all(
     rows.map((author) =>
       limiter(async () => {
+        await new Promise((r) => setTimeout(r, 300));
         const geo = await fetchRorGeo(author.ror_id);
 
         if (!geo.city && !geo.country) {
