@@ -311,6 +311,7 @@ const RAW_COUNTRY_MAP: Record<string, string> = {
   "turkiye": "Turkey",
   "egypt": "Egypt",
   "saudi arabia": "Saudi Arabia",
+  "kingdom of saudi arabia": "Saudi Arabia",
   "iran": "Iran",
   "iraq": "Iraq",
   "pakistan": "Pakistan",
