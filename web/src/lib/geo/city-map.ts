@@ -415,6 +415,8 @@ export const CITY_TO_COUNTRY: Record<string, CityInfo> = {
   "casablanca": { city: "Casablanca", country: "Morocco" },
   "rabat": { city: "Rabat", country: "Morocco" },
   "oujda": { city: "Oujda", country: "Morocco" },
+  "fez": { city: "Fez", country: "Morocco" },
+  "fès": { city: "Fez", country: "Morocco" },
   "tunis": { city: "Tunis", country: "Tunisia" },
   "algiers": { city: "Algiers", country: "Algeria" },
   "lagos": { city: "Lagos", country: "Nigeria" },
