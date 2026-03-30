@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const update: Record<string, any> = {
           geo_source:  "ror",
-          verified_by: "ror",
+          verified_by: "openalex",
         };
         if (geo.city)    update.city      = geo.city;
         if (geo.state)   update.state     = geo.state;
