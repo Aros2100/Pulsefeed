@@ -130,7 +130,7 @@ export default async function CondensationSimulatePage({ searchParams }: Props) 
     <SimulatorClient
       runId={run.id}
       specialty={run.specialty}
-      module="condensation_text"
+      module="condensation"
       baseVersion={run.base_version}
       initialPrompt={run.improved_prompt ?? ""}
       disagreements={disagreements}
