@@ -463,7 +463,7 @@ async function resolveAuthorFromOpenAlex(
         upgrades.institution_type = primaryInst.type;
         if (primaryInst.ror) {
           const rorGeo = await fetchRorGeo(primaryInst.ror);
-          if (rorGeo.city)                      upgrades.city    = await resolveCityAlias(rorGeo.city, rorGeo.country ?? countryName ?? "");
+          if (rorGeo.city)                      upgrades.city    = rorGeo.city;
           if (rorGeo.state)                     upgrades.state   = rorGeo.state;
           if (rorGeo.country && !countryName)   upgrades.country = normalizeCountry(rorGeo.country);
         }
@@ -514,7 +514,7 @@ async function resolveAuthorFromOpenAlex(
       if (instDept) upgrades.department = instDept;
       if (primaryInst?.ror) {
         const rorGeo = await fetchRorGeo(primaryInst.ror);
-        if (rorGeo.city)                    upgrades.city  = await resolveCityAlias(rorGeo.city, rorGeo.country ?? countryName ?? "");
+        if (rorGeo.city)                    upgrades.city  = rorGeo.city;
         if (rorGeo.state)                   upgrades.state = rorGeo.state;
         if (rorGeo.country && !countryName) upgrades.country = normalizeCountry(rorGeo.country);
       }
@@ -553,7 +553,7 @@ async function resolveAuthorFromOpenAlex(
     if (primaryInst?.ror && !resolved.ror_id) {
       enrichment.ror_id = primaryInst.ror;
       const rorGeo = await fetchRorGeo(primaryInst.ror);
-      if (rorGeo.city)    enrichment.city    = await resolveCityAlias(rorGeo.city, rorGeo.country ?? "");
+      if (rorGeo.city)    enrichment.city    = rorGeo.city;
       if (rorGeo.state)   enrichment.state   = rorGeo.state;
       if (rorGeo.country) enrichment.country = normalizeCountry(rorGeo.country);
     }
