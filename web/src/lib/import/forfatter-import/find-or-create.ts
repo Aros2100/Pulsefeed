@@ -454,22 +454,6 @@ async function matchByGeo(
     }
   }
 
-  // 2b2. Same name + same city + same country, different hospital
-  if (parsed.city && parsed.country) {
-    const sameCityCountry = candidates.filter(
-      c => c.city?.toLowerCase() === parsed.city!.toLowerCase()
-        && c.country?.toLowerCase() === parsed.country!.toLowerCase()
-    );
-    if (sameCityCountry.length === 1) {
-      const match = sameCityCountry[0];
-      if (!(newOrcid && match.orcid && newOrcid !== match.orcid)) {
-        if (debugName) console.log(`[GEO-DEBUG ${debugName}] matchByGeo: branch=2b2 (single same city+country) id=${match.id}`);
-        await mergeAuthor(admin, match.id, match, parsed, newOrcid, displayName, "geo", articleId, debugName);
-        return { id: match.id, outcome: "duplicate" };
-      }
-    }
-  }
-
   // 2e. No match — create new author
   if (debugName) console.log(`[GEO-DEBUG ${debugName}] matchByGeo: branch=2e (no match → create new)`);
   return await createNewAuthor(admin, displayName, normalized, newOrcid, primaryAff, affiliations, parsed, openAlexId, articleId, openAlexInstitution, debugName);
