@@ -42,7 +42,7 @@ export async function getCityCache(): Promise<CityCache> {
   const countryMap = new Map<string, string>();
 
   for (const row of data ?? []) {
-    if (!row.name || !row.country || (row.population ?? 0) < 50000) continue;
+    if (!row.name || !row.country || (row.population ?? 0) < 10000) continue;
     const key = row.name.trim().toLowerCase();
     const keyUnaccented = unaccent(key);
     // geo_cities.country stores full English country names (not ISO codes).
