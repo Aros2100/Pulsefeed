@@ -51,28 +51,34 @@ export async function POST(request: NextRequest) {
   }
 
   if (activate && module === "condensation") {
-    await admin
-      .from("articles")
-      .update({
-        short_headline:          null,
-        short_resume:            null,
-        bottom_line:             null,
-        pico_population:         null,
-        pico_intervention:       null,
-        pico_comparison:         null,
-        pico_outcome:            null,
-        sample_size:             null,
-        condensed_model_version: null,
-        condensed_at:            null,
-      })
-      .in("id",
-        admin
-          .from("lab_decisions")
-          .select("article_id")
-          .eq("module", "condensation_text")
-          .eq("decision", "rejected")
-          .not("article_id", "is", null)
-      );
+    const { data: rejectedRows } = await admin
+      .from("lab_decisions")
+      .select("article_id")
+      .eq("module", "condensation_text")
+      .eq("decision", "rejected")
+      .not("article_id", "is", null);
+
+    const rejectedIds = (rejectedRows ?? [])
+      .map((r) => r.article_id)
+      .filter((id): id is string => !!id);
+
+    if (rejectedIds.length > 0) {
+      await admin
+        .from("articles")
+        .update({
+          short_headline:          null,
+          short_resume:            null,
+          bottom_line:             null,
+          pico_population:         null,
+          pico_intervention:       null,
+          pico_comparison:         null,
+          pico_outcome:            null,
+          sample_size:             null,
+          condensed_model_version: null,
+          condensed_at:            null,
+        })
+        .in("id", rejectedIds);
+    }
   }
 
   const { data, error } = await admin
