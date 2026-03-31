@@ -8,7 +8,7 @@ import { getActivePrompt, scoreCondensation, type ActivePrompt } from "@/lib/lab
 
 const CONCURRENCY  = 1;
 const DELAY_MS     = 1300;
-const BATCH_LIMIT  = 100;
+const BATCH_LIMIT  = 10;
 
 const schema = z.object({
   specialty: z.string().refine(
