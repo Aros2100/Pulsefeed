@@ -28,6 +28,13 @@ const CANONICAL_MAP: Record<string, string> = Object.fromEntries(
 );
 
 function toCanonical(stored: string): string | null {
+  // 1. Direct case-insensitive match — canonical names pass through unchanged.
+  const trimmed = stored.trim();
+  const direct = SUBSPECIALTY_OPTIONS.find(
+    (o) => o.toLowerCase() === trimmed.toLowerCase(),
+  );
+  if (direct) return direct;
+  // 2. Legacy comma-format fallback ("Functional, pain and epilepsy surgery").
   return CANONICAL_MAP[normalizeKey(stored)] ?? null;
 }
 
@@ -110,6 +117,8 @@ export default function MeshExplorer({ userSubspecialties, topSubspecialties }: 
   const displaySubs = rawSubs
     .map((s) => toCanonical(s))
     .filter((s): s is string => s !== null);
+
+  console.log("[MeshExplorer] rawSubs →", rawSubs, "| displaySubs →", displaySubs);
 
   const [activeTab, setActiveTab] = useState<string>(displaySubs[0] ?? "");
   const [meshTerms, setMeshTerms] = useState<MeshTerm[] | null>(null);
