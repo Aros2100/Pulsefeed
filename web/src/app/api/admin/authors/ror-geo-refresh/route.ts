@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
     .from("authors")
     .select("id, ror_id")
     .not("ror_id", "is", null)
+    .is("geo_source", null)
     .order("id")
     .range(offset, offset + limit - 1);
 
