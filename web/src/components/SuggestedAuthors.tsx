@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
+
+const SUBSPECIALTY_SET = new Set<string>(SUBSPECIALTY_OPTIONS as unknown as string[]);
 
 interface SuggestedAuthor {
   id: string;
@@ -11,13 +14,19 @@ interface SuggestedAuthor {
   hospital: string | null;
   region: string | null;
   article_count: number;
+  last_article_date: string | null;
+  top_mesh_terms: string[];
 }
 
 interface Props {
-  userRegion: string | null;
+  userSubspecialties: string[] | null;
 }
 
-export default function SuggestedAuthors({ userRegion: _userRegion }: Props) {
+export default function SuggestedAuthors({ userSubspecialties }: Props) {
+  // Filter to canonical subspecialties only (exclude top-level "Neurosurgery")
+  const subTabs = (userSubspecialties ?? []).filter((s) => SUBSPECIALTY_SET.has(s));
+
+  const [activeSubFilter, setActiveSubFilter] = useState<string>("All");
   const [authors, setAuthors] = useState<SuggestedAuthor[]>([]);
   const [loading, setLoading] = useState(true);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
@@ -26,15 +35,24 @@ export default function SuggestedAuthors({ userRegion: _userRegion }: Props) {
 
   useEffect(() => {
     const ctrl = new AbortController();
-    fetch("/api/authors/suggested", { signal: ctrl.signal })
+    setLoading(true);
+    setAuthors([]);
+
+    const url =
+      activeSubFilter === "All"
+        ? "/api/authors/suggested"
+        : `/api/authors/suggested?subspecialty=${encodeURIComponent(activeSubFilter)}`;
+
+    fetch(url, { signal: ctrl.signal })
       .then((r) => r.json())
       .then((data: unknown) => {
         setAuthors((data as { authors?: SuggestedAuthor[] })?.authors ?? []);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+
     return () => ctrl.abort();
-  }, []);
+  }, [activeSubFilter]);
 
   async function dismiss(authorId: string) {
     setDismissed((prev) => new Set([...prev, authorId]));
@@ -48,8 +66,9 @@ export default function SuggestedAuthors({ userRegion: _userRegion }: Props) {
   async function toggleFollow(authorId: string) {
     setFollowLoading((prev) => new Set([...prev, authorId]));
     const isFollowing = followed.has(authorId);
-    const method = isFollowing ? "DELETE" : "POST";
-    const res = await fetch(`/api/authors/${authorId}/follow`, { method });
+    const res = await fetch(`/api/authors/${authorId}/follow`, {
+      method: isFollowing ? "DELETE" : "POST",
+    });
     if (res.ok) {
       setFollowed((prev) => {
         const next = new Set(prev);
@@ -66,7 +85,7 @@ export default function SuggestedAuthors({ userRegion: _userRegion }: Props) {
 
   const visible = authors.filter((a) => !dismissed.has(a.id));
 
-  if (!loading && visible.length === 0) return null;
+  if (!loading && visible.length === 0 && activeSubFilter === "All") return null;
 
   return (
     <div style={{
@@ -76,21 +95,57 @@ export default function SuggestedAuthors({ userRegion: _userRegion }: Props) {
       padding: "24px 28px",
     }}>
       {/* Header */}
-      <div style={{ marginBottom: "20px" }}>
+      <div style={{ marginBottom: subTabs.length > 0 ? "16px" : "20px" }}>
         <div style={{ fontSize: "15px", fontWeight: 700, color: "#1e293b", marginBottom: "4px" }}>
           Interesting authors for you
         </div>
         <div style={{ fontSize: "12px", color: "#94a3b8" }}>
-          Researchers publishing in your subspecialties from other regions
+          Researchers publishing in your subspecialties from other countries
         </div>
       </div>
+
+      {/* Subspecialty tabs */}
+      {subTabs.length > 0 && (
+        <div style={{
+          display: "flex", gap: "4px", flexWrap: "wrap",
+          marginBottom: "20px",
+        }}>
+          {["All", ...subTabs].map((tab) => {
+            const isActive = activeSubFilter === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveSubFilter(tab)}
+                style={{
+                  padding: "5px 12px",
+                  fontSize: "12px",
+                  fontWeight: isActive ? 600 : 500,
+                  color: isActive ? "#fff" : "#64748b",
+                  background: isActive
+                    ? "linear-gradient(135deg, #c0392b, #a93226)"
+                    : "#f1f5f9",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  fontFamily: "inherit",
+                  boxShadow: isActive ? "0 2px 6px rgba(192,57,43,0.25)" : "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {tab}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Skeleton */}
       {loading && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
           {[...Array(4)].map((_, i) => (
             <div key={i} style={{
-              height: "96px", borderRadius: "10px",
+              height: "120px", borderRadius: "10px",
               background: "linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)",
               backgroundSize: "200% 100%",
               animation: "shimmer 1.4s infinite",
@@ -99,8 +154,15 @@ export default function SuggestedAuthors({ userRegion: _userRegion }: Props) {
         </div>
       )}
 
+      {/* Empty state for specific tab */}
+      {!loading && visible.length === 0 && activeSubFilter !== "All" && (
+        <div style={{ fontSize: "13px", color: "#94a3b8", textAlign: "center", padding: "24px 0" }}>
+          No suggestions for this subspecialty yet.
+        </div>
+      )}
+
       {/* Cards */}
-      {!loading && (
+      {!loading && visible.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
           {visible.map((author) => {
             const isFollowing = followed.has(author.id);
@@ -116,11 +178,11 @@ export default function SuggestedAuthors({ userRegion: _userRegion }: Props) {
                   padding: "14px 16px",
                   display: "flex",
                   flexDirection: "column",
-                  gap: "8px",
+                  gap: "6px",
                   transition: "opacity 0.2s ease",
                 }}
               >
-                {/* Dismiss button */}
+                {/* Dismiss */}
                 <button
                   onClick={() => dismiss(author.id)}
                   title="Not interested"
@@ -148,24 +210,52 @@ export default function SuggestedAuthors({ userRegion: _userRegion }: Props) {
                   {author.display_name}
                 </Link>
 
-                {/* Meta */}
+                {/* Location + hospital */}
                 <div style={{ fontSize: "11px", color: "#64748b", lineHeight: 1.4 }}>
                   {location && <div>{location}</div>}
                   {author.hospital && (
                     <div style={{
-                      maxWidth: "100%", overflow: "hidden",
-                      textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      color: "#94a3b8",
+                      overflow: "hidden", textOverflow: "ellipsis",
+                      whiteSpace: "nowrap", color: "#94a3b8",
                     }}>
                       {author.hospital}
                     </div>
                   )}
-                  <div style={{ color: "#94a3b8", marginTop: "2px" }}>
+                  <div style={{ color: "#94a3b8", marginTop: "1px" }}>
                     {author.article_count} articles
+                    {author.last_article_date && (
+                      <span style={{ marginLeft: "6px" }}>
+                        · Last published: {author.last_article_date}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                {/* Follow button */}
+                {/* MeSH chips */}
+                {author.top_mesh_terms?.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "2px" }}>
+                    {author.top_mesh_terms.map((term) => (
+                      <span
+                        key={term}
+                        style={{
+                          display: "inline-block",
+                          padding: "2px 8px",
+                          fontSize: "10px",
+                          fontWeight: 500,
+                          color: "#475569",
+                          background: "#f1f5f9",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: "12px",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {term}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Follow */}
                 <button
                   onClick={() => toggleFollow(author.id)}
                   disabled={isFollowLoading}
@@ -178,6 +268,7 @@ export default function SuggestedAuthors({ userRegion: _userRegion }: Props) {
                     color: isFollowing ? "#15803d" : "#5a6a85",
                     cursor: isFollowLoading ? "wait" : "pointer",
                     transition: "all 0.15s ease",
+                    marginTop: "2px",
                   }}
                 >
                   {isFollowing ? "Following ✓" : "Follow"}
@@ -190,7 +281,7 @@ export default function SuggestedAuthors({ userRegion: _userRegion }: Props) {
 
       <style>{`
         @keyframes shimmer {
-          0% { background-position: 200% 0; }
+          0%   { background-position: 200% 0; }
           100% { background-position: -200% 0; }
         }
       `}</style>

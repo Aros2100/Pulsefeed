@@ -71,7 +71,7 @@ export default async function DashboardPage() {
 
         {/* Suggested Authors */}
         <div style={{ marginTop: "28px" }}>
-          <SuggestedAuthors userRegion={userRegion} />
+          <SuggestedAuthors userSubspecialties={userSubspecialties} />
         </div>
 
         {/* Article Filter Panel */}
