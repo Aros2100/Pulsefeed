@@ -238,9 +238,9 @@ export async function scoreCondensation(
       sample_size?: unknown;
     };
 
-    const short_headline = typeof parsed.short_headline === "string" ? parsed.short_headline.slice(0, 100) : "";
-    const short_resume   = typeof parsed.short_resume === "string"   ? parsed.short_resume.slice(0, 500)   : "";
-    const bottom_line    = typeof parsed.bottom_line === "string"    ? parsed.bottom_line.slice(0, 200)    : "";
+    const short_headline = typeof parsed.short_headline === "string" ? parsed.short_headline : "";
+    const short_resume   = typeof parsed.short_resume === "string"   ? parsed.short_resume   : "";
+    const bottom_line    = typeof parsed.bottom_line === "string"    ? parsed.bottom_line    : "";
 
     const pico_population   = typeof parsed.pico_population === "string"   ? parsed.pico_population   : null;
     const pico_intervention = typeof parsed.pico_intervention === "string" ? parsed.pico_intervention : null;
