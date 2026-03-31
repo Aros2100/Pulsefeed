@@ -49,7 +49,6 @@ export async function POST(request: NextRequest) {
   await Promise.all(
     rows.map((author) =>
       limiter(async () => {
-        await new Promise((r) => setTimeout(r, 300));
         const geo = await fetchRorGeo(author.ror_id);
 
         if (!geo.city && !geo.country) {
