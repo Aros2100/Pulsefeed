@@ -219,7 +219,7 @@ export async function scoreCondensation(
 
   const message = await trackedCall(`condensation_${activePrompt.version}`, {
     model: SCORING_MODEL,
-    max_tokens: 1024,
+    max_tokens: 2048,
     messages: [{ role: "user", content }],
   }, article.id, "condensation");
 
