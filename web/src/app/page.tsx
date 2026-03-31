@@ -3,6 +3,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import KPIOverview from "@/components/KPIOverview";
 import ArticleFilterPanel from "@/components/ArticleFilterPanel";
+import MeshExplorer from "@/components/MeshExplorer";
+import SuggestedAuthors from "@/components/SuggestedAuthors";
 import { getRegion } from "@/lib/geo/continent-map";
 
 function greeting() {
@@ -58,6 +60,19 @@ export default async function DashboardPage() {
 
         {/* KPI Overview */}
         <KPIOverview userSubspecialties={userSubspecialties} />
+
+        {/* MeSH Explorer */}
+        <div style={{ marginTop: "28px" }}>
+          <MeshExplorer
+            userSubspecialties={userSubspecialties}
+            topSubspecialties={topSubspecialties}
+          />
+        </div>
+
+        {/* Suggested Authors */}
+        <div style={{ marginTop: "28px" }}>
+          <SuggestedAuthors userRegion={userRegion} />
+        </div>
 
         {/* Article Filter Panel */}
         <div style={{ marginTop: "28px" }}>
