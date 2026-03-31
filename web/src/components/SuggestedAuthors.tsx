@@ -97,7 +97,7 @@ export default function SuggestedAuthors({ userSubspecialties }: Props) {
       {/* Header */}
       <div style={{ marginBottom: subTabs.length > 0 ? "16px" : "20px" }}>
         <div style={{ fontSize: "15px", fontWeight: 700, color: "#1e293b", marginBottom: "4px" }}>
-          Interesting authors for you
+          Interesting authors for you to follow
         </div>
         <div style={{ fontSize: "12px", color: "#94a3b8" }}>
           Researchers publishing in your subspecialties from other countries
@@ -172,7 +172,6 @@ export default function SuggestedAuthors({ userSubspecialties }: Props) {
               <div
                 key={author.id}
                 style={{
-                  position: "relative",
                   border: "1px solid #e2e8f0",
                   borderRadius: "10px",
                   padding: "14px 16px",
@@ -182,33 +181,49 @@ export default function SuggestedAuthors({ userSubspecialties }: Props) {
                   transition: "opacity 0.2s ease",
                 }}
               >
-                {/* Dismiss */}
-                <button
-                  onClick={() => dismiss(author.id)}
-                  title="Not interested"
-                  style={{
-                    position: "absolute", top: "10px", right: "10px",
-                    background: "none", border: "none", cursor: "pointer",
-                    color: "#cbd5e1", fontSize: "14px", lineHeight: 1,
-                    padding: "2px 4px", borderRadius: "4px",
-                    transition: "color 0.15s",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "#94a3b8")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "#cbd5e1")}
-                >
-                  ×
-                </button>
-
-                {/* Name */}
-                <Link
-                  href={`/authors/${author.id}`}
-                  style={{
-                    fontSize: "13px", fontWeight: 700, color: "#1e293b",
-                    textDecoration: "none", paddingRight: "20px", lineHeight: 1.3,
-                  }}
-                >
-                  {author.display_name}
-                </Link>
+                {/* Name + follow + dismiss */}
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+                  <Link
+                    href={`/authors/${author.id}`}
+                    style={{
+                      fontSize: "13px", fontWeight: 700, color: "#1e293b",
+                      textDecoration: "none", lineHeight: 1.3,
+                    }}
+                  >
+                    {author.display_name}
+                  </Link>
+                  <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+                    <button
+                      onClick={() => toggleFollow(author.id)}
+                      disabled={isFollowLoading}
+                      style={{
+                        fontSize: "11px", fontWeight: 600,
+                        padding: "4px 12px", borderRadius: "6px",
+                        border: isFollowing ? "1px solid #bbf7d0" : "1px solid #dde3ed",
+                        background: isFollowing ? "#f0fdf4" : "#f8fafc",
+                        color: isFollowing ? "#15803d" : "#5a6a85",
+                        cursor: isFollowLoading ? "wait" : "pointer",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {isFollowing ? "Following ✓" : "Follow"}
+                    </button>
+                    <button
+                      onClick={() => dismiss(author.id)}
+                      title="Not interested"
+                      style={{
+                        background: "none", border: "none", cursor: "pointer",
+                        color: "#cbd5e1", fontSize: "14px", lineHeight: 1,
+                        padding: "2px 4px", borderRadius: "4px",
+                        transition: "color 0.15s",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "#94a3b8")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "#cbd5e1")}
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
 
                 {/* Location + hospital */}
                 <div style={{ fontSize: "11px", color: "#64748b", lineHeight: 1.4 }}>
@@ -255,24 +270,6 @@ export default function SuggestedAuthors({ userSubspecialties }: Props) {
                   </div>
                 )}
 
-                {/* Follow */}
-                <button
-                  onClick={() => toggleFollow(author.id)}
-                  disabled={isFollowLoading}
-                  style={{
-                    alignSelf: "flex-start",
-                    fontSize: "11px", fontWeight: 600,
-                    padding: "4px 12px", borderRadius: "6px",
-                    border: isFollowing ? "1px solid #bbf7d0" : "1px solid #dde3ed",
-                    background: isFollowing ? "#f0fdf4" : "#f8fafc",
-                    color: isFollowing ? "#15803d" : "#5a6a85",
-                    cursor: isFollowLoading ? "wait" : "pointer",
-                    transition: "all 0.15s ease",
-                    marginTop: "2px",
-                  }}
-                >
-                  {isFollowing ? "Following ✓" : "Follow"}
-                </button>
               </div>
             );
           })}
