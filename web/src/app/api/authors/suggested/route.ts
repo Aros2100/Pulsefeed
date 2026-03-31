@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getRegion } from "@/lib/geo/continent-map";
 
 export async function GET(_request: NextRequest) {
   const supabase = await createClient();
@@ -13,12 +12,10 @@ export async function GET(_request: NextRequest) {
     .eq("id", user.id)
     .single();
 
-  const userRegion = profile?.country ? getRegion(profile.country as string) : null;
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any).rpc("get_suggested_authors", {
     p_user_id: user.id,
-    p_user_region: userRegion ?? null,
+    p_user_country: (profile?.country as string | null) ?? null,
   });
 
   if (error) return NextResponse.json({ authors: [] }, { status: 500 });
