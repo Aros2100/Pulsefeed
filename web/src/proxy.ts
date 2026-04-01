@@ -65,6 +65,13 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Allow terminal scripts authenticated via ADMIN_SECRET bearer token
+  const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (adminSecret && bearer === adminSecret) {
+    return supabaseResponse;
+  }
+
   // Protected route + not logged in → redirect to /login
   if (!user && !isPublicPath(pathname)) {
     const loginUrl = request.nextUrl.clone();
