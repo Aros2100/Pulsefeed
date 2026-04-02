@@ -545,9 +545,9 @@ export default function ArticleTypeAdminClient({
                     />
                   </th>
                   <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5a6a85" }}>Titel</th>
-                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5a6a85", whiteSpace: "nowrap" }}>Journal</th>
-                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5a6a85", whiteSpace: "nowrap" }}>Artikel type</th>
-                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5a6a85" }}>Publication types</th>
+                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5a6a85", width: "120px" }}>Journal</th>
+                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5a6a85", width: "140px" }}>Artikel type</th>
+                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5a6a85", width: "220px" }}>Publication types</th>
                 </tr>
               </thead>
               <tbody>
@@ -577,7 +577,7 @@ export default function ArticleTypeAdminClient({
                             style={{ cursor: "pointer" }}
                           />
                         </td>
-                        <td style={{ padding: "10px 16px", maxWidth: "360px" }}>
+                        <td style={{ padding: "10px 16px" }}>
                           <a
                             href={`/admin/articles/${article.id}`}
                             target="_blank"
@@ -587,7 +587,7 @@ export default function ArticleTypeAdminClient({
                               lineHeight: 1.4,
                               color: "#1a1a1a",
                               textDecoration: "none",
-                              fontWeight: 500,
+                              fontWeight: 600,
                               borderBottom: "1px solid transparent",
                             }}
                             onMouseEnter={(e) => (e.currentTarget.style.borderBottomColor = "#1a1a1a")}
@@ -596,7 +596,7 @@ export default function ArticleTypeAdminClient({
                             {article.title}
                           </a>
                         </td>
-                        <td style={{ padding: "10px 16px", color: "#5a6a85", whiteSpace: "nowrap" }}>
+                        <td style={{ padding: "10px 16px", width: "120px", fontSize: "12px", color: "#94a3b8" }}>
                           {article.journal_abbr ?? "—"}
                         </td>
                         <td style={{ padding: "10px 16px", whiteSpace: "nowrap" }}>
