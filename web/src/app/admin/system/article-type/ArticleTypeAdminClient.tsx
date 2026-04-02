@@ -162,6 +162,7 @@ export default function ArticleTypeAdminClient({
   const [pendingFilter,   setPendingFilter]   = useState<string>("All");
   const [selectedIds,     setSelectedIds]     = useState<Set<string>>(new Set());
   const [approving,       setApproving]       = useState(false);
+  const [loadingFilter,   setLoadingFilter]   = useState(false);
 
   /* ── Derived state ──────────────────────────────────────────── */
 
@@ -197,15 +198,31 @@ export default function ArticleTypeAdminClient({
     return map;
   }, [pendingCountsProp]);
 
-  const filteredPending = useMemo(
-    () => pendingFilter === "All"
-      ? pendingList
-      : pendingList.filter((a) => a.article_type_ai === pendingFilter),
-    [pendingList, pendingFilter]
-  );
+  // pendingList already contains the right articles for the active filter (fetched from server)
+  const filteredPending = pendingList;
 
   const allFilteredSelected =
     filteredPending.length > 0 && filteredPending.every((a) => selectedIds.has(a.id));
+
+  async function handleCategoryChange(category: string) {
+    setPendingFilter(category);
+    setSelectedIds(new Set());
+    if (category === "All") {
+      // Reset to pre-loaded full list
+      setPendingList(pendingApproval);
+      return;
+    }
+    setLoadingFilter(true);
+    try {
+      const res = await fetch(`/api/admin/article-type/pending?category=${encodeURIComponent(category)}`);
+      const data = await res.json() as { articles?: PendingArticle[] };
+      setPendingList(data.articles ?? []);
+    } catch {
+      showToast("Kunne ikke hente artikler", false);
+    } finally {
+      setLoadingFilter(false);
+    }
+  }
 
   function toggleSelectAll() {
     setSelectedIds((prev) => {
@@ -471,7 +488,7 @@ export default function ArticleTypeAdminClient({
           }}>
             <select
               value={pendingFilter}
-              onChange={(e) => { setPendingFilter(e.target.value); setSelectedIds(new Set()); }}
+              onChange={(e) => { void handleCategoryChange(e.target.value); }}
               style={{
                 fontSize: "13px",
                 border: "1px solid #dde3ed",
@@ -492,7 +509,7 @@ export default function ArticleTypeAdminClient({
                 ))}
             </select>
             <span style={{ fontSize: "12px", color: "#94a3b8", marginLeft: "auto" }}>
-              {selectedIds.size > 0 && `${selectedIds.size} valgt`}
+              {loadingFilter ? "Henter…" : selectedIds.size > 0 ? `${selectedIds.size} valgt` : ""}
             </span>
             <button
               type="button"
