@@ -557,16 +557,26 @@ export default function ArticleTypeAdminClient({
                           />
                         </td>
                         <td style={{ padding: "10px 16px", maxWidth: "360px" }}>
-                          <span style={{
-                            display: "-webkit-box",
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: "vertical",
-                            overflow: "hidden",
-                            lineHeight: 1.4,
-                            color: "#1a1a1a",
-                          }}>
+                          <a
+                            href={`/admin/articles/${article.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: "-webkit-box",
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                              lineHeight: 1.4,
+                              color: "#1a1a1a",
+                              textDecoration: "none",
+                              fontWeight: 500,
+                              borderBottom: "1px solid transparent",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.borderBottomColor = "#1a1a1a")}
+                            onMouseLeave={(e) => (e.currentTarget.style.borderBottomColor = "transparent")}
+                          >
                             {article.title}
-                          </span>
+                          </a>
                         </td>
                         <td style={{ padding: "10px 16px", color: "#5a6a85", whiteSpace: "nowrap" }}>
                           {article.journal_abbr ?? "—"}
