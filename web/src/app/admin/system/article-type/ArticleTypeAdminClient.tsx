@@ -430,7 +430,7 @@ export default function ArticleTypeAdminClient({
       {/* ── View switcher ────────────────────────────────────────── */}
       <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
         {(["rules", "pending"] as const).map((v) => {
-          const label = v === "rules" ? "Regler" : `Pending godkendelse (${pendingList.length.toLocaleString("da-DK")})`;
+          const label = v === "rules" ? "Regler" : `Pending godkendelse (${pendingApprovalCount.toLocaleString("da-DK")})`;
           const isActive = view === v;
           return (
             <button
