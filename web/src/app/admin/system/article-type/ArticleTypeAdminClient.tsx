@@ -135,12 +135,14 @@ export default function ArticleTypeAdminClient({
   initialRules,
   pendingApproval,
   pendingApprovalCount,
+  behandlet,
 }: {
   pending: number;
   deterministic: number;
   initialRules: Rule[];
   pendingApproval: PendingArticle[];
   pendingApprovalCount: number;
+  behandlet: number;
 }) {
   const [rules,           setRules]           = useState<Rule[]>(initialRules);
   const [activeTab,       setActiveTab]       = useState<string>(ARTICLE_TYPE_OPTIONS[0]);
@@ -397,8 +399,9 @@ export default function ArticleTypeAdminClient({
       <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
         {([
           { label: "Afventer scoring",      value: pending,              color: "#BA7517" },
+          { label: "Deterministisk scoret", value: deterministic,        color: "#5a6a85" },
           { label: "Afventer godkendelse",  value: pendingApprovalCount, color: "#b45309" },
-          { label: "Deterministisk scoret", value: deterministic,        color: "#3B6D11" },
+          { label: "Behandlet",             value: behandlet,            color: "#3B6D11" },
         ] as const).map((kpi) => (
           <div key={kpi.label} style={{
             background: "#fff",

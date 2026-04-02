@@ -12,7 +12,7 @@ type Rule = {
 export default async function ArticleTypeSystemPage() {
   const admin = createAdminClient();
 
-  const [pendingRes, deterministicRes, rulesRes, pendingApprovalRes, pendingApprovalCountRes] = await Promise.all([
+  const [pendingRes, deterministicRes, rulesRes, pendingApprovalRes, pendingApprovalCountRes, behandletRes] = await Promise.all([
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (admin as any).rpc("count_article_type_pending"),
 
@@ -32,6 +32,11 @@ export default async function ArticleTypeSystemPage() {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (admin as any).rpc("count_article_type_pending_approval"),
+
+    admin
+      .from("articles")
+      .select("*", { count: "exact", head: true })
+      .eq("article_type_validated", true),
   ]);
 
   const pending              = (pendingRes.data as number) ?? 0;
@@ -40,6 +45,7 @@ export default async function ArticleTypeSystemPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pendingApproval      = (pendingApprovalRes.data ?? []) as any[];
   const pendingApprovalCount = (pendingApprovalCountRes.data as number) ?? 0;
+  const behandlet            = behandletRes.count ?? 0;
 
   return (
     <div style={{ background: "#f5f7fa", minHeight: "100vh" }}>
@@ -67,6 +73,7 @@ export default async function ArticleTypeSystemPage() {
         initialRules={rules}
         pendingApproval={pendingApproval}
         pendingApprovalCount={pendingApprovalCount}
+        behandlet={behandlet}
       />
     </div>
   );
