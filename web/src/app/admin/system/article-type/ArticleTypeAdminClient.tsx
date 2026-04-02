@@ -397,7 +397,7 @@ export default function ArticleTypeAdminClient({
       <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
         {([
           { label: "Afventer scoring",      value: pending,              color: "#BA7517" },
-          { label: "Afventer godkendelse",  value: pendingList.length,   color: "#b45309" },
+          { label: "Afventer godkendelse",  value: pendingApprovalCount, color: "#b45309" },
           { label: "Deterministisk scoret", value: deterministic,        color: "#3B6D11" },
         ] as const).map((kpi) => (
           <div key={kpi.label} style={{
