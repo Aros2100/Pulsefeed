@@ -12,13 +12,9 @@ type Rule = {
 export default async function ArticleTypeSystemPage() {
   const admin = createAdminClient();
 
-  const [pendingRes, deterministicRes, rulesRes] = await Promise.all([
-    admin
-      .from("articles")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "approved")
-      .not("abstract", "is", null)
-      .is("article_type_ai", null),
+  const [pendingRes, deterministicRes, rulesRes, pendingApprovalRes] = await Promise.all([
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (admin as any).rpc("count_article_type_pending"),
 
     admin
       .from("articles")
@@ -30,11 +26,17 @@ export default async function ArticleTypeSystemPage() {
       .select("*")
       .order("article_type", { ascending: true })
       .order("publication_type", { ascending: true }),
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (admin as any).rpc("get_article_type_pending_approval"),
   ]);
 
-  const pending       = pendingRes.count ?? 0;
-  const deterministic = deterministicRes.count ?? 0;
-  const rules         = (rulesRes.data ?? []) as Rule[];
+  const pending             = (pendingRes.data as number) ?? 0;
+  const deterministic       = deterministicRes.count ?? 0;
+  const rules               = (rulesRes.data ?? []) as Rule[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pendingApproval     = (pendingApprovalRes.data ?? []) as any[];
+  const pendingApprovalCount = pendingApproval.length;
 
   return (
     <div style={{ background: "#f5f7fa", minHeight: "100vh" }}>
@@ -60,6 +62,8 @@ export default async function ArticleTypeSystemPage() {
         pending={pending}
         deterministic={deterministic}
         initialRules={rules}
+        pendingApproval={pendingApproval}
+        pendingApprovalCount={pendingApprovalCount}
       />
     </div>
   );

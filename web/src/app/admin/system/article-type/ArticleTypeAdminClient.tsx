@@ -84,6 +84,16 @@ type Rule = {
   is_active: boolean;
 };
 
+type PendingArticle = {
+  id: string;
+  title: string;
+  journal_abbr: string | null;
+  published_date: string | null;
+  article_type_ai: string | null;
+  article_type_confidence: number | null;
+  publication_types: string[] | null;
+};
+
 type ScoringState =
   | { status: "idle" }
   | { status: "running"; scored: number; total: number }
@@ -123,20 +133,31 @@ export default function ArticleTypeAdminClient({
   pending,
   deterministic,
   initialRules,
+  pendingApproval,
+  pendingApprovalCount,
 }: {
   pending: number;
   deterministic: number;
   initialRules: Rule[];
+  pendingApproval: PendingArticle[];
+  pendingApprovalCount: number;
 }) {
-  const [rules,         setRules]         = useState<Rule[]>(initialRules);
-  const [activeTab,     setActiveTab]     = useState<string>(ARTICLE_TYPE_OPTIONS[0]);
-  const [scoring,       setScoring]       = useState<ScoringState>({ status: "idle" });
-  const [toast,         setToast]         = useState<{ msg: string; ok: boolean } | null>(null);
-  const [newPubType,    setNewPubType]    = useState("");
-  const [busyAdd,       setBusyAdd]       = useState(false);
-  const [busyDeleteId,  setBusyDeleteId]  = useState<string | null>(null);
-  const [hoveredFjernId, setHoveredFjernId] = useState<string | null>(null);
-  const [hoveredRowId,   setHoveredRowId]   = useState<string | null>(null);
+  const [rules,           setRules]           = useState<Rule[]>(initialRules);
+  const [activeTab,       setActiveTab]       = useState<string>(ARTICLE_TYPE_OPTIONS[0]);
+  const [scoring,         setScoring]         = useState<ScoringState>({ status: "idle" });
+  const [toast,           setToast]           = useState<{ msg: string; ok: boolean } | null>(null);
+  const [newPubType,      setNewPubType]      = useState("");
+  const [busyAdd,         setBusyAdd]         = useState(false);
+  const [busyDeleteId,    setBusyDeleteId]    = useState<string | null>(null);
+  const [hoveredFjernId,  setHoveredFjernId]  = useState<string | null>(null);
+  const [hoveredRowId,    setHoveredRowId]    = useState<string | null>(null);
+
+  /* ── Pending approval state ─────────────────────────────────── */
+  const [view,            setView]            = useState<"rules" | "pending">("rules");
+  const [pendingList,     setPendingList]     = useState<PendingArticle[]>(pendingApproval);
+  const [pendingFilter,   setPendingFilter]   = useState<string>("All");
+  const [selectedIds,     setSelectedIds]     = useState<Set<string>>(new Set());
+  const [approving,       setApproving]       = useState(false);
 
   /* ── Derived state ──────────────────────────────────────────── */
 
@@ -160,6 +181,47 @@ export default function ArticleTypeAdminClient({
   );
 
   const activeRules = grouped[activeTab] ?? [];
+
+  /* ── Pending approval derived ───────────────────────────────── */
+
+  const pendingCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const a of pendingList) {
+      const t = a.article_type_ai ?? "Unknown";
+      map[t] = (map[t] ?? 0) + 1;
+    }
+    return map;
+  }, [pendingList]);
+
+  const filteredPending = useMemo(
+    () => pendingFilter === "All"
+      ? pendingList
+      : pendingList.filter((a) => a.article_type_ai === pendingFilter),
+    [pendingList, pendingFilter]
+  );
+
+  const allFilteredSelected =
+    filteredPending.length > 0 && filteredPending.every((a) => selectedIds.has(a.id));
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allFilteredSelected) {
+        filteredPending.forEach((a) => next.delete(a.id));
+      } else {
+        filteredPending.forEach((a) => next.add(a.id));
+      }
+      return next;
+    });
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
 
   /* ── Helpers ────────────────────────────────────────────────── */
 
@@ -262,6 +324,30 @@ export default function ArticleTypeAdminClient({
     }
   }
 
+  /* ── Batch approve ──────────────────────────────────────────── */
+
+  async function handleApprove() {
+    if (selectedIds.size === 0) return;
+    setApproving(true);
+    const ids = [...selectedIds];
+    try {
+      const res = await fetch("/api/admin/article-type/batch-approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ articleIds: ids }),
+      });
+      const data = await res.json() as { ok: boolean; error?: string };
+      if (!res.ok || !data.ok) { showToast(data.error ?? "Fejl", false); return; }
+      setPendingList((prev) => prev.filter((a) => !selectedIds.has(a.id)));
+      setSelectedIds(new Set());
+      showToast(`${ids.length} artikler godkendt`, true);
+    } catch {
+      showToast("Netværksfejl", false);
+    } finally {
+      setApproving(false);
+    }
+  }
+
   /* ── Render ─────────────────────────────────────────────────── */
 
   return (
@@ -274,7 +360,7 @@ export default function ArticleTypeAdminClient({
       {toast && <Toast toast={toast} />}
 
       {/* ── Scoring button row ──────────────────────────────────── */}
-      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+      {view === "rules" && <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
         {scoring.status === "running" && (
           <span style={{ fontSize: "12px", color: "#5a6a85" }}>
             {scoring.scored} / {scoring.total}…
@@ -305,20 +391,21 @@ export default function ArticleTypeAdminClient({
         >
           {scoring.status === "running" ? "Kører…" : "Kør scoring"}
         </button>
-      </div>
+      </div>}
 
       {/* ── KPIs ────────────────────────────────────────────────── */}
       <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
         {([
-          { label: "Afventer scoring",      value: pending,       color: "#BA7517" },
-          { label: "Deterministisk scoret", value: deterministic, color: "#3B6D11" },
+          { label: "Afventer scoring",      value: pending,              color: "#BA7517" },
+          { label: "Afventer godkendelse",  value: pendingList.length,   color: "#b45309" },
+          { label: "Deterministisk scoret", value: deterministic,        color: "#3B6D11" },
         ] as const).map((kpi) => (
           <div key={kpi.label} style={{
             background: "#fff",
             borderRadius: "10px",
             boxShadow: SHADOW,
             padding: "20px 28px",
-            flex: "1 1 180px",
+            flex: "1 1 160px",
           }}>
             <div style={{
               fontSize: "11px",
@@ -337,8 +424,183 @@ export default function ArticleTypeAdminClient({
         ))}
       </div>
 
+      {/* ── View switcher ────────────────────────────────────────── */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+        {(["rules", "pending"] as const).map((v) => {
+          const label = v === "rules" ? "Regler" : `Pending godkendelse (${pendingList.length.toLocaleString("da-DK")})`;
+          const isActive = view === v;
+          return (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setView(v)}
+              style={{
+                fontSize: "13px",
+                fontWeight: isActive ? 700 : 500,
+                padding: "7px 18px",
+                borderRadius: "7px",
+                border: isActive ? "none" : "1px solid #dde3ed",
+                background: isActive ? "#1a1a1a" : "#fff",
+                color: isActive ? "#fff" : "#5a6a85",
+                cursor: "pointer",
+                boxShadow: isActive ? SHADOW : "none",
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* ── Main rules card ──────────────────────────────────────── */}
-      <div style={{
+      {view === "pending" && (
+        <div style={{ background: "#fff", borderRadius: "10px", boxShadow: SHADOW, overflow: "hidden" }}>
+          {/* Filter + approve bar */}
+          <div style={{
+            padding: "14px 20px",
+            borderBottom: "1px solid #dde3ed",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            flexWrap: "wrap",
+          }}>
+            <select
+              value={pendingFilter}
+              onChange={(e) => { setPendingFilter(e.target.value); setSelectedIds(new Set()); }}
+              style={{
+                fontSize: "13px",
+                border: "1px solid #dde3ed",
+                borderRadius: "7px",
+                padding: "6px 12px",
+                background: "#fff",
+                color: "#1a1a1a",
+                cursor: "pointer",
+                fontFamily: "Inter, sans-serif",
+                outline: "none",
+              }}
+            >
+              <option value="All">Alle kategorier ({pendingList.length.toLocaleString("da-DK")})</option>
+              {Object.entries(pendingCounts)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([type, count]) => (
+                  <option key={type} value={type}>{type} ({count.toLocaleString("da-DK")})</option>
+                ))}
+            </select>
+            <span style={{ fontSize: "12px", color: "#94a3b8", marginLeft: "auto" }}>
+              {selectedIds.size > 0 && `${selectedIds.size} valgt`}
+            </span>
+            <button
+              type="button"
+              onClick={() => void handleApprove()}
+              disabled={selectedIds.size === 0 || approving}
+              style={{
+                fontSize: "13px",
+                fontWeight: 600,
+                padding: "7px 18px",
+                borderRadius: "7px",
+                border: "none",
+                background: selectedIds.size === 0 || approving ? "#e2e8f0" : "#3B6D11",
+                color: selectedIds.size === 0 || approving ? "#94a3b8" : "#fff",
+                cursor: selectedIds.size === 0 || approving ? "not-allowed" : "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {approving ? "Godkender…" : `Godkend valgte (${selectedIds.size})`}
+            </button>
+          </div>
+
+          {/* Table */}
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+              <thead>
+                <tr style={{ background: "#f8fafc", borderBottom: "1px solid #dde3ed" }}>
+                  <th style={{ padding: "10px 16px", textAlign: "left", width: "36px" }}>
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={toggleSelectAll}
+                      style={{ cursor: "pointer" }}
+                    />
+                  </th>
+                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5a6a85" }}>Titel</th>
+                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5a6a85", whiteSpace: "nowrap" }}>Journal</th>
+                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5a6a85", whiteSpace: "nowrap" }}>Artikel type</th>
+                  <th style={{ padding: "10px 16px", textAlign: "right", fontWeight: 600, color: "#5a6a85", whiteSpace: "nowrap" }}>Confidence</th>
+                  <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5a6a85" }}>Publication types</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPending.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: "32px", textAlign: "center", color: "#94a3b8" }}>
+                      {pendingList.length === 0 ? "Ingen artikler afventer godkendelse" : "Ingen artikler i denne kategori"}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPending.map((article) => {
+                    const isSelected = selectedIds.has(article.id);
+                    const pubTypes = (article.publication_types ?? []).join(", ");
+                    return (
+                      <tr
+                        key={article.id}
+                        style={{
+                          borderBottom: "1px solid #f1f5f9",
+                          background: isSelected ? "#f0fdf4" : undefined,
+                        }}
+                      >
+                        <td style={{ padding: "10px 16px" }}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelect(article.id)}
+                            style={{ cursor: "pointer" }}
+                          />
+                        </td>
+                        <td style={{ padding: "10px 16px", maxWidth: "360px" }}>
+                          <span style={{
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                            lineHeight: 1.4,
+                            color: "#1a1a1a",
+                          }}>
+                            {article.title}
+                          </span>
+                        </td>
+                        <td style={{ padding: "10px 16px", color: "#5a6a85", whiteSpace: "nowrap" }}>
+                          {article.journal_abbr ?? "—"}
+                        </td>
+                        <td style={{ padding: "10px 16px", whiteSpace: "nowrap" }}>
+                          <span style={{
+                            display: "inline-block",
+                            padding: "2px 9px",
+                            borderRadius: "5px",
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            background: "#f1f5f9",
+                            color: "#334155",
+                          }}>
+                            {article.article_type_ai ?? "—"}
+                          </span>
+                        </td>
+                        <td style={{ padding: "10px 16px", textAlign: "right", color: "#5a6a85", whiteSpace: "nowrap" }}>
+                          {article.article_type_confidence != null ? `${article.article_type_confidence}%` : "—"}
+                        </td>
+                        <td style={{ padding: "10px 16px", color: "#64748b", fontSize: "12px" }}>
+                          {pubTypes || "—"}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {view === "rules" && <div style={{
         background: "#fff",
         borderRadius: "10px",
         boxShadow: SHADOW,
@@ -498,7 +760,7 @@ export default function ArticleTypeAdminClient({
             {busyAdd ? "Tilføjer…" : "Tilføj"}
           </button>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

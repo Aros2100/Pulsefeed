@@ -101,7 +101,7 @@ export async function POST() {
                 article_type_confidence:    95,
                 article_type_rationale:     `Classified by publication type: ${matchedRaw}`,
                 article_type_method:        "deterministic",
-                article_type_validated:     true,
+                article_type_validated:     false,
                 article_type_scored_at:     new Date().toISOString(),
                 article_type_model_version: "deterministic-v1",
               })
