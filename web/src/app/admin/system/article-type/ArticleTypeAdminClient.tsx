@@ -136,6 +136,7 @@ export default function ArticleTypeAdminClient({
   pendingApproval,
   pendingApprovalCount,
   behandlet,
+  pendingCounts: pendingCountsProp,
 }: {
   pending: number;
   deterministic: number;
@@ -143,6 +144,7 @@ export default function ArticleTypeAdminClient({
   pendingApproval: PendingArticle[];
   pendingApprovalCount: number;
   behandlet: number;
+  pendingCounts: { article_type: string; count: number }[];
 }) {
   const [rules,           setRules]           = useState<Rule[]>(initialRules);
   const [activeTab,       setActiveTab]       = useState<string>(ARTICLE_TYPE_OPTIONS[0]);
@@ -186,14 +188,14 @@ export default function ArticleTypeAdminClient({
 
   /* ── Pending approval derived ───────────────────────────────── */
 
+  // Use server-side counts (full dataset) instead of deriving from the limited array
   const pendingCounts = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const a of pendingList) {
-      const t = a.article_type_ai ?? "Unknown";
-      map[t] = (map[t] ?? 0) + 1;
+    for (const row of pendingCountsProp) {
+      map[row.article_type] = Number(row.count);
     }
     return map;
-  }, [pendingList]);
+  }, [pendingCountsProp]);
 
   const filteredPending = useMemo(
     () => pendingFilter === "All"
