@@ -28,7 +28,7 @@ export default async function ArticleTypeSystemPage() {
       .order("publication_type", { ascending: true }),
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (admin as any).rpc("get_article_type_pending_approval"),
+    (admin as any).rpc("get_article_type_pending_approval", { p_limit: 5000 }),
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (admin as any).rpc("count_article_type_pending_approval"),
