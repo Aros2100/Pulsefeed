@@ -547,7 +547,6 @@ export default function ArticleTypeAdminClient({
                   <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5a6a85" }}>Titel</th>
                   <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5a6a85", whiteSpace: "nowrap" }}>Journal</th>
                   <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5a6a85", whiteSpace: "nowrap" }}>Artikel type</th>
-                  <th style={{ padding: "10px 16px", textAlign: "right", fontWeight: 600, color: "#5a6a85", whiteSpace: "nowrap" }}>Confidence</th>
                   <th style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#5a6a85" }}>Publication types</th>
                 </tr>
               </thead>
@@ -584,10 +583,7 @@ export default function ArticleTypeAdminClient({
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{
-                              display: "-webkit-box",
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: "vertical",
-                              overflow: "hidden",
+                              whiteSpace: "normal",
                               lineHeight: 1.4,
                               color: "#1a1a1a",
                               textDecoration: "none",
@@ -615,9 +611,6 @@ export default function ArticleTypeAdminClient({
                           }}>
                             {article.article_type_ai ?? "—"}
                           </span>
-                        </td>
-                        <td style={{ padding: "10px 16px", textAlign: "right", color: "#5a6a85", whiteSpace: "nowrap" }}>
-                          {article.article_type_confidence != null ? `${article.article_type_confidence}%` : "—"}
                         </td>
                         <td style={{ padding: "10px 16px", color: "#64748b", fontSize: "12px" }}>
                           {pubTypes || "—"}
