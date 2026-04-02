@@ -482,7 +482,7 @@ export default function ArticleTypeAdminClient({
                 outline: "none",
               }}
             >
-              <option value="All">Alle kategorier ({pendingList.length.toLocaleString("da-DK")})</option>
+              <option value="All">Alle kategorier ({pendingApprovalCount.toLocaleString("da-DK")})</option>
               {Object.entries(pendingCounts)
                 .sort(([a], [b]) => a.localeCompare(b))
                 .map(([type, count]) => (
