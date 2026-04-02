@@ -53,21 +53,19 @@ export async function POST() {
           return;
         }
 
-        // Collect all candidate articles first (paginated) so we have a stable total
+        // Collect all candidate articles via RPC (specialty_match = true, article_type_ai IS NULL)
         const allArticles: Article[] = [];
-        for (let from = 0; ; ) {
-          const { data } = await admin
-            .from("articles")
-            .select("id, publication_types")
-            .eq("status", "approved")
-            .not("abstract", "is", null)
-            .is("article_type_ai", null)
-            .range(from, from + 99);
+        const PAGE = 1000;
+        for (let offset = 0; ; offset += PAGE) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data } = await (admin as any).rpc("get_article_type_candidates", {
+            p_offset: offset,
+            p_limit: PAGE,
+          });
 
           if (!data || data.length === 0) break;
           allArticles.push(...(data as Article[]));
-          if (data.length < 100) break;
-          from += 100;
+          if (data.length < PAGE) break;
         }
 
         const total = allArticles.length;
