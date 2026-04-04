@@ -7,6 +7,20 @@ import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
 
 const MANDATORY_SUBSPECIALTY: string = "Neurosurgery";
 
+// Normalize legacy subspecialty names (e.g. "Functional, pain and epilepsy surgery")
+// to the canonical SUBSPECIALTY_OPTIONS entry so that electiveCount is accurate.
+function normalizeKey(s: string): string {
+  return s.toLowerCase().replace(/,/g, "").replace(/\s+/g, " ").trim();
+}
+const CANONICAL_MAP = Object.fromEntries(
+  SUBSPECIALTY_OPTIONS.map((opt) => [normalizeKey(opt), opt]),
+);
+function normalizeSubspecialties(subs: string[]): string[] {
+  return subs.map((s) =>
+    s === MANDATORY_SUBSPECIALTY ? s : (CANONICAL_MAP[normalizeKey(s)] ?? s),
+  );
+}
+
 interface Props {
   email:                     string;
   initialName:               string;
@@ -105,10 +119,10 @@ export default function ProfileClient({
   const [name, setName]                     = useState(initialName);
   const [title, setTitle]                   = useState(initialTitle);
   const [specialtySlugs] = useState(initialSpecialtySlugs);
-  const [subspecialties, setSubspecialties] = useState<string[]>(initialSubspecialties);
+  const [subspecialties, setSubspecialties] = useState<string[]>(() => normalizeSubspecialties(initialSubspecialties));
   const [editingAccount, setEditingAccount] = useState(false);
   const [editingSub, setEditingSub]         = useState(false);
-  const [tempSub, setTempSub]               = useState<string[]>(initialSubspecialties);
+  const [tempSub, setTempSub]               = useState<string[]>(() => normalizeSubspecialties(initialSubspecialties));
   const [savingSub, setSavingSub]           = useState(false);
   const [accountDraft, setAccountDraft]     = useState({
     name: initialName, title: initialTitle,

@@ -55,9 +55,19 @@ export async function GET() {
 
   // ── Author location stats ─────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: authorStatsRows } = await (admin as any).rpc("get_author_location_stats");
+  const { data: authorStatsRows, error: authorStatsError } = await (admin as any).rpc("get_author_location_stats");
+  if (authorStatsError) console.error("[data-quality] get_author_location_stats error:", authorStatsError);
   const authorStats = authorStatsRows?.[0] ?? {};
-  const totalA      = Number(authorStats.total_authors) || 0;
+
+  // Fallback: direct count if RPC returns 0 (e.g. constraint violation, schema mismatch)
+  let totalA = Number(authorStats.total_authors) || 0;
+  if (totalA === 0) {
+    const { count: directAuthorCount } = await admin
+      .from("authors")
+      .select("*", { count: "exact", head: true })
+      .is("deleted_at", null);
+    totalA = directAuthorCount ?? 0;
+  }
 
   // ── Article location coverage ─────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -112,10 +122,25 @@ export async function GET() {
       articles_with_mismatch:   articles_with_mismatch,
     },
     author_location: {
-      ...authorStats,
-      with_region_pct:  pct(Number(authorStats.with_region)  || 0, totalA),
-      with_country_pct: pct(Number(authorStats.with_country) || 0, totalA),
-      with_state_pct:   pct(Number(authorStats.with_state)   || 0, totalA),
+      with_region:          Number(authorStats.with_region)          || 0,
+      with_country:         Number(authorStats.with_country)         || 0,
+      with_state:           Number(authorStats.with_state)           || 0,
+      with_city:            Number(authorStats.with_city)            || 0,
+      distinct_regions:     Number(authorStats.distinct_regions)     || 0,
+      no_region:            Number(authorStats.no_region)            || 0,
+      no_country:           Number(authorStats.no_country)           || 0,
+      no_state:             Number(authorStats.no_state)             || 0,
+      no_city:              Number(authorStats.no_city)              || 0,
+      no_geo:               Number(authorStats.no_geo)               || 0,
+      affiliation_too_long: Number(authorStats.affiliation_too_long) || 0,
+      suspect_city_values:  Number(authorStats.suspect_city_values)  || 0,
+      source_ror:           Number(authorStats.source_ror)           || 0,
+      source_parser:        Number(authorStats.source_parser)        || 0,
+      verified_human:       Number(authorStats.verified_human)       || 0,
+      with_region_pct:  totalA > 0 ? Math.round((Number(authorStats.with_region)  || 0) / totalA * 100) : 0,
+      with_country_pct: totalA > 0 ? Math.round((Number(authorStats.with_country) || 0) / totalA * 100) : 0,
+      with_state_pct:   totalA > 0 ? Math.round((Number(authorStats.with_state)   || 0) / totalA * 100) : 0,
+      with_city_pct:    totalA > 0 ? Math.round((Number(authorStats.with_city)    || 0) / totalA * 100) : 0,
     },
     article_location: {
       with_region:      art_with_region         ?? 0,

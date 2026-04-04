@@ -39,7 +39,7 @@ export default async function ArticleTypeOverviewPage() {
       .select("*", { count: "exact", head: true })
       .eq("specialty", FIXED_SPECIALTY)
       .eq("module", "article_type")
-      .eq("disagreement_reason", "corrected"),
+      .not("disagreement_reason", "is", null),
 
     // Last decision
     admin

@@ -41,6 +41,7 @@ interface Props {
   currentPage:         number;
   totalPages:          number;
   totalCount:          number;
+  activeMeshTerms?:    string[];
 }
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -108,6 +109,7 @@ export default function ArticleListClient({
   currentPage,
   totalPages,
   totalCount,
+  activeMeshTerms,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -300,6 +302,40 @@ export default function ArticleListClient({
             <ArticleGeoFilter geoMap={geoMap} userHospital={userHospital} />
 
           </div>
+
+          {/* Active MeSH chips (read-only) */}
+          {activeMeshTerms && activeMeshTerms.length > 0 && (
+            <div style={{
+              borderTop: "1px solid #f0f0f0",
+              padding: "10px 24px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              flexWrap: "wrap" as const,
+            }}>
+              <span style={{ fontSize: "11px", fontWeight: 600, color: "#94a3b8", whiteSpace: "nowrap" as const }}>
+                MeSH:
+              </span>
+              {activeMeshTerms.map((term) => (
+                <span
+                  key={term}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    padding: "4px 12px",
+                    fontSize: "11.5px",
+                    fontWeight: 500,
+                    color: "#fff",
+                    background: "linear-gradient(135deg, #c0392b, #a93226)",
+                    borderRadius: "20px",
+                    whiteSpace: "nowrap" as const,
+                  }}
+                >
+                  {term}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Articles card */}

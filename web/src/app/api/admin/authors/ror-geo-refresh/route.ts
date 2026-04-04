@@ -12,8 +12,16 @@ const schema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAdmin();
-  if (!auth.ok) return auth.response;
+  // Allow terminal scripts to authenticate via ADMIN_SECRET bearer token
+  // in addition to the normal session-cookie flow.
+  const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  const adminSecret = process.env.ADMIN_SECRET;
+  const scriptAuth = adminSecret && bearer === adminSecret;
+
+  if (!scriptAuth) {
+    const auth = await requireAdmin();
+    if (!auth.ok) return auth.response;
+  }
 
   let body: unknown;
   try { body = await request.json(); }

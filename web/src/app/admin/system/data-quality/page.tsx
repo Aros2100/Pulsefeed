@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ type DQData = {
     no_geo: number;
     affiliation_too_long: number;
     suspect_city_values: number;
-    source_openalex: number;
+    source_ror: number;
     source_parser: number;
     verified_human: number;
   };
@@ -162,118 +162,9 @@ function SectionCard({
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-type RorResetState  = { status: "idle" | "running" | "done" | "error"; reset?: number; error?: string };
-type RorRefreshState = {
-  status: "idle" | "running" | "done" | "error";
-  processed: number; updated: number; skipped: number; error?: string;
-};
-type ParserRefreshState = {
-  status: "idle" | "running" | "done" | "error";
-  processed: number; updated: number; skipped: number; error?: string;
-};
-
 export default function DataQualityPage() {
   const [data, setData] = useState<DQData | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const [rorReset,    setRorReset]    = useState<RorResetState>({ status: "idle" });
-  const [rorRefresh,  setRorRefresh]  = useState<RorRefreshState>({ status: "idle", processed: 0, updated: 0, skipped: 0 });
-  const [rorCountdown, setRorCountdown] = useState<number | null>(null);
-  const rorStopRef = useRef(false);
-
-  const [parserRefresh, setParserRefresh] = useState<ParserRefreshState>({ status: "idle", processed: 0, updated: 0, skipped: 0 });
-
-  async function handleRorReset() {
-    if (!confirm("Dette nulstiller city, state, country, region, continent, geo_source og verified_by på alle forfattere med ROR-id. Er du sikker?")) return;
-    setRorReset({ status: "running" });
-    try {
-      const res  = await fetch("/api/admin/authors/ror-geo-reset", { method: "POST" });
-      const json = await res.json() as { ok: boolean; reset?: number; error?: string };
-      if (!json.ok) setRorReset({ status: "error", error: json.error });
-      else          setRorReset({ status: "done", reset: json.reset });
-    } catch (e) {
-      setRorReset({ status: "error", error: String(e) });
-    }
-  }
-
-  async function handleRorRefresh() {
-    if (!confirm("Dette genberiger alle forfattere med ROR-id via ROR API. Jobbet pauser 5 min mellem batches pga. ROR rate limit. Kan tage lang tid. Fortsæt?")) return;
-    rorStopRef.current = false;
-    setRorRefresh({ status: "running", processed: 0, updated: 0, skipped: 0 });
-    setRorCountdown(null);
-    let offset = 0;
-    let totalProcessed = 0, totalUpdated = 0, totalSkipped = 0;
-    const PAUSE_MS = 5 * 60 * 1000;
-    try {
-      while (true) {
-        if (rorStopRef.current) break;
-        const res  = await fetch("/api/admin/authors/ror-geo-refresh", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ offset, limit: 150 }),
-        });
-        const json = await res.json() as { ok: boolean; processed: number; updated: number; skipped: number; nextOffset: number; done: boolean; error?: string };
-        if (!json.ok) {
-          setRorRefresh({ status: "error", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped, error: json.error });
-          setRorCountdown(null);
-          return;
-        }
-        totalProcessed += json.processed;
-        totalUpdated   += json.updated;
-        totalSkipped   += json.skipped;
-        setRorRefresh({ status: "running", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped });
-        if (json.done) break;
-        offset = json.nextOffset;
-
-        // 5-minute countdown before next batch
-        const deadline = Date.now() + PAUSE_MS;
-        const tick = setInterval(() => {
-          const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-          setRorCountdown(remaining);
-          if (remaining === 0) clearInterval(tick);
-        }, 1000);
-        setRorCountdown(Math.ceil(PAUSE_MS / 1000));
-        await new Promise((r) => setTimeout(r, PAUSE_MS));
-        clearInterval(tick);
-        setRorCountdown(null);
-      }
-      setRorRefresh({ status: "done", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped });
-      setRorCountdown(null);
-    } catch (e) {
-      setRorRefresh({ status: "error", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped, error: String(e) });
-      setRorCountdown(null);
-    }
-  }
-
-  async function handleParserRefresh() {
-    if (!confirm("Dette re-beriger geo på alle forfattere UDEN ROR-id via affiliation-parseren. Er du sikker?")) return;
-    setParserRefresh({ status: "running", processed: 0, updated: 0, skipped: 0 });
-    let offset = 0;
-    let totalProcessed = 0, totalUpdated = 0, totalSkipped = 0;
-    try {
-      while (true) {
-        const res  = await fetch("/api/admin/authors/parser-geo-refresh", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ offset, limit: 200 }),
-        });
-        const json = await res.json() as { ok: boolean; processed: number; updated: number; skipped: number; nextOffset: number; done: boolean; error?: string };
-        if (!json.ok) {
-          setParserRefresh({ status: "error", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped, error: json.error });
-          return;
-        }
-        totalProcessed += json.processed;
-        totalUpdated   += json.updated;
-        totalSkipped   += json.skipped;
-        setParserRefresh({ status: "running", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped });
-        if (json.done) break;
-        offset = json.nextOffset;
-      }
-      setParserRefresh({ status: "done", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped });
-    } catch (e) {
-      setParserRefresh({ status: "error", processed: totalProcessed, updated: totalUpdated, skipped: totalSkipped, error: String(e) });
-    }
-  }
 
   useEffect(() => {
     fetch("/api/admin/system/data-quality")
@@ -300,7 +191,7 @@ export default function DataQualityPage() {
     with_city: 0, distinct_regions: 0,
     no_region: 0, no_country: 0, no_state: 0, no_city: 0, no_geo: 0,
     affiliation_too_long: 0, suspect_city_values: 0,
-    source_openalex: 0, source_parser: 0, verified_human: 0,
+    source_ror: 0, source_parser: 0, verified_human: 0,
   };
   const article_location = data.article_location ?? {
     with_region: 0, with_region_pct: 0, no_region: 0,
@@ -454,7 +345,7 @@ export default function DataQualityPage() {
           </div>
           {/* Row 3 — Meta */}
           <div style={{ ...metricsGrid, gridTemplateColumns: "repeat(4, 1fr)", paddingTop: 0 }}>
-            <MetricCard label="Source: OpenAlex" value={num(author_location.source_openalex)} sub="primær kilde" />
+            <MetricCard label="Source: ROR"       value={num(author_location.source_ror)}     sub="primær kilde" />
             <MetricCard label="Source: Parser"   value={num(author_location.source_parser)}   sub="fallback" />
             <Link href="/admin/authors?filter=suspect_city" style={{ textDecoration: "none" }}>
               <MetricCard
@@ -563,127 +454,6 @@ export default function DataQualityPage() {
           </div>
         </SectionCard>
 
-        {/* 6 · Parser geo refresh */}
-        <SectionCard number="6" title="Parser geo refresh (forfattere uden ROR-id)">
-          <div style={{ padding: "20px 24px" }}>
-            <p style={{ margin: "0 0 16px", fontSize: "14px", color: "#374151", lineHeight: 1.6 }}>
-              Re-beriger geo-data på alle forfattere <strong>uden</strong> ROR-id via affiliation-parseren.
-              Bruger det nye flow: <code style={{ fontSize: "12px", background: "#f1f3f7", borderRadius: "3px", padding: "1px 4px" }}>parseAffiliation → normalizeGeo → lookupState → getRegion/getContinent</code>.
-            </p>
-            <button
-              onClick={handleParserRefresh}
-              disabled={parserRefresh.status === "running"}
-              style={{
-                padding: "7px 16px", borderRadius: "6px", border: "1px solid #d1d5db",
-                background: parserRefresh.status === "running" ? "#f3f4f6" : "#fff",
-                fontSize: "13px", fontWeight: 600,
-                cursor: parserRefresh.status === "running" ? "not-allowed" : "pointer",
-                color: "#1a1a1a",
-              }}
-            >
-              {parserRefresh.status === "running" ? "Kører…" : "Run parser geo refresh"}
-            </button>
-            {(parserRefresh.status === "running" || parserRefresh.status === "done") && (
-              <div style={{ marginTop: "10px", fontSize: "13px", color: parserRefresh.status === "done" ? "#15803d" : "#374151", fontWeight: parserRefresh.status === "done" ? 600 : 400 }}>
-                {parserRefresh.status === "done" && "✓ "}
-                {parserRefresh.processed.toLocaleString("da-DK")} behandlet
-                {" · "}{parserRefresh.updated.toLocaleString("da-DK")} opdateret
-                {" · "}{parserRefresh.skipped.toLocaleString("da-DK")} skippet
-              </div>
-            )}
-            {parserRefresh.status === "error" && (
-              <div style={{ marginTop: "10px", fontSize: "13px", color: "#dc2626" }}>
-                Fejl: {parserRefresh.error}
-              </div>
-            )}
-          </div>
-        </SectionCard>
-
-        {/* 5 · ROR geo refresh */}
-        <SectionCard number="5" title="ROR geo refresh">
-          <div style={{ padding: "20px 24px" }}>
-            <p style={{ margin: "0 0 16px", fontSize: "14px", color: "#374151", lineHeight: 1.6 }}>
-              Nulstil og genberig geo-felterne på alle forfattere med et ROR-id via ROR API.
-              Kør typisk reset → refresh i sekvens.
-            </p>
-
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "flex-start" }}>
-
-              {/* Reset */}
-              <div style={{ flex: "1 1 300px", background: "#f8f9fb", borderRadius: "8px", padding: "16px 18px" }}>
-                <div style={{ fontSize: "12px", fontWeight: 700, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>
-                  1 · Reset ROR geo
-                </div>
-                <p style={{ fontSize: "13px", color: "#374151", margin: "0 0 12px", lineHeight: 1.5 }}>
-                  Sætter city, state, country, region, continent, geo_source og verified_by til NULL på alle forfattere med ror_id.
-                </p>
-                <button
-                  onClick={handleRorReset}
-                  disabled={rorReset.status === "running"}
-                  style={{
-                    padding: "7px 16px", borderRadius: "6px", border: "1px solid #d1d5db",
-                    background: rorReset.status === "running" ? "#f3f4f6" : "#fff",
-                    fontSize: "13px", fontWeight: 600, cursor: rorReset.status === "running" ? "not-allowed" : "pointer",
-                    color: "#1a1a1a",
-                  }}
-                >
-                  {rorReset.status === "running" ? "Nulstiller…" : "Reset ROR geo"}
-                </button>
-                {rorReset.status === "done" && (
-                  <div style={{ marginTop: "10px", fontSize: "13px", color: "#15803d", fontWeight: 600 }}>
-                    ✓ {(rorReset.reset ?? 0).toLocaleString("da-DK")} forfattere nulstillet
-                  </div>
-                )}
-                {rorReset.status === "error" && (
-                  <div style={{ marginTop: "10px", fontSize: "13px", color: "#dc2626" }}>
-                    Fejl: {rorReset.error}
-                  </div>
-                )}
-              </div>
-
-              {/* Refresh */}
-              <div style={{ flex: "1 1 300px", background: "#f8f9fb", borderRadius: "8px", padding: "16px 18px" }}>
-                <div style={{ fontSize: "12px", fontWeight: 700, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>
-                  2 · Run ROR geo refresh
-                </div>
-                <p style={{ fontSize: "13px", color: "#374151", margin: "0 0 12px", lineHeight: 1.5 }}>
-                  Henter geo fra ROR API for alle forfattere med ror_id og skriver city, state, country, region og kontinent.
-                </p>
-                <button
-                  onClick={handleRorRefresh}
-                  disabled={rorRefresh.status === "running"}
-                  style={{
-                    padding: "7px 16px", borderRadius: "6px", border: "1px solid #d1d5db",
-                    background: rorRefresh.status === "running" ? "#f3f4f6" : "#fff",
-                    fontSize: "13px", fontWeight: 600, cursor: rorRefresh.status === "running" ? "not-allowed" : "pointer",
-                    color: "#1a1a1a",
-                  }}
-                >
-                  {rorRefresh.status === "running" ? "Kører…" : "Run ROR geo refresh"}
-                </button>
-                {(rorRefresh.status === "running" || rorRefresh.status === "done") && (
-                  <div style={{ marginTop: "10px", fontSize: "13px", color: rorRefresh.status === "done" ? "#15803d" : "#374151", fontWeight: rorRefresh.status === "done" ? 600 : 400 }}>
-                    {rorRefresh.status === "done" && "✓ "}
-                    {rorRefresh.processed.toLocaleString("da-DK")} behandlet
-                    {" · "}{rorRefresh.updated.toLocaleString("da-DK")} opdateret
-                    {" · "}{rorRefresh.skipped.toLocaleString("da-DK")} skippet
-                  </div>
-                )}
-                {rorCountdown !== null && (
-                  <div style={{ marginTop: "8px", fontSize: "13px", color: "#d97706", fontWeight: 500 }}>
-                    ⏳ Venter {Math.floor(rorCountdown / 60)}:{String(rorCountdown % 60).padStart(2, "0")} før næste batch (ROR rate limit)…
-                  </div>
-                )}
-                {rorRefresh.status === "error" && (
-                  <div style={{ marginTop: "10px", fontSize: "13px", color: "#dc2626" }}>
-                    Fejl: {rorRefresh.error}
-                  </div>
-                )}
-              </div>
-
-            </div>
-          </div>
-        </SectionCard>
 
       </div>
     </div>

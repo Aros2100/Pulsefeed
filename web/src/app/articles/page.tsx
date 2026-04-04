@@ -30,9 +30,10 @@ export default async function ArticlesPage({
     continent?: string; region?: string; country?: string; city?: string;
     hospital?: string; geo_search?: string;
     page?: string;
+    "mesh[]"?: string | string[];
   }>;
 }) {
-  const { period, subspecialty, continent, region, country, city, hospital, geo_search, page } = await searchParams;
+  const { period, subspecialty, continent, region, country, city, hospital, geo_search, page, "mesh[]": mesh } = await searchParams;
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -72,6 +73,23 @@ export default async function ArticlesPage({
   }
 
   if (subspecialty) articlesQuery = articlesQuery.contains("subspecialty_ai", [subspecialty]);
+
+  const meshTerms = mesh
+    ? (Array.isArray(mesh) ? mesh : [mesh])
+    : [];
+
+  if (meshTerms.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: meshIdRows } = await (supabase as any).rpc(
+      "get_article_ids_for_mesh_terms",
+      { p_mesh_terms: meshTerms },
+    );
+    const matchingIds = (meshIdRows ?? []).map((r: { id: string }) => r.id) as string[];
+    articlesQuery = articlesQuery.in(
+      "id",
+      matchingIds.length > 0 ? matchingIds : ["00000000-0000-0000-0000-000000000000"],
+    );
+  }
 
   if (continent) {
     const regions = [...new Set(
@@ -177,6 +195,7 @@ export default async function ArticlesPage({
         currentPage={currentPage}
         totalPages={totalPages}
         totalCount={totalCount ?? 0}
+        activeMeshTerms={meshTerms}
       />
     </div>
   );

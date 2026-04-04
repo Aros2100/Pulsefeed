@@ -35,6 +35,7 @@ export async function GET(request: Request) {
   const noCity       = searchParams.get("no_city")     === "true";
   const notParsed    = searchParams.get("not_parsed")   === "true";
   const suspectCity  = searchParams.get("suspect_city") === "true";
+  const articleType  = searchParams.get("article_type")?.trim() ?? "";
   const sortBy   = searchParams.get("sort_by") ?? "imported_at";
   const sortAsc  = searchParams.get("sort_dir") === "asc";
 
@@ -109,6 +110,11 @@ export async function GET(request: Request) {
   if (dateTo)   query = query.lte("imported_at", dateTo);
   if (meshTerm) query = query.filter("mesh_terms::text", "ilike", `%${meshTerm}%`);
   if (search)   query = query.or(`title.ilike.%${search}%,journal_abbr.ilike.%${search}%`);
+  if (articleType === "Unclassified") {
+    query = query.is("article_type_ai", null);
+  } else if (articleType) {
+    query = query.eq("article_type_ai", articleType).eq("article_type_validated", true);
+  }
   if (missingGeo)   query = query.is("geo_country", null).is("geo_city", null);
   if (noRegion)     query = query.is("geo_region",  null);
   if (noCountry)    query = query.is("geo_country", null);

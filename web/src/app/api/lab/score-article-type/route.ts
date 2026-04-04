@@ -7,7 +7,7 @@ import { getActivePrompt, scoreArticleType, type ActivePrompt } from "@/lib/lab/
 
 const CONCURRENCY  = 1;
 const DELAY_MS     = 1300;
-const BATCH_LIMIT  = 100;
+const BATCH_LIMIT  = 10;
 const FIXED_SPECIALTY = "neurosurgery";
 
 const schema = z.object({
@@ -41,6 +41,7 @@ async function classifyWithRetry(
     try {
       return await scoreArticleType(article, activePrompt);
     } catch (err: unknown) {
+      console.error(`[score-article-type] scoreArticleType error for ${article.id}:`, err);
       const status = (err as { status?: number })?.status;
       if (status === 429 && attempt < retries - 1) {
         const waitMs = (attempt + 1) * 60_000;
@@ -81,23 +82,31 @@ export async function POST(request: NextRequest) {
   let fetchError: { message: string } | null;
 
   if (scoreAll) {
-    // Re-score articles with outdated or missing article_type_model_version
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: rescoreIds } = await (admin as any).rpc("get_article_type_rescore_candidates", {
+      p_version: activePrompt.version,
+      p_limit: 500,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const candidateIds: string[] = ((rescoreIds ?? []) as any[]).map((r) => r.id ?? r);
+
     const res = await admin
       .from("articles")
       .select("id, title, abstract, journal_abbr, journal_title, mesh_terms, publication_types")
-      .eq("status", "approved")
-      .not("abstract", "is", null)
-      .or(`article_type_scored_at.is.null,article_type_model_version.is.null,article_type_model_version.neq.${activePrompt.version}`)
-      .order("article_type_scored_at", { ascending: true, nullsFirst: true })
+      .in("id", candidateIds.length > 0 ? candidateIds : ["00000000-0000-0000-0000-000000000000"])
       .limit(500);
     articles = res.data as Article[] | null;
     fetchError = res.error;
   } else {
     // Normal Lab-scoring: fill up to BATCH_LIMIT
-    const { data: alreadyScoredCount } = await admin.rpc(
-      "count_article_type_not_validated",
-    );
-    const existing = Number(alreadyScoredCount ?? 0);
+    // Count only AI-scored but not yet validated (avoids counting deterministic + validated rows)
+    const { count: existingCount } = await admin
+      .from("articles")
+      .select("*", { count: "exact", head: true })
+      .not("article_type_scored_at", "is", null)
+      .is("article_type_method", null)
+      .eq("article_type_validated", false);
+    const existing = existingCount ?? 0;
     const remaining = Math.max(0, BATCH_LIMIT - existing);
 
     if (remaining === 0) {
@@ -113,11 +122,28 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Fetch only articles with specialty_match = true (via article_specialties join)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: specialtyIds, error: candidateError } = await (admin as any).rpc("get_article_type_candidates", {
+      p_offset: 0,
+      p_limit: remaining * 5, // over-fetch so we can filter to unscored
+    });
+
+    if (candidateError) {
+      console.error("[score-article-type] candidates error:", candidateError);
+      return NextResponse.json({ ok: false, error: candidateError.message }, { status: 500 });
+    }
+
+    console.log("[score-article-type] raw candidates sample:", JSON.stringify((specialtyIds as unknown[])?.slice(0, 2)));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const candidateIds: string[] = ((specialtyIds ?? []) as any[]).map((r) => r.id ?? r);
+    console.log(`[score-article-type] candidates: ${candidateIds.length}, remaining: ${remaining}`);
+    console.log("[score-article-type] candidateIds sample:", candidateIds.slice(0, 2));
+
     const res = await admin
       .from("articles")
       .select("id, title, abstract, journal_abbr, journal_title, mesh_terms, publication_types")
-      .eq("status", "approved")
-      .not("abstract", "is", null)
+      .in("id", candidateIds.length > 0 ? candidateIds : ["00000000-0000-0000-0000-000000000000"])
       .is("article_type_scored_at", null)
       .order("circle", { ascending: false, nullsFirst: false })
       .limit(remaining);
@@ -130,6 +156,7 @@ export async function POST(request: NextRequest) {
   }
 
   const toScore = (articles ?? []) as Article[];
+  console.log(`[score-article-type] toScore.length: ${toScore.length}`);
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -148,6 +175,7 @@ export async function POST(request: NextRequest) {
             limiter(async () => {
               try {
                 const cls = await classifyWithDelay(article, activePrompt!);
+                console.log(`[score-article-type] scored ${article.id}: ${cls.article_type}`);
                 const { error } = await admin
                   .from("articles")
                   .update({

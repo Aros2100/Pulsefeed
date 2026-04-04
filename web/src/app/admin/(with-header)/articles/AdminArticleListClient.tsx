@@ -25,6 +25,7 @@ interface Filters {
   mesh_term: string;
   specialty: string;
   subspecialty: string;
+  article_type: string;
   has_abstract: string;
   date_from: string;
   date_to: string;
@@ -110,6 +111,7 @@ function filtersFromParams(sp: URLSearchParams): Filters {
     mesh_term:       sp.get("mesh_term")       ?? "",
     specialty:       sp.get("specialty")       ?? "neurosurgery",
     subspecialty:    sp.get("subspecialty")    ?? "",
+    article_type:    sp.get("article_type")    ?? "",
     has_abstract:    sp.get("has_abstract")    ?? "",
     date_from:       sp.get("date_from")       ?? "",
     date_to:         sp.get("date_to")         ?? "",
@@ -137,6 +139,7 @@ function filtersToParams(f: Filters): URLSearchParams {
   if (f.mesh_term)       p.set("mesh_term",       f.mesh_term);
   if (f.specialty)       p.set("specialty",       f.specialty);
   if (f.subspecialty)    p.set("subspecialty",    f.subspecialty);
+  if (f.article_type)    p.set("article_type",    f.article_type);
   if (f.has_abstract)    p.set("has_abstract",    f.has_abstract);
   if (f.date_from)       p.set("date_from",       f.date_from);
   if (f.date_to)         p.set("date_to",         f.date_to);
@@ -159,7 +162,7 @@ function filtersToParams(f: Filters): URLSearchParams {
 }
 
 const EMPTY_FILTERS: Filters = {
-  search: "", mesh_term: "", specialty: "neurosurgery", subspecialty: "",
+  search: "", mesh_term: "", specialty: "neurosurgery", subspecialty: "", article_type: "",
   has_abstract: "", date_from: "", date_to: "",
   geo_continent: "", geo_region: "", geo_country: "", geo_state: "", geo_city: "",
   missing_geo: false, no_region: false, no_country: false, no_state: false, no_city: false, not_parsed: false, suspect_city: false,
@@ -319,7 +322,7 @@ export default function AdminArticleListClient() {
   }
 
   const hasActiveFilters = !!(
-    filters.subspecialty ||
+    filters.subspecialty || filters.article_type ||
     filters.has_abstract || filters.date_from || filters.date_to || filters.search ||
     filters.mesh_term || filters.geo_continent || filters.geo_region || filters.geo_country || filters.geo_state ||
     filters.geo_city || filters.missing_geo
@@ -430,6 +433,24 @@ export default function AdminArticleListClient() {
 
         {/* Række 3: Øvrige filtre */}
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+          <SelectFilter
+            value={filters.article_type}
+            onChange={(v) => setFilter("article_type", v)}
+            placeholder="Article type: Alle"
+            options={[
+              { value: "Meta-analysis",          label: "Meta-analysis" },
+              { value: "Review",                 label: "Review" },
+              { value: "Intervention study",     label: "Intervention study" },
+              { value: "Non-interventional study", label: "Non-interventional study" },
+              { value: "Basic study",            label: "Basic study" },
+              { value: "Case",                   label: "Case" },
+              { value: "Guideline",              label: "Guideline" },
+              { value: "Technique & Technology", label: "Technique & Technology" },
+              { value: "Administration",         label: "Administration" },
+              { value: "Letters & Notices",      label: "Letters & Notices" },
+              { value: "Unclassified",           label: "Unclassified" },
+            ]}
+          />
           <SelectFilter
             value={filters.has_abstract}
             onChange={(v) => setFilter("has_abstract", v)}

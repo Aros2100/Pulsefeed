@@ -28,6 +28,7 @@ interface ArticleVerdict {
   ai_decision: string;
   ai_confidence: number | null;
   corrected: boolean;
+  disagreement_reason?: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -93,6 +94,8 @@ export default function ArticleTypeClient() {
 
   const [verdicts, setVerdicts]               = useState<Record<string, ArticleVerdict>>({});
   const [checkedOption, setCheckedOption]     = useState<string | null>(null);
+  const [disagreeMode, setDisagreeMode]       = useState(false);
+  const [comment, setComment]                 = useState("");
   const [scoring, setScoring]                 = useState(false);
   const [scoringProgress, setScoringProgress] = useState<{ scored: number; failed: number; total: number } | null>(null);
   const [saving, setSaving]                   = useState(false);
@@ -105,6 +108,8 @@ export default function ArticleTypeClient() {
   // Reset option selection when article changes
   useEffect(() => {
     setCheckedOption(null);
+    setDisagreeMode(false);
+    setComment("");
   }, [selectedId]);
 
   // ── Load articles (with pre-scoring if needed) ────────────────────────────
@@ -128,10 +133,11 @@ export default function ArticleTypeClient() {
       if (!d.ok) { setLoading(false); return; }
 
       const list = d.articles ?? [];
+      const alreadyScored = list.filter((a) => a.article_type_ai !== null);
 
-      if (list.length >= 100) {
+      if (alreadyScored.length >= 10) {
         setLoading(false);
-        populateArticles(list);
+        populateArticles(alreadyScored);
       } else {
         setScoring(true);
         setScoringProgress(null);
@@ -181,7 +187,12 @@ export default function ArticleTypeClient() {
           if ((e as Error).name === "AbortError") return;
           return;
         }
-        populateArticles(d2.articles ?? []);
+        const scoredArticles = (d2.articles ?? []).filter((a) => a.article_type_ai !== null);
+        if (scoredArticles.length > 0) {
+          populateArticles(scoredArticles);
+        } else {
+          setTotalCount(0);
+        }
       }
     }
 
@@ -253,16 +264,17 @@ export default function ArticleTypeClient() {
     }));
   }
 
-  function correctArticle(articleId: string, aiType: string, aiConfidence: number | null, editorType: string) {
+  function correctArticle(articleId: string, aiType: string, aiConfidence: number | null, editorType: string, disagreementReason?: string) {
     justVerdictedRef.current = articleId;
     const corrected = editorType !== aiType;
     setVerdicts((prev) => ({
       ...prev,
       [articleId]: {
-        decision:     editorType,
-        ai_decision:  aiType,
-        ai_confidence: aiConfidence,
+        decision:            editorType,
+        ai_decision:         aiType,
+        ai_confidence:       aiConfidence,
         corrected,
+        disagreement_reason: disagreementReason ?? null,
       },
     }));
   }
@@ -292,11 +304,12 @@ export default function ArticleTypeClient() {
     const toSave = articles
       .filter((a) => isArticleComplete(a.id))
       .map((a) => ({
-        article_id:    a.id,
-        decision:      verdicts[a.id].decision,
-        ai_decision:   verdicts[a.id].ai_decision,
-        corrected:     verdicts[a.id].corrected,
-        ai_confidence: verdicts[a.id].ai_confidence,
+        article_id:          a.id,
+        decision:            verdicts[a.id].decision,
+        ai_decision:         verdicts[a.id].ai_decision,
+        corrected:           verdicts[a.id].corrected,
+        ai_confidence:       verdicts[a.id].ai_confidence,
+        disagreement_reason: verdicts[a.id].disagreement_reason ?? null,
       }));
 
     if (toSave.length === 0) return;
@@ -348,9 +361,10 @@ export default function ArticleTypeClient() {
   const isLast           = visibleIdx >= articles.length - 1;
   const currentComplete  = currentArticle ? isArticleComplete(currentArticle.id) : false;
 
-  const aiType       = currentArticle?.article_type_ai ?? null;
-  const aiConfidence = currentArticle?.article_type_confidence ?? null;
-  const aiRationale  = currentArticle?.article_type_rationale ?? null;
+  const aiType         = currentArticle?.article_type_ai ?? null;
+  const aiConfidence   = currentArticle?.article_type_confidence ?? null;
+  const aiRationale    = currentArticle?.article_type_rationale ?? null;
+  const otherCategories = ARTICLE_TYPE_OPTIONS.filter((opt) => opt !== aiType);
 
   // ── Loading / empty states ──────────────────────────────────────────────
 
@@ -548,25 +562,17 @@ export default function ArticleTypeClient() {
 
           {/* RIGHT — Article Type */}
           <div style={{ width: "440px", flexShrink: 0, display: "flex", flexDirection: "column", background: "#fafbfc" }}>
-            <div style={{ flex: 1, padding: "28px 24px 24px", display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto" }}>
+            <div style={{ flex: 1, padding: "28px 24px 24px", display: "flex", flexDirection: "column", gap: "20px", overflowY: "auto" }}>
 
-              {/* AI Article Type badge + confidence */}
+              {/* AI type + confidence + rationale */}
               <div>
-                <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#7c3aed", marginBottom: "8px" }}>
+                <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#7c3aed", marginBottom: "10px" }}>
                   AI Artikel Type
                 </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
-                  {aiType ? (
-                    <span style={{
-                      fontSize: "13px", fontWeight: 700, color: "#7c3aed",
-                      background: "#f5f3ff", border: "1px solid #ddd6fe",
-                      borderRadius: "5px", padding: "4px 10px",
-                    }}>
-                      {aiType}
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: "13px", color: "#999" }}>—</span>
-                  )}
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                  <div style={{ fontSize: "22px", fontWeight: 700, color: aiType ? "#1a1a1a" : "#999" }}>
+                    {aiType ?? "Not scored yet"}
+                  </div>
                   {aiConfidence != null && (
                     <span style={{
                       fontSize: "11px", fontWeight: 700,
@@ -578,101 +584,129 @@ export default function ArticleTypeClient() {
                       {aiConfidence}%
                     </span>
                   )}
-                  {currentVerdict && !currentVerdict.corrected && (
-                    <span style={{ fontSize: "11px", fontWeight: 700, color: "#15803d", marginLeft: "4px" }}>✓ Godkendt</span>
-                  )}
-                  {currentVerdict?.corrected && (
-                    <span style={{ fontSize: "11px", fontWeight: 700, color: "#dc2626", marginLeft: "4px" }}>Korrigeret → {currentVerdict.decision}</span>
-                  )}
                 </div>
-              </div>
-
-              {/* AI Rationale — italic */}
-              {aiRationale && (
-                <div style={{ background: "#f3f0ff", border: "1px solid #e9e0ff", borderRadius: "8px", padding: "12px 14px" }}>
-                  <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#7c3aed", marginBottom: "4px" }}>
-                    AI Begrundelse
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#4a4a4a", lineHeight: 1.6, fontStyle: "italic" }}>
+                {aiRationale && (
+                  <div style={{ fontSize: "13px", color: "#5a6a85", marginTop: "8px", lineHeight: 1.6 }}>
                     {aiRationale}
                   </div>
+                )}
+              </div>
+
+              {/* Verdict status badge */}
+              {currentVerdict && (
+                <div style={{
+                  padding: "10px 14px", borderRadius: "8px",
+                  background: currentVerdict.corrected ? "#fef2f2" : "#f0fdf4",
+                  border: `1px solid ${currentVerdict.corrected ? "#fecaca" : "#bbf7d0"}`,
+                  fontSize: "13px", fontWeight: 600,
+                  color: currentVerdict.corrected ? "#dc2626" : "#15803d",
+                }}>
+                  {currentVerdict.corrected ? `Disagree → ${currentVerdict.decision}` : "Agree ✓"}
+                  {currentVerdict.disagreement_reason && (
+                    <div style={{ fontSize: "12px", fontWeight: 400, color: "#5a6a85", marginTop: "4px" }}>
+                      {currentVerdict.disagreement_reason}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Godkend AI button */}
-              <button
-                onClick={() => approveAi(currentArticle.id, aiType ?? "Other", aiConfidence)}
-                style={{
-                  borderRadius: "6px",
-                  padding: "9px 14px",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  background: currentVerdict && !currentVerdict.corrected ? "#15803d" : "#16a34a",
-                  border: "none",
-                  color: "#fff",
-                  cursor: "pointer",
-                  width: "100%",
-                }}
-              >
-                ✓ Godkend AI
-              </button>
-
-              {/* Korrektion — single-select list */}
-              <div>
-                <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#5a6a85", marginBottom: "8px" }}>
-                  Korriger — vælg 1
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
-                  {ARTICLE_TYPE_OPTIONS.map((option) => {
-                    const isChecked = checkedOption === option;
-                    return (
-                      <label
-                        key={option}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "5px",
-                          padding: "5px 4px",
-                          borderRadius: "3px",
-                          cursor: "pointer",
-                          background: isChecked ? "#fef2f2" : "transparent",
-                          fontSize: "12px",
-                          color: isChecked ? "#dc2626" : "#1a1a1a",
-                          fontWeight: isChecked ? 600 : 400,
-                        }}
-                      >
-                        <input
-                          type="radio"
-                          name="article_type_correction"
-                          checked={isChecked}
-                          onChange={() => setCheckedOption(option)}
-                          style={{ accentColor: "#dc2626", cursor: "pointer", width: "13px", height: "13px" }}
-                        />
-                        {option}
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Godkend korrektion button */}
-              {checkedOption !== null && (
+              {/* Agree / Disagree buttons */}
+              <div style={{ display: "flex", gap: "8px" }}>
                 <button
-                  onClick={() => correctArticle(currentArticle.id, aiType ?? "Other", aiConfidence, checkedOption)}
+                  onClick={() => {
+                    approveAi(currentArticle.id, aiType ?? "Unclassified", aiConfidence);
+                    setDisagreeMode(false);
+                  }}
                   style={{
-                    borderRadius: "6px",
-                    padding: "9px 14px",
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    background: "#dc2626",
-                    border: "none",
-                    color: "#fff",
-                    cursor: "pointer",
-                    width: "100%",
+                    flex: 1, borderRadius: "6px", padding: "9px 14px", fontSize: "13px", fontWeight: 700,
+                    background: currentVerdict && !currentVerdict.corrected ? "#15803d" : "#16a34a",
+                    border: "none", color: "#fff", cursor: "pointer",
                   }}
                 >
-                  Godkend korrektion
+                  Agree
                 </button>
+                <button
+                  onClick={() => {
+                    setDisagreeMode(true);
+                    setCheckedOption(null);
+                    setComment("");
+                  }}
+                  style={{
+                    flex: 1, borderRadius: "6px", padding: "9px 14px", fontSize: "13px", fontWeight: 700,
+                    background: disagreeMode || currentVerdict?.corrected ? "#dc2626" : "#fff",
+                    border: `1px solid ${disagreeMode || currentVerdict?.corrected ? "#dc2626" : "#dde3ed"}`,
+                    color: disagreeMode || currentVerdict?.corrected ? "#fff" : "#5a6a85",
+                    cursor: "pointer",
+                  }}
+                >
+                  Disagree
+                </button>
+              </div>
+
+              {/* Disagree mode: filtered category list + comment + confirm */}
+              {disagreeMode && (
+                <>
+                  <div>
+                    <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#5a6a85", marginBottom: "8px" }}>
+                      Vælg korrekt kategori
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+                      {otherCategories.map((option) => {
+                        const isChecked = checkedOption === option;
+                        return (
+                          <label
+                            key={option}
+                            style={{
+                              display: "flex", alignItems: "center", gap: "5px",
+                              padding: "5px 4px", borderRadius: "3px", cursor: "pointer",
+                              background: isChecked ? "#fef2f2" : "transparent",
+                              fontSize: "12px",
+                              color: isChecked ? "#dc2626" : "#1a1a1a",
+                              fontWeight: isChecked ? 600 : 400,
+                            }}
+                          >
+                            <input
+                              type="radio"
+                              name="article_type_correction"
+                              checked={isChecked}
+                              onChange={() => setCheckedOption(option)}
+                              style={{ accentColor: "#dc2626", cursor: "pointer", width: "13px", height: "13px" }}
+                            />
+                            {option}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <textarea
+                    placeholder="Comment (optional)"
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    rows={3}
+                    style={{
+                      width: "100%", padding: "8px 10px", fontSize: "12px",
+                      border: "1px solid #dde3ed", borderRadius: "6px",
+                      resize: "vertical", outline: "none", boxSizing: "border-box",
+                      color: "#1a1a1a", fontFamily: "inherit",
+                    }}
+                  />
+
+                  {checkedOption !== null && (
+                    <button
+                      onClick={() => {
+                        correctArticle(currentArticle.id, aiType ?? "Unclassified", aiConfidence, checkedOption, comment || undefined);
+                        setDisagreeMode(false);
+                      }}
+                      style={{
+                        borderRadius: "6px", padding: "9px 14px", fontSize: "13px", fontWeight: 700,
+                        background: "#dc2626", border: "none", color: "#fff", cursor: "pointer", width: "100%",
+                      }}
+                    >
+                      Confirm
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>

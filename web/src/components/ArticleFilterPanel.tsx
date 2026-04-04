@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { DM_Sans, DM_Mono, Fraunces } from "next/font/google";
+import { ARTICLE_TYPE_METADATA } from "@/lib/lab/article-type-options";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -51,21 +52,6 @@ const EVIDENCE_LEVELS = [
   { level: 3, label: "Prospective", color: "#e67e22" },
   { level: 2, label: "Retrospective", color: "#f39c12" },
   { level: 1, label: "Case/Op.", color: "#bdc3c7" },
-] as const;
-
-// ── Article types ────────────────────────────────────────────────────────────
-
-const ARTICLE_TYPES = [
-  "Original",
-  "Syst. Review",
-  "Meta-Analysis",
-  "Case Report",
-  "Review",
-  "Editorial",
-  "Letter",
-  "Guideline",
-  "Tech Note",
-  "Trial",
 ] as const;
 
 // ── Period ────────────────────────────────────────────────────────────────────
@@ -302,57 +288,39 @@ export default function ArticleFilterPanel({ userSubspecialties, topSubspecialti
               </span>
             )}
           </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, auto)",
-              gap: "4px",
-              justifyContent: "center",
-              width: "fit-content",
-              margin: "0 auto",
-            }}
-          >
-            {ARTICLE_TYPES.map((type) => {
-              const selected = selectedTypes.includes(type);
-              const anySelected = selectedTypes.length > 0;
-              let bg: string;
-              let color: string;
-              let shadow: string;
-              if (!anySelected) {
-                bg = "#f8fafc";
-                color = "#64748b";
-                shadow = "none";
-              } else if (selected) {
-                bg = "linear-gradient(135deg, #c0392b, #a93226)";
-                color = "#fff";
-                shadow = "0 2px 8px rgba(192, 57, 43, 0.35)";
-              } else {
-                bg = "#f8fafc";
-                color = "#64748b";
-                shadow = "none";
-              }
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "6px" }}>
+            {ARTICLE_TYPE_METADATA.map(({ value, isStudyType }) => {
+              const selected = selectedTypes.includes(value);
               return (
                 <button
-                  key={type}
-                  onClick={() => toggleType(type)}
+                  key={value}
+                  onClick={() => toggleType(value)}
                   style={{
-                    padding: "6px 14px",
+                    padding: "6px 8px",
                     fontSize: "11.5px",
                     fontWeight: 500,
-                    color,
-                    background: bg,
-                    boxShadow: shadow,
+                    textAlign: "center",
                     border: "none",
                     borderRadius: "8px",
                     cursor: "pointer",
                     transition: "all 0.15s ease",
                     fontFamily: "inherit",
                     whiteSpace: "nowrap",
-                    minWidth: "110px",
-                    textAlign: "center",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    ...(isStudyType
+                      ? {
+                          background: selected ? "#991b1b" : "#b91c1c",
+                          color: "#fff",
+                          boxShadow: selected ? "0 2px 8px rgba(153,27,27,0.35)" : "none",
+                        }
+                      : {
+                          background: selected ? "#cbd5e1" : "#f8fafc",
+                          color: selected ? "#1e293b" : "#64748b",
+                        }),
                   }}
                 >
-                  {type}
+                  {value}
                 </button>
               );
             })}

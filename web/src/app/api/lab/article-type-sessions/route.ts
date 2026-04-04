@@ -8,11 +8,12 @@ const FIXED_SPECIALTY = "neurosurgery";
 
 const schema = z.object({
   verdicts: z.array(z.object({
-    article_id:    z.string().uuid(),
-    decision:      z.string(),
-    ai_decision:   z.string(),
-    corrected:     z.boolean(),
-    ai_confidence: z.number().nullable().optional(),
+    article_id:          z.string().uuid(),
+    decision:            z.string(),
+    ai_decision:         z.string(),
+    corrected:           z.boolean(),
+    ai_confidence:       z.number().nullable().optional(),
+    disagreement_reason: z.string().nullable().optional(),
   })).min(1),
 });
 
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
     decision:            v.decision,
     ai_decision:         v.ai_decision,
     ai_confidence:       v.ai_confidence ?? null,
-    disagreement_reason: v.corrected ? "corrected" : null,
+    disagreement_reason: v.disagreement_reason ?? (v.corrected ? "corrected" : null),
     model_version:       modelVersion,
   }));
 
@@ -82,6 +83,16 @@ export async function POST(request: NextRequest) {
   if (decisionsError) {
     console.error("[article-type-sessions] lab_decisions insert error:", decisionsError);
     return NextResponse.json({ ok: false, error: decisionsError.message }, { status: 500 });
+  }
+
+  // 3. Update articles: set article_type_validated = true for all verdicts;
+  //    for corrected ones also update article_type_ai to the chosen decision.
+  const allIds = verdicts.map((v) => v.article_id);
+  await admin.from("articles").update({ article_type_validated: true }).in("id", allIds);
+
+  const corrected = verdicts.filter((v) => v.corrected);
+  for (const v of corrected) {
+    await admin.from("articles").update({ article_type_ai: v.decision }).eq("id", v.article_id);
   }
 
   // Fire-and-forget: log article events
