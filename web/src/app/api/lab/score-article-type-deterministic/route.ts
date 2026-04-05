@@ -9,7 +9,7 @@ type Rule = {
 
 type Article = {
   id: string;
-  publication_types: unknown;
+  publication_types: string[] | null;
 };
 
 function normalize(s: string): string {
@@ -77,9 +77,7 @@ export async function POST() {
         let skipped = 0;
 
         for (const article of allArticles) {
-          const pubTypes = Array.isArray(article.publication_types)
-            ? (article.publication_types as string[])
-            : [];
+          const pubTypes = article.publication_types ?? [];
 
           let matched: string | null = null;
           let matchedRaw: string | null = null;
