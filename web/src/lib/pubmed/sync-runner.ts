@@ -356,7 +356,8 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<void> {
             });
           }
         } else {
-          await db.from("articles")
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (db as any).from("articles")
             .update({ pubmed_synced_at: new Date().toISOString() })
             .eq("pubmed_id", pm.pubmedId);
         }
@@ -368,7 +369,8 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<void> {
     // Flush log entries
     for (let i = 0; i < logEntries.length; i += UPDATE_BATCH) {
       const batch = logEntries.slice(i, i + UPDATE_BATCH);
-      const { error } = await db.from("pubmed_sync_log").insert(batch);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (db as any).from("pubmed_sync_log").insert(batch);
       if (error) console.error("[pubmed-sync] log insert error:", error.message);
     }
   }
@@ -380,7 +382,8 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<void> {
     }));
     for (let i = 0; i < importedEntries.length; i += UPDATE_BATCH) {
       const batch = importedEntries.slice(i, i + UPDATE_BATCH);
-      const { error } = await db.from("pubmed_sync_log").insert(batch);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (db as any).from("pubmed_sync_log").insert(batch);
       if (error) console.error("[pubmed-sync] imported log insert error:", error.message);
     }
   }

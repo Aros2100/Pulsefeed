@@ -8,7 +8,8 @@ export async function GET() {
 
   const admin = createAdminClient();
 
-  const { data, error } = await admin.rpc("pubmed_sync_log_runs");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (admin as any).rpc("pubmed_sync_log_runs");
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
