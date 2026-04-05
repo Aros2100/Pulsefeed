@@ -8,7 +8,9 @@ export type AuthorEventType =
   | "merged"
   | "article_linked"
   | "openalex_fetched"
-  | "geo_parsed";
+  | "geo_parsed"
+  | "author_updated"
+  | "author_unlinked";
 
 export async function logAuthorEvent(
   authorId: string,

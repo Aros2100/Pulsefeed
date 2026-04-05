@@ -23,6 +23,14 @@ function fmt(iso: string | null) {
   });
 }
 
+function fmtSyncRun(runTime: string | null) {
+  if (!runTime) return "—";
+  return new Date(runTime + ":00").toLocaleString("da-DK", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
 function num(v: number) { return v.toLocaleString("da-DK"); }
 function dash(v: number | null | undefined) { return v != null && v > 0 ? num(v) : "—"; }
 
@@ -157,6 +165,9 @@ export default async function ImportDashboardPage() {
     authorsTodayRes, authorsWeekRes, authorsMonthRes, authorsYearRes, authorsTotalRes,
     openalexTodayRes, openalexWeekRes, openalexMonthRes, openalexYearRes, openalexTotalRes,
     uverTodayRes, uverWeekRes, uverMonthRes, uverYearRes, uverTotalRes,
+    syncLogRes,
+    neverSyncedRes, retractedTotalRes, authorsChangedRes,
+    authorUpdateEventsRes,
   ] = await Promise.all([
     // Article counts per circle+status
     countQ(1, "approved"), countQ(2, "approved"), countQ(2, "pending"), countQ(2, "rejected"),
@@ -243,6 +254,13 @@ export default async function ImportDashboardPage() {
       .gte("created_at", new Date(new Date().getFullYear(), 0, 1).toISOString()),
     a.from("authors").select("id", { count: "exact", head: true })
       .eq("verified_by", "uverificeret"),
+    // PubMed Sync
+    a.rpc("pubmed_sync_log_runs"),
+    a.from("articles").select("id", { count: "exact", head: true }).is("pubmed_synced_at", null),
+    a.from("articles").select("id", { count: "exact", head: true }).eq("retracted", true),
+    a.from("articles").select("id", { count: "exact", head: true }).eq("authors_changed", true),
+    // Forfatter-opdateringer
+    a.from("article_events").select("payload").eq("event_type", "authors_updated"),
   ]);
 
   // ── Article stats ──
@@ -295,6 +313,24 @@ export default async function ImportDashboardPage() {
   const uverMonth = (uverMonthRes as { count: number | null }).count ?? 0;
   const uverYear  = (uverYearRes  as { count: number | null }).count ?? 0;
   const uverTotal = (uverTotalRes as { count: number | null }).count ?? 0;
+
+  // PubMed Sync stats
+  const latestRun = (syncLogRes.data?.[0] ?? null) as { run_time: string; imported: string | number; updated: string | number; retracted: string | number } | null;
+  const lastSyncedAt     = latestRun?.run_time ?? null;
+  const lastRunImported  = Number(latestRun?.imported  ?? 0);
+  const lastRunUpdated   = Number(latestRun?.updated   ?? 0);
+  const lastRunRetracted = Number(latestRun?.retracted ?? 0);
+  const neverSynced    = (neverSyncedRes    as { count: number | null }).count ?? 0;
+  const retractedTotal = (retractedTotalRes as { count: number | null }).count ?? 0;
+  const authorsChanged = (authorsChangedRes as { count: number | null }).count ?? 0;
+
+  // Forfatter-opdateringer
+  const authorUpdateEvents = (authorUpdateEventsRes.data ?? []) as { payload: Record<string, unknown> | null }[];
+  const articlesUpdated = authorUpdateEvents.length;
+  const totalMatchedA  = authorUpdateEvents.reduce((s, e) => s + ((e.payload?.scenario_a as number) ?? 0), 0);
+  const totalCreatedB  = authorUpdateEvents.reduce((s, e) => s + ((e.payload?.scenario_b as number) ?? 0), 0);
+  const totalRemovedC  = authorUpdateEvents.reduce((s, e) => s + ((e.payload?.scenario_c as number) ?? 0), 0);
+  const totalUnmatched = authorUpdateEvents.reduce((s, e) => s + ((e.payload?.unmatched  as number) ?? 0), 0);
 
   // Circle table data
   const circleRows: {
@@ -455,6 +491,83 @@ export default async function ImportDashboardPage() {
               </div>
               <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>Seneste kørsel</div>
             </div>
+          </div>
+        </div>
+
+        {/* ═══ SEKTION 3: PUBMED SYNC ═══ */}
+        <SectionHeading title="PubMed Sync" />
+        <div style={sectionCard}>
+          <div style={sectionHeader}>
+            <span style={headerLabel}>Seneste kørsel</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+              <span style={{ fontSize: "12px", color: "#94a3b8" }}>{fmtSyncRun(lastSyncedAt)}</span>
+              <Link
+                href="/admin/system/import/pubmed-sync"
+                style={{ fontSize: "13px", fontWeight: 600, color: "#E83B2A", textDecoration: "none" }}
+              >
+                Administrér →
+              </Link>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", padding: "20px" }}>
+            {[
+              { label: "Importeret", value: lastRunImported,  color: "#1a1a1a" },
+              { label: "Opdateret",  value: lastRunUpdated,   color: "#1a1a1a" },
+              { label: "Retracted",  value: lastRunRetracted, color: lastRunRetracted > 0 ? "#dc2626" : "#1a1a1a" },
+            ].map(({ label, value, color }) => (
+              <div key={label} style={{ background: "#f8f9fb", borderRadius: "8px", padding: "16px 18px" }}>
+                <div style={{ fontSize: "11px", color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: "4px" }}>{label}</div>
+                <div style={{ fontSize: "20px", fontWeight: 700, color }}>{num(value)}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ borderTop: "1px solid #eef0f4", padding: "20px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            {[
+              { label: "Aldrig synket",   value: neverSynced,    color: neverSynced > 0 ? "#d97706" : "#1a1a1a" },
+              { label: "Retracted i DB",  value: retractedTotal, color: retractedTotal > 0 ? "#dc2626" : "#1a1a1a" },
+              { label: "Authors changed", value: authorsChanged, color: authorsChanged > 0 ? "#ea580c" : "#1a1a1a" },
+            ].map(({ label, value, color }) => (
+              <div key={label} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "16px 20px", flex: 1, minWidth: 130 }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}>{num(value)}</div>
+                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ═══ SEKTION 4: FORFATTER-OPDATERINGER ═══ */}
+        <SectionHeading title="Forfatter-opdateringer" />
+        <div style={sectionCard}>
+          <div style={sectionHeader}>
+            <span style={headerLabel}>Authors changed pipeline</span>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", padding: "20px" }}>
+            {[
+              { label: "Artikler opdateret",          value: articlesUpdated, color: "#1a1a1a" },
+              { label: "Authors changed (afventer)",  value: authorsChanged,  color: authorsChanged  > 0 ? "#ea580c" : "#1a1a1a" },
+              { label: "Ikke matchet",                value: totalUnmatched,  color: totalUnmatched  > 0 ? "#d97706" : "#1a1a1a" },
+            ].map(({ label, value, color }) => (
+              <div key={label} style={{ background: "#f8f9fb", borderRadius: "8px", padding: "16px 18px" }}>
+                <div style={{ fontSize: "11px", color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: "4px" }}>{label}</div>
+                <div style={{ fontSize: "20px", fontWeight: 700, color }}>{num(value)}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ borderTop: "1px solid #eef0f4", padding: "20px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            {[
+              { label: "Matchet (A)",  value: totalMatchedA, color: "#15803d" },
+              { label: "Oprettet (B)", value: totalCreatedB, color: "#1a1a1a" },
+              { label: "Fjernet (C)",  value: totalRemovedC, color: totalRemovedC > 0 ? "#dc2626" : "#1a1a1a" },
+            ].map(({ label, value, color }) => (
+              <div key={label} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "16px 20px", flex: 1, minWidth: 130 }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}>{num(value)}</div>
+                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>{label}</div>
+              </div>
+            ))}
           </div>
         </div>
 

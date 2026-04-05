@@ -527,7 +527,13 @@ function parseSingleSegment(
       if (isPostalCode(candidate)) { cityIdx--; continue; }
       // Allow city-state-country: if candidate is a country name but country is already set
       // and matches (e.g. "Hong Kong, Hong Kong"), treat it as city candidate.
-      if (lookupCountry(candidate) !== null && lookupCountry(candidate) !== country) { cityIdx--; continue; }
+      // Exception: SAR/territories that appear as both country AND city in affiliations
+      // e.g. "Hong Kong, China" — "Hong Kong" is a country in our map but also the city.
+      if (lookupCountry(candidate) !== null && lookupCountry(candidate) !== country) {
+        const isCityToo = cityNames.has(candidate.trim().toLowerCase()) || !!lookupCity(candidate);
+        if (!isCityToo) { cityIdx--; continue; }
+        // Fall through — treat as city despite being a known country name
+      }
       if (matchesKeywords(candidate, DEPT_KEYWORDS)) { cityIdx--; continue; }
 
       // Candidate passed guards — try to match as city

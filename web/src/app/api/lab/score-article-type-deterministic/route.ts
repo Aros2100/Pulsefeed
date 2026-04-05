@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 type Rule = {
   publication_type: string;
   article_type: string;
+  priority: number;
 };
 
 type Article = {
@@ -32,7 +33,7 @@ export async function POST() {
         // Fetch active rules
         const { data: rulesData, error: rulesError } = await admin
           .from("article_type_rules")
-          .select("publication_type, article_type")
+          .select("publication_type, article_type, priority")
           .eq("is_active", true);
 
         if (rulesError) {
@@ -41,13 +42,16 @@ export async function POST() {
           return;
         }
 
-        const rules = (rulesData ?? []) as Rule[];
-        const ruleMap = new Map<string, string>();
+        const rules = (rulesData ?? []) as unknown as Rule[];
+        const priorityMap = new Map<string, { article_type: string; priority: number }>();
         for (const rule of rules) {
-          ruleMap.set(normalize(rule.publication_type), rule.article_type);
+          priorityMap.set(normalize(rule.publication_type), {
+            article_type: rule.article_type,
+            priority:     rule.priority,
+          });
         }
 
-        if (ruleMap.size === 0) {
+        if (priorityMap.size === 0) {
           send({ done: true, scored: 0, skipped: 0 });
           controller.close();
           return;
@@ -79,13 +83,15 @@ export async function POST() {
 
           let matched: string | null = null;
           let matchedRaw: string | null = null;
+          let matchedPriority = Infinity;
 
           for (const pt of pubTypes) {
             const key = normalize(pt);
-            if (ruleMap.has(key)) {
-              matched = ruleMap.get(key)!;
+            const rule = priorityMap.get(key);
+            if (rule && rule.priority < matchedPriority) {
+              matched = rule.article_type;
               matchedRaw = pt;
-              break;
+              matchedPriority = rule.priority;
             }
           }
 
@@ -101,7 +107,7 @@ export async function POST() {
                 article_type_method:        "deterministic",
                 article_type_validated:     false,
                 article_type_scored_at:     new Date().toISOString(),
-                article_type_model_version: "deterministic-v1",
+                article_type_model_version: "deterministic-v2",
               })
               .eq("id", article.id);
             scored++;

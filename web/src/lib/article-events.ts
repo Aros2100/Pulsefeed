@@ -11,7 +11,8 @@ export type ArticleEventType =
   | "author_linked"
   | "quality_check"
   | "auto_tagged"
-  | "geo_updated";
+  | "geo_updated"
+  | "authors_updated";
 
 export async function logArticleEvent(
   articleId: string,
