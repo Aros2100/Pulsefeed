@@ -155,6 +155,8 @@ function cleanCity(raw: string, cityNames: Set<string>): string {
   city = city.replace(/^[A-Z]{1,2}[-\s]?\d{3,6}\s+/i, "").trim();
   // Strip leading pure digit postal codes: "8200 Aarhus" → "Aarhus", "93 Lodz" → "Lodz"
   city = city.replace(/^\d{2,5}[-\s]+/, "").trim();
+  // Strip postal code glued directly to city name without space: "Berlin12345" → "Berlin"
+  city = city.replace(/^([A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F\s\-]+?)\d{4,6}$/, "$1").trim();
   // Strip leading Irish Eircode: "D09 V2N0 Dublin" → "Dublin"
   city = city.replace(/^[A-Z]\d{2}\s+[A-Z0-9]{4}\s+/, "").trim();
   // Strip INSERM/institution number prefix: "INSERM 1033 Lyon" → "Lyon"
@@ -504,7 +506,9 @@ function parseSingleSegment(
       if (US_STATES[maybeStUpper]) {
         segments.pop();
       } else if (lookupCountry(maybeSt) === "United States") {
-        segments.pop();
+        // Only pop a full state name if it's not the last remaining segment —
+        // otherwise the city scanner still needs it (e.g. "New York" as city).
+        if (segments.length > 1) segments.pop();
       }
     }
   }
@@ -521,7 +525,9 @@ function parseSingleSegment(
       if (isAdmin) {
         const adminKey = candidate.trim().toLowerCase();
         const adminIsCity = cityNames.has(adminKey) || !!lookupCity(candidate);
-        if (!adminIsCity) { cityIdx--; continue; }
+        // Explicit fallthrough for US state names that are also known cities (e.g. "New York")
+        const isUSStateCity = !!US_STATES[candidate.trim().toUpperCase()] && cityNames.has(adminKey);
+        if (!adminIsCity && !isUSStateCity) { cityIdx--; continue; }
       }
       if (candidate.length <= 4 && (US_STATES[candidate.toUpperCase()] || isProvinceCode(candidate))) { cityIdx--; continue; }
       if (isPostalCode(candidate)) { cityIdx--; continue; }

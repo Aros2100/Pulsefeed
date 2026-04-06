@@ -650,7 +650,7 @@ export default function ArticleTypeClient() {
                     <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#5a6a85", marginBottom: "8px" }}>
                       Vælg korrekt kategori
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1px" }}>
                       {otherCategories.map((option) => {
                         const isChecked = checkedOption === option;
                         return (

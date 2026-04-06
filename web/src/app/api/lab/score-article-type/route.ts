@@ -7,7 +7,7 @@ import { getActivePrompt, scoreArticleType, type ActivePrompt } from "@/lib/lab/
 
 const CONCURRENCY  = 1;
 const DELAY_MS     = 1300;
-const BATCH_LIMIT  = 10;
+const BATCH_LIMIT  = 25;
 const FIXED_SPECIALTY = "neurosurgery";
 
 const schema = z.object({
