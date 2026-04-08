@@ -1,10 +1,10 @@
 // IMPORTANT: These filters must match the corresponding RPC functions in Supabase.
 // If you change filters here, also update:
 //   - get_scored_not_validated_articles (specialty_tag)
-//   - get_classification_not_validated_articles (classification)
+//   - get_subspecialty_not_validated_articles (subspecialty)
 //   - get_condensation_not_validated_articles (condensation)
 //   - get_article_type_not_validated_articles (article_type)
-//   - count_scored_not_validated, count_classification_not_validated, count_condensation_not_validated
+//   - count_scored_not_validated, count_subspecialty_not_validated, count_condensation_not_validated
 //   - count_article_type_not_validated
 
 /**
@@ -19,8 +19,8 @@ export const MODULE_FILTERS = {
     requireAbstract: false,
     nullCheck: "specialty_confidence",
   },
-  classification: {
-    description: "Approved C3 articles for classification",
+  subspecialty: {
+    description: "Approved C3 articles for subspecialty classification",
     filters: { status: "approved", circle: null },
     requireAbstract: true,
     nullCheck: "classification_scored_at",

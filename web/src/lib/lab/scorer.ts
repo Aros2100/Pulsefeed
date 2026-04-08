@@ -1,6 +1,6 @@
 import { trackedCall } from "@/lib/ai/tracked-client";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
+import { getSubspecialties } from "@/lib/lab/classification-options";
 import { ARTICLE_TYPE_OPTIONS } from "@/lib/lab/article-type-options";
 
 export const SCORING_MODEL = process.env.AI_SCORING_MODEL ?? "claude-haiku-4-5-20251001";
@@ -90,13 +90,15 @@ export async function scoreClassification(
   specialty: string,
   activePrompt: ActivePrompt
 ): Promise<ClassificationResult> {
+  const subspecialties = await getSubspecialties(specialty);
+
   const content = activePrompt.prompt
     .replace(/\{\{specialty\}\}|\{specialty\}/g,                 specialty)
     .replace(/\{\{title\}\}|\{title\}/g,                         article.title)
     .replace(/\{\{abstract\}\}|\{abstract\}/g,                   article.abstract ?? "No abstract available")
-    .replace(/\{\{subspecialty_list\}\}|\{subspecialty_list\}/g, SUBSPECIALTY_OPTIONS.join(", "));
+    .replace(/\{\{subspecialty_list\}\}|\{subspecialty_list\}/g, subspecialties.join(", "));
 
-  const message = await trackedCall(`classification_${activePrompt.version}`, {
+  const message = await trackedCall(`subspecialty_${activePrompt.version}`, {
     model: SCORING_MODEL,
     max_tokens: 512,
     messages: [{ role: "user", content }],
@@ -104,7 +106,7 @@ export async function scoreClassification(
 
   const raw = (message.content[0] as { type: string; text: string }).text.trim();
 
-  const subspecialtySet = new Set<string>(SUBSPECIALTY_OPTIONS);
+  const subspecialtySet = new Set<string>(subspecialties);
 
   try {
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
