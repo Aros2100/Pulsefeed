@@ -12,6 +12,7 @@ export const ARTICLE_TYPE_OPTIONS = [
   "Tech",
   "Administration",
   "Letters & Notices",
+  "Unclassified",
 ] as const;
 
 export type ArticleTypeOption = typeof ARTICLE_TYPE_OPTIONS[number];
@@ -28,4 +29,5 @@ export const ARTICLE_TYPE_METADATA: { value: ArticleTypeOption; isStudyType: boo
   { value: "Tech",                     isStudyType: false },
   { value: "Administration",           isStudyType: false },
   { value: "Letters & Notices",        isStudyType: false },
+  { value: "Unclassified",             isStudyType: false },
 ];
