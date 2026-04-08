@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { SPECIALTIES } from "@/lib/auth/specialties";
 import SearchClient from "./SearchClient";
 
 export default async function SearchPage({
@@ -27,15 +26,7 @@ export default async function SearchPage({
   // Derive distinct specialty tags from all loaded articles (equivalent to SELECT DISTINCT unnest)
   const specialtyTags = [...new Set(
     (articles ?? []).flatMap((a) => (a.specialty_tags as string[] | null) ?? [])
-  )].sort((a, b) => {
-    // Sort: known SPECIALTIES order first, then alphabetical
-    const ai = SPECIALTIES.findIndex((s) => s.slug === a);
-    const bi = SPECIALTIES.findIndex((s) => s.slug === b);
-    if (ai !== -1 && bi !== -1) return ai - bi;
-    if (ai !== -1) return -1;
-    if (bi !== -1) return 1;
-    return a.localeCompare(b);
-  });
+  )].sort((a, b) => a.localeCompare(b));
 
   const params = await searchParams;
   const initialSpecialties = params.specialties

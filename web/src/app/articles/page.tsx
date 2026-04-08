@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { SPECIALTIES, ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { getSubspecialties } from "@/lib/lab/classification-options";
 import { REGION_MAP, getContinent } from "@/lib/geo/continent-map";
 import ArticleListClient from "./ArticleListClient";
@@ -126,8 +126,7 @@ export default async function ArticlesPage({
   const totalPages = Math.ceil((totalCount ?? 0) / PAGE_SIZE);
 
   const specialtyLabel = (profile?.specialty_slugs ?? [])
-    .map((s) => SPECIALTIES.find((sp) => sp.slug === s)?.label)
-    .filter(Boolean)
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, " "))
     .join(", ") || "All specialties";
 
   const savedMap: Record<string, string | null> = {};

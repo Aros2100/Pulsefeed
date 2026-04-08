@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SPECIALTIES } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import TaggingNav from "../TaggingNav";
 import CombosClient from "./CombosClient";
 
 export default async function CombosPage() {
   const admin = createAdminClient();
-  const activeSpecialties = SPECIALTIES.filter((s) => s.active).map((s) => s.slug);
+  const activeSpecialties = [ACTIVE_SPECIALTY];
   const specialty = activeSpecialties[0] ?? "neurosurgery";
 
   // Fetch combo rules

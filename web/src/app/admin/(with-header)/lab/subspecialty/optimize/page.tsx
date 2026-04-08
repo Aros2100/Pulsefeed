@@ -1,26 +1,11 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SPECIALTIES } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import PatternAnalysis, { type OptimizationRun } from "@/components/lab/PatternAnalysis";
 
 export default async function ClassificationOptimizePage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  const { data: profile } = await supabase
-    .from("users")
-    .select("specialty_slugs")
-    .eq("id", user!.id)
-    .single();
-
-  const userSpecialties: string[] = (profile?.specialty_slugs as string[] | null) ?? [];
-  const activeSpec =
-    SPECIALTIES.find((s) => s.active && userSpecialties.includes(s.slug)) ??
-    SPECIALTIES.find((s) => s.active);
-
-  const specialty      = activeSpec?.slug  ?? "neurosurgery";
-  const specialtyLabel = activeSpec?.label ?? "Neurosurgery";
+  const specialty = ACTIVE_SPECIALTY;
+  const specialtyLabel = ACTIVE_SPECIALTY.charAt(0).toUpperCase() + ACTIVE_SPECIALTY.slice(1);
 
   const admin = createAdminClient();
 
@@ -29,7 +14,7 @@ export default async function ClassificationOptimizePage() {
     .from("model_versions")
     .select("version")
     .eq("specialty", specialty)
-    .eq("module", "classification_subspecialty")
+    .eq("module", "subspecialty")
     .eq("active", true)
     .limit(1)
     .maybeSingle();
@@ -42,14 +27,14 @@ export default async function ClassificationOptimizePage() {
           .from("lab_decisions")
           .select("decision, ai_decision")
           .eq("specialty", specialty)
-          .eq("module", "classification_subspecialty")
+          .eq("module", "subspecialty")
           .eq("model_version", activeModelVersion)
           .not("ai_decision", "is", null)
       : admin
           .from("lab_decisions")
           .select("decision, ai_decision")
           .eq("specialty", specialty)
-          .eq("module", "classification_subspecialty")
+          .eq("module", "subspecialty")
           .not("ai_decision", "is", null)
     ),
 
@@ -57,7 +42,7 @@ export default async function ClassificationOptimizePage() {
       .from("model_optimization_runs")
       .select("id, base_version, total_decisions, fp_count, fn_count, fp_patterns, fn_patterns, recommended_changes, improved_prompt, created_at")
       .eq("specialty", specialty)
-      .eq("module", "classification_subspecialty")
+      .eq("module", "subspecialty")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -78,7 +63,7 @@ export default async function ClassificationOptimizePage() {
 
         {/* Back */}
         <div style={{ marginBottom: "8px" }}>
-          <Link href="/admin/lab/classification/evaluation" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+          <Link href="/admin/lab/subspecialty/evaluation" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
             ← Prompt Evaluation
           </Link>
         </div>
@@ -105,11 +90,11 @@ export default async function ClassificationOptimizePage() {
         {/* Pattern analysis */}
         <PatternAnalysis
           specialty={specialty}
-          module="classification_subspecialty"
+          module="subspecialty"
           initialRun={latestRun}
           disabled={!hasSufficientData}
           accentColor="#7c3aed"
-          simulatePath="/admin/lab/classification/simulate"
+          simulatePath="/admin/lab/subspecialty/simulate"
         />
 
       </div>

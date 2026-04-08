@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { SPECIALTIES } from "@/lib/auth/specialties";
 
 interface Article {
   id: string;
@@ -58,8 +57,6 @@ function relevanceInfo(cr: string | null): { label: string; bg: string; color: s
 }
 
 function specialtyLabel(slug: string): string {
-  const known = SPECIALTIES.find((s) => s.slug === slug);
-  if (known) return known.label;
   return slug.charAt(0).toUpperCase() + slug.slice(1).replace(/-/g, " ");
 }
 

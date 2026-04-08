@@ -1,14 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
 
   const specialty = request.nextUrl.searchParams.get("specialty");
-  if (!specialty || !(SPECIALTY_SLUGS as readonly string[]).includes(specialty)) {
+  if (!specialty || specialty !== ACTIVE_SPECIALTY) {
     return NextResponse.json(
       { ok: false, error: "Missing or invalid specialty" },
       { status: 400 }

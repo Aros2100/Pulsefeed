@@ -3,7 +3,7 @@ import { z } from "zod";
 import pLimit from "p-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { getActivePrompt, scoreArticle, type ActivePrompt } from "@/lib/lab/scorer";
 import { logArticleEvent } from "@/lib/article-events";
 
@@ -13,10 +13,11 @@ const BATCH_LIMIT  = 100;
 
 const schema = z.object({
   specialty: z.string().refine(
-    (v) => (SPECIALTY_SLUGS as readonly string[]).includes(v),
+    (v) => v === ACTIVE_SPECIALTY,
     { message: "Invalid specialty" }
   ),
   scoreAll: z.boolean().default(false),
+  limit: z.number().int().positive().optional(),
 });
 
 type Article = { id: string; title: string; abstract: string | null; specialty_tags: string[] | null };
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
   }
 
-  const { specialty, scoreAll } = result.data;
+  const { specialty, scoreAll, limit: userLimit } = result.data;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
@@ -137,7 +138,7 @@ export async function POST(request: NextRequest) {
     .select("id, title, abstract, specialty_tags")
     .in("id", ids)
     .order("circle", { ascending: false, nullsFirst: false })
-    .limit(scoreAll ? BATCH_LIMIT : remaining);
+    .limit(scoreAll ? BATCH_LIMIT : Math.min(userLimit ?? remaining, remaining));
 
   if (fetchError) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
@@ -154,6 +155,8 @@ export async function POST(request: NextRequest) {
       }
 
       let scored = 0;
+      let approved = 0;
+      let rejected = 0;
       const failedIds: string[] = [];
       const limiter = pLimit(CONCURRENCY);
 
@@ -174,6 +177,8 @@ export async function POST(request: NextRequest) {
                   })
                   .eq("id", article.id);
                 if (error) throw new Error(error.message);
+                scored++;
+                if (score.ai_decision === "approved") approved++; else rejected++;
                 await admin
                   .from("article_specialties")
                   .update({
@@ -189,7 +194,6 @@ export async function POST(request: NextRequest) {
                   model_version:        score.version,
                   specialty_tags:       article.specialty_tags,
                 });
-                scored++;
               } catch (e) {
                 console.error(`[score-batch] failed article ${article.id}:`, e);
                 failedIds.push(article.id);
@@ -212,9 +216,9 @@ export async function POST(request: NextRequest) {
             .in("id", failedIds);
         }
 
-        send({ done: true, scored, failed: failedIds.length, total: toScore.length });
+        send({ done: true, scored, approved, rejected, failed: failedIds.length, total: toScore.length });
       } catch (e) {
-        send({ done: true, error: String(e), scored, failed: failedIds.length, total: toScore.length });
+        send({ done: true, error: String(e), scored, approved, rejected, failed: failedIds.length, total: toScore.length });
       } finally {
         controller.close();
       }

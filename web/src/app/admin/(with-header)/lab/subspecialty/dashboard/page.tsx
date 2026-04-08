@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SPECIALTIES } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import BenchmarkTable from "@/components/lab/BenchmarkTable";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -45,17 +44,7 @@ interface VersionStats {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default async function ClassificationDashboardPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  const { data: profile } = await supabase
-    .from("users").select("specialty_slugs").eq("id", user!.id).single();
-
-  const userSpecialties: string[] = (profile?.specialty_slugs as string[] | null) ?? [];
-  const activeSpec =
-    SPECIALTIES.find((s) => s.active && userSpecialties.includes(s.slug)) ??
-    SPECIALTIES.find((s) => s.active);
-  const specialty = activeSpec?.slug ?? "neurosurgery";
+  const specialty = ACTIVE_SPECIALTY;
 
   const admin = createAdminClient();
 
@@ -64,7 +53,7 @@ export default async function ClassificationDashboardPage() {
     .from("model_versions")
     .select("version, activated_at, active")
     .eq("specialty", specialty)
-    .eq("module", "classification_subspecialty")
+    .eq("module", "subspecialty")
     .order("activated_at", { ascending: false });
 
   const rawVersions = versionsRes.data ?? [];
@@ -92,7 +81,7 @@ export default async function ClassificationDashboardPage() {
       .from("lab_decisions")
       .select("model_version, ai_decision, decision, ai_confidence, disagreement_reason")
       .eq("specialty", specialty)
-      .eq("module", "classification_subspecialty")
+      .eq("module", "subspecialty")
       .not("ai_decision", "is", null)
       .range(from, from + 999);
     if (!data || data.length === 0) break;
@@ -219,8 +208,8 @@ export default async function ClassificationDashboardPage() {
 
         {/* Back */}
         <div style={{ marginBottom: "8px" }}>
-          <Link href="/admin/lab/classification" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
-            ← Klassificering
+          <Link href="/admin/lab/subspecialty" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+            ← Subspecialer
           </Link>
         </div>
 

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest, after } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { runImportCircle2 } from "@/specialties/neurosurgery/filter-c2";
 import { runCitationFetch } from "@/lib/import/fetch-citations";
 import { runAILocationParsing } from "@/lib/geo/ai-location-scorer";
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   if (!auth.ok) return auth.response;
 
   const specialty = request.nextUrl.searchParams.get("specialty");
-  if (!specialty || !(SPECIALTY_SLUGS as readonly string[]).includes(specialty)) {
+  if (!specialty || specialty !== ACTIVE_SPECIALTY) {
     return NextResponse.json(
       { ok: false, error: "Missing or invalid specialty" },
       { status: 400 }

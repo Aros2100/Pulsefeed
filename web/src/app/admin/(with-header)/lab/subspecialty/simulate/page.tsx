@@ -5,9 +5,9 @@ import SimulatorClient, { type SimulationDisagreement, type SimulationAgreement,
 const CONFIG: SimulatorConfig = {
   label: "Classification",
   accent: "#7c3aed",
-  optimizeHref: "/admin/lab/classification/optimize",
+  optimizeHref: "/admin/lab/subspecialty/optimize",
   resultType: "tags",
-  scoreEndpoint: "/api/lab/score-classification",
+  scoreEndpoint: "/api/lab/score-subspecialty",
   rescoreIncludesSpecialty: true,
   showSpecialtyInSubtitle: true,
   regressionCommentPlaceholder: "Fx: Korrekt — ren neurologi",
@@ -55,7 +55,7 @@ type RawDecision = {
 export default async function ClassificationSimulatePage({ searchParams }: Props) {
   const { run_id } = await searchParams;
 
-  if (!run_id) redirect("/admin/lab/classification/optimize");
+  if (!run_id) redirect("/admin/lab/subspecialty/optimize");
 
   const admin = createAdminClient();
 
@@ -69,7 +69,7 @@ export default async function ClassificationSimulatePage({ searchParams }: Props
       .single() as unknown as Promise<RunResult>
   );
 
-  if (!run) redirect("/admin/lab/classification/optimize");
+  if (!run) redirect("/admin/lab/subspecialty/optimize");
 
   // Fetch all decisions
   const [{ data: rawDecisions }, { data: rawAgreementData }] = await Promise.all([
@@ -77,7 +77,7 @@ export default async function ClassificationSimulatePage({ searchParams }: Props
       .from("lab_decisions")
       .select("decision, ai_decision, ai_confidence, disagreement_reason, article_id, articles(title, journal_title)")
       .eq("specialty", run.specialty)
-      .eq("module", "classification_subspecialty")
+      .eq("module", "subspecialty")
       .not("ai_decision", "is", null)
       .order("decided_at", { ascending: false }),
 
@@ -85,7 +85,7 @@ export default async function ClassificationSimulatePage({ searchParams }: Props
       .from("lab_decisions")
       .select("decision, ai_decision, ai_confidence, article_id, articles(title, journal_title)")
       .eq("specialty", run.specialty)
-      .eq("module", "classification_subspecialty")
+      .eq("module", "subspecialty")
       .not("ai_decision", "is", null)
       .order("decided_at", { ascending: false })
       .limit(300),

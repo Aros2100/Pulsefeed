@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { runAutoTag } from "@/lib/tagging/auto-tagger";
-import { SPECIALTIES } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 async function runAllAutoTag() {
-  const activeSpecialties = SPECIALTIES.filter((s) => s.active).map((s) => s.slug);
+  const activeSpecialties = [ACTIVE_SPECIALTY];
 
   for (const specialty of activeSpecialties) {
     const result = await runAutoTag(specialty);

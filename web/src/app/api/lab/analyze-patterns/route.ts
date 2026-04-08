@@ -2,14 +2,14 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { getActivePrompt, ANALYSIS_MODEL } from "@/lib/lab/scorer";
 import { trackedCall } from "@/lib/ai/tracked-client";
-import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
+import { getSubspecialties } from "@/lib/lab/classification-options";
 
 const schema = z.object({
   specialty: z.string().refine(
-    (v) => (SPECIALTY_SLUGS as readonly string[]).includes(v),
+    (v) => v === ACTIVE_SPECIALTY,
     { message: "Invalid specialty" }
   ),
   module: z.string().min(1),
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
   }
 
-  const isClassification = module === "classification_subspecialty";
+  const isClassification = module === "subspecialty";
   const isCondensation   = module.startsWith("condensation");
 
   // Condensation: all rejections are quality issues (ai_decision is always "approved")
@@ -95,8 +95,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
+  const subspecialties = await getSubspecialties(specialty);
+
   const promptForOptimization = activePrompt.prompt
-    .replace(SUBSPECIALTY_OPTIONS.join(", "), "{{subspecialty_list}}");
+    .replace(subspecialties.join(", "), "{{subspecialty_list}}");
 
   let userMessage: string;
 

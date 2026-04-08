@@ -3,22 +3,17 @@
 import { useState } from "react";
 import ProfileAvatarUpload from "./ProfileAvatarUpload";
 import ProfilePrivacyClient from "./ProfilePrivacyClient";
-import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
-
 const MANDATORY_SUBSPECIALTY: string = "Neurosurgery";
 
-// Normalize legacy subspecialty names (e.g. "Functional, pain and epilepsy surgery")
-// to the canonical SUBSPECIALTY_OPTIONS entry so that electiveCount is accurate.
 function normalizeKey(s: string): string {
   return s.toLowerCase().replace(/,/g, "").replace(/\s+/g, " ").trim();
 }
-const CANONICAL_MAP = Object.fromEntries(
-  SUBSPECIALTY_OPTIONS.map((opt) => [normalizeKey(opt), opt]),
-);
-function normalizeSubspecialties(subs: string[]): string[] {
-  return subs.map((s) =>
-    s === MANDATORY_SUBSPECIALTY ? s : (CANONICAL_MAP[normalizeKey(s)] ?? s),
+function makeNormalizeSubspecialties(allSubspecialties: string[]) {
+  const canonicalMap = Object.fromEntries(
+    allSubspecialties.map((opt) => [normalizeKey(opt), opt]),
   );
+  return (subs: string[]) =>
+    subs.map((s) => s === MANDATORY_SUBSPECIALTY ? s : (canonicalMap[normalizeKey(s)] ?? s));
 }
 
 interface Props {
@@ -44,6 +39,7 @@ interface Props {
   displayName:               string;
   firstArticleDate:          string | null;
   latestArticleDate:         string | null;
+  subspecialties:            string[];
 }
 
 function formatDate(d: string | null | undefined): string {
@@ -114,8 +110,10 @@ export default function ProfileClient({
   initialIsPublic, initialEmailNotifications, articleCount, specialtyLabels,
   initialSubspecialties, initialCountry, initialCity, initialState,
   initialHospital, initialDepartment, avatarUrl, displayName,
-  firstArticleDate, latestArticleDate,
+  firstArticleDate, latestArticleDate, subspecialties: allSubspecialties,
 }: Props) {
+  const normalizeSubspecialties = makeNormalizeSubspecialties(allSubspecialties);
+
   const [name, setName]                     = useState(initialName);
   const [title, setTitle]                   = useState(initialTitle);
   const [specialtySlugs] = useState(initialSpecialtySlugs);
@@ -216,7 +214,7 @@ export default function ProfileClient({
                     Select subspecialties (max 3)
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
-                    {SUBSPECIALTY_OPTIONS.filter(s => s !== MANDATORY_SUBSPECIALTY).map((sub) => {
+                    {allSubspecialties.filter(s => s !== MANDATORY_SUBSPECIALTY).map((sub) => {
                       const selected = tempSub.includes(sub);
                       const electiveCount = tempSub.filter(s => s !== MANDATORY_SUBSPECIALTY).length;
                       const disabled = !selected && electiveCount >= 3;

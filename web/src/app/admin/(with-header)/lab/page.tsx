@@ -1,30 +1,16 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SPECIALTIES } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 export default async function LabPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const specialty = ACTIVE_SPECIALTY;
 
-  const { data: profile } = await supabase
-    .from("users")
-    .select("specialty_slugs")
-    .eq("id", user!.id)
-    .single();
-
-  const userSpecialties: string[] = (profile?.specialty_slugs as string[] | null) ?? [];
-  const activeSpec = SPECIALTIES.find(
-    (s) => s.active && userSpecialties.includes(s.slug)
-  ) ?? SPECIALTIES.find((s) => s.active);
-
-  const specialty = activeSpec?.slug ?? "neurosurgery";
-
-  const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
 
   const [specQueueResult, clsQueueResult, cndQueueResult, atQueueResult] = await Promise.all([
     admin.rpc("count_scored_not_validated", { p_specialty: specialty }),
-    admin.rpc("count_classification_not_validated", { p_specialty: specialty }),
+    admin.rpc("count_subspecialty_not_validated", { p_specialty: specialty }),
     admin.rpc("count_condensation_not_validated", { p_specialty: specialty }),
     admin.rpc("count_article_type_not_validated"),
   ]);
@@ -43,10 +29,10 @@ export default async function LabPage() {
       color: "#E83B2A",
     },
     {
-      title: "Klassificering",
+      title: "Subspecialer",
       description: "Klassificér artikler i sub-specialer og træn klassificeringsmodellen",
       queue: clsQueueCount,
-      href: "/admin/lab/classification",
+      href: "/admin/lab/subspecialty",
       color: "#7c3aed",
     },
     {

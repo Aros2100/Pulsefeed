@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { SPECIALTIES } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 interface Props {
   initialName:           string;
@@ -186,7 +186,7 @@ export default function ProfileEditClient({ initialName, initialTitle, initialSp
             {editingSpec ? (
               <div style={{ marginTop: "8px" }}>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
-                  {SPECIALTIES.map((s) => (
+                  {[{ slug: ACTIVE_SPECIALTY, label: ACTIVE_SPECIALTY.charAt(0).toUpperCase() + ACTIVE_SPECIALTY.slice(1) }].map((s) => (
                     <button
                       key={s.slug}
                       onClick={() => toggleSlug(s.slug)}
@@ -213,7 +213,7 @@ export default function ProfileEditClient({ initialName, initialTitle, initialSp
             ) : slugs.length > 0 ? (
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
                 {slugs.map((slug) => {
-                  const label = SPECIALTIES.find((s) => s.slug === slug)?.label ?? slug;
+                  const label = slug.charAt(0).toUpperCase() + slug.slice(1).replace(/-/g, " ");
                   return (
                     <span key={slug} style={{ background: "#EEF2F7", borderRadius: "6px", padding: "3px 10px", fontSize: "12px", fontWeight: 600, color: "#1a1a1a" }}>
                       {label}

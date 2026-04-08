@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SPECIALTIES, ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import ArticleStamkort, { type ArticleData } from "@/components/articles/ArticleStamkort";
 import AdminArticleTabs from "./AdminArticleTabs";
 import ArticleEditableFields from "./ArticleEditableFields";
@@ -19,7 +19,7 @@ function fmt(iso: string | null) {
 }
 
 function specialtyLabel(slug: string) {
-  return SPECIALTIES.find((s) => s.slug === slug)?.label ?? slug;
+  return slug.charAt(0).toUpperCase() + slug.slice(1).replace(/-/g, " ");
 }
 
 // ── Timeline colours ──────────────────────────────────────────────────────────

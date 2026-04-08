@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SPECIALTIES } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -87,8 +87,8 @@ export default async function SpecialtyImportPage({
   params: Promise<{ specialty: string }>;
 }) {
   const { specialty } = await params;
-  const spec = SPECIALTIES.find((s) => s.slug === specialty);
-  if (!spec) notFound();
+  if (specialty !== ACTIVE_SPECIALTY) notFound();
+  const spec = { label: ACTIVE_SPECIALTY.charAt(0).toUpperCase() + ACTIVE_SPECIALTY.slice(1) };
 
   const admin = createAdminClient();
 

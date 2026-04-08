@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { logArticleEvent } from "@/lib/article-events";
 
 const TAG_REMAP: Record<string, string> = {
@@ -21,7 +21,7 @@ const TAG_REMAP: Record<string, string> = {
 
 const schema = z.object({
   article_id: z.string().uuid(),
-  specialty: z.string().refine((v) => (SPECIALTY_SLUGS as readonly string[]).includes(v), {
+  specialty: z.string().refine((v) => v === ACTIVE_SPECIALTY, {
     message: "Invalid specialty",
   }),
   editor_verdict: z.enum(["relevant", "not_relevant", "unsure"]),

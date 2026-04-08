@@ -2,13 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 const createSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   specialty: z
     .string()
-    .refine((v) => (SPECIALTY_SLUGS as readonly string[]).includes(v), {
+    .refine((v) => v === ACTIVE_SPECIALTY, {
       message: "Invalid specialty",
     }),
   query_string: z.string().min(1, "Query is required"),
@@ -23,7 +23,7 @@ const updateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   specialty: z
     .string()
-    .refine((v) => (SPECIALTY_SLUGS as readonly string[]).includes(v))
+    .refine((v) => v === ACTIVE_SPECIALTY)
     .optional(),
   query_string: z.string().min(1).optional(),
   journal_list: z.array(z.string()).optional(),

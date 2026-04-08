@@ -2,9 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
-
-const SUBSPECIALTY_SET = new Set<string>(SUBSPECIALTY_OPTIONS as unknown as string[]);
 
 interface SuggestedAuthor {
   id: string;
@@ -20,11 +17,13 @@ interface SuggestedAuthor {
 
 interface Props {
   userSubspecialties: string[] | null;
+  allSubspecialties: string[];
 }
 
-export default function SuggestedAuthors({ userSubspecialties }: Props) {
+export default function SuggestedAuthors({ userSubspecialties, allSubspecialties }: Props) {
   // Filter to canonical subspecialties only (exclude top-level "Neurosurgery")
-  const subTabs = (userSubspecialties ?? []).filter((s) => SUBSPECIALTY_SET.has(s));
+  const subspecialtySet = new Set<string>(allSubspecialties);
+  const subTabs = (userSubspecialties ?? []).filter((s) => subspecialtySet.has(s));
 
   const [activeSubFilter, setActiveSubFilter] = useState<string>("All");
   const [authors, setAuthors] = useState<SuggestedAuthor[]>([]);

@@ -1,24 +1,25 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
 
   const specialty = request.nextUrl.searchParams.get("specialty");
-  if (!specialty || !(SPECIALTY_SLUGS as readonly string[]).includes(specialty)) {
+  if (!specialty || specialty !== ACTIVE_SPECIALTY) {
     return NextResponse.json(
       { ok: false, error: "Missing or invalid specialty" },
       { status: 400 }
     );
   }
 
-  const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
 
   const { data: articles, error } = await admin.rpc(
-    "get_classification_not_validated_articles",
+    "get_subspecialty_not_validated_articles",
     { p_specialty: specialty, p_limit: 100 },
   );
 

@@ -2,15 +2,15 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { trackedCall } from "@/lib/ai/tracked-client";
-import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
+import { getSubspecialties } from "@/lib/lab/classification-options";
 
 const DELAY_MS = 1300; // stay safely under 50 req/min
 
 const schema = z.object({
   specialty: z.string().refine(
-    (v) => (SPECIALTY_SLUGS as readonly string[]).includes(v),
+    (v) => v === ACTIVE_SPECIALTY,
     { message: "Invalid specialty" }
   ),
   prompt: z.string().min(10),
@@ -30,11 +30,13 @@ async function scoreWithPrompt(
   specialty: string,
   promptTemplate: string
 ): Promise<ScoreResult> {
+  const subspecialties = await getSubspecialties(specialty);
+
   const content = promptTemplate
     .replace(/\{\{specialty\}\}|\{specialty\}/g,                 specialty)
     .replace(/\{\{title\}\}|\{title\}/g,                         article.title)
     .replace(/\{\{abstract\}\}|\{abstract\}/g,                   article.abstract ?? "No abstract available")
-    .replace(/\{\{subspecialty_list\}\}|\{subspecialty_list\}/g, SUBSPECIALTY_OPTIONS.join(", "));
+    .replace(/\{\{subspecialty_list\}\}|\{subspecialty_list\}/g, subspecialties.join(", "));
 
   const message = await trackedCall("simulate_prompt", {
     model: "claude-haiku-4-5-20251001",

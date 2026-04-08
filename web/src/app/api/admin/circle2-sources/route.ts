@@ -2,14 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 const SOURCE_TYPES = ["mesh", "text", "author", "institution", "citation", "doi", "keyword", "affiliation"] as const;
 
 const createSchema = z.object({
   specialty: z
     .string()
-    .refine((v) => (SPECIALTY_SLUGS as readonly string[]).includes(v), {
+    .refine((v) => v === ACTIVE_SPECIALTY, {
       message: "Invalid specialty",
     }),
   type: z.enum(SOURCE_TYPES),
@@ -23,7 +23,7 @@ const updateSchema = z.object({
   id: z.string().uuid("Invalid source ID"),
   specialty: z
     .string()
-    .refine((v) => (SPECIALTY_SLUGS as readonly string[]).includes(v))
+    .refine((v) => v === ACTIVE_SPECIALTY)
     .optional(),
   type: z.enum(SOURCE_TYPES).optional(),
   value: z.string().min(1).optional(),
@@ -132,7 +132,7 @@ export async function PATCH(request: NextRequest) {
 const bulkAffiliationSchema = z.object({
   specialty: z
     .string()
-    .refine((v) => (SPECIALTY_SLUGS as readonly string[]).includes(v), {
+    .refine((v) => v === ACTIVE_SPECIALTY, {
       message: "Invalid specialty",
     }),
   terms: z.array(z.string().min(1)).max(500),

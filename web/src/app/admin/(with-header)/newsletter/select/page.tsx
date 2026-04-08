@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { SPECIALTIES } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import NewsletterSelectClient from "./NewsletterSelectClient";
 
 function getISOWeek(d: Date): number {
@@ -26,8 +26,7 @@ export default async function NewsletterSelectPage() {
 
   const specialtySlugs: string[] = profile?.specialty_slugs ?? [];
   const specialtyLabel = specialtySlugs
-    .map((s) => SPECIALTIES.find((sp) => sp.slug === s)?.label)
-    .filter(Boolean)
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, " "))
     .join(", ") || "All specialties";
 
   // Fetch articles from the last 14 days

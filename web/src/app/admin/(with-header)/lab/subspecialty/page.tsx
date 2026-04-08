@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SPECIALTIES } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { SectionCard } from "../SectionCard";
 
 function fmtDate(iso: string | null): string {
@@ -16,21 +15,7 @@ function fmtDate(iso: string | null): string {
 }
 
 export default async function ClassificationOverviewPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  const { data: profile } = await supabase
-    .from("users")
-    .select("specialty_slugs")
-    .eq("id", user!.id)
-    .single();
-
-  const userSpecialties: string[] = (profile?.specialty_slugs as string[] | null) ?? [];
-  const activeSpec = SPECIALTIES.find(
-    (s) => s.active && userSpecialties.includes(s.slug)
-  ) ?? SPECIALTIES.find((s) => s.active);
-
-  const specialty = activeSpec?.slug ?? "neurosurgery";
+  const specialty = ACTIVE_SPECIALTY;
 
   const admin = createAdminClient();
 
@@ -48,13 +33,13 @@ export default async function ClassificationOverviewPage() {
       .from("lab_decisions")
       .select("*", { count: "exact", head: true })
       .eq("specialty", specialty)
-      .eq("module", "classification_subspecialty")
+      .eq("module", "subspecialty")
       .not("ai_decision", "is", null),
     admin
       .from("lab_decisions")
       .select("*", { count: "exact", head: true })
       .eq("specialty", specialty)
-      .eq("module", "classification_subspecialty")
+      .eq("module", "subspecialty")
       .eq("disagreement_reason", "corrected"),
 
     // Last decision
@@ -62,7 +47,7 @@ export default async function ClassificationOverviewPage() {
       .from("lab_decisions")
       .select("decided_at")
       .eq("specialty", specialty)
-      .eq("module", "classification_subspecialty")
+      .eq("module", "subspecialty")
       .order("decided_at", { ascending: false })
       .limit(1),
   ]);
@@ -103,7 +88,7 @@ export default async function ClassificationOverviewPage() {
             The Lab
           </div>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
-            Klassificering
+            Subspecialer
           </h1>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
             Klassificér artikler i sub-specialer
@@ -147,7 +132,7 @@ export default async function ClassificationOverviewPage() {
                 ? `Start session · ${queueCount} artikler →`
                 : "Start session →"
             }
-            actionHref="/admin/lab/classification/session"
+            actionHref="/admin/lab/subspecialty/session"
             actionColor="#7c3aed"
           />
 
@@ -178,7 +163,7 @@ export default async function ClassificationOverviewPage() {
               },
             ]}
             actionLabel="Se detaljer →"
-            actionHref="/admin/lab/classification/dashboard"
+            actionHref="/admin/lab/subspecialty/dashboard"
           />
 
           {/* Card 3: Prompt */}
@@ -198,7 +183,7 @@ export default async function ClassificationOverviewPage() {
               },
             ]}
             actionLabel="Evaluér prompt →"
-            actionHref="/admin/lab/classification/evaluation"
+            actionHref="/admin/lab/subspecialty/evaluation"
             actionColor="#d97706"
           />
 

@@ -65,7 +65,8 @@ export default function SystemCards({ hasAlerts }: { hasAlerts: boolean }) {
       gap: "32px",
     }}>
       <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", justifyContent: "center" }}>
-        <Card href="/admin/system/import"  emoji="📥" label="Import"  sub="PubMed import-statistik" />
+        <Card href="/admin/system/import"   emoji="📥" label="Import"   sub="PubMed import-statistik" />
+        <Card href="/admin/system/scoring"  emoji="🤖" label="Scoring"  sub="AI-scoring af artikler" />
 <Card href="/admin/system/auto-tagging" emoji="🏷️" label="Auto-Tagging" sub="MeSH auto-tagging rules" />
         <Card href="/admin/system/alerts"  emoji="🔔" label="Alerts"  sub="System-beskeder til brugere" badge={hasAlerts} />
         <Card href="/admin/system/cost"    emoji="💰" label="Cost"    sub="AI API-forbrug" />

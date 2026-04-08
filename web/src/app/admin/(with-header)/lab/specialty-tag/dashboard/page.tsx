@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SPECIALTIES } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import BenchmarkTable from "@/components/lab/BenchmarkTable";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -45,17 +44,7 @@ interface VersionStats {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  const { data: profile } = await supabase
-    .from("users").select("specialty_slugs").eq("id", user!.id).single();
-
-  const userSpecialties: string[] = (profile?.specialty_slugs as string[] | null) ?? [];
-  const activeSpec =
-    SPECIALTIES.find((s) => s.active && userSpecialties.includes(s.slug)) ??
-    SPECIALTIES.find((s) => s.active);
-  const specialty = activeSpec?.slug ?? "neurosurgery";
+  const specialty = ACTIVE_SPECIALTY;
 
   const admin = createAdminClient();
 

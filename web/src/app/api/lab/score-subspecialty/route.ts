@@ -3,7 +3,7 @@ import { z } from "zod";
 import pLimit from "p-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { getActivePrompt, scoreClassification, type ActivePrompt } from "@/lib/lab/scorer";
 import { applyUnscoredFilters } from "@/lib/lab/article-filters";
 
@@ -13,7 +13,7 @@ const BATCH_LIMIT  = 100;
 
 const schema = z.object({
   specialty: z.string().refine(
-    (v) => (SPECIALTY_SLUGS as readonly string[]).includes(v),
+    (v) => v === ACTIVE_SPECIALTY,
     { message: "Invalid specialty" }
   ),
   scoreAll: z.boolean().optional().default(false),
@@ -38,13 +38,13 @@ async function classifyWithRetry(
 ) {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      console.log("[score-classification] article id:", article.id);
+      console.log("[score-subspecialty] article id:", article.id);
       return await scoreClassification(article, specialty, activePrompt);
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
       if (status === 429 && attempt < retries - 1) {
         const waitMs = (attempt + 1) * 60_000;
-        console.warn(`[score-classification] rate limited — waiting ${waitMs / 1000}s before retry ${attempt + 1}/${retries - 1}`);
+        console.warn(`[score-subspecialty] rate limited — waiting ${waitMs / 1000}s before retry ${attempt + 1}/${retries - 1}`);
         await new Promise((r) => setTimeout(r, waitMs));
         continue;
       }
@@ -68,11 +68,12 @@ export async function POST(request: NextRequest) {
   }
 
   const { specialty, scoreAll } = result.data;
-  const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
 
   let activePrompt;
   try {
-    activePrompt = await getActivePrompt(specialty, "classification_subspecialty");
+    activePrompt = await getActivePrompt(specialty, "subspecialty");
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
   } else {
     // Normal Lab-scoring: fill up to BATCH_LIMIT
     const { data: alreadyScoredCount } = await admin.rpc(
-      "count_classification_not_validated",
+      "count_subspecialty_not_validated",
       { p_specialty: specialty },
     );
     const existing = Number(alreadyScoredCount ?? 0);
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
 
     const filteredQuery = await applyUnscoredFilters(
       admin.from("articles").select("id, title, abstract"),
-      "classification",
+      "subspecialty",
       specialty,
       admin,
     );
@@ -170,7 +171,7 @@ export async function POST(request: NextRequest) {
               } catch (e) {
                 const status = (e as { status?: number })?.status;
                 const msg = (e as Error)?.message ?? String(e);
-                console.error(`[score-classification] failed article ${article.id} (status=${status}): ${msg}`);
+                console.error(`[score-subspecialty] failed article ${article.id} (status=${status}): ${msg}`);
                 failedIds.push(article.id);
               }
               send({ scored, failed: failedIds.length, total: toScore.length });

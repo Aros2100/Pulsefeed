@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { SPECIALTIES } from "@/lib/auth/specialties";
-import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 const EXTRA_TAGS: { slug: string; label: string }[] = [
   { slug: "neuroscience",       label: "Neuroscience" },
@@ -12,7 +11,7 @@ const EXTRA_TAGS: { slug: string; label: string }[] = [
 ];
 
 const ALL_TAGS = [
-  ...SPECIALTIES.map((s) => ({ slug: s.slug as string, label: s.label as string })),
+  { slug: ACTIVE_SPECIALTY, label: ACTIVE_SPECIALTY.charAt(0).toUpperCase() + ACTIVE_SPECIALTY.slice(1) },
   ...EXTRA_TAGS,
 ];
 
@@ -25,6 +24,7 @@ interface Props {
   initialSpecialtyMatch: boolean | null;
   initialSpecialty:      string;
   initialSubspecialties: string[];
+  subspecialties:        string[];
 }
 
 export default function ArticleEditableFields({
@@ -33,6 +33,7 @@ export default function ArticleEditableFields({
   initialSpecialtyMatch,
   initialSpecialty,
   initialSubspecialties,
+  subspecialties: allSubspecialties,
 }: Props) {
   const [tags,           setTags]           = useState<string[]>(initialTags);
   const [subspecialties, setSubspecialties] = useState<string[]>(initialSubspecialties);
@@ -172,7 +173,7 @@ export default function ArticleEditableFields({
             style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "999px", border: "1px dashed #bfdbfe", background: "#f8fbff", color: "#1d4ed8", outline: "none", minWidth: "140px" }}
           />
           <datalist id="subspecialty-suggestions">
-            {SUBSPECIALTY_OPTIONS.filter((o) => !subspecialties.includes(o)).map((o) => (
+            {allSubspecialties.filter((o) => !subspecialties.includes(o)).map((o) => (
               <option key={o} value={o}>{o}</option>
             ))}
           </datalist>

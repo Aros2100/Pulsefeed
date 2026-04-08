@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   catch { return NextResponse.json({ ok: false, error: "Invalid request" }, { status: 400 }); }
 
   const schema = z.object({
-    specialty:   z.string().refine((v) => (SPECIALTY_SLUGS as readonly string[]).includes(v)),
+    specialty:   z.string().refine((v) => v === ACTIVE_SPECIALTY),
     module:      z.string().default("specialty_tag"),
     // Accept either "prompt" (legacy) or "prompt_text" (new)
     prompt:      z.string().min(10).optional(),

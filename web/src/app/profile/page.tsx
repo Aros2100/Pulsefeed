@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { SPECIALTIES, ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import ScoreBadge from "@/components/ScoreBadge";
 import ProfileClient from "./ProfileClient";
 import { getSubspecialties } from "@/lib/lab/classification-options";
@@ -59,7 +59,7 @@ export default async function ProfilePage() {
 
   const specialtySlugs: string[]       = profile?.specialty_slugs ?? [];
   const subspecialtiesList = await getSubspecialties(ACTIVE_SPECIALTY);
-  const specialtyLabels                = Object.fromEntries(SPECIALTIES.map((s) => [s.slug, s.label as string]));
+  const specialtyLabels: Record<string, string>                = {};
 
   type ArticleRow = {
     id: string;

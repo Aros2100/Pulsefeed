@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -108,9 +107,10 @@ function arraysEqual(a: string[], b: string[]): boolean {
 interface Props {
   specialty: string;
   label: string;
+  subspecialties: string[];
 }
 
-export default function ClassificationClient({ specialty, label }: Props) {
+export default function SubspecialtyClient({ specialty, label, subspecialties }: Props) {
   const router = useRouter();
 
   const [articles, setArticles]               = useState<ClassificationArticle[]>([]);
@@ -144,7 +144,7 @@ export default function ClassificationClient({ specialty, label }: Props) {
 
       let d: { ok: boolean; articles?: ClassificationArticle[] };
       try {
-        d = await fetch(`/api/admin/training/classification-articles?specialty=${specialty}`, { signal: abort.signal })
+        d = await fetch(`/api/admin/training/subspecialty-articles?specialty=${specialty}`, { signal: abort.signal })
           .then((r) => r.json()) as { ok: boolean; articles?: ClassificationArticle[] };
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
@@ -165,7 +165,7 @@ export default function ClassificationClient({ specialty, label }: Props) {
         setLoading(false);
 
         try {
-          const response = await fetch("/api/lab/score-classification", {
+          const response = await fetch("/api/lab/score-subspecialty", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ specialty }),
@@ -202,7 +202,7 @@ export default function ClassificationClient({ specialty, label }: Props) {
         // Reload with fresh scores
         let d2: { ok: boolean; articles?: ClassificationArticle[] };
         try {
-          d2 = await fetch(`/api/admin/training/classification-articles?specialty=${specialty}`, { signal: abort.signal })
+          d2 = await fetch(`/api/admin/training/subspecialty-articles?specialty=${specialty}`, { signal: abort.signal })
             .then((r) => r.json()) as { ok: boolean; articles?: ClassificationArticle[] };
         } catch (e) {
           if ((e as Error).name === "AbortError") return;
@@ -313,7 +313,7 @@ export default function ClassificationClient({ specialty, label }: Props) {
   // ── Bekræft & gem ───────────────────────────────────────────────────────
 
   async function handleSave(navigateTo?: string) {
-    const destination = navigateTo ?? "/admin/lab/classification";
+    const destination = navigateTo ?? "/admin/lab/subspecialty";
     const toSave = articles
       .filter((a) => isArticleComplete(a.id))
       .map((a) => ({
@@ -327,7 +327,7 @@ export default function ClassificationClient({ specialty, label }: Props) {
 
     setSaving(true);
     try {
-      const res = await fetch("/api/lab/classification-sessions", {
+      const res = await fetch("/api/lab/subspecialty-sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ specialty, verdicts: toSave }),
@@ -339,7 +339,7 @@ export default function ClassificationClient({ specialty, label }: Props) {
         setPendingHref(null);
         setToast(`${data.reviewed} artikler klassificeret`);
         setTimeout(() => {
-          router.push(navigateTo === undefined ? "/admin/lab/classification" : destination);
+          router.push(navigateTo === undefined ? "/admin/lab/subspecialty" : destination);
         }, 2500);
       } else {
         setToast(`Fejl: ${data.error ?? "Ukendt fejl"}`);
@@ -417,8 +417,8 @@ export default function ClassificationClient({ specialty, label }: Props) {
       <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f5f7fa", gap: "12px" }}>
         <div style={{ fontSize: "18px", fontWeight: 700, color: "#1a1a1a" }}>Ingen artikler at klassificere</div>
         <div style={{ fontSize: "14px", color: "#888" }}>Alle artikler for {label} er allerede klassificeret.</div>
-        <button onClick={() => router.push("/admin/lab/classification")} style={{ marginTop: "12px", borderRadius: "8px", padding: "10px 20px", background: "#1a1a1a", color: "#fff", border: "none", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
-          ← Tilbage til Klassificering
+        <button onClick={() => router.push("/admin/lab/subspecialty")} style={{ marginTop: "12px", borderRadius: "8px", padding: "10px 20px", background: "#1a1a1a", color: "#fff", border: "none", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
+          ← Tilbage til Subspecialer
         </button>
       </div>
     );
@@ -431,8 +431,8 @@ export default function ClassificationClient({ specialty, label }: Props) {
 
       {/* Header bar */}
       <header style={{ height: "48px", background: "#fff", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", padding: "0 20px", flexShrink: 0, gap: "12px" }}>
-        <a href="/admin/lab/classification" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none", flexShrink: 0 }}>
-          ← Klassificering
+        <a href="/admin/lab/subspecialty" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none", flexShrink: 0 }}>
+          ← Subspecialer
         </a>
         <span style={{ color: "#dde3ed", flexShrink: 0 }}>·</span>
         <span style={{ fontSize: "13px", color: "#1a1a1a", fontWeight: 600, flexShrink: 0 }}>
@@ -607,7 +607,7 @@ export default function ClassificationClient({ specialty, label }: Props) {
                   Korriger (vælg 1–{maxCorrections}) — {checkedSubs.length} af {maxCorrections} valgt
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1px 12px" }}>
-                  {SUBSPECIALTY_OPTIONS.map((option) => {
+                  {subspecialties.map((option) => {
                     const isChecked = checkedSubs.includes(option);
                     const isDisabled = !isChecked && checkedSubs.length >= maxCorrections;
                     return (

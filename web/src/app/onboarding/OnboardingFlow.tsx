@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AuthorSearch, { type AuthorMeta } from "@/components/AuthorSearch";
 import AuthorGeoFields from "@/components/authors/AuthorGeoFields";
-import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
 
 const TOTAL_STEPS = 3;
 
@@ -55,9 +54,10 @@ interface SelectedAuthor {
 
 interface Props {
   initialAuthorQuery?: string;
+  subspecialties: string[];
 }
 
-export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
+export default function OnboardingFlow({ initialAuthorQuery = "", subspecialties }: Props) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [authorLinked, setAuthorLinked] = useState(false);
@@ -416,7 +416,7 @@ export default function OnboardingFlow({ initialAuthorQuery = "" }: Props) {
               gap: "8px",
               marginBottom: "12px",
             }}>
-              {SUBSPECIALTY_OPTIONS.map((s) => {
+              {subspecialties.map((s) => {
                 const checked = selectedSubspecialties.includes(s);
                 const atMax = selectedSubspecialties.length >= MAX_SUBSPECIALTIES && !checked;
                 return (

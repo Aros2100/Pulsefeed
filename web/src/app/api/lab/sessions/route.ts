@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { type Author } from "@/lib/import/artikel-import/fetcher";
 import { linkAuthorsToArticle } from "@/lib/import/forfatter-import/find-or-create";
 import { logArticleEvent } from "@/lib/article-events";
@@ -23,7 +23,7 @@ const TAG_REMAP: Record<string, string> = {
 
 const schema = z.object({
   specialty: z.string().refine(
-    (v) => (SPECIALTY_SLUGS as readonly string[]).includes(v),
+    (v) => v === ACTIVE_SPECIALTY,
     { message: "Invalid specialty" }
   ),
   module: z.string().default("specialty_tag"),

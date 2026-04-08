@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SPECIALTIES } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import VersionSelector from "@/components/lab/VersionSelector";
 import PromptDrawer, { type ModelVersion } from "@/components/lab/PromptDrawer";
 
@@ -120,22 +119,8 @@ interface Props {
 export default async function ClassificationEvaluationPage({ searchParams }: Props) {
   const { version: versionParam } = await searchParams;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  const { data: profile } = await supabase
-    .from("users")
-    .select("specialty_slugs")
-    .eq("id", user!.id)
-    .single();
-
-  const userSpecialties: string[] = (profile?.specialty_slugs as string[] | null) ?? [];
-  const activeSpec =
-    SPECIALTIES.find((s) => s.active && userSpecialties.includes(s.slug)) ??
-    SPECIALTIES.find((s) => s.active);
-
-  const specialty      = activeSpec?.slug  ?? "neurosurgery";
-  const specialtyLabel = activeSpec?.label ?? "Neurosurgery";
+  const specialty = ACTIVE_SPECIALTY;
+  const specialtyLabel = ACTIVE_SPECIALTY.charAt(0).toUpperCase() + ACTIVE_SPECIALTY.slice(1);
 
   const admin = createAdminClient();
 
@@ -144,7 +129,7 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
     .from("model_versions")
     .select("id, version, prompt_text, notes, activated_at, active, generated_by")
     .eq("specialty", specialty)
-    .eq("module", "classification_subspecialty")
+    .eq("module", "subspecialty")
     .order("activated_at", { ascending: false });
 
   const modelVersions = (modelVersionsData ?? []) as Array<{ version: string; active: boolean }>;
@@ -156,7 +141,7 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
     .from("lab_decisions")
     .select("article_id, decision, decided_at, ai_decision, ai_confidence, disagreement_reason")
     .eq("specialty", specialty)
-    .eq("module", "classification_subspecialty")
+    .eq("module", "subspecialty")
     .not("ai_decision", "is", null)
     .order("decided_at", { ascending: false });
 
@@ -179,7 +164,7 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
       : Promise.resolve({ data: null }),
     admin.from("lab_decisions")
       .select("model_version, ai_decision, decision")
-      .eq("specialty", specialty).eq("module", "classification_subspecialty")
+      .eq("specialty", specialty).eq("module", "subspecialty")
       .not("ai_decision", "is", null)
       .limit(10000),
   ]);
@@ -232,8 +217,8 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
 
         {/* Back */}
         <div style={{ marginBottom: "8px" }}>
-          <Link href="/admin/lab/classification" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
-            ← Klassificering
+          <Link href="/admin/lab/subspecialty" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+            ← Subspecialer
           </Link>
         </div>
 
@@ -249,7 +234,7 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
             <PromptDrawer
               versions={promptVersions}
               specialty={specialty}
-              module="classification_subspecialty"
+              module="subspecialty"
               totalDisagreements={totalDisagree}
             />
           </div>
@@ -266,7 +251,7 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
           </div>
           {hasSufficientData ? (
             <Link
-              href="/admin/lab/classification/optimize"
+              href="/admin/lab/subspecialty/optimize"
               style={{ flexShrink: 0, fontSize: "13px", fontWeight: 700, background: "#1a1a1a", color: "#fff", borderRadius: "7px", padding: "7px 16px", textDecoration: "none", whiteSpace: "nowrap" }}
             >
               Optimize model →

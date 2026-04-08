@@ -2,12 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { logArticleEvent } from "@/lib/article-events";
 
 const schema = z.object({
   specialty: z.string().refine(
-    (v) => (SPECIALTY_SLUGS as readonly string[]).includes(v),
+    (v) => v === ACTIVE_SPECIALTY,
     { message: "Invalid specialty" }
   ),
   verdicts: z.array(z.object({
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     .from("model_versions")
     .select("version")
     .eq("specialty", specialty)
-    .eq("module", "classification_subspecialty")
+    .eq("module", "subspecialty")
     .eq("active", true)
     .limit(1)
     .maybeSingle();
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     .from("lab_sessions")
     .insert({
       specialty,
-      module: "classification_subspecialty",
+      module: "subspecialty",
       user_id: null,
       completed_at: new Date().toISOString(),
       articles_reviewed: verdicts.length,
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (sessionError) {
-    console.error("[classification-sessions] lab_sessions insert error:", sessionError);
+    console.error("[subspecialty-sessions] lab_sessions insert error:", sessionError);
     return NextResponse.json({ ok: false, error: sessionError.message }, { status: 500 });
   }
 
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     session_id:          sessionId,
     article_id:          v.article_id,
     specialty,
-    module:              "classification_subspecialty",
+    module:              "subspecialty",
     decision:            v.decision,
     ai_decision:         v.ai_decision,
     ai_confidence:       null,
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
 
   const { error: decisionsError } = await admin.from("lab_decisions").insert(decisionRows);
   if (decisionsError) {
-    console.error("[classification-sessions] lab_decisions insert error:", decisionsError);
+    console.error("[subspecialty-sessions] lab_decisions insert error:", decisionsError);
     return NextResponse.json({ ok: false, error: decisionsError.message }, { status: 500 });
   }
 

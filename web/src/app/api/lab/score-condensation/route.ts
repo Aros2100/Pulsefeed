@@ -3,7 +3,7 @@ import { z } from "zod";
 import pLimit from "p-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { getActivePrompt, scoreCondensation, type ActivePrompt } from "@/lib/lab/scorer";
 
 const CONCURRENCY  = 1;
@@ -12,7 +12,7 @@ const BATCH_LIMIT  = 10;
 
 const schema = z.object({
   specialty: z.string().refine(
-    (v) => (SPECIALTY_SLUGS as readonly string[]).includes(v),
+    (v) => v === ACTIVE_SPECIALTY,
     { message: "Invalid specialty" }
   ),
 });

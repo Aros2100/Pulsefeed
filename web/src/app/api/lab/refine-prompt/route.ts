@@ -2,9 +2,9 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { SPECIALTY_SLUGS } from "@/lib/auth/specialties";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { trackedCall } from "@/lib/ai/tracked-client";
-import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
+import { getSubspecialties } from "@/lib/lab/classification-options";
 
 const regressionCommentSchema = z.object({
   article_id: z.string().uuid(),
@@ -18,7 +18,7 @@ const schema = z.object({
   fp_patterns:    z.array(z.string()),
   fn_patterns:    z.array(z.string()),
   specialty:      z.string().refine(
-    (v) => (SPECIALTY_SLUGS as readonly string[]).includes(v),
+    (v) => v === ACTIVE_SPECIALTY,
     { message: "Invalid specialty" }
   ),
   run_id: z.string().uuid().nullable().optional(),
@@ -44,8 +44,10 @@ export async function POST(request: NextRequest) {
     ? `\n\nThe domain expert also reviewed regression cases (articles where the new prompt disagrees with earlier correct decisions) and provided these comments:\n<regression_comments>\n${regression_comments.map((c, i) => `${i + 1}. ${c.title ? `"${c.title}" — ` : ""}${c.comment}`).join("\n")}\n</regression_comments>\n\nUse these regression comments to avoid introducing new errors while fixing the prompt.`
     : "";
 
+  const subspecialties = await getSubspecialties(specialty);
+
   const promptForOptimization = current_prompt
-    .replace(SUBSPECIALTY_OPTIONS.join(", "), "{{subspecialty_list}}");
+    .replace(subspecialties.join(", "), "{{subspecialty_list}}");
 
   const userMessage = `You are refining an AI scoring prompt for ${specialty} article relevance.
 
