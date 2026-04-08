@@ -1,19 +1,13 @@
-export const SUBSPECIALTY_OPTIONS = [
-  "Spine surgery",
-  "Neurosurgical oncology and Radiosurgery",
-  "Vascular and Endovascular Neurosurgery",
-  "Functional Pain and Epilepsy Surgery",
-  "Pediatric and foetal neurosurgery",
-  "Neurotraumatology",
-  "Peripheral nerve surgery",
-  "Skull base and pituitary surgery",
-  "Craniofacial and reconstruction surgery",
-  "Geriatric Neurosurgery",
-  "Hydrocephalus and CSF Disorders",
-  "Neurointensive care and Neuroinfection",
-  "Neurorehabilitation",
-  "Surgical Technique and Technology",
-  "Basic and Translational Research",
-  "Ethics Education and Socioeconomics",
-  "Digital Health Robotics and Innovation",
-] as const;
+import { createAdminClient } from "@/lib/supabase/admin";
+
+export async function getSubspecialties(specialty: string): Promise<string[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+  const { data } = await admin
+    .from("subspecialties")
+    .select("name")
+    .eq("specialty", specialty)
+    .eq("active", true)
+    .order("sort_order");
+  return (data ?? []).map((r: { name: string }) => r.name);
+}
