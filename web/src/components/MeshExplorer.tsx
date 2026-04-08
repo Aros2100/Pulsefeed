@@ -115,12 +115,10 @@ export default function MeshExplorer({ userSubspecialties, topSubspecialties, al
     ? userSubspecialties
     : topSubspecialties.slice(0, 3).map((s) => s.tag);
 
-  // Normalize to canonical names and drop the top-level specialty "Neurosurgery"
+  // Normalize to canonical names and drop the top-level specialty itself
   const displaySubs = rawSubs
     .map((s) => toCanonical(s))
-    .filter((s): s is string => s !== null);
-
-  console.log("[MeshExplorer] rawSubs →", rawSubs, "| displaySubs →", displaySubs);
+    .filter((s): s is string => s !== null && s.toLowerCase() !== ACTIVE_SPECIALTY);
 
   const [activeTab, setActiveTab] = useState<string>(displaySubs[0] ?? "");
   const [meshTerms, setMeshTerms] = useState<MeshTerm[] | null>(null);
