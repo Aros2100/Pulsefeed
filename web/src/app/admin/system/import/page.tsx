@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ReparseAuthorGeoButton } from "./ReparseAuthorGeoButton";
 import { ParseArticleLocationsButton } from "./ParseArticleLocationsButton";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -179,7 +180,7 @@ export default async function ImportDashboardPage() {
     admin.rpc("count_unlinked_articles"),
     admin.rpc("count_unlinked_author_slots"),
     // Latest completed import log per circle
-    admin.from("pubmed_filters").select("id").eq("specialty", "neurosurgery").eq("circle", 1)
+    admin.from("pubmed_filters").select("id").eq("specialty", ACTIVE_SPECIALTY).eq("circle", 1)
       .then(async (fRes: { data: { id: string }[] | null }) => {
         const ids = (fRes.data ?? []).map((f) => f.id);
         if (ids.length === 0) return { data: null };
@@ -187,7 +188,7 @@ export default async function ImportDashboardPage() {
           .eq("status", "completed").in("filter_id", ids)
           .order("started_at", { ascending: false }).limit(1).maybeSingle();
       }),
-    admin.from("pubmed_filters").select("id").eq("specialty", "neurosurgery").eq("circle", 2)
+    admin.from("pubmed_filters").select("id").eq("specialty", ACTIVE_SPECIALTY).eq("circle", 2)
       .then(async (fRes: { data: { id: string }[] | null }) => {
         const ids = (fRes.data ?? []).map((f) => f.id);
         if (ids.length === 0) return { data: null };

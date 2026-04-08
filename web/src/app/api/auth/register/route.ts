@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { registerSchema } from "@/lib/auth/schemas";
 import { toAuthError } from "@/lib/auth/errors";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
     const admin = createAdminClient();
     const { error: updateError } = await admin
       .from("users")
-      .update({ specialty_slugs: ["neurosurgery"] })
+      .update({ specialty_slugs: [ACTIVE_SPECIALTY] })
       .eq("id", data.user.id);
 
     if (updateError) {

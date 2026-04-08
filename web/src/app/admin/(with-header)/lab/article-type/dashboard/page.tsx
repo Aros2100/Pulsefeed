@@ -2,8 +2,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import BenchmarkTable from "@/components/lab/BenchmarkTable";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
-const FIXED_SPECIALTY = "neurosurgery";
+const FIXED_SPECIALTY = ACTIVE_SPECIALTY;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

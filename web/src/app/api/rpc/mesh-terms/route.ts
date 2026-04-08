@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
 
   const params = request.nextUrl.searchParams;
   const subspecialty = params.get("subspecialty");
-  const specialty = params.get("specialty") ?? "neurosurgery";
+  const specialty = params.get("specialty") ?? ACTIVE_SPECIALTY;
   const clinicalOnly = params.get("clinical_only") !== "false";
   const yearRange = params.get("year_range") ?? "2";
 

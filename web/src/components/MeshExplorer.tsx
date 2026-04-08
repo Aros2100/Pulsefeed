@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { DM_Sans, DM_Mono } from "next/font/google";
-import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -23,19 +23,18 @@ function normalizeKey(s: string): string {
   return s.toLowerCase().replace(/[,]/g, "").replace(/\s+/g, " ").trim();
 }
 
-const CANONICAL_MAP: Record<string, string> = Object.fromEntries(
-  SUBSPECIALTY_OPTIONS.map((opt) => [normalizeKey(opt), opt]),
-);
-
-function toCanonical(stored: string): string | null {
-  // 1. Direct case-insensitive match — canonical names pass through unchanged.
-  const trimmed = stored.trim();
-  const direct = SUBSPECIALTY_OPTIONS.find(
-    (o) => o.toLowerCase() === trimmed.toLowerCase(),
+function makeToCanonical(allSubspecialties: string[]) {
+  const canonicalMap: Record<string, string> = Object.fromEntries(
+    allSubspecialties.map((opt) => [normalizeKey(opt), opt]),
   );
-  if (direct) return direct;
-  // 2. Legacy comma-format fallback ("Functional, pain and epilepsy surgery").
-  return CANONICAL_MAP[normalizeKey(stored)] ?? null;
+  return function toCanonical(stored: string): string | null {
+    const trimmed = stored.trim();
+    const direct = allSubspecialties.find(
+      (o) => o.toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (direct) return direct;
+    return canonicalMap[normalizeKey(stored)] ?? null;
+  };
 }
 
 const CLINICAL_STOPLIST = new Set([
@@ -69,6 +68,7 @@ interface MeshTerm {
 interface Props {
   userSubspecialties: string[] | null;
   topSubspecialties: { tag: string; count: number }[];
+  allSubspecialties: string[];
 }
 
 function AnimatedNumber({ value }: { value: number }) {
@@ -108,7 +108,9 @@ function AnimatedNumber({ value }: { value: number }) {
   return <>{display.toLocaleString("en-US")}</>;
 }
 
-export default function MeshExplorer({ userSubspecialties, topSubspecialties }: Props) {
+export default function MeshExplorer({ userSubspecialties, topSubspecialties, allSubspecialties }: Props) {
+  const toCanonical = makeToCanonical(allSubspecialties);
+
   const rawSubs = userSubspecialties?.length
     ? userSubspecialties
     : topSubspecialties.slice(0, 3).map((s) => s.tag);
@@ -135,7 +137,7 @@ export default function MeshExplorer({ userSubspecialties, topSubspecialties }: 
   useEffect(() => {
     if (displaySubs.length === 0) return;
     const params = new URLSearchParams();
-    params.set("specialty", "neurosurgery");
+    params.set("specialty", ACTIVE_SPECIALTY);
     for (const s of displaySubs) params.append("sub[]", s);
     fetch(`/api/rpc/subspecialty-counts?${params.toString()}`)
       .then((r) => r.json())

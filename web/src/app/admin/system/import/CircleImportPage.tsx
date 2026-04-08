@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 /* ═══ Types ═══════════════════════════════════════════════════════════════════ */
 
@@ -150,7 +151,7 @@ const kpiLabel: React.CSSProperties = {
 
 export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 }) {
   const cfg = CIRCLES[circle];
-  const specialty = "neurosurgery";
+  const specialty = ACTIVE_SPECIALTY;
 
   // Config
   const [configText, setConfigText] = useState("");

@@ -12,3 +12,5 @@ export const SPECIALTIES = [
 export type SpecialtySlug = (typeof SPECIALTIES)[number]["slug"];
 
 export const SPECIALTY_SLUGS = SPECIALTIES.map((s) => s.slug);
+
+export const ACTIVE_SPECIALTY = SPECIALTIES.find((s) => s.active)!.slug;

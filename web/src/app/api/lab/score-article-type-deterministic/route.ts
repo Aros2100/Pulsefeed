@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 type Rule = {
   publication_type: string;
@@ -63,7 +64,7 @@ const priorityMap = new Map<string, { article_type: string; priority: number }>(
         for (let offset = 0; ; offset += PAGE) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const { data } = await (admin as any).rpc("get_article_type_candidates", {
-            p_specialty: "neurosurgery",
+            p_specialty: ACTIVE_SPECIALTY,
             p_offset: offset,
             p_limit: PAGE,
           });

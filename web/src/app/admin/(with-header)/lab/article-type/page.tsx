@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SectionCard } from "../SectionCard";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
-const FIXED_SPECIALTY = "neurosurgery";
+const FIXED_SPECIALTY = ACTIVE_SPECIALTY;
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "Aldrig";

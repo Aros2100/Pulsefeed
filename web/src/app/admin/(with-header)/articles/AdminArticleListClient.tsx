@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 interface ArticleRow {
   id: string;
@@ -109,7 +109,7 @@ function filtersFromParams(sp: URLSearchParams): Filters {
   return {
     search:          sp.get("search")          ?? "",
     mesh_term:       sp.get("mesh_term")       ?? "",
-    specialty:       sp.get("specialty")       ?? "neurosurgery",
+    specialty:       sp.get("specialty")       ?? ACTIVE_SPECIALTY,
     subspecialty:    sp.get("subspecialty")    ?? "",
     article_type:    sp.get("article_type")    ?? "",
     has_abstract:    sp.get("has_abstract")    ?? "",
@@ -162,14 +162,14 @@ function filtersToParams(f: Filters): URLSearchParams {
 }
 
 const EMPTY_FILTERS: Filters = {
-  search: "", mesh_term: "", specialty: "neurosurgery", subspecialty: "", article_type: "",
+  search: "", mesh_term: "", specialty: ACTIVE_SPECIALTY, subspecialty: "", article_type: "",
   has_abstract: "", date_from: "", date_to: "",
   geo_continent: "", geo_region: "", geo_country: "", geo_state: "", geo_city: "",
   missing_geo: false, no_region: false, no_country: false, no_state: false, no_city: false, not_parsed: false, suspect_city: false,
   sort_by: "imported_at", sort_dir: "desc", page: 1,
 };
 
-export default function AdminArticleListClient() {
+export default function AdminArticleListClient({ subspecialties }: { subspecialties: string[] }) {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -382,12 +382,12 @@ export default function AdminArticleListClient() {
             placeholder="Specialty: Alle"
             options={specialties}
           />
-          {filters.specialty === "neurosurgery" && (
+          {filters.specialty === ACTIVE_SPECIALTY && (
             <SelectFilter
               value={filters.subspecialty}
               onChange={(v) => setFilter("subspecialty", v)}
               placeholder="Subspecialitet: Alle"
-              options={SUBSPECIALTY_OPTIONS.map((t) => ({ value: t, label: t }))}
+              options={subspecialties.map((t) => ({ value: t, label: t }))}
             />
           )}
         </div>

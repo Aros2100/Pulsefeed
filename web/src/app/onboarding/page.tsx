@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import OnboardingFlow from "./OnboardingFlow";
+import { getSubspecialties } from "@/lib/lab/classification-options";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 export default async function OnboardingPage() {
   const supabase = await createClient();
@@ -27,6 +29,7 @@ export default async function OnboardingPage() {
   const initialAuthorQuery = [profile?.first_name, profile?.last_name]
     .filter(Boolean)
     .join(" ") || profile?.name || "";
+  const subspecialties = await getSubspecialties(ACTIVE_SPECIALTY);
 
   return (
     <div
@@ -52,7 +55,7 @@ export default async function OnboardingPage() {
             priority
           />
         </div>
-        <OnboardingFlow initialAuthorQuery={initialAuthorQuery} />
+        <OnboardingFlow initialAuthorQuery={initialAuthorQuery} subspecialties={subspecialties} />
       </div>
     </div>
   );

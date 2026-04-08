@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SPECIALTIES } from "@/lib/auth/specialties";
+import { SPECIALTIES, ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import ArticleStamkort, { type ArticleData } from "@/components/articles/ArticleStamkort";
 import AdminArticleTabs from "./AdminArticleTabs";
 import ArticleEditableFields from "./ArticleEditableFields";
@@ -425,7 +425,7 @@ export default async function AdminArticleLogPage({
     admin.from("article_authors").select("author_id, position, authors(author_score, department, hospital, city, state, country, verified_by)").eq("article_id", id),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (admin as any).from("article_specialties").select("specialty, specialty_match").eq("article_id", id).order("specialty").limit(1).maybeSingle(),
-    getSubspecialties("neurosurgery"),
+    getSubspecialties(ACTIVE_SPECIALTY),
   ]);
 
   const article = articleResult.data;

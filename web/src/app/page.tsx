@@ -6,6 +6,7 @@ import ArticleTypeChart from "@/components/ArticleTypeChart";
 import MeshExplorer from "@/components/MeshExplorer";
 import SuggestedAuthors from "@/components/SuggestedAuthors";
 import { getSubspecialties } from "@/lib/lab/classification-options";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -33,7 +34,7 @@ export default async function DashboardPage() {
     { p_limit: 3 },
   );
   const topSubspecialties = (topSubsData ?? []) as { tag: string; count: number }[];
-  const allSubspecialties = await getSubspecialties("neurosurgery");
+  const allSubspecialties = await getSubspecialties(ACTIVE_SPECIALTY);
 
   const quickLinks = [
     { icon: "✉️", title: "Newsletters",    desc: "View your previous digests",       href: "/newsletters" },
@@ -75,7 +76,7 @@ export default async function DashboardPage() {
 
         {/* Article Type Distribution */}
         <div style={{ marginTop: "28px" }}>
-          <ArticleTypeChart specialty="neurosurgery" />
+          <ArticleTypeChart specialty={ACTIVE_SPECIALTY} />
         </div>
 
         {/* Quick access */}

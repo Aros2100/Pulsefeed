@@ -1,13 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
 
   const { searchParams } = new URL(request.url);
-  const specialty = searchParams.get("specialty") ?? "neurosurgery";
+  const specialty = searchParams.get("specialty") ?? ACTIVE_SPECIALTY;
   const minCount = parseInt(searchParams.get("min_count") ?? "3", 10);
 
   const admin = createAdminClient();

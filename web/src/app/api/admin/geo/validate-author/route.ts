@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { resolveCityAlias } from "@/lib/geo/city-aliases";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 const INST_KEYWORDS = [
   "hospital", "university", "institute", "medical", "clinic",
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
     const { data: insertData, error: insertError } = await (admin as any).from("lab_decisions").insert({
       author_id: author_id,
       module: "author_geo",
-      specialty: "neurosurgery",
+      specialty: ACTIVE_SPECIALTY,
       decision: action,
       ai_decision: JSON.stringify(oldData),
       disagreement_reason: null,

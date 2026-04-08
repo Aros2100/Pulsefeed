@@ -3,8 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import PatternAnalysis, { type OptimizationRun } from "@/components/lab/PatternAnalysis";
 import { ARTICLE_TYPE_DISAGREEMENT_THRESHOLD } from "@/lib/lab/article-type-options";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
-const FIXED_SPECIALTY = "neurosurgery";
+const FIXED_SPECIALTY = ACTIVE_SPECIALTY;
 
 export default async function ArticleTypeOptimizePage() {
   const supabase = await createClient();

@@ -4,11 +4,12 @@ import pLimit from "p-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { getActivePrompt, scoreArticleType, type ActivePrompt } from "@/lib/lab/scorer";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 const CONCURRENCY  = 1;
 const DELAY_MS     = 1300;
 const BATCH_LIMIT  = 25;
-const FIXED_SPECIALTY = "neurosurgery";
+const FIXED_SPECIALTY = ACTIVE_SPECIALTY;
 
 const schema = z.object({
   scoreAll: z.boolean().optional().default(false),
@@ -84,6 +85,7 @@ export async function POST(request: NextRequest) {
   if (scoreAll) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rescoreIds } = await (admin as any).rpc("get_article_type_rescore_candidates", {
+      p_specialty: FIXED_SPECIALTY,
       p_version: activePrompt.version,
       p_limit: 500,
     });
@@ -125,6 +127,7 @@ export async function POST(request: NextRequest) {
     // Fetch only articles with specialty_match = true (via article_specialties join)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: specialtyIds, error: candidateError } = await (admin as any).rpc("get_article_type_candidates", {
+      p_specialty: FIXED_SPECIALTY,
       p_offset: 0,
       p_limit: remaining * 5, // over-fetch so we can filter to unscored
     });

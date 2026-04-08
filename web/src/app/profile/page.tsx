@@ -3,9 +3,10 @@ export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { SPECIALTIES } from "@/lib/auth/specialties";
+import { SPECIALTIES, ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import ScoreBadge from "@/components/ScoreBadge";
 import ProfileClient from "./ProfileClient";
+import { getSubspecialties } from "@/lib/lab/classification-options";
 import MergeCheck from "./MergeCheck";
 
 const card: React.CSSProperties = {
@@ -57,6 +58,7 @@ export default async function ProfilePage() {
     .single();
 
   const specialtySlugs: string[]       = profile?.specialty_slugs ?? [];
+  const subspecialtiesList = await getSubspecialties(ACTIVE_SPECIALTY);
   const specialtyLabels                = Object.fromEntries(SPECIALTIES.map((s) => [s.slug, s.label as string]));
 
   type ArticleRow = {
@@ -149,6 +151,7 @@ export default async function ProfilePage() {
           displayName={profile?.name || (user.user_metadata?.name as string | undefined) || user.email || "?"}
           firstArticleDate={firstArticleDate}
           latestArticleDate={latestArticleDate}
+          subspecialties={subspecialtiesList}
         />
 
         {/* Author Profile */}

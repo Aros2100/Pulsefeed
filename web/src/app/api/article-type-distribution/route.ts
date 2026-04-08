@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 export async function GET(req: NextRequest) {
-  const specialty = req.nextUrl.searchParams.get("specialty") ?? "neurosurgery";
+  const specialty = req.nextUrl.searchParams.get("specialty") ?? ACTIVE_SPECIALTY;
   const supabase = await createClient();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

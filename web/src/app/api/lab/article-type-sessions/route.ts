@@ -3,8 +3,9 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { logArticleEvent } from "@/lib/article-events";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
-const FIXED_SPECIALTY = "neurosurgery";
+const FIXED_SPECIALTY = ACTIVE_SPECIALTY;
 
 const schema = z.object({
   verdicts: z.array(z.object({
@@ -85,14 +86,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: decisionsError.message }, { status: 500 });
   }
 
-  // 3. Update articles: set article_type_validated = true for all verdicts;
+  // 3. Update articles: set article_type + article_type_validated on all verdicts;
   //    for corrected ones also update article_type_ai to the chosen decision.
-  const allIds = verdicts.map((v) => v.article_id);
-  await admin.from("articles").update({ article_type_validated: true }).in("id", allIds);
-
-  const corrected = verdicts.filter((v) => v.corrected);
-  for (const v of corrected) {
-    await admin.from("articles").update({ article_type_ai: v.decision }).eq("id", v.article_id);
+  for (const v of verdicts) {
+    const update: Record<string, unknown> = {
+      article_type:           v.decision,
+      article_type_validated: true,
+    };
+    if (v.corrected) {
+      update.article_type_ai = v.decision;
+    }
+    await admin.from("articles").update(update).eq("id", v.article_id);
   }
 
   // Fire-and-forget: log article events

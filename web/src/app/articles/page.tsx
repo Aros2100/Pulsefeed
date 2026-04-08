@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { SPECIALTIES } from "@/lib/auth/specialties";
-import { SUBSPECIALTY_OPTIONS } from "@/lib/lab/classification-options";
+import { SPECIALTIES, ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
+import { getSubspecialties } from "@/lib/lab/classification-options";
 import { REGION_MAP, getContinent } from "@/lib/geo/continent-map";
 import ArticleListClient from "./ArticleListClient";
 
@@ -43,6 +43,7 @@ export default async function ArticlesPage({
     .from("users").select("specialty_slugs, author_id").eq("id", user.id).single();
 
   const specialtySlugs: string[] = profile?.specialty_slugs ?? [];
+  const subspecialtiesList = await getSubspecialties(ACTIVE_SPECIALTY);
 
   // Fetch user's hospital for pre-filling the geo filter
   let userHospital: string | null = null;
@@ -189,7 +190,7 @@ export default async function ArticlesPage({
         projects={(projectRows ?? []) as { id: string; name: string }[]}
         activePeriod={period ?? null}
         activeSubspecialty={subspecialty ?? null}
-        subspecialtyOptions={[...SUBSPECIALTY_OPTIONS]}
+        subspecialtyOptions={subspecialtiesList}
         geoMap={geoMap}
         userHospital={userHospital}
         currentPage={currentPage}

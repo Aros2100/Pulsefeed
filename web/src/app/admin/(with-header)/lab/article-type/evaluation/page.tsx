@@ -4,8 +4,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import VersionSelector from "@/components/lab/VersionSelector";
 import PromptDrawer, { type ModelVersion } from "@/components/lab/PromptDrawer";
 import { ARTICLE_TYPE_DISAGREEMENT_THRESHOLD } from "@/lib/lab/article-type-options";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
-const FIXED_SPECIALTY = "neurosurgery";
+const FIXED_SPECIALTY = ACTIVE_SPECIALTY;
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";

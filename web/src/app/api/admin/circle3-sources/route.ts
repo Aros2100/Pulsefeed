@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 type C3Source = {
   id: string;
@@ -63,7 +64,7 @@ export async function PUT(request: NextRequest) {
 
   if (terms.length > 0) {
     const rows = terms.map((t) => ({
-      specialty:   "neurosurgery",
+      specialty:   ACTIVE_SPECIALTY,
       type:        "affiliation",
       value:       t.trim(),
       active:      true,

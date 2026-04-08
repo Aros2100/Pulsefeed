@@ -3,6 +3,7 @@ import { fetchPubMedIds, fetchArticleDetails, sleep } from "@/lib/import/artikel
 import { runArticleChecks } from "@/lib/import/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
 import { buildImportEventPayload } from "@/lib/article-events/import-payload";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import type { Json } from "@/lib/supabase/types";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -174,7 +175,7 @@ export async function runImportCircle3(
             pubmed_indexed_at: a.pubmedIndexedAt,
             issn_electronic:   a.issnElectronic,
             issn_print:        a.issnPrint,
-            specialty_tags:    ["neurosurgery"],
+            specialty_tags:    [ACTIVE_SPECIALTY],
             circle:            3,
             approval_method:   null,
             status:            "pending",
@@ -203,7 +204,7 @@ export async function runImportCircle3(
                   circle:          3,
                   status:          "pending",
                   approval_method: null,
-                  specialty_tags:  ["neurosurgery"],
+                  specialty_tags:  [ACTIVE_SPECIALTY],
                   pubmed_id:       row.pubmed_id,
                   import_log_id:   logId,
                   source_id:       null,
@@ -214,7 +215,7 @@ export async function runImportCircle3(
             if (upsertedRows && upsertedRows.length > 0) {
               const specialtyRows = upsertedRows.map((row) => ({
                 article_id:      row.id,
-                specialty:       'neurosurgery',
+                specialty:       ACTIVE_SPECIALTY,
                 specialty_match: null,
                 source:          'c3_filter',
                 scored_by:       null,
