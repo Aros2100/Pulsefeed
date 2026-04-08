@@ -43,7 +43,7 @@ export async function POST() {
         }
 
         const rules = (rulesData ?? []) as unknown as Rule[];
-        const priorityMap = new Map<string, { article_type: string; priority: number }>();
+const priorityMap = new Map<string, { article_type: string; priority: number }>();
         for (const rule of rules) {
           priorityMap.set(normalize(rule.publication_type), {
             article_type: rule.article_type,
@@ -63,6 +63,7 @@ export async function POST() {
         for (let offset = 0; ; offset += PAGE) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const { data } = await (admin as any).rpc("get_article_type_candidates", {
+            p_specialty: "neurosurgery",
             p_offset: offset,
             p_limit: PAGE,
           });
@@ -72,7 +73,7 @@ export async function POST() {
           if (data.length < PAGE) break;
         }
 
-        const total = allArticles.length;
+const total = allArticles.length;
         let scored = 0;
         let skipped = 0;
 
@@ -99,6 +100,7 @@ export async function POST() {
             await admin
               .from("articles")
               .update({
+                article_type:               matched,
                 article_type_ai:            matched,
                 article_type_confidence:    95,
                 article_type_rationale:     `Classified by publication type: ${matchedRaw}`,

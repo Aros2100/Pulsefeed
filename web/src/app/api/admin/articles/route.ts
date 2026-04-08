@@ -59,12 +59,14 @@ export async function GET(request: Request) {
         p_specialty:       specialty,
         p_specialty_match: "true",
         p_subspecialty:    subspecialty   || null,
+        p_search:          search         || null,
         p_geo_continent:   geoContinent   || null,
         p_geo_region:      geoRegion      || null,
         p_geo_country:     geoCountry     || null,
         p_geo_state:       geoState       || null,
         p_geo_city:        geoCity        || null,
         p_circle:          circle ? parseInt(circle, 10) : null,
+        p_article_type:    articleType    || null,
       }
     );
     if (countErr) return NextResponse.json({ ok: false, error: countErr.message }, { status: 500 });
@@ -83,12 +85,14 @@ export async function GET(request: Request) {
         p_limit:           limit,
         p_offset:          start,
         p_subspecialty:    subspecialty   || null,
+        p_search:          search         || null,
         p_geo_continent:   geoContinent   || null,
         p_geo_region:      geoRegion      || null,
         p_geo_country:     geoCountry     || null,
         p_geo_state:       geoState       || null,
         p_geo_city:        geoCity        || null,
         p_circle:          circle ? parseInt(circle, 10) : null,
+        p_article_type:    articleType    || null,
       }
     );
     if (idsErr) return NextResponse.json({ ok: false, error: idsErr.message }, { status: 500 });
@@ -109,11 +113,11 @@ export async function GET(request: Request) {
   if (dateFrom) query = query.gte("imported_at", dateFrom);
   if (dateTo)   query = query.lte("imported_at", dateTo);
   if (meshTerm) query = query.filter("mesh_terms::text", "ilike", `%${meshTerm}%`);
-  if (search)   query = query.or(`title.ilike.%${search}%,journal_abbr.ilike.%${search}%`);
+  if (search && !specialty) query = query.or(`title.ilike.%${search}%,journal_abbr.ilike.%${search}%`);
   if (articleType === "Unclassified") {
-    query = query.is("article_type_ai", null);
+    query = query.is("article_type", null);
   } else if (articleType) {
-    query = query.eq("article_type_ai", articleType).eq("article_type_validated", true);
+    query = query.eq("article_type", articleType);
   }
   if (missingGeo)   query = query.is("geo_country", null).is("geo_city", null);
   if (noRegion)     query = query.is("geo_region",  null);

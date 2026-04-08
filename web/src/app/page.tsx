@@ -2,10 +2,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import KPIOverview from "@/components/KPIOverview";
-import ArticleFilterPanel from "@/components/ArticleFilterPanel";
+import ArticleTypeChart from "@/components/ArticleTypeChart";
 import MeshExplorer from "@/components/MeshExplorer";
 import SuggestedAuthors from "@/components/SuggestedAuthors";
-import { getRegion } from "@/lib/geo/continent-map";
+import { getSubspecialties } from "@/lib/lab/classification-options";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -21,21 +21,19 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("name, specialty_slugs, author_id, subspecialties, country")
+    .select("name, specialty_slugs, author_id, subspecialties")
     .eq("id", user.id)
     .single();
 
   const firstName = profile?.name?.split(" ")[0] ?? "there";
   const userSubspecialties = (profile?.subspecialties as string[] | null) ?? null;
-  const userCountry = (profile?.country as string | null) ?? null;
-  const userRegion = userCountry ? getRegion(userCountry) : null;
-
   // Fetch top subspecialties from DB
   const { data: topSubsData } = await supabase.rpc(
     "get_top_subspecialties",
     { p_limit: 3 },
   );
   const topSubspecialties = (topSubsData ?? []) as { tag: string; count: number }[];
+  const allSubspecialties = await getSubspecialties("neurosurgery");
 
   const quickLinks = [
     { icon: "✉️", title: "Newsletters",    desc: "View your previous digests",       href: "/newsletters" },
@@ -66,21 +64,18 @@ export default async function DashboardPage() {
           <MeshExplorer
             userSubspecialties={userSubspecialties}
             topSubspecialties={topSubspecialties}
+            allSubspecialties={allSubspecialties}
           />
         </div>
 
         {/* Suggested Authors */}
         <div style={{ marginTop: "28px" }}>
-          <SuggestedAuthors userSubspecialties={userSubspecialties} />
+          <SuggestedAuthors userSubspecialties={userSubspecialties} allSubspecialties={allSubspecialties} />
         </div>
 
-        {/* Article Filter Panel */}
+        {/* Article Type Distribution */}
         <div style={{ marginTop: "28px" }}>
-          <ArticleFilterPanel
-            userSubspecialties={userSubspecialties}
-            topSubspecialties={topSubspecialties}
-            userRegion={userRegion}
-          />
+          <ArticleTypeChart specialty="neurosurgery" />
         </div>
 
         {/* Quick access */}

@@ -5,6 +5,7 @@ import { SPECIALTIES } from "@/lib/auth/specialties";
 import ArticleStamkort, { type ArticleData } from "@/components/articles/ArticleStamkort";
 import AdminArticleTabs from "./AdminArticleTabs";
 import ArticleEditableFields from "./ArticleEditableFields";
+import { getSubspecialties } from "@/lib/lab/classification-options";
 import GeoCard from "./GeoCard";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -418,12 +419,13 @@ export default async function AdminArticleLogPage({
   const { id } = await params;
   const admin = createAdminClient();
 
-  const [articleResult, eventsResult, authorLinksResult, specialtyResult] = await Promise.all([
+  const [articleResult, eventsResult, authorLinksResult, specialtyResult, subspecialtiesList] = await Promise.all([
     admin.from("articles").select("*").eq("id", id).maybeSingle(),
     admin.from("article_events").select("*").eq("article_id", id).order("sequence", { ascending: true }),
     admin.from("article_authors").select("author_id, position, authors(author_score, department, hospital, city, state, country, verified_by)").eq("article_id", id),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (admin as any).from("article_specialties").select("specialty, specialty_match").eq("article_id", id).order("specialty").limit(1).maybeSingle(),
+    getSubspecialties("neurosurgery"),
   ]);
 
   const article = articleResult.data;
@@ -488,6 +490,33 @@ export default async function AdminArticleLogPage({
           </CardBody>
         </Card>
       )}
+
+      {/* Klassifikation */}
+      <Card>
+        <CardHeader label="Klassifikation" />
+        <CardBody>
+          <CardKVRow label="Article type" value={(raw.article_type as string | null) ?? "—"} />
+          <CardKVRow label="Subspecialty" value={
+            (() => {
+              const sub = a.subspecialty_ai;
+              const tags: string[] = Array.isArray(sub)
+                ? sub
+                : typeof sub === "string" && sub.startsWith("{") && sub.endsWith("}")
+                  ? sub.slice(1, -1).split(",").map((s: string) => s.replace(/^"|"$/g, "").trim()).filter(Boolean)
+                  : sub
+                    ? [sub as string]
+                    : [];
+              return tags.length > 0 ? tags.join(", ") : "—";
+            })()
+          } />
+          <CardKVRow label="Specialty" value={
+            (() => {
+              const slug = specialtyRow?.specialty ?? (a.specialty_tags as string[] | null)?.[0];
+              return slug ? specialtyLabel(slug) : "—";
+            })()
+          } />
+        </CardBody>
+      </Card>
 
       {/* Bibliometri */}
       <Card>
@@ -597,11 +626,12 @@ export default async function AdminArticleLogPage({
             initialSpecialtyMatch={specialtyRow?.specialty_match ?? null}
             initialSpecialty={specialtyRow?.specialty ?? (a.specialty_tags as string[] | null)?.[0] ?? ""}
             initialSubspecialties={(Array.isArray(a.subspecialty_ai) ? a.subspecialty_ai : []) as string[]}
+            subspecialties={subspecialtiesList}
           />
         </CardBody>
       </Card>
 
-      {/* Klassificering */}
+      {/* Subspecialer */}
       {(a.subspecialty_ai ||
         a.patient_population || a.time_to_read != null || a.full_text_available != null ||
         a.trial_registration || (raw.geo_region as string | null)) && (() => {
@@ -688,7 +718,7 @@ export default async function AdminArticleLogPage({
 
         return (
           <Card>
-            <CardHeader label="Klassificering" />
+            <CardHeader label="Subspecialer" />
             <CardBody>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, fontSize: "14px" }}>
                 <div>
@@ -938,6 +968,47 @@ export default async function AdminArticleLogPage({
           )}
         </CardBody>
       </Card>
+
+      {/* PubMed Sync */}
+      <Card>
+        <CardHeader label="PubMed Sync" />
+        <CardBody>
+          <CardKVRow
+            label="Last synced"
+            value={
+              (raw.pubmed_synced_at as string | null)
+                ? fmt(raw.pubmed_synced_at as string)
+                : <span style={{ color: "#9ca3af" }}>Not yet synced</span>
+            }
+          />
+          <CardKVRow
+            label="Retracted"
+            value={
+              raw.retracted === true
+                ? <Badge color="red">Yes</Badge>
+                : <Badge color="gray">No</Badge>
+            }
+          />
+          <CardKVRow
+            label="Authors changed"
+            value={
+              raw.authors_changed === true
+                ? <Badge color="orange">Yes</Badge>
+                : <Badge color="gray">No</Badge>
+            }
+          />
+          {raw.authors_changed === true && Array.isArray(raw.authors_raw_new) && (
+            <CardKVRow
+              label="New authors data"
+              value={
+                <span style={{ color: "#9ca3af", fontSize: "13px" }}>
+                  {(raw.authors_raw_new as unknown[]).length} authors pending review
+                </span>
+              }
+            />
+          )}
+        </CardBody>
+      </Card>
     </div>
   );
 
@@ -1034,6 +1105,25 @@ export default async function AdminArticleLogPage({
           <h1 style={{ fontSize: "16px", fontWeight: 700, lineHeight: 1.4, margin: 0 }}>
             {a.title}
           </h1>
+          {raw.retracted === true && (
+            <div style={{
+              marginTop: "12px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              background: "#fef2f2",
+              border: "1px solid #fecaca",
+              borderRadius: "6px",
+              padding: "6px 12px",
+            }}>
+              <span style={{ fontSize: "13px", fontWeight: 700, color: "#b91c1c" }}>
+                ⚠ RETRACTED
+              </span>
+              <span style={{ fontSize: "12px", color: "#ef4444" }}>
+                This article has been retracted from PubMed
+              </span>
+            </div>
+          )}
         </div>
 
       </div>
