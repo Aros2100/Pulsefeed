@@ -8,7 +8,7 @@ import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 const CONCURRENCY  = 1;
 const DELAY_MS     = 1300;
-const BATCH_LIMIT  = 25;
+const BATCH_LIMIT  = 50;
 const FIXED_SPECIALTY = ACTIVE_SPECIALTY;
 
 const schema = z.object({
