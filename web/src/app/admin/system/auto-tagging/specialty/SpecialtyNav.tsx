@@ -8,7 +8,7 @@ const tabs = [
   { href: "/admin/system/auto-tagging/specialty/combos", label: "Combo terms" },
 ];
 
-export default function TaggingNav() {
+export default function SpecialtyNav() {
   const pathname = usePathname();
 
   return (

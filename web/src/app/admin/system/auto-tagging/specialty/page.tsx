@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-import TaggingClient from "./TaggingClient";
-import TaggingNav from "./TaggingNav";
+import SpecialtyClient from "./SpecialtyClient";
+import SpecialtyNav from "./SpecialtyNav";
 
 export default async function TaggingPage() {
   const admin = createAdminClient();
@@ -66,9 +66,9 @@ export default async function TaggingPage() {
             ← System
           </Link>
         </div>
-        <TaggingNav />
+        <SpecialtyNav />
       </div>
-      <TaggingClient
+      <SpecialtyClient
         rules={typedRules}
         readyArticles={readyArticles}
         kpis={{

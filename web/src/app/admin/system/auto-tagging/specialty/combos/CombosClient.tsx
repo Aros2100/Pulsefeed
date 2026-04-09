@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import TaggingKpiCards from "../TaggingKpiCards";
-import type { TaggingKpis } from "../TaggingKpiCards";
+import SpecialtyKpiCards from "../SpecialtyKpiCards";
+import type { TaggingKpis } from "../SpecialtyKpiCards";
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -455,7 +455,7 @@ export default function CombosClient({
       {toast && <Toast toast={toast} />}
 
       {/* KPI cards */}
-      <TaggingKpiCards kpis={kpis} />
+      <SpecialtyKpiCards kpis={kpis} />
 
       {/* Hover tooltip */}
       {hoveredCell && (

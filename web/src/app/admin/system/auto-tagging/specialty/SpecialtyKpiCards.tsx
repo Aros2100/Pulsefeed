@@ -28,7 +28,7 @@ function KpiCard({ label, value, accent }: { label: string; value: number; accen
   );
 }
 
-export default function TaggingKpiCards({ kpis }: { kpis: TaggingKpis }) {
+export default function SpecialtyKpiCards({ kpis }: { kpis: TaggingKpis }) {
   return (
     <div style={{ display: "flex", gap: "16px", marginBottom: "28px", flexWrap: "wrap" }}>
       <KpiCard label="Total pending" value={kpis.totalPending} />

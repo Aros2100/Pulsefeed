@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-import TaggingNav from "../TaggingNav";
+import SpecialtyNav from "../SpecialtyNav";
 import CombosClient from "./CombosClient";
 
 export default async function CombosPage() {
@@ -107,7 +107,7 @@ export default async function CombosPage() {
             ← System
           </Link>
         </div>
-        <TaggingNav />
+        <SpecialtyNav />
       </div>
       <CombosClient
         rules={rulesWithCounts}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import TaggingNav from "../TaggingNav";
+import SpecialtyNav from "../../specialty/SpecialtyNav";
 
 const SHADOW = "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)";
 
@@ -112,7 +112,7 @@ export default function PublicationTypesPage() {
             ← System
           </Link>
         </div>
-        <TaggingNav />
+        <SpecialtyNav />
 
         {/* KPI Cards */}
         <div style={{ display: "flex", gap: "16px", marginBottom: "24px", flexWrap: "wrap" }}>
