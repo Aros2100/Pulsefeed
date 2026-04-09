@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const tabs = [
-  { href: "/admin/system/auto-tagging/tagging", label: "Single terms" },
-  { href: "/admin/system/auto-tagging/tagging/combos", label: "Combo terms" },
+  { href: "/admin/system/auto-tagging/specialty", label: "Single terms" },
+  { href: "/admin/system/auto-tagging/specialty/combos", label: "Combo terms" },
 ];
 
 export default function TaggingNav() {
@@ -25,7 +25,7 @@ export default function TaggingNav() {
       <div style={{ display: "flex", gap: "0", borderBottom: "2px solid #e5e7eb" }}>
         {tabs.map((t) => {
           const isActive =
-            t.href === "/admin/system/auto-tagging/tagging"
+            t.href === "/admin/system/auto-tagging/specialty"
               ? pathname === t.href
               : pathname.startsWith(t.href);
           return (

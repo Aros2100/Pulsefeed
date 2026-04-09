@@ -48,7 +48,7 @@ export default function AutoTaggingPage() {
         </Link>
       </div>
       <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", justifyContent: "center" }}>
-        <Card href="/admin/system/auto-tagging/tagging"       emoji="🏷️" label="Speciale"     sub="MeSH auto-tagging rules" />
+        <Card href="/admin/system/auto-tagging/specialty"       emoji="🏷️" label="Speciale"     sub="MeSH auto-tagging rules" />
         <Card href="/admin/system/auto-tagging/article-type"  emoji="📄" label="Artikel Type" sub="Deterministisk klassificering" />
       </div>
     </div>
