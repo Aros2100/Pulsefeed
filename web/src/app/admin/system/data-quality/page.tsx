@@ -246,7 +246,7 @@ export default function DataQualityPage() {
               highlight={imp.awaiting_linking > 500 ? "amber" : imp.awaiting_linking > 0 ? undefined : "green"} />
           </div>
           <div style={{ padding: "0 20px 16px", textAlign: "right" }}>
-            <Link href="/admin/system/docs/pubmed-import" style={{ fontSize: "12px", color: "#5a6a85", textDecoration: "none" }}>
+            <Link href="/admin/system/data-quality/docs/pubmed-import" style={{ fontSize: "12px", color: "#5a6a85", textDecoration: "none" }}>
               → PubMed import pipeline documentation
             </Link>
           </div>
@@ -267,7 +267,7 @@ export default function DataQualityPage() {
               highlight={author_linking.articles_with_mismatch > 0 ? "amber" : undefined} />
           </div>
           <div style={{ padding: "0 20px 16px", textAlign: "right" }}>
-            <Link href="/admin/system/docs/author-linking" style={{ fontSize: "12px", color: "#5a6a85", textDecoration: "none" }}>
+            <Link href="/admin/system/data-quality/docs/author-linking" style={{ fontSize: "12px", color: "#5a6a85", textDecoration: "none" }}>
               → Author linking pipeline documentation
             </Link>
           </div>
@@ -361,7 +361,7 @@ export default function DataQualityPage() {
             />
           </div>
           <div style={{ padding: "0 20px 16px", textAlign: "right" }}>
-            <Link href="/admin/system/docs/author-geo" style={{ fontSize: "12px", color: "#5a6a85", textDecoration: "none" }}>
+            <Link href="/admin/system/data-quality/docs/author-geo" style={{ fontSize: "12px", color: "#5a6a85", textDecoration: "none" }}>
               → Author geo pipeline documentation
             </Link>
           </div>
@@ -448,7 +448,7 @@ export default function DataQualityPage() {
             </Link>
           </div>
           <div style={{ padding: "0 20px 16px", textAlign: "right" }}>
-            <Link href="/admin/system/docs/article-geo" style={{ fontSize: "12px", color: "#5a6a85", textDecoration: "none" }}>
+            <Link href="/admin/system/data-quality/docs/article-geo" style={{ fontSize: "12px", color: "#5a6a85", textDecoration: "none" }}>
               → Geo pipeline documentation
             </Link>
           </div>
