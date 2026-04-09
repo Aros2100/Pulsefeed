@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { runAuthorUpdateBatch } from "@/lib/forfatter-import/update-authors";
+import { runAuthorUpdateBatch } from "@/lib/import/forfatter-import/update-authors";
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
