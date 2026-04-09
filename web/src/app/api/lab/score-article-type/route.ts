@@ -179,6 +179,15 @@ export async function POST(request: NextRequest) {
               try {
                 const cls = await classifyWithDelay(article, activePrompt!);
                 console.log(`[score-article-type] scored ${article.id}: ${cls.article_type}`);
+                const VALID_ARTICLE_TYPES = [
+                  "Meta-analysis", "Review", "Intervention study", "Non-interventional study",
+                  "Basic study", "Case", "Guideline", "Surgical Technique", "Tech",
+                  "Administration", "Letters & Notices", "Unclassified",
+                ];
+                if (!VALID_ARTICLE_TYPES.includes(cls.article_type)) {
+                  console.warn(`[score-article-type] invalid article_type "${cls.article_type}" for ${article.id} — falling back to Unclassified`);
+                  cls.article_type = "Unclassified";
+                }
                 const { error } = await admin
                   .from("articles")
                   .update({
