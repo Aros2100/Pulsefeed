@@ -449,7 +449,7 @@ export default async function ImportDashboardPage() {
           <div style={sectionHeader}>
             <span style={headerLabel}>Forfatter-berigelse</span>
             <Link
-              href="/admin/system/author-linking"
+              href="/admin/system/import/author-linking"
               style={{ fontSize: "13px", fontWeight: 600, color: "#E83B2A", textDecoration: "none" }}
             >
               Administrér →
