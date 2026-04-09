@@ -129,7 +129,7 @@ function Toast({ toast }: { toast: { msg: string; ok: boolean } }) {
 
 /* ── Main component ─────────────────────────────────────────────── */
 
-export default function ArticleTypeAdminClient({
+export default function ArticleTypeClient({
   pending,
   deterministic,
   initialRules,

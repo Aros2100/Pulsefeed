@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import ArticleTypeAdminClient from "./ArticleTypeAdminClient";
+import ArticleTypeClient from "./ArticleTypeClient";
 
 type Rule = {
   id: string;
@@ -72,7 +72,7 @@ export default async function ArticleTypeSystemPage() {
           </p>
         </div>
       </div>
-      <ArticleTypeAdminClient
+      <ArticleTypeClient
         pending={pending}
         deterministic={deterministic}
         initialRules={rules}
