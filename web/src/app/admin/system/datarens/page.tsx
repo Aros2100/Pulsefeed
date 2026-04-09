@@ -35,13 +35,13 @@ export default function DatarensPage() {
 
   const items = [
     {
-      href:  "/admin/datarens/author-geo",
+      href:  "/admin/system/datarens/author-geo",
       title: "Author Verification",
       desc:  "Verificér forfatter-lokationer fra affiliation-parsing",
       stats: statLabel,
     },
     {
-      href:  "/admin/datarens/dedub",
+      href:  "/admin/system/datarens/dedub",
       title: "Dedub",
       desc:  "Deduplicering af forfatterposter",
       stats: null,
