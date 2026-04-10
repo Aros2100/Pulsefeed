@@ -40,10 +40,10 @@ export async function GET(request: NextRequest) {
       filterIds = filterIds.filter((id) => circleFilterIds.has(id));
     }
 
-    logsQuery =
-      filterIds.length > 0
-        ? logsQuery.or(`filter_id.in.(${filterIds.join(",")})`)
-        : logsQuery.is("filter_id", null);
+    if (filterIds.length === 0) {
+      return NextResponse.json({ ok: true, logs: [] });
+    }
+    logsQuery = logsQuery.or(`filter_id.in.(${filterIds.join(",")})`);
   }
 
   const { data: logs, error } = await logsQuery;
