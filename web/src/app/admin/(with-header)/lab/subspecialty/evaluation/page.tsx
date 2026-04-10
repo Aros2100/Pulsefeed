@@ -206,9 +206,9 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
   const agreementRate   = total > 0 ? Math.round(((total - totalDisagree) / total) * 100) : null;
 
   // Data sufficiency
-  const hasSufficientData = totalDisagree >= 10;
-  const dataBanner = totalDisagree < 10
-    ? { bg: "#fef2f2", border: "#fecaca", dot: "#dc2626", text: "#b91c1c", msg: `Insufficient data — need at least 10 disagreements to identify reliable trends (${totalDisagree} so far)` }
+  const hasSufficientData = totalDisagree >= 0;
+  const dataBanner = totalDisagree < 0
+    ? { bg: "#fef2f2", border: "#fecaca", dot: "#dc2626", text: "#b91c1c", msg: `Insufficient data — need at least 0 disagreements to identify reliable trends (${totalDisagree} so far)` }
     : { bg: "#f0fdf4", border: "#bbf7d0", dot: "#15803d", text: "#14532d", msg: `Sufficient data for reliable trend analysis (${totalDisagree} disagreements)` };
 
   return (

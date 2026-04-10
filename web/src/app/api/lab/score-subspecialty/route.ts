@@ -9,7 +9,7 @@ import { applyUnscoredFilters } from "@/lib/lab/article-filters";
 
 const CONCURRENCY  = 1;
 const DELAY_MS     = 1300;
-const BATCH_LIMIT  = 100;
+const BATCH_LIMIT  = 50;
 
 const schema = z.object({
   specialty: z.string().refine(

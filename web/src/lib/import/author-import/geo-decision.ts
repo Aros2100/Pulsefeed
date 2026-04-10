@@ -1,27 +1,25 @@
-// Hent by/stat/land fra ROR geonames_details for et givet ROR-id (uden prefix)
+import { createAdminClient } from "@/lib/supabase/admin";
+
 export async function fetchRorGeo(
   rorId: string
 ): Promise<{ city: string | null; state: string | null; country: string | null }> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
-  try {
-    const res = await fetch(`https://api.ror.org/organizations/${rorId}`, {
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    if (!res.ok) return { city: null, state: null, country: null };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = (await res.json()) as any;
-    const geo = data.locations?.[0]?.geonames_details;
-    return {
-      city:    geo?.name                     ?? null,
-      state:   geo?.country_subdivision_name ?? null,
-      country: geo?.country_name             ?? null,
-    };
-  } catch {
-    clearTimeout(timeout);
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("ror_institutions")
+    .select("city, state, country")
+    .eq("ror_id", rorId)
+    .maybeSingle();
+
+  if (!data) {
+    console.warn(`[fetchRorGeo] ror_id ikke fundet i ror_institutions: ${rorId}`);
     return { city: null, state: null, country: null };
   }
+
+  return {
+    city:    data.city    ?? null,
+    state:   data.state   ?? null,
+    country: data.country ?? null,
+  };
 }
 
 export function isGeoUpgrade(

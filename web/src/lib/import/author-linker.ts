@@ -11,8 +11,8 @@ import { getCityCache, normalizeCityKey } from "@/lib/geo/city-cache";
 import { fetchWorksByDois, type OpenAlexWork } from "@/lib/openalex/client";
 import pLimit from "p-limit";
 
-const BATCH_SIZE = 100;
-const LINK_CONCURRENCY = 3;
+const BATCH_SIZE = 250;
+const LINK_CONCURRENCY = 8;
 
 export async function runAuthorLinking(logId: string, importLogId?: string): Promise<void> {
   const admin = createAdminClient();
@@ -72,7 +72,16 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
         batch.map((article) => limiter(async () => {
           const rawAuthors = (article.authors ?? []) as Record<string, unknown>[];
           console.error(`[author-linker] PMID ${article.pubmed_id}: authors field type=${typeof article.authors}, rawAuthors.length=${rawAuthors.length}`);
-          if (rawAuthors.length === 0) {
+
+          const allRejected = rawAuthors.every(
+            (a) => !String(a.lastName ?? "").trim() && !String(a.orcid ?? "").trim()
+          );
+
+          if (rawAuthors.length === 0 || allRejected) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (admin as any).from("articles")
+              .update({ authors_unresolvable: true })
+              .eq("id", article.id);
             articlesProcessed++;
             return;
           }
