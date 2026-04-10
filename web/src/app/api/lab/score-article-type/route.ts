@@ -179,29 +179,6 @@ export async function POST(request: NextRequest) {
               try {
                 const cls = await classifyWithDelay(article, activePrompt!);
                 console.log(`[score-article-type] scored ${article.id}: ${cls.article_type}`);
-                const ARTICLE_TYPE_ALIASES: Record<string, string> = {
-                  "Systematic Review":  "Review",
-                  "Narrative Review":   "Review",
-                  "Scoping Review":     "Review",
-                  "Literature Review":  "Review",
-                  "Network Meta-analysis":   "Meta-analysis",
-                  "Systematic Meta-analysis": "Meta-analysis",
-                };
-                const VALID_ARTICLE_TYPES = [
-                  "Meta-analysis", "Review", "Intervention study", "Non-interventional study",
-                  "Basic study", "Case", "Guideline", "Surgical Technique", "Tech",
-                  "Administration", "Letters & Notices", "Unclassified",
-                ];
-                let articleType = cls.article_type;
-                if (ARTICLE_TYPE_ALIASES[articleType]) {
-                  console.log(`[score-article-type] alias "${articleType}" → "${ARTICLE_TYPE_ALIASES[articleType]}" for ${article.id}`);
-                  articleType = ARTICLE_TYPE_ALIASES[articleType];
-                }
-                if (!VALID_ARTICLE_TYPES.includes(articleType)) {
-                  console.warn(`[score-article-type] invalid article_type "${articleType}" for ${article.id} — falling back to Unclassified`);
-                  articleType = "Unclassified";
-                }
-                cls.article_type = articleType;
                 const { error } = await admin
                   .from("articles")
                   .update({

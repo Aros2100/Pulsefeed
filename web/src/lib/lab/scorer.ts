@@ -147,6 +147,39 @@ export interface ArticleTypeResult {
   version: string;
 }
 
+const ARTICLE_TYPE_ALIASES: Record<string, string> = {
+  // Review variants
+  "Systematic Review":           "Review",
+  "Narrative Review":            "Review",
+  "Scoping Review":              "Review",
+  "Literature Review":           "Review",
+  // Meta-analysis variants
+  "Network Meta-analysis":       "Meta-analysis",
+  "Systematic Meta-analysis":    "Meta-analysis",
+  // Case variants
+  "Case Report":                 "Case",
+  "Case Series":                 "Case",
+  // Intervention study variants
+  "Clinical Trial":              "Intervention study",
+  "RCT":                         "Intervention study",
+  "Randomized Controlled Trial": "Intervention study",
+  // Non-interventional study variants
+  "Cohort Study":                "Non-interventional study",
+  "Observational Study":         "Non-interventional study",
+  "Retrospective Study":         "Non-interventional study",
+  "Cross-sectional Study":       "Non-interventional study",
+  // Surgical Technique variants
+  "Technical Note":              "Surgical Technique",
+  // Letters & Notices variants
+  "Editorial":                   "Letters & Notices",
+  "Letter":                      "Letters & Notices",
+  "Letter to the Editor":        "Letters & Notices",
+  "Comment":                     "Letters & Notices",
+  "Erratum":                     "Letters & Notices",
+  // Legacy fallback
+  "Other":                       "Unclassified",
+};
+
 export async function scoreArticleType(
   article: {
     id?: string;
@@ -191,17 +224,20 @@ export async function scoreArticleType(
       rationale?: string;
     };
 
+    const rawType = parsed.article_type;
     const article_type =
-      typeof parsed.article_type === "string" && articleTypeSet.has(parsed.article_type)
-        ? parsed.article_type
-        : "Other";
+      typeof rawType === "string"
+        ? articleTypeSet.has(rawType)
+          ? rawType
+          : ARTICLE_TYPE_ALIASES[rawType] ?? "Unclassified"
+        : "Unclassified";
     const confidence = Math.min(99, Math.max(1, Math.round(Number(parsed.confidence ?? 50))));
     const rationale = typeof parsed.rationale === "string" ? parsed.rationale.slice(0, 500) : "";
 
     return { article_type, confidence, rationale, version: activePrompt.version };
   } catch {
     return {
-      article_type: "Other",
+      article_type: "Unclassified",
       confidence: 50,
       rationale: "Failed to parse AI response",
       version: activePrompt.version,

@@ -15,6 +15,7 @@ const schema = z.object({
     corrected:           z.boolean(),
     ai_confidence:       z.number().nullable().optional(),
     disagreement_reason: z.string().nullable().optional(),
+    ai_reasoning:        z.string().nullable().optional(),
   })).min(1),
 });
 
@@ -77,6 +78,7 @@ export async function POST(request: NextRequest) {
     ai_decision:         v.ai_decision,
     ai_confidence:       v.ai_confidence ?? null,
     disagreement_reason: v.disagreement_reason ?? (v.corrected ? "corrected" : null),
+    ai_reasoning:        v.ai_reasoning ?? null,
     model_version:       modelVersion,
   }));
 

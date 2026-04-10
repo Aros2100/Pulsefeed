@@ -310,6 +310,7 @@ export default function ArticleTypeClient() {
         corrected:           verdicts[a.id].corrected,
         ai_confidence:       verdicts[a.id].ai_confidence,
         disagreement_reason: verdicts[a.id].disagreement_reason ?? null,
+        ai_reasoning:        a.article_type_rationale ?? null,
       }));
 
     if (toSave.length === 0) return;
