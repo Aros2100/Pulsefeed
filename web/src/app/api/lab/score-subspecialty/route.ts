@@ -82,16 +82,19 @@ export async function POST(request: NextRequest) {
   let fetchError: { message: string } | null;
 
   if (scoreAll) {
-    // Re-score articles with outdated or missing classification_model_version
+    // Re-score articles where subspecialty_ai is NULL and not yet validated
+    const { data: rescoreIds } = await admin.rpc("get_subspecialty_rescore_candidates", {
+      p_specialty: specialty,
+      p_limit: 50,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const candidateIds: string[] = ((rescoreIds ?? []) as any[]).map((r) => r.id ?? r);
+
     const res = await admin
       .from("articles")
       .select("id, title, abstract")
-      .eq("status", "approved")
-      .not("abstract", "is", null)
-      .contains("specialty_tags", [specialty])
-      .or(`classification_scored_at.is.null,classification_model_version.is.null,classification_model_version.neq.${activePrompt.version}`)
-      .order("classification_scored_at", { ascending: true, nullsFirst: true })
-      .limit(500);
+      .in("id", candidateIds.length > 0 ? candidateIds : ["00000000-0000-0000-0000-000000000000"])
+      .limit(50);
     articles = res.data as Article[] | null;
     fetchError = res.error;
   } else {
@@ -161,9 +164,9 @@ export async function POST(request: NextRequest) {
                   .from("articles")
                   .update({
                     subspecialty_ai:              cls.subspecialty,
-                    classification_reason:        cls.reason,
-                    classification_model_version: cls.version,
-                    classification_scored_at:     new Date().toISOString(),
+                    subspecialty_reason:        cls.reason,
+                    subspecialty_model_version: cls.version,
+                    subspecialty_scored_at:     new Date().toISOString(),
                   })
                   .eq("id", article.id);
                 if (error) throw new Error(error.message);

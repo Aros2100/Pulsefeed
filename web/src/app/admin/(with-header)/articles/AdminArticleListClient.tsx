@@ -291,7 +291,7 @@ export default function AdminArticleListClient({ subspecialties }: { subspecialt
       if (key === "geo_region")    { next.geo_country = ""; next.geo_state = ""; next.geo_city = ""; }
       if (key === "geo_country")   { next.geo_state = ""; next.geo_city = ""; }
       if (key === "geo_state")     { next.geo_city = ""; }
-      if (key === "specialty" && value !== "neurosurgery") { next.subspecialty = ""; }
+      if (key === "specialty" && value !== ACTIVE_SPECIALTY) { next.subspecialty = ""; }
       return next;
     });
   }

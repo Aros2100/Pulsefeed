@@ -52,9 +52,9 @@ export type Database = {
           subspecialty_ai: string | null
           article_type_ai: string | null
           study_design_ai: string | null
-          classification_reason: string | null
-          classification_scored_at: string | null
-          classification_model_version: string | null
+          subspecialty_reason: string | null
+          subspecialty_scored_at: string | null
+          subspecialty_model_version: string | null
           substances: Json
           title: string
           verified: boolean | null
@@ -97,9 +97,9 @@ export type Database = {
           subspecialty_ai?: string | null
           article_type_ai?: string | null
           study_design_ai?: string | null
-          classification_reason?: string | null
-          classification_scored_at?: string | null
-          classification_model_version?: string | null
+          subspecialty_reason?: string | null
+          subspecialty_scored_at?: string | null
+          subspecialty_model_version?: string | null
           substances?: Json
           title: string
           verified?: boolean | null
@@ -142,9 +142,9 @@ export type Database = {
           subspecialty_ai?: string | null
           article_type_ai?: string | null
           study_design_ai?: string | null
-          classification_reason?: string | null
-          classification_scored_at?: string | null
-          classification_model_version?: string | null
+          subspecialty_reason?: string | null
+          subspecialty_scored_at?: string | null
+          subspecialty_model_version?: string | null
           substances?: Json
           title?: string
           verified?: boolean | null

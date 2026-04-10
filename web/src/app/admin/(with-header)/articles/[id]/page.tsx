@@ -666,7 +666,7 @@ export default async function AdminArticleLogPage({
 
         const aiRows: ClsRow[] = [
           clsFr("Subspecialty", subTags.length > 0 ? subTags.join(", ") : null),
-          clsFr("Model", a.classification_model_version ? `v${a.classification_model_version}` : null),
+          clsFr("Model", a.subspecialty_model_version ? `v${a.subspecialty_model_version}` : null),
         ].filter((r): r is ClsRow => r !== null);
 
         const popStyle = a.patient_population
@@ -731,9 +731,9 @@ export default async function AdminArticleLogPage({
                       <span style={{ color: "#1a1a1a" }}>{value}</span>
                     </div>
                   ))}
-                  {a.classification_reason && (
+                  {a.subspecialty_reason && (
                     <div style={{ marginTop: "8px", fontSize: "12px", color: "#666", fontStyle: "italic", lineHeight: 1.5 }}>
-                      {a.classification_reason}
+                      {a.subspecialty_reason}
                     </div>
                   )}
                 </div>

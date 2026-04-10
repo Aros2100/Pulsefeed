@@ -23,7 +23,7 @@ export const MODULE_FILTERS = {
     description: "Approved C3 articles for subspecialty classification",
     filters: { status: "approved", circle: null },
     requireAbstract: true,
-    nullCheck: "classification_scored_at",
+    nullCheck: "subspecialty_scored_at",
   },
   condensation: {
     description: "Approved C3 articles for condensation",

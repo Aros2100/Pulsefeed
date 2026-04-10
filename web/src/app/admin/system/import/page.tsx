@@ -79,9 +79,10 @@ const BADGES = {
   1: { label: "C1", bg: "#dbeafe", text: "#1d4ed8" },
   2: { label: "C2", bg: "#f3e8ff", text: "#7c3aed" },
   3: { label: "C3", bg: "#fff7ed", text: "#c2410c" },
+  4: { label: "C4", bg: "#dcfce7", text: "#15803d" },
 } as const;
 
-function CircleBadge({ circle }: { circle: 1 | 2 | 3 }) {
+function CircleBadge({ circle }: { circle: 1 | 2 | 3 | 4 }) {
   const b = BADGES[circle];
   return (
     <span style={{
@@ -158,9 +159,10 @@ export default async function ImportDashboardPage() {
   const [
     c1ApprovedRes, c2ApprovedRes, c2PendingRes, c2RejectedRes,
     c3ApprovedRes, c3PendingRes, c3RejectedRes,
+    c4ApprovedRes,
     totalArticlesRes,
     authorsResult, unlinkedResult, unlinkedSlotsResult,
-    latestC1LogResult, latestC2LogResult, latestC3LogResult,
+    latestC1LogResult, latestC2LogResult, latestC3LogResult, latestC4LogResult,
     latestLinkingRunResult,
     articlesTodayRes, articlesWeekRes, articlesMonthRes, articlesYearRes,
     authorsTodayRes, authorsWeekRes, authorsMonthRes, authorsYearRes, authorsTotalRes,
@@ -173,6 +175,7 @@ export default async function ImportDashboardPage() {
     // Article counts per circle+status
     countQ(1, "approved"), countQ(2, "approved"), countQ(2, "pending"), countQ(2, "rejected"),
     countQ(3, "approved"), countQ(3, "pending"), countQ(3, "rejected"),
+    countQ(4, "approved"),
     // Total articles
     admin.from("articles").select("id", { count: "exact", head: true }),
     // Authors
@@ -200,6 +203,14 @@ export default async function ImportDashboardPage() {
       .eq("status", "completed").eq("circle", 3)
       .order("started_at", { ascending: false }).limit(1)
       .maybeSingle() as Promise<{ data: ImportLog | null }>,
+    admin.from("pubmed_filters").select("id").eq("specialty", ACTIVE_SPECIALTY).eq("circle", 4)
+      .then(async (fRes: { data: { id: string }[] | null }) => {
+        const ids = (fRes.data ?? []).map((f) => f.id);
+        if (ids.length === 0) return { data: null };
+        return admin.from("import_logs").select("started_at, articles_imported")
+          .eq("status", "completed").in("filter_id", ids)
+          .order("started_at", { ascending: false }).limit(1).maybeSingle();
+      }),
     admin.from("author_linking_logs")
       .select("started_at")
       .eq("status", "completed")
@@ -272,12 +283,14 @@ export default async function ImportDashboardPage() {
   const c3Approved = (c3ApprovedRes as { count: number | null }).count ?? 0;
   const c3Pending  = (c3PendingRes as { count: number | null }).count ?? 0;
   const c3Rejected = (c3RejectedRes as { count: number | null }).count ?? 0;
+  const c4Approved = (c4ApprovedRes as { count: number | null }).count ?? 0;
   const totalArticles = totalArticlesRes.count ?? 0;
 
   // Latest import per circle
   const latestC1 = latestC1LogResult.data as ImportLog | null;
   const latestC2 = latestC2LogResult.data as ImportLog | null;
   const latestC3 = (latestC3LogResult as { data: ImportLog | null }).data;
+  const latestC4 = latestC4LogResult.data as ImportLog | null;
 
   // Author stats
   const totalAuthors = authorsResult.count ?? 0;
@@ -335,7 +348,7 @@ export default async function ImportDashboardPage() {
 
   // Circle table data
   const circleRows: {
-    circle: 1 | 2 | 3;
+    circle: 1 | 2 | 3 | 4;
     name: string;
     approved: number | null;
     pending: number | null;
@@ -345,9 +358,10 @@ export default async function ImportDashboardPage() {
     { circle: 1, name: "Trusted Journals", approved: c1Approved, pending: null, rejected: null, latestDate: latestC1?.started_at ?? null },
     { circle: 2, name: "Extended Sources", approved: c2Approved, pending: c2Pending, rejected: c2Rejected, latestDate: latestC2?.started_at ?? null },
     { circle: 3, name: "Danish Sources", approved: c3Approved || null, pending: c3Pending, rejected: c3Rejected || null, latestDate: latestC3?.started_at ?? null },
+    { circle: 4, name: "MeSH Terms", approved: c4Approved || null, pending: null, rejected: null, latestDate: latestC4?.started_at ?? null },
   ];
 
-  const totalApproved = c1Approved + c2Approved + c3Approved;
+  const totalApproved = c1Approved + c2Approved + c3Approved + c4Approved;
   const totalPending = c2Pending + c3Pending;
   const totalRejected = c2Rejected + c3Rejected;
 

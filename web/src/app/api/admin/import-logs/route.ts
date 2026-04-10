@@ -32,8 +32,8 @@ export async function GET(request: NextRequest) {
 
     let filterIds = (filters ?? []).map((f) => f.id);
 
-    // If circle param is provided (1 or 2), narrow to filters of that circle
-    if (circle === 1 || circle === 2) {
+    // If circle param is provided (1, 2, or 4), narrow to filters of that circle
+    if (circle === 1 || circle === 2 || circle === 4) {
       const circleFilterIds = new Set(
         ((await admin.from("pubmed_filters").select("id").eq("specialty", specialty).eq("circle", circle)).data ?? []).map((f) => f.id)
       );

@@ -38,9 +38,9 @@ export interface ArticleData {
   clinical_relevance: string | null;
   // Classification (AI-scored)
   subspecialty_ai: string | null;
-  classification_reason: string | null;
-  classification_model_version: string | null;
-  classification_scored_at: string | null;
+  subspecialty_reason: string | null;
+  subspecialty_model_version: string | null;
+  subspecialty_scored_at: string | null;
   // Condensation (AI-scored)
   short_headline: string | null;
   bottom_line: string | null;

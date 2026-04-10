@@ -83,6 +83,11 @@ pulsefeed/
 - **Naming**: camelCase functions, PascalCase components, snake_case DB columns, kebab-case files.
 - **Error pattern**: `{ ok: false, error: string }` with appropriate HTTP status.
 - **Fire-and-forget**: Long tasks use `after()` hook or `void runTask()`.
+- **RLS**: Every new `public` table MUST have RLS enabled + at least one policy in the same migration. Never create a table without it:
+  ```sql
+  ALTER TABLE public.my_table ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "authenticated can read my_table" ON public.my_table FOR SELECT TO authenticated USING (true);
+  ```
 
 ## Environment Variables
 

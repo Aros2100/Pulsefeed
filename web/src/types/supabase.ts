@@ -237,9 +237,9 @@ export type Database = {
           circle: number | null
           citation_count: number | null
           citations_fetched_at: string | null
-          classification_model_version: string | null
-          classification_reason: string | null
-          classification_scored_at: string | null
+          subspecialty_model_version: string | null
+          subspecialty_reason: string | null
+          subspecialty_scored_at: string | null
           clinical_relevance: string | null
           coi_statement: string | null
           condensed_at: string | null
@@ -336,9 +336,9 @@ export type Database = {
           circle?: number | null
           citation_count?: number | null
           citations_fetched_at?: string | null
-          classification_model_version?: string | null
-          classification_reason?: string | null
-          classification_scored_at?: string | null
+          subspecialty_model_version?: string | null
+          subspecialty_reason?: string | null
+          subspecialty_scored_at?: string | null
           clinical_relevance?: string | null
           coi_statement?: string | null
           condensed_at?: string | null
@@ -435,9 +435,9 @@ export type Database = {
           circle?: number | null
           citation_count?: number | null
           citations_fetched_at?: string | null
-          classification_model_version?: string | null
-          classification_reason?: string | null
-          classification_scored_at?: string | null
+          subspecialty_model_version?: string | null
+          subspecialty_reason?: string | null
+          subspecialty_scored_at?: string | null
           clinical_relevance?: string | null
           coi_statement?: string | null
           condensed_at?: string | null
@@ -2219,8 +2219,8 @@ export type Database = {
           article_type_ai: string
           authors: Json
           circle: number
-          classification_model_version: string
-          classification_reason: string
+          subspecialty_model_version: string
+          subspecialty_reason: string
           id: string
           journal_abbr: string
           journal_title: string

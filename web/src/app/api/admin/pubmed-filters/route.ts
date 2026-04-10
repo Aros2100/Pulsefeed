@@ -13,9 +13,10 @@ const createSchema = z.object({
     }),
   query_string: z.string().min(1, "Query is required"),
   journal_list: z.array(z.string()).optional(),
+  mesh_list: z.array(z.string()).optional(),
   max_results: z.number().int().min(1).max(10000).default(100),
   active: z.boolean().default(true),
-  circle: z.number().int().refine((v) => [1, 2].includes(v)).default(1),
+  circle: z.number().int().refine((v) => [1, 2, 4].includes(v)).default(1),
 });
 
 const updateSchema = z.object({
@@ -27,9 +28,10 @@ const updateSchema = z.object({
     .optional(),
   query_string: z.string().min(1).optional(),
   journal_list: z.array(z.string()).optional(),
+  mesh_list: z.array(z.string()).optional(),
   max_results: z.number().int().min(1).max(10000).optional(),
   active: z.boolean().optional(),
-  circle: z.number().int().refine((v) => [1, 2].includes(v)).optional(),
+  circle: z.number().int().refine((v) => [1, 2, 4].includes(v)).optional(),
 });
 
 export async function GET(request: NextRequest) {

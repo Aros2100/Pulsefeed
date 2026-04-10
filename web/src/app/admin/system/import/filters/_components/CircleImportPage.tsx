@@ -57,6 +57,16 @@ const CIRCLES = {
     configPlaceholder: "Rigshospitalet\nAarhus University Hospital\nOdense University Hospital",
     configHelp: "Ét navn per linje. Kombineres automatisk med neurosurg*[AD], fx (\"Copenhagen\"[AD] AND neurosurg*[AD]).",
   },
+  4: {
+    label: "C4",
+    title: "MeSH Terms",
+    desc: "Artikler tagget med neurokirurgiske MeSH-termer på tværs af alle tidsskrifter — auto-approved ved import",
+    badge: { bg: "#dcfce7", text: "#15803d" },
+    approval: "MeSH",
+    configLabel: "MeSH Terms",
+    configPlaceholder: "Neurosurgical Procedures\nSpinal Cord\nCraniotomy",
+    configHelp: "Én MeSH-term per linje. Bygger automatisk PubMed-query med [MeSH Terms], fx \"Neurosurgical Procedures\"[MeSH Terms].",
+  },
 } as const;
 
 /* ═══ Helpers ═════════════════════════════════════════════════════════════════ */
@@ -76,11 +86,12 @@ function logDuration(log: ImportLog): string {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
-function buildQuery(circle: 1 | 2 | 3, text: string): string {
+function buildQuery(circle: 1 | 2 | 3 | 4, text: string): string {
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   if (lines.length === 0) return "";
   if (circle === 1) return lines.map((j) => `"${j}"[TA]`).join(" OR ");
   if (circle === 2) return lines.map((v) => (/\s/.test(v) ? `"${v}"[AD]` : `${v}*[AD]`)).join(" OR ");
+  if (circle === 4) return lines.map((t) => `"${t}"[MeSH Terms]`).join(" OR ");
   return lines.map((v) => `("${v}"[AD] AND neurosurg*[AD])`).join(" OR ");
 }
 
@@ -149,13 +160,13 @@ const kpiLabel: React.CSSProperties = {
 
 /* ═══ Main component ══════════════════════════════════════════════════════════ */
 
-export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 }) {
+export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 | 4 }) {
   const cfg = CIRCLES[circle];
   const specialty = ACTIVE_SPECIALTY;
 
   // Config
   const [configText, setConfigText] = useState("");
-  const [maxResults, setMaxResults] = useState(circle === 1 ? 100 : 500);
+  const [maxResults, setMaxResults] = useState(circle === 1 ? 100 : circle === 4 ? 500 : 500);
   const [showQuery, setShowQuery] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -186,6 +197,15 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 }) {
           setC1FilterId(f.id);
           setConfigText((f.journal_list ?? []).join("\n"));
           setMaxResults(f.max_results ?? 100);
+        }
+      } else if (circle === 4) {
+        const res = await fetch(`/api/admin/pubmed-filters?specialty=${specialty}&circle=4`);
+        const d = await res.json();
+        if (d.ok && d.filters?.length > 0) {
+          const f = d.filters[0];
+          setC1FilterId(f.id);
+          setConfigText((f.mesh_list ?? []).join("\n"));
+          setMaxResults(f.max_results ?? 500);
         }
       } else if (circle === 2) {
         const res = await fetch(`/api/admin/circle2-sources?specialty=${specialty}`);
@@ -270,6 +290,27 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 }) {
           if (!d.ok) { setSaveError(d.error ?? "Fejl"); return; }
           if (d.filter?.id) setC1FilterId(d.filter.id);
         }
+      } else if (circle === 4) {
+        const meshTerms = configText.split("\n").map((t) => t.trim()).filter(Boolean);
+        const query_string = buildQuery(4, configText);
+        if (c1FilterId) {
+          const res = await fetch("/api/admin/pubmed-filters", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: c1FilterId, mesh_list: meshTerms, query_string, max_results: maxResults }),
+          });
+          const d = await res.json();
+          if (!d.ok) { setSaveError(d.error ?? "Fejl"); return; }
+        } else {
+          const res = await fetch("/api/admin/pubmed-filters", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: "Neurosurgery MeSH Terms", specialty, query_string, mesh_list: meshTerms, max_results: maxResults, circle: 4 }),
+          });
+          const d = await res.json();
+          if (!d.ok) { setSaveError(d.error ?? "Fejl"); return; }
+          if (d.filter?.id) setC1FilterId(d.filter.id);
+        }
       } else if (circle === 2) {
         const terms = configText.split("\n").map((t) => t.trim()).filter(Boolean);
         const res = await fetch("/api/admin/circle2-sources", {
@@ -305,7 +346,9 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 }) {
         ? "/api/admin/pubmed/trigger-import"
         : circle === 2
           ? `/api/admin/pubmed/trigger-import-circle2?specialty=${specialty}`
-          : "/api/admin/pubmed/trigger-import-circle3";
+          : circle === 4
+            ? "/api/admin/pubmed/trigger-import-circle4"
+            : "/api/admin/pubmed/trigger-import-circle3";
       const res = await fetch(url, { method: "POST" });
       const d = await res.json();
       if (d.ok) {
@@ -397,8 +440,8 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 }) {
             </div>
             <div>
               <div style={kpiLabel}>Pending</div>
-              <div style={{ fontSize: "16px", fontWeight: 600, color: circle === 1 ? "#888" : "#d97706" }}>
-                {circle === 1 ? "—" : stats ? stats.pending.toLocaleString("da-DK") : "—"}
+              <div style={{ fontSize: "16px", fontWeight: 600, color: (circle === 1 || circle === 4) ? "#888" : "#d97706" }}>
+                {(circle === 1 || circle === 4) ? "—" : stats ? stats.pending.toLocaleString("da-DK") : "—"}
               </div>
             </div>
             <div>

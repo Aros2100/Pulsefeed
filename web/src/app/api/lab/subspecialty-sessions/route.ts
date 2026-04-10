@@ -86,6 +86,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: decisionsError.message }, { status: 500 });
   }
 
+  // 3. Update articles.subspecialty with the validated decision
+  for (const v of verdicts) {
+    const { error: updateError } = await admin
+      .from("articles")
+      .update({ subspecialty: v.decision })
+      .eq("id", v.article_id);
+    if (updateError) {
+      console.error(`[subspecialty-sessions] articles update error for ${v.article_id}:`, updateError);
+    }
+  }
+
   // Fire-and-forget: log article events
   void Promise.all(
     verdicts.map((v) =>

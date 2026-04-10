@@ -8,8 +8,8 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const circle = parseInt(searchParams.get("circle") ?? "0");
-  if (![1, 2, 3].includes(circle)) {
-    return NextResponse.json({ ok: false, error: "Invalid circle (1-3)" }, { status: 400 });
+  if (![1, 2, 3, 4].includes(circle)) {
+    return NextResponse.json({ ok: false, error: "Invalid circle (1-4)" }, { status: 400 });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
