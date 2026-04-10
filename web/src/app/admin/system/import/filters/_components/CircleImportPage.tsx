@@ -173,6 +173,8 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 | 4 }) 
   const [saved, setSaved] = useState(false);
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [c1FilterId, setC1FilterId] = useState<string | null>(null);
+  const [filterActive, setFilterActive] = useState<boolean | null>(null);
+  const [togglingActive, setTogglingActive] = useState(false);
 
   // Import
   const [importing, setImporting] = useState(false);
@@ -195,6 +197,7 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 | 4 }) 
         if (d.ok && d.filters?.length > 0) {
           const f = d.filters[0];
           setC1FilterId(f.id);
+          setFilterActive(f.active ?? true);
           setConfigText((f.journal_list ?? []).join("\n"));
           setMaxResults(f.max_results ?? 100);
         }
@@ -204,6 +207,7 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 | 4 }) 
         if (d.ok && d.filters?.length > 0) {
           const f = d.filters[0];
           setC1FilterId(f.id);
+          setFilterActive(f.active ?? true);
           setConfigText((f.mesh_list ?? []).join("\n"));
           setMaxResults(f.max_results ?? 500);
         }
@@ -337,6 +341,24 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 | 4 }) 
     }
   }
 
+  /* ── Toggle active ── */
+  async function handleToggleActive() {
+    if (!c1FilterId || filterActive === null) return;
+    const newActive = !filterActive;
+    setTogglingActive(true);
+    try {
+      const res = await fetch("/api/admin/pubmed-filters", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: c1FilterId, active: newActive }),
+      });
+      const d = await res.json();
+      if (d.ok) setFilterActive(newActive);
+    } finally {
+      setTogglingActive(false);
+    }
+  }
+
   /* ── Trigger import ── */
   async function handleImport() {
     setImporting(true);
@@ -395,20 +417,66 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 | 4 }) 
             </div>
             <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>{cfg.desc}</p>
           </div>
-          <button
-            onClick={handleImport}
-            disabled={importing}
-            style={{
-              padding: "9px 20px", fontSize: "13px", fontWeight: 700,
-              background: importing ? "#9ca3af" : cfg.badge.text, color: "#fff",
-              border: "none", borderRadius: "8px", cursor: importing ? "default" : "pointer",
-              whiteSpace: "nowrap", marginTop: "4px",
-              display: "inline-flex", alignItems: "center", gap: "8px",
-            }}
-          >
-            {importing && <Spinner />}
-            {importing ? "Importerer…" : "Kør import nu"}
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "4px" }}>
+            {/* Active toggle — only for C1 and C4 when filter row exists */}
+            {(circle === 1 || circle === 4) && c1FilterId !== null && filterActive !== null && (
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <button
+                  onClick={handleToggleActive}
+                  disabled={togglingActive}
+                  style={{
+                    position: "relative",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    width: "36px",
+                    height: "20px",
+                    borderRadius: "10px",
+                    border: "none",
+                    cursor: togglingActive ? "not-allowed" : "pointer",
+                    background: filterActive ? "#16a34a" : "#d1d5db",
+                    transition: "background 0.15s",
+                    padding: 0,
+                    opacity: togglingActive ? 0.6 : 1,
+                    flexShrink: 0,
+                  }}
+                  aria-label={filterActive ? "Deaktivér daglig import" : "Aktivér daglig import"}
+                >
+                  <span style={{
+                    position: "absolute",
+                    left: filterActive ? "18px" : "2px",
+                    width: "16px",
+                    height: "16px",
+                    borderRadius: "50%",
+                    background: "#fff",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+                    transition: "left 0.15s",
+                  }} />
+                </button>
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", lineHeight: 1 }}>
+                    Daglig import
+                  </div>
+                  <div style={{ fontSize: "11px", color: filterActive ? "#15803d" : "#9ca3af", fontWeight: 600, marginTop: "2px" }}>
+                    {filterActive ? "Aktiv" : "Inaktiv"}
+                  </div>
+                </div>
+              </div>
+            )}
+            <button
+              onClick={handleImport}
+              disabled={importing}
+              style={{
+                padding: "9px 20px", fontSize: "13px", fontWeight: 700,
+                background: importing ? "#9ca3af" : cfg.badge.text, color: "#fff",
+                border: "none", borderRadius: "8px", cursor: importing ? "default" : "pointer",
+                whiteSpace: "nowrap",
+                display: "inline-flex", alignItems: "center", gap: "8px",
+              }}
+            >
+              {importing && <Spinner />}
+              {importing ? "Importerer…" : "Kør import nu"}
+            </button>
+          </div>
         </div>
 
         {importError && (

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ReparseAuthorGeoButton } from "./_components/ReparseAuthorGeoButton";
 import { ParseArticleLocationsButton } from "./_components/ParseArticleLocationsButton";
-import { DailyImportToggle } from "./_components/DailyImportToggle";
+import { NextCronRun } from "./_components/NextCronRun";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -172,7 +172,7 @@ export default async function ImportDashboardPage() {
     syncLogRes,
     neverSyncedRes, retractedTotalRes, authorsChangedRes,
     authorUpdateEventsRes,
-    dailyImportSettingRes,
+    c1ActiveRes, c4ActiveRes, c2ActiveRes,
   ] = await Promise.all([
     // Article counts per circle+status
     countQ(1, "approved"), countQ(2, "approved"), countQ(2, "pending"), countQ(2, "rejected"),
@@ -275,8 +275,10 @@ export default async function ImportDashboardPage() {
     a.from("articles").select("id", { count: "exact", head: true }).eq("authors_changed", true),
     // Forfatter-opdateringer
     a.from("article_events").select("payload").eq("event_type", "authors_updated"),
-    // System settings
-    a.from("system_settings").select("value").eq("key", "daily_import_enabled").maybeSingle(),
+    // Filter active status per circle
+    a.from("pubmed_filters").select("active").eq("specialty", ACTIVE_SPECIALTY).eq("circle", 1).maybeSingle(),
+    a.from("pubmed_filters").select("active").eq("specialty", ACTIVE_SPECIALTY).eq("circle", 4).maybeSingle(),
+    a.from("pubmed_filters").select("active").eq("specialty", ACTIVE_SPECIALTY).eq("circle", 2).maybeSingle(),
   ]);
 
   // ── Article stats ──
@@ -342,8 +344,10 @@ export default async function ImportDashboardPage() {
   const retractedTotal = (retractedTotalRes as { count: number | null }).count ?? 0;
   const authorsChanged = (authorsChangedRes as { count: number | null }).count ?? 0;
 
-  // System settings
-  const dailyImportEnabled = (dailyImportSettingRes as { data: { value: boolean } | null }).data?.value !== false;
+  // Filter active status
+  const c1Active = (c1ActiveRes as { data: { active: boolean } | null }).data?.active ?? null;
+  const c4Active = (c4ActiveRes as { data: { active: boolean } | null }).data?.active ?? null;
+  const c2Active = (c2ActiveRes as { data: { active: boolean } | null }).data?.active ?? null;
 
   // Forfatter-opdateringer
   const authorUpdateEvents = (authorUpdateEventsRes.data ?? []) as { payload: Record<string, unknown> | null }[];
@@ -396,7 +400,39 @@ export default async function ImportDashboardPage() {
         </div>
 
         {/* ═══ DAGLIG IMPORT ═══ */}
-        <DailyImportToggle initialEnabled={dailyImportEnabled} />
+        <div style={sectionCard}>
+          <div style={sectionHeader}>
+            <span style={headerLabel}>Daglig import</span>
+            <span style={{ fontSize: "12px", color: "#94a3b8" }}>
+              Næste kørsel: <NextCronRun />
+            </span>
+          </div>
+          <div style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: "32px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "13px", color: "#5a6a85" }}>
+              Kører dagligt kl. 03:00 UTC — C1 → C4 → C2 → PubMed Sync
+            </span>
+            <div style={{ display: "flex", gap: "10px", marginLeft: "auto", flexWrap: "wrap" }}>
+              {([
+                { label: "C1", active: c1Active, bg: "#dbeafe", text: "#1d4ed8" },
+                { label: "C4", active: c4Active, bg: "#dcfce7", text: "#15803d" },
+                { label: "C2", active: c2Active, bg: "#f3e8ff", text: "#7c3aed" },
+              ] as const).map(({ label, active, bg, text }) => (
+                <div key={label} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{
+                    fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 6px",
+                    background: bg, color: text,
+                  }}>{label}</span>
+                  <span style={{
+                    fontSize: "12px", fontWeight: 600,
+                    color: active === true ? "#15803d" : active === false ? "#9ca3af" : "#d1d5db",
+                  }}>
+                    {active === true ? "Aktiv" : active === false ? "Inaktiv" : "—"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
 
         {/* ═══ SEKTION 1: ARTIKLER ═══ */}
         <SectionHeading title="Artikler" />

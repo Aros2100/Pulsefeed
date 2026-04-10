@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest, after } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { runImport } from "@/specialties/neurosurgery/filter-c1";
 import { runImportCircle4 } from "@/specialties/neurosurgery/filter-c4";
 import { runImportCircle2 } from "@/specialties/neurosurgery/filter-c2";
@@ -14,19 +13,6 @@ export async function POST(request: NextRequest) {
 
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Check whether daily import is enabled
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const admin = createAdminClient() as any;
-  const { data: setting } = await admin
-    .from("system_settings")
-    .select("value")
-    .eq("key", "daily_import_enabled")
-    .maybeSingle();
-
-  if (setting?.value === false) {
-    return NextResponse.json({ ok: true, skipped: true });
   }
 
   after(async () => {
