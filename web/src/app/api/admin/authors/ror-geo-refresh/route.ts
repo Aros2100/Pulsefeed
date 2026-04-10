@@ -3,7 +3,7 @@ import { z } from "zod";
 import pLimit from "p-limit";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fetchRorGeo } from "@/lib/import/forfatter-import/geo-decision";
+import { fetchRorGeo } from "@/lib/import/author-import/geo-decision";
 import { getRegion, getContinent } from "@/lib/geo/continent-map";
 
 const schema = z.object({

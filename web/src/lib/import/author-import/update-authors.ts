@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { normalizeOrcid, findOrCreateAuthor } from "@/lib/import/forfatter-import/find-or-create";
-import { normalizeAuthorName, decodeHtmlEntities, type Author } from "@/lib/import/artikel-import/fetcher";
+import { normalizeOrcid, findOrCreateAuthor } from "@/lib/import/author-import/find-or-create";
+import { normalizeAuthorName, decodeHtmlEntities, type Author } from "@/lib/import/article-import/fetcher";
 import { logAuthorEvent } from "@/lib/author-events";
 import { logArticleEvent } from "@/lib/article-events";
 

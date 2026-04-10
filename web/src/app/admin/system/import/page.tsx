@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ReparseAuthorGeoButton } from "./ReparseAuthorGeoButton";
-import { ParseArticleLocationsButton } from "./ParseArticleLocationsButton";
+import { ReparseAuthorGeoButton } from "./_components/ReparseAuthorGeoButton";
+import { ParseArticleLocationsButton } from "./_components/ParseArticleLocationsButton";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -414,7 +414,7 @@ export default async function ImportDashboardPage() {
                   </td>
                   <td style={{ ...tdStyle, textAlign: "right" }}>
                     <Link
-                      href={`/admin/system/import/c${row.circle}`}
+                      href={`/admin/system/import/filters/c${row.circle}`}
                       style={{ fontSize: "13px", fontWeight: 600, color: "#E83B2A", textDecoration: "none" }}
                     >
                       Administrér →
@@ -503,7 +503,7 @@ export default async function ImportDashboardPage() {
             <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
               <span style={{ fontSize: "12px", color: "#94a3b8" }}>{fmtSyncRun(lastSyncedAt)}</span>
               <Link
-                href="/admin/system/import/pubmed-sync"
+                href="/admin/system/import/article-sync"
                 style={{ fontSize: "13px", fontWeight: 600, color: "#E83B2A", textDecoration: "none" }}
               >
                 Administrér →

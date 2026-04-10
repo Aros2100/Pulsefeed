@@ -172,6 +172,51 @@ export const RAW_INSTITUTIONS: [string, InstitutionInfo][] = [
 
   // Italy
   ["agenzia di tutela della salute", { institution: "Agenzia di Tutela della Salute", city: "Milan", country: "Italy" }],
+
+  // Switzerland (additions)
+  ["university hospital basel", { institution: "University Hospital Basel", city: "Basel", country: "Switzerland" }],
+  ["universitätsspital basel", { institution: "Universitätsspital Basel", city: "Basel", country: "Switzerland" }],
+  ["universitatsspital basel", { institution: "Universitätsspital Basel", city: "Basel", country: "Switzerland" }],
+  ["university of basel", { institution: "University of Basel", city: "Basel", country: "Switzerland" }],
+  ["gzo spital wetzikon", { institution: "GZO Spital Wetzikon", city: "Wetzikon", country: "Switzerland" }],
+  ["universitätsspital bern", { institution: "Universitätsspital Bern", city: "Bern", country: "Switzerland" }],
+  ["universitatsspital bern", { institution: "Universitätsspital Bern", city: "Bern", country: "Switzerland" }],
+  ["inselspital", { institution: "Inselspital", city: "Bern", country: "Switzerland" }],
+
+  // USA (additions)
+  ["university of california san francisco", { institution: "University of California San Francisco", city: "San Francisco", country: "United States" }],
+  ["loyola university medical center", { institution: "Loyola University Medical Center", city: "Maywood", country: "United States" }],
+  ["jefferson university hospital", { institution: "Jefferson University Hospital", city: "Philadelphia", country: "United States" }],
+  ["university at buffalo", { institution: "University at Buffalo", city: "Buffalo", country: "United States" }],
+  ["ucsf", { institution: "UCSF", city: "San Francisco", country: "United States" }],
+
+  // France (additions)
+  ["hôpital neurologique et neurochirurgical pierre-wertheimer", { institution: "Hôpital Neurologique et Neurochirurgical Pierre-Wertheimer", city: "Lyon", country: "France" }],
+  ["hopital neurologique et neurochirurgical pierre-wertheimer", { institution: "Hôpital Neurologique et Neurochirurgical Pierre-Wertheimer", city: "Lyon", country: "France" }],
+  ["hôpital neurologique pierre wertheimer", { institution: "Hôpital Neurologique Pierre Wertheimer", city: "Lyon", country: "France" }],
+  ["hopital neurologique pierre wertheimer", { institution: "Hôpital Neurologique Pierre Wertheimer", city: "Lyon", country: "France" }],
+  ["hospices civils de lyon", { institution: "Hospices Civils de Lyon", city: "Lyon", country: "France" }],
+  ["chu de montpellier", { institution: "CHU de Montpellier", city: "Montpellier", country: "France" }],
+  ["chu de rennes", { institution: "CHU de Rennes", city: "Rennes", country: "France" }],
+  ["sorbonne université", { institution: "Sorbonne Université", city: "Paris", country: "France" }],
+  ["sorbonne universite", { institution: "Sorbonne Université", city: "Paris", country: "France" }],
+
+  // Netherlands
+  ["university medical center utrecht", { institution: "University Medical Center Utrecht", city: "Utrecht", country: "Netherlands" }],
+  ["umc utrecht", { institution: "UMC Utrecht", city: "Utrecht", country: "Netherlands" }],
+
+  // Spain
+  ["hospital universitario virgen de las nieves", { institution: "Hospital Universitario Virgen de las Nieves", city: "Granada", country: "Spain" }],
+
+  // Turkey
+  ["bildungs- und forschungskrankenhaus kayseri", { institution: "Bildungs- und Forschungskrankenhaus Kayseri", city: "Kayseri", country: "Turkey" }],
+  ["zonguldak atatürk state hospital", { institution: "Zonguldak Atatürk State Hospital", city: "Zonguldak", country: "Turkey" }],
+  ["zonguldak ataturk state hospital", { institution: "Zonguldak Atatürk State Hospital", city: "Zonguldak", country: "Turkey" }],
+
+  // Sweden (additions)
+  ["sahlgrenska university hospital", { institution: "Sahlgrenska University Hospital", city: "Gothenburg", country: "Sweden" }],
+  ["sahlgrenska academy", { institution: "Sahlgrenska Academy", city: "Gothenburg", country: "Sweden" }],
+  ["university of gothenburg", { institution: "University of Gothenburg", city: "Gothenburg", country: "Sweden" }],
 ];
 
 /**

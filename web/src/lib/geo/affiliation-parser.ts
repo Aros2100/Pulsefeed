@@ -219,6 +219,13 @@ function cleanCity(raw: string, cityNames: Set<string>): string {
   return city;
 }
 
+const CANADIAN_PROVINCES: Record<string, string> = {
+  "ONT": "Ontario", "BC": "British Columbia", "ALTA": "Alberta",
+  "QUE": "Quebec", "MAN": "Manitoba", "SASK": "Saskatchewan",
+  "NS": "Nova Scotia", "NB": "New Brunswick", "PEI": "Prince Edward Island",
+  "NFLD": "Newfoundland", "NWT": "Northwest Territories", "YT": "Yukon",
+};
+
 // ── Missing-comma normalizer ────────────────────────────────────────────────────
 
 function escapeRegExp(s: string): string {
@@ -451,10 +458,23 @@ function parseSingleSegment(
     // Check US state (incl. full names like "Georgia", "Virginia") before country lookup
     // to avoid "Georgia" matching the country Georgia instead of the US state.
     const upperLast = lastSeg.toUpperCase();
-    const directMatch = lookupCountry(lastSeg);
+    // Strip dots for punctuated abbreviations: "N.Y." → "NY", "B.C." → "BC", "Alta." → "ALTA"
+    const depuncted = lastSeg.replace(/\./g, "").toUpperCase();
+    // Unaccented fallback for diacritic country names: "Sénégal" → "Senegal"
+    const unaccentedLast = lastSeg.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const directMatch = lookupCountry(lastSeg) ?? (unaccentedLast !== lastSeg ? lookupCountry(unaccentedLast) : null);
     if (US_STATES[upperLast]) {
       country = "United States";
       isUS = true;
+      segments.pop();
+    } else if (US_STATES[depuncted] && depuncted !== upperLast) {
+      // Punctuated US state abbreviations: "N.Y." → NY, "N.J." → NJ, "D.C." → DC
+      country = "United States";
+      isUS = true;
+      segments.pop();
+    } else if (CANADIAN_PROVINCES[depuncted]) {
+      // Canadian province abbreviations: "Ont." → ONT, "B.C." → BC, "Alta." → ALTA
+      country = "Canada";
       segments.pop();
     } else if (directMatch) {
       country = directMatch;

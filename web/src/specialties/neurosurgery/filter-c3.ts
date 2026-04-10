@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fetchPubMedIds, fetchArticleDetails, sleep } from "@/lib/import/artikel-import/fetcher";
+import { fetchPubMedIds, fetchArticleDetails, sleep } from "@/lib/import/article-import/fetcher";
 import { runArticleChecks } from "@/lib/import/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
 import { buildImportEventPayload } from "@/lib/article-events/import-payload";

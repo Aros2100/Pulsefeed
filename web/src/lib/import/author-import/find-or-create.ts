@@ -8,7 +8,7 @@ import { logAuthorEvent } from "@/lib/author-events";
 import { matchPubMedToOpenAlex } from "@/lib/openalex/match-authors";
 import type { OpenAlexWork, OpenAlexAuthorship } from "@/lib/openalex/client";
 import pLimit from "p-limit";
-import { normalizeAuthorName, type Author, type AuthorOutcome } from "@/lib/import/artikel-import/fetcher";
+import { normalizeAuthorName, type Author, type AuthorOutcome } from "@/lib/import/article-import/fetcher";
 import { fetchRorGeo, isGeoUpgrade } from "./geo-decision";
 import { resolveState } from "./geo-writer";
 
@@ -156,7 +156,7 @@ export async function enrichAuthorWithOpenAlex(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: oaMatch } = await (admin as any)
     .from("authors")
-    .select("id, display_name, orcid, openalex_id")
+    .select("id, display_name, orcid, openalex_id, city, geo_locked_by")
     .eq("openalex_id", oaId)
     .maybeSingle();
 
@@ -167,6 +167,19 @@ export async function enrichAuthorWithOpenAlex(
     if (displayName.length > (oaMatch.display_name?.length ?? 0)) {
       updates.display_name = displayName;
       updates.display_name_normalized = normalized;
+    }
+    if (
+      !oaMatch.city &&
+      primaryInst?.ror &&
+      oaMatch.geo_locked_by !== "human" &&
+      oaMatch.geo_locked_by !== "user"
+    ) {
+      const rorGeo = await fetchRorGeo(primaryInst.ror);
+      if (rorGeo.city)    updates.city    = rorGeo.city;
+      if (rorGeo.state)   updates.state   = rorGeo.state;
+      if (rorGeo.country) updates.country = normalizeCountry(rorGeo.country);
+      updates.ror_id     = primaryInst.ror;
+      updates.geo_source = "ror";
     }
     if (Object.keys(updates).length > 0) {
       await admin.from("authors").update(updates).eq("id", oaMatch.id);
@@ -268,11 +281,11 @@ export async function enrichAuthorWithOpenAlex(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: resolved } = await (admin as any)
     .from("authors")
-    .select("openalex_id, ror_id, geo_source, department")
+    .select("openalex_id, ror_id, geo_source, department, city")
     .eq("id", result.id)
     .maybeSingle();
 
-  if (resolved && !resolved.openalex_id) {
+  if (resolved && (!resolved.openalex_id || (!resolved.city && primaryInst?.ror))) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const enrichment: Record<string, any> = { openalex_id: oaId, openalex_enriched_at: new Date().toISOString() };
     if (primaryInst?.displayName) {
