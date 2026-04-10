@@ -212,12 +212,21 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 | 4 }) 
           setMaxResults(f.max_results ?? 500);
         }
       } else if (circle === 2) {
-        const res = await fetch(`/api/admin/circle2-sources?specialty=${specialty}`);
-        const d = await res.json();
-        if (d.ok) {
-          const rows = (d.sources ?? []).filter((s: { type: string }) => s.type === "affiliation");
+        const [sourcesRes, filterRes] = await Promise.all([
+          fetch(`/api/admin/circle2-sources?specialty=${specialty}`),
+          fetch(`/api/admin/pubmed-filters?specialty=${specialty}&circle=2`),
+        ]);
+        const sourcesD = await sourcesRes.json();
+        if (sourcesD.ok) {
+          const rows = (sourcesD.sources ?? []).filter((s: { type: string }) => s.type === "affiliation");
           setConfigText(rows.map((s: { value: string }) => s.value).join("\n"));
           if (rows.length > 0 && rows[0].max_results) setMaxResults(rows[0].max_results);
+        }
+        const filterD = await filterRes.json();
+        if (filterD.ok && filterD.filters?.length > 0) {
+          const f = filterD.filters[0];
+          setC1FilterId(f.id);
+          setFilterActive(f.active ?? true);
         }
       } else {
         const res = await fetch("/api/admin/circle3-sources");
@@ -418,8 +427,8 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 | 4 }) 
             <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>{cfg.desc}</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "4px" }}>
-            {/* Active toggle — only for C1 and C4 when filter row exists */}
-            {(circle === 1 || circle === 4) && c1FilterId !== null && filterActive !== null && (
+            {/* Active toggle — only for C1, C2 and C4 when filter row exists */}
+            {(circle === 1 || circle === 2 || circle === 4) && c1FilterId !== null && filterActive !== null && (
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <button
                   onClick={handleToggleActive}
