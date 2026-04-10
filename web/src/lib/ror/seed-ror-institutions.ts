@@ -116,7 +116,8 @@ interface RorRecord {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const db = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = createAdminClient() as any;
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ror-seed-"));
 
   try {
