@@ -46,7 +46,8 @@ export interface Circle2ImportResult {
 export async function runImportCircle2(
   specialty: string,
   existingLogId?: string,
-  trigger: "cron" | "manual" = "cron"
+  trigger: "cron" | "manual" = "cron",
+  reldate?: number
 ): Promise<Circle2ImportResult> {
   const admin: AdminClient = createAdminClient();
   const errors: string[] = [];
@@ -118,7 +119,7 @@ export async function runImportCircle2(
 
       await sleep(RATE_LIMIT_MS);
 
-      const pmids = await fetchPubMedIds(query, maxResults);
+      const pmids = await fetchPubMedIds(query, maxResults, reldate);
       totalFetched += pmids.length;
 
       if (pmids.length === 0) continue;

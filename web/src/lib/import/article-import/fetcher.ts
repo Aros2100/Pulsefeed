@@ -231,10 +231,12 @@ export interface ArticleDetails {
 
 /**
  * Calls PubMed ESearch and returns a list of PMIDs for the given query.
+ * If reldate is provided, restricts results to articles indexed within the last N days.
  */
 export async function fetchPubMedIds(
   queryString: string,
-  maxResults = 100
+  maxResults = 100,
+  reldate?: number
 ): Promise<string[]> {
   const params = new URLSearchParams({
     db: "pubmed",
@@ -243,6 +245,11 @@ export async function fetchPubMedIds(
     retmode: "json",
     api_key: apiKey(),
   });
+
+  if (reldate !== undefined) {
+    params.set("datetype", "edat");
+    params.set("reldate", String(reldate));
+  }
 
   const res = await fetch(`${BASE_URL}/esearch.fcgi?${params}`);
   if (!res.ok) throw new Error(`ESearch failed: HTTP ${res.status}`);

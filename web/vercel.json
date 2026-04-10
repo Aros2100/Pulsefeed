@@ -3,6 +3,10 @@
     {
       "path": "/api/internal/pubmed/run-import",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/admin/pubmed/trigger-import-daily",
+      "schedule": "0 3 * * *"
     }
   ]
 }

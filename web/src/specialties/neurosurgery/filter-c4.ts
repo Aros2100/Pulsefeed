@@ -29,7 +29,8 @@ export async function runImportCircle4(
   filterId?: string,
   force = false,
   existingLogId?: string,
-  trigger: "cron" | "manual" = "cron"
+  trigger: "cron" | "manual" = "cron",
+  reldate?: number
 ): Promise<ImportResult> {
   const admin = createAdminClient();
   const errors: string[] = [];
@@ -85,7 +86,7 @@ export async function runImportCircle4(
     try {
       await sleep(RATE_LIMIT_MS);
 
-      const pmids = await fetchPubMedIds(filter.query_string, filter.max_results ?? 500);
+      const pmids = await fetchPubMedIds(filter.query_string, filter.max_results ?? 500, reldate);
       filterFetched = pmids.length;
       if (!pmids.length) continue;
 

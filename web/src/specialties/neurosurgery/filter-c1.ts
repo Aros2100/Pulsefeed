@@ -27,7 +27,8 @@ export async function runImport(
   filterId?: string,
   force = false,
   existingLogId?: string,
-  trigger: "cron" | "manual" = "cron"
+  trigger: "cron" | "manual" = "cron",
+  reldate?: number
 ): Promise<ImportResult> {
   const admin = createAdminClient();
   const errors: string[] = [];
@@ -85,7 +86,7 @@ export async function runImport(
       await sleep(RATE_LIMIT_MS);
 
       const tSearch = Date.now();
-      const pmids = await fetchPubMedIds(filter.query_string, filter.max_results ?? 100);
+      const pmids = await fetchPubMedIds(filter.query_string, filter.max_results ?? 100, reldate);
       console.error(`[import] fetchPubMedIds: ${Date.now() - tSearch}ms`);
       filterFetched = pmids.length;
       if (!pmids.length) continue;

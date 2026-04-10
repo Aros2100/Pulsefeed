@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ReparseAuthorGeoButton } from "./_components/ReparseAuthorGeoButton";
 import { ParseArticleLocationsButton } from "./_components/ParseArticleLocationsButton";
+import { DailyImportToggle } from "./_components/DailyImportToggle";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -171,6 +172,7 @@ export default async function ImportDashboardPage() {
     syncLogRes,
     neverSyncedRes, retractedTotalRes, authorsChangedRes,
     authorUpdateEventsRes,
+    dailyImportSettingRes,
   ] = await Promise.all([
     // Article counts per circle+status
     countQ(1, "approved"), countQ(2, "approved"), countQ(2, "pending"), countQ(2, "rejected"),
@@ -273,6 +275,8 @@ export default async function ImportDashboardPage() {
     a.from("articles").select("id", { count: "exact", head: true }).eq("authors_changed", true),
     // Forfatter-opdateringer
     a.from("article_events").select("payload").eq("event_type", "authors_updated"),
+    // System settings
+    a.from("system_settings").select("value").eq("key", "daily_import_enabled").maybeSingle(),
   ]);
 
   // ── Article stats ──
@@ -338,6 +342,9 @@ export default async function ImportDashboardPage() {
   const retractedTotal = (retractedTotalRes as { count: number | null }).count ?? 0;
   const authorsChanged = (authorsChangedRes as { count: number | null }).count ?? 0;
 
+  // System settings
+  const dailyImportEnabled = (dailyImportSettingRes as { data: { value: boolean } | null }).data?.value !== false;
+
   // Forfatter-opdateringer
   const authorUpdateEvents = (authorUpdateEventsRes.data ?? []) as { payload: Record<string, unknown> | null }[];
   const articlesUpdated = authorUpdateEvents.length;
@@ -387,6 +394,9 @@ export default async function ImportDashboardPage() {
           </div>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Import oversigt</h1>
         </div>
+
+        {/* ═══ DAGLIG IMPORT ═══ */}
+        <DailyImportToggle initialEnabled={dailyImportEnabled} />
 
         {/* ═══ SEKTION 1: ARTIKLER ═══ */}
         <SectionHeading title="Artikler" />
