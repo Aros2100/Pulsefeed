@@ -3,7 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export async function fetchRorGeo(
   rorId: string
 ): Promise<{ city: string | null; state: string | null; country: string | null }> {
-  const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
   const { data } = await admin
     .from("ror_institutions")
     .select("city, state, country")
