@@ -44,7 +44,7 @@ export async function POST() {
   }
 
   after(async () => {
-    await runImportCircle3(newLog.id, "manual");
+    await runImportCircle3(newLog.id, "manual", 1);
   });
 
   after(async () => {

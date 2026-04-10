@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
   // after() holder Vercel-funktionen i live efter response — erstatter void (fire-and-forget)
   // som fejlagtigt blev dræbt af Vercel inden importen nåede at færdiggøre.
   after(async () => {
-    await runImportCircle2(specialty, newLog.id, "manual");
+    await runImportCircle2(specialty, newLog.id, "manual", 1);
   });
 
   after(async () => {

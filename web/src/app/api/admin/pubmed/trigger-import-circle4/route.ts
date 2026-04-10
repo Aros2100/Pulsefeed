@@ -29,7 +29,7 @@ export async function POST() {
   }
 
   after(async () => {
-    await runImportCircle4(undefined, false, undefined, "manual");
+    await runImportCircle4(undefined, false, undefined, "manual", 1);
   });
 
   after(async () => {

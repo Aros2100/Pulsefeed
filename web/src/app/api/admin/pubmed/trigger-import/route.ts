@@ -17,8 +17,9 @@ export async function POST(request: NextRequest) {
     // Body is optional
   }
 
-  // Fire-and-forget — runImport opretter selv import_logs rækker pr. filter
-  void runImport(filterId, false, undefined, "manual");
+  after(async () => {
+    await runImport(filterId, false, undefined, "manual", 1);
+  });
 
   after(async () => {
     await runCitationFetch(200);

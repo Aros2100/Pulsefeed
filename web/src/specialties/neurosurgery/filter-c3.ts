@@ -48,7 +48,8 @@ export interface Circle3ImportResult {
  */
 export async function runImportCircle3(
   existingLogId?: string,
-  trigger: "cron" | "manual" = "cron"
+  trigger: "cron" | "manual" = "cron",
+  reldate?: number
 ): Promise<Circle3ImportResult> {
   const admin: AdminClient = createAdminClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -105,7 +106,7 @@ export async function runImportCircle3(
 
     await sleep(RATE_LIMIT_MS);
 
-    const pmids = await fetchPubMedIds(query, maxResults);
+    const pmids = await fetchPubMedIds(query, maxResults, reldate);
     totalFetched = pmids.length;
 
     if (pmids.length > 0) {
