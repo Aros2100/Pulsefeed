@@ -9,13 +9,12 @@ interface ArticleRow {
   title: string;
   journal_abbr: string | null;
   published_date: string | null;
-  imported_at: string;
   authors: unknown;
   article_type?: string | null;
 }
 
 type Period = "today" | "week" | "month" | "year";
-type SortField = "title" | "journal_abbr" | "published_date" | "imported_at";
+type SortField = "title" | "journal_abbr" | "published_date" | "article_type";
 
 const ARTICLE_TYPES = [
   "Meta-analysis",
@@ -241,7 +240,7 @@ export default function RecentArticlesClient({
     { key: "title",          label: "Title" },
     { key: "journal_abbr",   label: "Journal" },
     { key: "published_date", label: "Published" },
-    { key: "imported_at",    label: "Imported" },
+    { key: "article_type",   label: "Article type" },
   ];
 
   return (
@@ -388,7 +387,7 @@ export default function RecentArticlesClient({
                         {fmt(a.published_date)}
                       </td>
                       <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", fontSize: "12px", color: "#5a6a85", whiteSpace: "nowrap" }}>
-                        {fmt(a.imported_at)}
+                        {a.article_type ?? "—"}
                       </td>
                     </tr>
                   );

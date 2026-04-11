@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 
-const ALLOWED_SORT = ["title", "journal_abbr", "published_date", "imported_at", "circle", "verified", "evidence_score"] as const;
+const ALLOWED_SORT = ["title", "journal_abbr", "published_date", "imported_at", "article_type", "circle", "verified", "evidence_score"] as const;
 
 function parseMulti(raw: string | null): string[] | null {
   if (!raw) return null;
