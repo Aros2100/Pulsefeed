@@ -4,6 +4,12 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 
 const ALLOWED_SORT = ["title", "journal_abbr", "published_date", "imported_at", "circle", "verified", "evidence_score"] as const;
 
+function parseMulti(raw: string | null): string[] | null {
+  if (!raw) return null;
+  const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  return parts.length > 0 ? parts : null;
+}
+
 export async function GET(request: Request) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
@@ -21,6 +27,8 @@ export async function GET(request: Request) {
   const hasAbstract     = searchParams.get("has_abstract");
   const dateFrom = searchParams.get("date_from");
   const dateTo   = searchParams.get("date_to");
+  const pubDateFrom = searchParams.get("pub_date_from")?.trim() ?? "";
+  const pubDateTo   = searchParams.get("pub_date_to")?.trim() ?? "";
   const meshTerm     = searchParams.get("mesh_term")?.trim() ?? "";
   const search       = searchParams.get("search")?.trim() ?? "";
   const geoCountry   = searchParams.get("geo_country")?.trim() ?? "";
@@ -41,7 +49,6 @@ export async function GET(request: Request) {
 
   const safeSortBy = (ALLOWED_SORT as readonly string[]).includes(sortBy) ? sortBy : "imported_at";
   const start = (page - 1) * limit;
-  const end   = start + limit - 1;
 
   let filteredTotal: number | null = null;
 
@@ -51,57 +58,132 @@ export async function GET(request: Request) {
     .select("id, title, journal_abbr, published_date, imported_at, authors, status, circle, specialty_tags, verified, abstract, evidence_score", { count: "exact" });
 
   if (specialty) {
-    // Specialty valgt — filtrer via article_specialties
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: countData, error: countErr } = await (admin as any).rpc(
-      "count_articles_by_specialty",
-      {
-        p_specialty:       specialty,
-        p_specialty_match: "true",
-        p_subspecialty:    subspecialty   || null,
-        p_search:          search         || null,
-        p_geo_continent:   geoContinent   || null,
-        p_geo_region:      geoRegion      || null,
-        p_geo_country:     geoCountry     || null,
-        p_geo_state:       geoState       || null,
-        p_geo_city:        geoCity        || null,
-        p_circle:          circle ? parseInt(circle, 10) : null,
-        p_article_type:    articleType    || null,
+    const subspecialtyList = parseMulti(subspecialty ?? "");
+    const articleTypeList  = parseMulti(articleType);
+    const useMultiRpc = (subspecialtyList?.length ?? 0) > 1
+      || (articleTypeList?.length ?? 0) > 1
+      || !!pubDateFrom || !!pubDateTo;
+
+    if (useMultiRpc) {
+      // ── Array-filter RPC path ────────────────────────────────────────────
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: countData, error: countErr } = await (admin as any).rpc(
+        "count_articles_by_specialty_multi",
+        {
+          p_specialty:       specialty,
+          p_specialty_match: "true",
+          p_subspecialties:  subspecialtyList ?? null,
+          p_article_types:   articleTypeList  ?? null,
+          p_date_from:       pubDateFrom || null,
+          p_date_to:         pubDateTo   || null,
+          p_search:          search      || null,
+          p_geo_continent:   geoContinent || null,
+          p_geo_region:      geoRegion    || null,
+          p_geo_country:     geoCountry   || null,
+          p_geo_state:       geoState     || null,
+          p_geo_city:        geoCity      || null,
+          p_circle:          circle ? parseInt(circle, 10) : null,
+        }
+      );
+      if (countErr) return NextResponse.json({ ok: false, error: countErr.message }, { status: 500 });
+      filteredTotal = Number(countData ?? 0);
+
+      if (filteredTotal === 0) {
+        return NextResponse.json({ ok: true, rows: [], total: 0 });
       }
-    );
-    if (countErr) return NextResponse.json({ ok: false, error: countErr.message }, { status: 500 });
-    filteredTotal = Number(countData ?? 0);
 
-    if (filteredTotal === 0) {
-      return NextResponse.json({ ok: true, rows: [], total: 0 });
-    }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: specialtyIds, error: idsErr } = await (admin as any).rpc(
+        "get_article_ids_by_specialty_paged_multi",
+        {
+          p_specialty:       specialty,
+          p_specialty_match: "true",
+          p_limit:           limit,
+          p_offset:          start,
+          p_subspecialties:  subspecialtyList ?? null,
+          p_article_types:   articleTypeList  ?? null,
+          p_date_from:       pubDateFrom || null,
+          p_date_to:         pubDateTo   || null,
+          p_sort_by:         safeSortBy,
+          p_sort_dir:        sortAsc ? "asc" : "desc",
+          p_search:          search      || null,
+          p_geo_continent:   geoContinent || null,
+          p_geo_region:      geoRegion    || null,
+          p_geo_country:     geoCountry   || null,
+          p_geo_state:       geoState     || null,
+          p_geo_city:        geoCity      || null,
+          p_circle:          circle ? parseInt(circle, 10) : null,
+        }
+      );
+      if (idsErr) return NextResponse.json({ ok: false, error: idsErr.message }, { status: 500 });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: specialtyIds, error: idsErr } = await (admin as any).rpc(
-      "get_article_ids_by_specialty_paged",
-      {
-        p_specialty:       specialty,
-        p_specialty_match: "true",
-        p_limit:           limit,
-        p_offset:          start,
-        p_subspecialty:    subspecialty   || null,
-        p_search:          search         || null,
-        p_geo_continent:   geoContinent   || null,
-        p_geo_region:      geoRegion      || null,
-        p_geo_country:     geoCountry     || null,
-        p_geo_state:       geoState       || null,
-        p_geo_city:        geoCity        || null,
-        p_circle:          circle ? parseInt(circle, 10) : null,
-        p_article_type:    articleType    || null,
+      const pageIds = (specialtyIds ?? []).map((r: { article_id: string }) => r.article_id);
+      if (pageIds.length === 0) {
+        return NextResponse.json({ ok: true, rows: [], total: filteredTotal });
       }
-    );
-    if (idsErr) return NextResponse.json({ ok: false, error: idsErr.message }, { status: 500 });
 
-    const pageIds = (specialtyIds ?? []).map((r: { article_id: string }) => r.article_id);
-    if (pageIds.length === 0) {
-      return NextResponse.json({ ok: true, rows: [], total: filteredTotal });
+      const { data: rows, error: rowsErr } = await admin
+        .from("articles")
+        .select("id, title, journal_abbr, published_date, imported_at, authors, status, circle, specialty_tags, verified, abstract, evidence_score")
+        .in("id", pageIds)
+        .order(safeSortBy, { ascending: sortAsc });
+
+      if (rowsErr) return NextResponse.json({ ok: false, error: rowsErr.message }, { status: 500 });
+      return NextResponse.json({ ok: true, rows: rows ?? [], total: filteredTotal });
+
+    } else {
+      // ── Single-value RPC path (existing) ────────────────────────────────
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: countData, error: countErr } = await (admin as any).rpc(
+        "count_articles_by_specialty",
+        {
+          p_specialty:       specialty,
+          p_specialty_match: "true",
+          p_subspecialty:    subspecialty   || null,
+          p_search:          search         || null,
+          p_geo_continent:   geoContinent   || null,
+          p_geo_region:      geoRegion      || null,
+          p_geo_country:     geoCountry     || null,
+          p_geo_state:       geoState       || null,
+          p_geo_city:        geoCity        || null,
+          p_circle:          circle ? parseInt(circle, 10) : null,
+          p_article_type:    articleType    || null,
+        }
+      );
+      if (countErr) return NextResponse.json({ ok: false, error: countErr.message }, { status: 500 });
+      filteredTotal = Number(countData ?? 0);
+
+      if (filteredTotal === 0) {
+        return NextResponse.json({ ok: true, rows: [], total: 0 });
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: specialtyIds, error: idsErr } = await (admin as any).rpc(
+        "get_article_ids_by_specialty_paged",
+        {
+          p_specialty:       specialty,
+          p_specialty_match: "true",
+          p_limit:           limit,
+          p_offset:          start,
+          p_subspecialty:    subspecialty   || null,
+          p_search:          search         || null,
+          p_geo_continent:   geoContinent   || null,
+          p_geo_region:      geoRegion      || null,
+          p_geo_country:     geoCountry     || null,
+          p_geo_state:       geoState       || null,
+          p_geo_city:        geoCity        || null,
+          p_circle:          circle ? parseInt(circle, 10) : null,
+          p_article_type:    articleType    || null,
+        }
+      );
+      if (idsErr) return NextResponse.json({ ok: false, error: idsErr.message }, { status: 500 });
+
+      const pageIds = (specialtyIds ?? []).map((r: { article_id: string }) => r.article_id);
+      if (pageIds.length === 0) {
+        return NextResponse.json({ ok: true, rows: [], total: filteredTotal });
+      }
+      query = query.in("id", pageIds);
     }
-    query = query.in("id", pageIds);
   }
 
   if (verified === "true")  query = query.eq("verified", true);
@@ -136,6 +218,7 @@ export async function GET(request: Request) {
     query = query.in("id", ids);
   }
 
+  const end = start + limit - 1;
   const { data, error, count } = await query
     .order(safeSortBy, { ascending: sortAsc })
     .range(start, end);

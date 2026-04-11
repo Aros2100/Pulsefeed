@@ -225,7 +225,7 @@ export default async function ClassificationEvaluationPage({ searchParams }: Pro
         {/* Heading */}
         <div style={{ marginBottom: "20px" }}>
           <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#7c3aed", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
-            Prompt Evaluation · Classification
+            Prompt Evaluation · Subspeciality
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
             <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>

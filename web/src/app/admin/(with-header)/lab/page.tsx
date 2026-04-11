@@ -22,34 +22,34 @@ export default async function LabPage() {
 
   const modules = [
     {
-      title: "Speciale-validering",
-      description: "Validér AI-tagging af artikler til dit speciale og træn modellen",
+      title: "Specialty",
+      description: "Validate AI tagging of articles to your specialty and train the model",
       queue: specQueueCount,
       href: "/admin/lab/specialty-tag",
       color: "#E83B2A",
     },
     {
-      title: "Subspecialer",
-      description: "Klassificér artikler i sub-specialer og træn klassificeringsmodellen",
+      title: "Subspeciality",
+      description: "Classify articles into subspecialities and train the classification model",
       queue: clsQueueCount,
       href: "/admin/lab/subspecialty",
       color: "#7c3aed",
     },
     {
-      title: "Kondensering",
-      description: "Validér AI-genereret overskrift, resumé, bottom line, PICO og sample size",
+      title: "Condensation",
+      description: "Validate AI-generated headline, summary, bottom line, PICO and sample size",
       queue: cndQueueCount,
       href: "/admin/lab/condensation",
       color: "#059669",
-      badge: "Ny",
+      badge: "New",
     },
     {
-      title: "Artikel Type",
-      description: "Klassificér artikler i klinisk studie, review, guideline, kirurgisk teknik, case report eller andet",
+      title: "Article Type",
+      description: "Classify articles as clinical study, review, guideline, surgical technique, case report or other",
       queue: atQueueCount,
       href: "/admin/lab/article-type",
       color: "#0284c7",
-      badge: "Ny",
+      badge: "New",
     },
   ];
 
@@ -76,10 +76,10 @@ export default async function LabPage() {
             The Lab
           </div>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
-            Moduler
+            Modules
           </h1>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
-            Vælg et modul for at validere og træne AI-modellerne
+            Select a module to validate and train the AI models
           </p>
         </div>
 
@@ -134,7 +134,7 @@ export default async function LabPage() {
                       borderRadius: "6px",
                       padding: "4px 10px",
                     }}>
-                      {m.queue} i kø
+                      {m.queue} in queue
                     </span>
                   )}
                   <span style={{ fontSize: "18px", color: "#bbb" }}>→</span>

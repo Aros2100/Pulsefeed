@@ -71,7 +71,7 @@ export default async function ClassificationOptimizePage() {
         {/* Heading */}
         <div style={{ marginBottom: "24px" }}>
           <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#7c3aed", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
-            Prompt Optimization · Classification
+            Prompt Optimization · Subspeciality
           </div>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
             Optimize Model · {specialtyLabel}

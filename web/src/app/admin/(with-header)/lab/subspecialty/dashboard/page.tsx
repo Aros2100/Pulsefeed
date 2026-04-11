@@ -219,7 +219,7 @@ export default async function ClassificationDashboardPage() {
             Performance
           </div>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
-            Classification Benchmark — Subspecialty
+            Benchmark — Subspeciality
           </h1>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
             Nøjagtighed og korrektionsanalyse pr. model-version
@@ -228,7 +228,7 @@ export default async function ClassificationDashboardPage() {
 
         {/* Vertical bar chart */}
         <div style={card}>
-          <div style={cardHeader}>Nøjagtighed pr. version — Subspecialty</div>
+          <div style={cardHeader}>Accuracy by version — Subspeciality</div>
           <div style={{ padding: "24px 24px 20px" }}>
             {chartVersions.length === 0 ? (
               <div style={{ height: barHeight, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa", fontSize: "13px" }}>
@@ -372,7 +372,7 @@ export default async function ClassificationDashboardPage() {
 
         {/* Version comparison table */}
         <div style={card}>
-          <div style={cardHeader}>Versions-sammenligning — Subspecialty</div>
+          <div style={cardHeader}>Version comparison — Subspeciality</div>
           {tableRows.length === 0 ? (
             <div style={{ padding: "24px", fontSize: "13px", color: "#aaa" }}>Ingen versioner endnu.</div>
           ) : (

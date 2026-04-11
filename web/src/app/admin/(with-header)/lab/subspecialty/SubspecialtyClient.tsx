@@ -548,7 +548,7 @@ const [saving, setSaving]                   = useState(false);
               {/* AI Subspecialty badges */}
               <div>
                 <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#7c3aed", marginBottom: "8px" }}>
-                  AI Subspecialty
+                  AI Subspeciality
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                   {aiTags.length > 0 ? aiTags.map((tag) => (
@@ -607,7 +607,7 @@ const [saving, setSaving]                   = useState(false);
                   Korriger (vælg 1–{maxCorrections}) — {checkedSubs.length} af {maxCorrections} valgt
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1px 12px" }}>
-                  {subspecialties.map((option) => {
+                  {[...subspecialties, "Other"].map((option) => {
                     const isChecked = checkedSubs.includes(option);
                     const isDisabled = !isChecked && checkedSubs.length >= maxCorrections;
                     return (

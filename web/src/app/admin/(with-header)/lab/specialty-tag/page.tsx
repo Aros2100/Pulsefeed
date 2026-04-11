@@ -5,8 +5,8 @@ import { SectionCard } from "../SectionCard";
 import PromptDrawer, { type ModelVersion } from "@/components/lab/PromptDrawer";
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return "Aldrig";
-  return new Date(iso).toLocaleString("da-DK", {
+  if (!iso) return "Never";
+  return new Date(iso).toLocaleString("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -17,7 +17,7 @@ function fmtDate(iso: string | null): string {
 
 function fmtShortDate(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("da-DK", {
+  return new Date(iso).toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -191,55 +191,55 @@ export default async function SpecialtyTagPage() {
             The Lab
           </div>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
-            Speciale-validering
+            Specialty
           </h1>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
-            Mærk artikler og træn AI-modellerne til dit speciale
+            Tag articles and train the AI models for your specialty
           </p>
         </div>
 
         {/* Three section cards */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
 
-          {/* Card 1: Validering */}
+          {/* Card 1: Validation */}
           <SectionCard
-            headerLabel="Validering"
+            headerLabel="Validation"
             badges={[
               ...(activeVersionName
                 ? [{ label: activeVersionName, color: "#dde3ed", textColor: "#5a6a85" }]
                 : []),
-              { label: "Aktiv", color: "#E83B2A" },
+              { label: "Active", color: "#E83B2A" },
             ]}
             kpis={[
               {
-                label: "Artikler i kø",
+                label: "Articles in queue",
                 value: String(queueCount),
                 valueColor: queueCount > 0 ? "#E83B2A" : undefined,
               },
               {
-                label: `Bearbejdet, ${activeVersionName ?? "—"}`,
+                label: `Reviewed, ${activeVersionName ?? "—"}`,
                 value: String(activeVersionCount),
                 sub: activeVersionCount !== totalDecisions
-                  ? `${totalDecisions} i alt`
+                  ? `${totalDecisions} total`
                   : undefined,
               },
               {
-                label: "Uenigheder",
+                label: "Disagreements",
                 value: activeVersionCount > 0
                   ? `${Math.round((disagreementsCount / activeVersionCount) * 100)}%`
                   : "—",
                 valueColor: disagreementsCount > 0 ? "#d97706" : undefined,
-                sub: `${disagreementsCount} af ${activeVersionCount}`,
+                sub: `${disagreementsCount} of ${activeVersionCount}`,
               },
               {
-                label: "Sidst bearbejdet",
+                label: "Last reviewed",
                 value: fmtDate(lastDecisionAt),
                 valueColor: "#5a6a85",
               },
             ]}
             actionLabel={
               queueCount > 0
-                ? `Start session · ${queueCount} artikler klar →`
+                ? `Start session · ${queueCount} articles ready →`
                 : "Start session →"
             }
             actionHref={`/admin/lab/specialty-tag/training`}
@@ -256,27 +256,27 @@ export default async function SpecialtyTagPage() {
             }
             kpis={[
               {
-                label: "Nøjagtighed",
+                label: "Accuracy",
                 value: agreementRate !== null ? `${agreementRate}%` : "—",
                 valueColor: agreementRate !== null ? "#15803d" : undefined,
               },
               {
-                label: "Falsk positive",
+                label: "False positives",
                 value: String(fpCount),
-                sub: "AI siger ja, editor nej",
+                sub: "AI says yes, editor no",
               },
               {
-                label: "Falsk negative",
+                label: "False negatives",
                 value: String(fnCount),
-                sub: "AI siger nej, editor ja",
+                sub: "AI says no, editor yes",
               },
               {
-                label: "Beslutninger",
+                label: "Decisions",
                 value: String(decisionsWithAi),
-                sub: activeVersionName ? `${activeVersionName}-periode` : undefined,
+                sub: activeVersionName ? `${activeVersionName} period` : undefined,
               },
             ]}
-            actionLabel="Se detaljer →"
+            actionLabel="View details →"
             actionHref="/admin/lab/specialty-tag/dashboard"
           />
 
@@ -287,21 +287,21 @@ export default async function SpecialtyTagPage() {
               ...(activeVersionName
                 ? [{ label: activeVersionName, color: "#dde3ed", textColor: "#5a6a85" }]
                 : []),
-              { label: "Aktiv", color: "#2563eb" },
+              { label: "Active", color: "#2563eb" },
             ]}
             kpis={[
               {
-                label: "Aktiv version",
+                label: "Active version",
                 value: activeVersionName ?? "—",
               },
               {
-                label: "Uenigheder",
+                label: "Disagreements",
                 value: String(disagreementsCount),
                 valueColor: disagreementsCount > 0 ? "#d97706" : undefined,
-                sub: "til analyse",
+                sub: "for analysis",
               },
               {
-                label: "Implementeret",
+                label: "Deployed",
                 value: fmtShortDate(activatedAt),
               },
               {
@@ -309,11 +309,11 @@ export default async function SpecialtyTagPage() {
                 value: agreementRate !== null ? `${agreementRate}%` : "—",
                 valueColor: agreementRate !== null ? "#15803d" : undefined,
                 sub: decisionsWithAi > 0
-                  ? `${agreementCount} af ${decisionsWithAi}`
+                  ? `${agreementCount} of ${decisionsWithAi}`
                   : undefined,
               },
             ]}
-            actionLabel="Start evaluering →"
+            actionLabel="Start evaluation →"
             actionHref="/admin/lab/specialty-tag/evaluation"
             secondaryAction={
               <PromptDrawer

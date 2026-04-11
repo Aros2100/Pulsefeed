@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import SimulatorClient, { type SimulationDisagreement, type SimulationAgreement, type SimulatorConfig } from "@/components/lab/SimulatorClient";
 
 const CONFIG: SimulatorConfig = {
-  label: "Classification",
+  label: "Subspeciality",
   accent: "#7c3aed",
   optimizeHref: "/admin/lab/subspecialty/optimize",
   resultType: "tags",

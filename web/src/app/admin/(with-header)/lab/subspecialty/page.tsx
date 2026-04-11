@@ -4,8 +4,8 @@ import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { SectionCard } from "../SectionCard";
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return "Aldrig";
-  return new Date(iso).toLocaleString("da-DK", {
+  if (!iso) return "Never";
+  return new Date(iso).toLocaleString("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -88,48 +88,48 @@ export default async function ClassificationOverviewPage() {
             The Lab
           </div>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
-            Subspecialer
+            Subspeciality
           </h1>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
-            Klassificér artikler i sub-specialer
+            Classify articles into subspecialities
           </p>
         </div>
 
         {/* Section cards */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
 
-          {/* Card 1: Validering */}
+          {/* Card 1: Validation */}
           <SectionCard
-            headerLabel="Validering"
-            badges={[{ label: "Aktiv", color: "#7c3aed" }]}
+            headerLabel="Validation"
+            badges={[{ label: "Active", color: "#7c3aed" }]}
             kpis={[
               {
-                label: "Artikler i kø",
+                label: "Articles in queue",
                 value: String(queueCount),
                 valueColor: queueCount > 0 ? "#7c3aed" : undefined,
               },
               {
-                label: "Bearbejdet",
+                label: "Reviewed",
                 value: String(totalReviewed),
-                sub: "artikler klassificeret",
+                sub: "articles classified",
               },
               {
-                label: "Uenigheder",
+                label: "Disagreements",
                 value: totalDecisions > 0
                   ? `${Math.round((totalDisagreements / totalDecisions) * 100)}%`
                   : "—",
                 valueColor: totalDisagreements > 0 ? "#d97706" : undefined,
-                sub: `${totalDisagreements} af ${totalDecisions} beslutninger`,
+                sub: `${totalDisagreements} of ${totalDecisions} decisions`,
               },
               {
-                label: "Sidst bearbejdet",
+                label: "Last reviewed",
                 value: fmtDate(lastDecisionAt),
                 valueColor: "#5a6a85",
               },
             ]}
             actionLabel={
               queueCount > 0
-                ? `Start session · ${queueCount} artikler →`
+                ? `Start session · ${queueCount} articles →`
                 : "Start session →"
             }
             actionHref="/admin/lab/subspecialty/session"
@@ -149,7 +149,7 @@ export default async function ClassificationOverviewPage() {
             }
             kpis={[
               {
-                label: "Subspecialty",
+                label: "Subspeciality",
                 value: totalDecisions > 0
                   ? `${Math.round(((totalDecisions - totalDisagreements) / totalDecisions) * 100)}%`
                   : "—",
@@ -157,32 +157,32 @@ export default async function ClassificationOverviewPage() {
                 sub: `${totalDecisions - totalDisagreements} af ${totalDecisions}`,
               },
               {
-                label: "Beslutninger",
+                label: "Decisions",
                 value: String(totalDecisions),
-                sub: `${totalReviewed} artikler`,
+                sub: `${totalReviewed} articles`,
               },
             ]}
-            actionLabel="Se detaljer →"
+            actionLabel="View details →"
             actionHref="/admin/lab/subspecialty/dashboard"
           />
 
           {/* Card 3: Prompt */}
           <SectionCard
             headerLabel="Prompt"
-            badges={totalDisagreements > 0 ? [{ label: `${totalDisagreements} uenigheder`, color: "#d97706" }] : []}
+            badges={totalDisagreements > 0 ? [{ label: `${totalDisagreements} disagreements`, color: "#d97706" }] : []}
             kpis={[
               {
-                label: "Subspecialty",
+                label: "Subspeciality",
                 value: String(totalDisagreements),
-                sub: `af ${totalDecisions} beslutninger`,
+                sub: `of ${totalDecisions} decisions`,
               },
               {
                 label: "Threshold",
                 value: "50",
-                sub: "pr. parameter",
+                sub: "per parameter",
               },
             ]}
-            actionLabel="Evaluér prompt →"
+            actionLabel="Evaluate prompt →"
             actionHref="/admin/lab/subspecialty/evaluation"
             actionColor="#d97706"
           />
