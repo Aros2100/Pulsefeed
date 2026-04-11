@@ -122,9 +122,7 @@ export default function SubspecialtyClient({ specialty, label, subspecialties }:
   const [checkedSubs, setCheckedSubs]         = useState<string[]>([]);
   const [scoring, setScoring]                 = useState(false);
   const [scoringProgress, setScoringProgress] = useState<{ scored: number; failed: number; total: number } | null>(null);
-  const [rescoring, setRescoring]             = useState(false);
-  const [rescoreProgress, setRescoreProgress] = useState<{ scored: number; failed: number; total: number } | null>(null);
-  const [saving, setSaving]                   = useState(false);
+const [saving, setSaving]                   = useState(false);
   const [toast, setToast]                     = useState<string | null>(null);
   const [pendingHref, setPendingHref]         = useState<string | null>(null);
 
@@ -353,39 +351,6 @@ export default function SubspecialtyClient({ specialty, label, subspecialties }:
     }
   }
 
-  // ── Rescore NULLs ────────────────────────────────────────────────────────
-
-  async function handleRescore() {
-    setRescoring(true);
-    setRescoreProgress(null);
-    try {
-      const response = await fetch("/api/lab/score-subspecialty", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ specialty, scoreAll: true }),
-      });
-      const reader = response.body!.getReader();
-      const decoder = new TextDecoder();
-      outer: while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        for (const line of decoder.decode(value).split("\n")) {
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const data = JSON.parse(line.slice(6)) as { scored?: number; failed?: number; total?: number; done?: boolean };
-            if (data.done) break outer;
-            if (data.scored !== undefined && data.total !== undefined) {
-              setRescoreProgress({ scored: data.scored, failed: data.failed ?? 0, total: data.total });
-            }
-          } catch { /* ignore malformed events */ }
-        }
-      }
-    } catch { /* ignore */ }
-    setRescoring(false);
-    setRescoreProgress(null);
-    setToast("Rescore færdig — genindlæs siden for at se resultater");
-  }
-
   // ── Checkbox handling ─────────────────────────────────────────────────────
 
   const PEDIATRIC = "Pediatric and foetal neurosurgery";
@@ -523,29 +488,6 @@ export default function SubspecialtyClient({ specialty, label, subspecialties }:
             }}
           >
             {saving ? <><Spinner size={10} /> Gemmer…</> : <>Gem {reviewedCount > 0 ? `(${reviewedCount})` : ""}</>}
-          </button>
-          <button
-            onClick={() => void handleRescore()}
-            disabled={rescoring}
-            title="Re-score artikler med subspecialty_ai = NULL (maks 50 ad gangen)"
-            style={{
-              borderRadius: "6px",
-              padding: "5px 14px",
-              fontSize: "12px",
-              fontWeight: 700,
-              background: rescoring ? "#e2e8f0" : "#f1f5f9",
-              border: "1px solid #e5e7eb",
-              color: rescoring ? "#94a3b8" : "#5a6a85",
-              cursor: rescoring ? "not-allowed" : "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "5px",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {rescoring
-              ? <><Spinner size={10} /> {rescoreProgress ? `${rescoreProgress.scored}/${rescoreProgress.total}` : "Rescorer…"}</>
-              : "Rescore NULLs"}
           </button>
         </div>
       </header>
