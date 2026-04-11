@@ -58,7 +58,7 @@ export async function applyUnscoredFilters(
 ): Promise<any | null> { // eslint-disable-line @typescript-eslint/no-explicit-any
   const config = MODULE_FILTERS[module];
 
-  let q = query.contains("specialty_tags", [specialty]);
+  let q = query;
 
   if (config.filters.status === "approved") {
     // Use article_specialties as source of truth for approved articles

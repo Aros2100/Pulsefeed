@@ -343,6 +343,7 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<void> {
             update.retracted = true;
             if (!changed.includes("publication_types")) changed.push("publication_types");
           }
+          if (pm.dateRevised) update.pubmed_modified_at = pm.dateRevised;
 
           const { error: updateErr } = await db
             .from("articles").update(update).eq("pubmed_id", pm.pubmedId);

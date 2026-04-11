@@ -485,7 +485,6 @@ async function createNewAuthor(
   resolvedOpenAlexInstitution?: { displayName: string; ror: string | null; type: string } | null,
   debugName?: string,
 ): Promise<{ id: string; outcome: AuthorOutcome }> {
-  await new Promise((r) => setTimeout(r, 150));
   const openalexId = resolvedOpenAlexId ?? null;
   const oaInst = (openalexId && resolvedOpenAlexInstitution) ? resolvedOpenAlexInstitution : null;
 
@@ -600,7 +599,7 @@ export async function linkAuthorsToArticle(
       )
     : new Map<number, OpenAlexAuthorship>();
 
-  const oaLimit = pLimit(5);
+  const oaLimit = pLimit(10);
   const preResolvedOAMap = new Map<number, OpenAlexIdResult | null>();
   await Promise.all(
     authors.map((author, i) => {

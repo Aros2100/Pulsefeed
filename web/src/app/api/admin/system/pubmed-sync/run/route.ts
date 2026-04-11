@@ -3,8 +3,15 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { runPubmedSync } from "@/lib/pubmed/sync-runner";
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAdmin();
-  if (!auth.ok) return auth.response;
+  // Accept enten admin-session eller CRON_SECRET
+  const authHeader = request.headers.get("Authorization");
+  const cronSecret = process.env.CRON_SECRET;
+  const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
+
+  if (!isCron) {
+    const auth = await requireAdmin();
+    if (!auth.ok) return auth.response;
+  }
 
   let daysBack = 7;
   let limit = 500;

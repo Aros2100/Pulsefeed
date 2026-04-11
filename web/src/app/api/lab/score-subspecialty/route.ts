@@ -5,7 +5,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { getActivePrompt, scoreClassification, type ActivePrompt } from "@/lib/lab/scorer";
-import { applyUnscoredFilters } from "@/lib/lab/article-filters";
 
 const CONCURRENCY  = 1;
 const DELAY_MS     = 1300;
@@ -119,22 +118,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const filteredQuery = await applyUnscoredFilters(
-      admin.from("articles").select("id, title, abstract"),
-      "subspecialty",
-      specialty,
-      admin,
+    const { data: unscoredData, error: unscoredError } = await admin.rpc(
+      "get_subspecialty_unscored_articles",
+      { p_specialty: specialty, p_limit: remaining }
     );
-    if (!filteredQuery) {
-      articles = [];
-      fetchError = null;
-    } else {
-      const res = await filteredQuery
-        .order("circle", { ascending: false, nullsFirst: false })
-        .limit(remaining);
-      articles = res.data as Article[] | null;
-      fetchError = res.error;
-    }
+    articles = unscoredData as Article[] | null;
+    fetchError = unscoredError;
   }
 
   if (fetchError) {
