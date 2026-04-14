@@ -9,7 +9,8 @@
  *   cd web && npx tsx scripts/backfill-pubmed-dates.ts
  */
 
-import "dotenv/config";
+import { config } from "dotenv";
+config({ path: new URL("../.env.local", import.meta.url).pathname });
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchArticleDetails } from "@/lib/import/article-import/fetcher";
 
