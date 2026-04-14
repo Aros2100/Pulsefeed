@@ -218,7 +218,11 @@ async function esearch(
       retmode: "json",
     });
     if (apiKey) p.set("api_key", apiKey);
-    const res = await fetch(`${BASE}/esearch.fcgi?${p}`);
+    const res = await fetch(`${BASE}/esearch.fcgi`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: p,
+    });
     if (!res.ok) throw new Error(`esearch HTTP ${res.status}`);
     const json = await res.json() as { esearchresult: { idlist: string[]; count: string } };
     const result = json.esearchresult;
@@ -235,18 +239,21 @@ async function esearch(
 // ── Main export ─────────────────────────────────────────────────────────────
 
 export interface SyncRunnerOpts {
-  daysBack?:      number;
+  mindate?:       string;
+  maxdate?:       string;
   esearchRetmax?: number;
 }
 
 export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<void> {
-  const { daysBack = 7, esearchRetmax = 10_000 } = opts;
+  const { esearchRetmax = 10_000 } = opts;
   const db     = createAdminClient();
   const apiKey = process.env.PUBMED_API_KEY ?? "";
 
-  const now     = new Date();
-  const mindate = fmtDate(new Date(now.getTime() - daysBack * 86_400_000));
-  const maxdate = fmtDate(now);
+  const today   = new Date();
+  const toDate  = opts.maxdate ? new Date(opts.maxdate) : today;
+  const fromDate = opts.mindate ? new Date(opts.mindate) : new Date(today.getTime() - 7 * 86_400_000);
+  const mindate = fmtDate(fromDate);
+  const maxdate = fmtDate(toDate);
 
   console.log(`[pubmed-sync] Period: ${mindate} → ${maxdate}, retmax: ${esearchRetmax}`);
 
@@ -271,7 +278,7 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<void> {
     .from("pubmed_filters")
     .select("query_string, circle")
     .eq("active", true)
-    .in("circle", [1, 2]);
+    .in("circle", [1, 2, 4]);
   if (filterErr) throw filterErr;
   if (!filters?.length) throw new Error("Ingen aktive C1/C2 filtre fundet i pubmed_filters");
   const filterQuery = filters.map(f => `(${f.query_string})`).join(" OR ");
@@ -287,7 +294,7 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<void> {
     if (dbIds.has(id)) matches.push(id);
     else newPmids.push(id);
   }
-  console.log(`[pubmed-sync] Match: ${matches.length}, Nye: ${newPmids.length}`);
+  console.log(`[pubmed-sync] Match: ${matches.length}`);
 
   const logEntries: SyncLogEntry[] = [];
 
@@ -373,19 +380,6 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<void> {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (db as any).from("pubmed_sync_log").insert(batch);
       if (error) console.error("[pubmed-sync] log insert error:", error.message);
-    }
-  }
-
-  // Log new PMIDs (not imported, just tracked)
-  if (newPmids.length > 0) {
-    const importedEntries: SyncLogEntry[] = newPmids.map(id => ({
-      pubmed_id: id, event: "imported" as const, fields_changed: null, pubmed_modified_at: null,
-    }));
-    for (let i = 0; i < importedEntries.length; i += UPDATE_BATCH) {
-      const batch = importedEntries.slice(i, i + UPDATE_BATCH);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (db as any).from("pubmed_sync_log").insert(batch);
-      if (error) console.error("[pubmed-sync] imported log insert error:", error.message);
     }
   }
 

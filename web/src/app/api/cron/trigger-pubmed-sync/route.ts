@@ -11,19 +11,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  let daysBack = 7;
-  let limit = 500;
-  try {
-    const body = (await request.json()) as { daysBack?: number; limit?: number };
-    if (body.daysBack && body.daysBack > 0) daysBack = body.daysBack;
-    if (body.limit   && body.limit > 0)    limit    = body.limit;
-  } catch {
-    // body is optional
-  }
-
   after(async () => {
     try {
-      await runPubmedSync({ daysBack, esearchRetmax: limit });
+      const yesterday = new Date(Date.now() - 86_400_000);
+      const fmtDate = (d: Date) =>
+        `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+      await runPubmedSync({
+        mindate: fmtDate(yesterday),
+        maxdate: fmtDate(new Date()),
+        esearchRetmax: 500,
+      });
     } catch (e) {
       console.error("[trigger-pubmed-sync] failed:", e);
     }

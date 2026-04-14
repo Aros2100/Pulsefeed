@@ -7,7 +7,6 @@ import Link from "next/link";
 
 interface SyncLog {
   runTime:   string;
-  imported:  number;
   updated:   number;
   retracted: number;
   total:     number;
@@ -77,7 +76,12 @@ export default function PubmedSyncPage() {
   const [error,       setError]       = useState<string | null>(null);
   const [logs,        setLogs]        = useState<SyncLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
-  const [params,      setParams]      = useState({ daysBack: 7, limit: 500 });
+  const [mindate, setMindate] = useState(() => {
+    const d = new Date(Date.now() - 7 * 86_400_000);
+    return d.toISOString().slice(0, 10);
+  });
+  const [maxdate, setMaxdate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [limit,   setLimit]   = useState(500);
 
   /* ── Fetch logs ── */
   const fetchLogs = useCallback(async () => {
@@ -108,7 +112,7 @@ export default function PubmedSyncPage() {
       const res = await fetch("/api/admin/system/pubmed-sync/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ daysBack: params.daysBack, limit: params.limit }),
+        body: JSON.stringify({ mindate, maxdate, limit }),
       });
       const d = await res.json();
       if (!d.ok) {
@@ -173,16 +177,27 @@ export default function PubmedSyncPage() {
             <span style={headerLabel}>Konfiguration</span>
           </div>
           <div style={{ padding: "20px 24px" }}>
-            <div style={{ display: "flex", gap: "32px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", alignItems: "flex-end" }}>
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#5a6a85", marginBottom: "6px" }}>
-                  Dage tilbage
+                  Fra (MDAT)
                 </label>
                 <input
-                  type="number" min={1} max={365}
-                  value={params.daysBack}
-                  onChange={(e) => setParams(p => ({ ...p, daysBack: Math.max(1, parseInt(e.target.value) || 7) }))}
-                  style={inputStyle}
+                  type="date"
+                  value={mindate}
+                  onChange={(e) => setMindate(e.target.value)}
+                  style={{ border: "1px solid #d1d5db", borderRadius: "8px", padding: "8px 12px", fontSize: "13px", color: "#1a1a1a", outline: "none" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#5a6a85", marginBottom: "6px" }}>
+                  Til (MDAT)
+                </label>
+                <input
+                  type="date"
+                  value={maxdate}
+                  onChange={(e) => setMaxdate(e.target.value)}
+                  style={{ border: "1px solid #d1d5db", borderRadius: "8px", padding: "8px 12px", fontSize: "13px", color: "#1a1a1a", outline: "none" }}
                 />
               </div>
               <div>
@@ -191,14 +206,14 @@ export default function PubmedSyncPage() {
                 </label>
                 <input
                   type="number" min={1} max={50000}
-                  value={params.limit}
-                  onChange={(e) => setParams(p => ({ ...p, limit: Math.max(1, parseInt(e.target.value) || 500) }))}
+                  value={limit}
+                  onChange={(e) => setLimit(Math.max(1, parseInt(e.target.value) || 500))}
                   style={inputStyle}
                 />
               </div>
             </div>
             <p style={{ fontSize: "12px", color: "#5a6a85", marginTop: "14px", marginBottom: 0, lineHeight: 1.6 }}>
-              Syncer artikler modificeret i PubMed inden for de seneste {params.daysBack} {params.daysBack === 1 ? "dag" : "dage"}.
+              Syncer artikler modificeret på PubMed fra {fmt(mindate)} til {fmt(maxdate)}.
               Kun artikler der allerede er i databasen opdateres — nye artikler importeres via circle-import.
             </p>
           </div>
@@ -217,7 +232,7 @@ export default function PubmedSyncPage() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  {["Dato", "Importeret", "Opdateret", "Retracted", "Total"].map(h => (
+                  {["Dato", "Opdateret", "Retracted", "Total"].map(h => (
                     <th key={h} style={thStyle}>{h}</th>
                   ))}
                 </tr>
@@ -226,7 +241,6 @@ export default function PubmedSyncPage() {
                 {logs.map((log) => (
                   <tr key={log.runTime}>
                     <td style={{ ...tdStyle, whiteSpace: "nowrap", color: "#5a6a85" }}>{fmt(log.runTime)}</td>
-                    <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>{num(log.imported)}</td>
                     <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>{num(log.updated)}</td>
                     <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
                       {log.retracted > 0 ? (

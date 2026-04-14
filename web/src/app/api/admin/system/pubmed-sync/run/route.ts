@@ -13,19 +13,21 @@ export async function POST(request: NextRequest) {
     if (!auth.ok) return auth.response;
   }
 
-  let daysBack = 7;
+  let mindate: string | undefined;
+  let maxdate: string | undefined;
   let limit = 500;
   try {
-    const body = (await request.json()) as { daysBack?: number; limit?: number };
-    if (body.daysBack && body.daysBack > 0) daysBack = body.daysBack;
-    if (body.limit   && body.limit > 0)    limit    = body.limit;
+    const body = (await request.json()) as { mindate?: string; maxdate?: string; limit?: number };
+    mindate = body.mindate || undefined;
+    maxdate = body.maxdate || undefined;
+    if (body.limit && body.limit > 0) limit = body.limit;
   } catch {
     // body is optional
   }
 
   after(async () => {
     try {
-      await runPubmedSync({ daysBack, esearchRetmax: limit });
+      await runPubmedSync({ mindate, maxdate, esearchRetmax: limit });
     } catch (e) {
       console.error("[pubmed-sync/run] failed:", e);
     }
