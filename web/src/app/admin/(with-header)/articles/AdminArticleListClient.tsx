@@ -163,7 +163,6 @@ function filtersFromParams(sp: URLSearchParams): Filters {
     geo_country:     sp.get("geo_country")     ?? "",
     geo_state:       sp.get("geo_state")       ?? "",
     geo_city:        sp.get("geo_city")        ?? "",
-    missing_geo:     sp.get("missing_geo")     === "true",
     no_region:       sp.get("no_region")       === "true",
     no_country:      sp.get("no_country")      === "true",
     no_state:        sp.get("no_state")        === "true",
