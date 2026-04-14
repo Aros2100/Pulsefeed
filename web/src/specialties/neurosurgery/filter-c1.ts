@@ -37,8 +37,8 @@ export async function runImport(
   let totalFetched = 0;
   let totalAuthorSlots = 0;
 
-  // 1. Load filters — eksplicit circle != 2 så C2-filtre ikke kører som C1
-  let q = admin.from("pubmed_filters").select("*").eq("active", true).neq("circle", 2);
+  // 1. Load filters — explicitly circle = 1 only
+  let q = admin.from("pubmed_filters").select("*").eq("active", true).eq("circle", 1);
   if (filterId) q = q.eq("id", filterId);
 
   const { data: filters, error: filtersErr } = await q;
@@ -86,8 +86,11 @@ export async function runImport(
       await sleep(RATE_LIMIT_MS);
 
       const tSearch = Date.now();
-      const pmids = await fetchPubMedIds(filter.query_string, filter.max_results ?? 100, reldate);
+      const { pmids, totalCount } = await fetchPubMedIds(filter.query_string, filter.max_results ?? 100, reldate);
       console.error(`[import] fetchPubMedIds: ${Date.now() - tSearch}ms`);
+      if (totalCount > pmids.length) {
+        console.error(`[import] ESearch returned ${totalCount} total hits but retmax=${filter.max_results ?? 100} — ${totalCount - pmids.length} articles not fetched`);
+      }
       filterFetched = pmids.length;
       if (!pmids.length) continue;
 

@@ -1,231 +1,73 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireAdmin } from "@/lib/auth/require-admin";
 
-const ALLOWED_SORT = ["title", "journal_abbr", "published_date", "imported_at", "article_type", "circle", "verified", "evidence_score"] as const;
+const ALLOWED_SORT = ["title", "journal_abbr", "pubmed_indexed_at", "imported_at", "circle", "evidence_score"] as const;
+type SortField = typeof ALLOWED_SORT[number];
 
-function parseMulti(raw: string | null): string[] | null {
-  if (!raw) return null;
-  const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
-  return parts.length > 0 ? parts : null;
-}
+export async function GET(request: NextRequest) {
+  const supabase = createAdminClient();
 
-export async function GET(request: Request) {
-  const auth = await requireAdmin();
-  if (!auth.ok) return auth.response;
+  const params = request.nextUrl.searchParams;
+  const page          = Math.max(1, parseInt(params.get("page") ?? "1", 10));
+  const limit         = Math.min(200, Math.max(1, parseInt(params.get("limit") ?? "50", 10)));
+  const sortByRaw     = params.get("sort_by") ?? "imported_at";
+  const sort_by: SortField = (ALLOWED_SORT as readonly string[]).includes(sortByRaw) ? sortByRaw as SortField : "imported_at";
+  const ascending     = params.get("sort_dir") === "asc";
+  const search        = params.get("search");
+  const mesh_term     = params.get("mesh_term");
+  const specialty     = params.get("specialty");
+  const subspecialty  = params.get("subspecialty");
+  const article_type  = params.get("article_type");
+  const pub_date_from = params.get("pub_date_from");
+  const pub_date_to   = params.get("pub_date_to");
+  const geo_continent = params.get("geo_continent");
+  const geo_region    = params.get("geo_region");
+  const geo_country   = params.get("geo_country");
+  const geo_state     = params.get("geo_state");
+  const geo_city      = params.get("geo_city");
 
-  const admin = createAdminClient();
-  const { searchParams } = new URL(request.url);
+  const from = (page - 1) * limit;
+  const to   = from + limit - 1;
 
-  const page    = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
-  const limit   = Math.min(100, Math.max(10, parseInt(searchParams.get("limit") ?? "50", 10)));
-  const circle        = searchParams.get("circle");
-  const specialty     = searchParams.get("specialty") ?? "";
-  const subspecialty = searchParams.get("subspecialty");
-  const verified        = searchParams.get("verified");
-  const approvalMethod  = searchParams.get("approval_method");
-  const hasAbstract     = searchParams.get("has_abstract");
-  const dateFrom = searchParams.get("date_from");
-  const dateTo   = searchParams.get("date_to");
-  const pubDateFrom = searchParams.get("pub_date_from")?.trim() ?? "";
-  const pubDateTo   = searchParams.get("pub_date_to")?.trim() ?? "";
-  const meshTerm     = searchParams.get("mesh_term")?.trim() ?? "";
-  const search       = searchParams.get("search")?.trim() ?? "";
-  const geoCountry   = searchParams.get("geo_country")?.trim() ?? "";
-  const geoContinent = searchParams.get("geo_continent")?.trim() ?? "";
-  const geoRegion    = searchParams.get("geo_region")?.trim() ?? "";
-  const geoState     = searchParams.get("geo_state")?.trim() ?? "";
-  const geoCity      = searchParams.get("geo_city")?.trim() ?? "";
-  const missingGeo   = searchParams.get("missing_geo") === "true";
-  const noRegion     = searchParams.get("no_region")   === "true";
-  const noCountry    = searchParams.get("no_country")  === "true";
-  const noState      = searchParams.get("no_state")    === "true";
-  const noCity       = searchParams.get("no_city")     === "true";
-  const notParsed    = searchParams.get("not_parsed")   === "true";
-  const suspectCity  = searchParams.get("suspect_city") === "true";
-  const articleType  = searchParams.get("article_type")?.trim() ?? "";
-  const sortBy   = searchParams.get("sort_by") ?? "imported_at";
-  const sortAsc  = searchParams.get("sort_dir") === "asc";
-
-  const safeSortBy = (ALLOWED_SORT as readonly string[]).includes(sortBy) ? sortBy : "imported_at";
-  const start = (page - 1) * limit;
-
-  let filteredTotal: number | null = null;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let query: any = admin
-    .from("articles")
-    .select("id, title, journal_abbr, published_date, imported_at, authors, status, circle, specialty_tags, verified, abstract, evidence_score", { count: "exact" });
+  let query;
 
   if (specialty) {
-    const subspecialtyList = parseMulti(subspecialty ?? "");
-    const articleTypeList  = parseMulti(articleType);
-    const useMultiRpc = (subspecialtyList?.length ?? 0) > 1
-      || (articleTypeList?.length ?? 0) > 1
-      || !!pubDateFrom || !!pubDateTo;
-
-    if (useMultiRpc) {
-      // ── Array-filter RPC path ────────────────────────────────────────────
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: countData, error: countErr } = await (admin as any).rpc(
-        "count_articles_by_specialty_multi",
-        {
-          p_specialty:       specialty,
-          p_specialty_match: "true",
-          p_subspecialties:  subspecialtyList ?? null,
-          p_article_types:   articleTypeList  ?? null,
-          p_date_from:       pubDateFrom || null,
-          p_date_to:         pubDateTo   || null,
-          p_search:          search      || null,
-          p_geo_continent:   geoContinent || null,
-          p_geo_region:      geoRegion    || null,
-          p_geo_country:     geoCountry   || null,
-          p_geo_state:       geoState     || null,
-          p_geo_city:        geoCity      || null,
-          p_circle:          circle ? parseInt(circle, 10) : null,
-        }
-      );
-      if (countErr) return NextResponse.json({ ok: false, error: countErr.message }, { status: 500 });
-      filteredTotal = Number(countData ?? 0);
-
-      if (filteredTotal === 0) {
-        return NextResponse.json({ ok: true, rows: [], total: 0 });
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: specialtyIds, error: idsErr } = await (admin as any).rpc(
-        "get_article_ids_by_specialty_paged_multi",
-        {
-          p_specialty:       specialty,
-          p_specialty_match: "true",
-          p_limit:           limit,
-          p_offset:          start,
-          p_subspecialties:  subspecialtyList ?? null,
-          p_article_types:   articleTypeList  ?? null,
-          p_date_from:       pubDateFrom || null,
-          p_date_to:         pubDateTo   || null,
-          p_sort_by:         safeSortBy,
-          p_sort_dir:        sortAsc ? "asc" : "desc",
-          p_search:          search      || null,
-          p_geo_continent:   geoContinent || null,
-          p_geo_region:      geoRegion    || null,
-          p_geo_country:     geoCountry   || null,
-          p_geo_state:       geoState     || null,
-          p_geo_city:        geoCity      || null,
-          p_circle:          circle ? parseInt(circle, 10) : null,
-        }
-      );
-      if (idsErr) return NextResponse.json({ ok: false, error: idsErr.message }, { status: 500 });
-
-      const pageIds = (specialtyIds ?? []).map((r: { article_id: string }) => r.article_id);
-      if (pageIds.length === 0) {
-        return NextResponse.json({ ok: true, rows: [], total: filteredTotal });
-      }
-
-      const { data: rows, error: rowsErr } = await admin
-        .from("articles")
-        .select("id, title, journal_abbr, published_date, imported_at, authors, status, circle, specialty_tags, verified, abstract, evidence_score")
-        .in("id", pageIds)
-        .order(safeSortBy, { ascending: sortAsc });
-
-      if (rowsErr) return NextResponse.json({ ok: false, error: rowsErr.message }, { status: 500 });
-      return NextResponse.json({ ok: true, rows: rows ?? [], total: filteredTotal });
-
-    } else {
-      // ── Single-value RPC path (existing) ────────────────────────────────
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: countData, error: countErr } = await (admin as any).rpc(
-        "count_articles_by_specialty",
-        {
-          p_specialty:       specialty,
-          p_specialty_match: "true",
-          p_subspecialty:    subspecialty   || null,
-          p_search:          search         || null,
-          p_geo_continent:   geoContinent   || null,
-          p_geo_region:      geoRegion      || null,
-          p_geo_country:     geoCountry     || null,
-          p_geo_state:       geoState       || null,
-          p_geo_city:        geoCity        || null,
-          p_circle:          circle ? parseInt(circle, 10) : null,
-          p_article_type:    articleType    || null,
-        }
-      );
-      if (countErr) return NextResponse.json({ ok: false, error: countErr.message }, { status: 500 });
-      filteredTotal = Number(countData ?? 0);
-
-      if (filteredTotal === 0) {
-        return NextResponse.json({ ok: true, rows: [], total: 0 });
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: specialtyIds, error: idsErr } = await (admin as any).rpc(
-        "get_article_ids_by_specialty_paged",
-        {
-          p_specialty:       specialty,
-          p_specialty_match: "true",
-          p_limit:           limit,
-          p_offset:          start,
-          p_subspecialty:    subspecialty   || null,
-          p_search:          search         || null,
-          p_geo_continent:   geoContinent   || null,
-          p_geo_region:      geoRegion      || null,
-          p_geo_country:     geoCountry     || null,
-          p_geo_state:       geoState       || null,
-          p_geo_city:        geoCity        || null,
-          p_circle:          circle ? parseInt(circle, 10) : null,
-          p_article_type:    articleType    || null,
-        }
-      );
-      if (idsErr) return NextResponse.json({ ok: false, error: idsErr.message }, { status: 500 });
-
-      const pageIds = (specialtyIds ?? []).map((r: { article_id: string }) => r.article_id);
-      if (pageIds.length === 0) {
-        return NextResponse.json({ ok: true, rows: [], total: filteredTotal });
-      }
-      query = query.in("id", pageIds);
-    }
+    query = supabase
+      .from("articles")
+      .select(
+        `id, title, journal_abbr, pubmed_indexed_at, imported_at, authors, circle, specialty_tags, abstract, evidence_score, article_type,
+         article_specialties!inner(specialty, specialty_match)`,
+        { count: "exact" }
+      )
+      .eq("article_specialties.specialty", specialty)
+      .eq("article_specialties.specialty_match", true)
+      .order(sort_by, { ascending })
+      .range(from, to);
+  } else {
+    query = supabase
+      .from("articles")
+      .select(
+        "id, title, journal_abbr, pubmed_indexed_at, imported_at, authors, circle, specialty_tags, abstract, evidence_score, article_type",
+        { count: "exact" }
+      )
+      .order(sort_by, { ascending })
+      .range(from, to);
   }
 
-  if (verified === "true")  query = query.eq("verified", true);
-  if (verified === "false") query = query.eq("verified", false);
-  if (approvalMethod === "null")  query = query.is("approval_method", null);
-  else if (approvalMethod)        query = query.eq("approval_method", approvalMethod);
-  if (hasAbstract === "true")  query = query.not("abstract", "is", null);
-  if (hasAbstract === "false") query = query.is("abstract", null);
-  if (dateFrom) query = query.gte("imported_at", dateFrom);
-  if (dateTo)   query = query.lte("imported_at", dateTo);
-  if (meshTerm) query = query.filter("mesh_terms::text", "ilike", `%${meshTerm}%`);
-  if (search && !specialty) query = query.or(`title.ilike.%${search}%,journal_abbr.ilike.%${search}%`);
-  if (articleType === "Unclassified") {
-    query = query.is("article_type", null);
-  } else if (articleType) {
-    query = query.eq("article_type", articleType);
-  }
-  if (missingGeo)   query = query.is("geo_country", null).is("geo_city", null);
-  if (noRegion)     query = query.is("geo_region",  null);
-  if (noCountry)    query = query.is("geo_country", null);
-  if (noState)      query = query.is("geo_state",   null).not("geo_country", "is", null);
-  if (noCity)       query = query.is("geo_city",    null).not("geo_country", "is", null);
-  if (notParsed)    query = query.is("location_parsed_at", null);
+  if (search)        query = query.ilike("title", `%${search}%`);
+  if (mesh_term)     query = query.contains("mesh_terms", [mesh_term]);
+  if (subspecialty)  query = query.contains("subspecialty_ai", [subspecialty]);
+  if (article_type)  query = query.eq("article_type", article_type);
+  if (pub_date_from) query = query.gte("pubmed_indexed_at", pub_date_from);
+  if (pub_date_to)   query = query.lte("pubmed_indexed_at", pub_date_to);
+  if (geo_continent) query = query.eq("geo_continent", geo_continent);
+  if (geo_region)    query = query.eq("geo_region", geo_region);
+  if (geo_country)   query = query.eq("geo_country", geo_country);
+  if (geo_state)     query = query.eq("geo_state", geo_state);
+  if (geo_city)      query = query.eq("geo_city", geo_city);
 
-  // suspect_city: regex filters not supported by PostgREST .or() — use RPC to get IDs first
-  if (suspectCity) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: idRows, error: rpcErr } = await (admin as any).rpc("get_suspect_city_article_ids");
-    if (rpcErr) return NextResponse.json({ ok: false, error: rpcErr.message }, { status: 500 });
-    const ids: string[] = (idRows ?? []).map((r: { id: string }) => r.id);
-    if (ids.length === 0) return NextResponse.json({ ok: true, rows: [], total: 0 });
-    query = query.in("id", ids);
-  }
+  const { data: rows, count, error } = await query;
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
-  const end = start + limit - 1;
-  const { data, error, count } = await query
-    .order(safeSortBy, { ascending: sortAsc })
-    .range(start, end);
-
-  if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ ok: true, rows: data ?? [], total: filteredTotal ?? count ?? 0 });
+  return NextResponse.json({ ok: true, rows: rows ?? [], total: count ?? 0 });
 }

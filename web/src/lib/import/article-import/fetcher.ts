@@ -237,7 +237,7 @@ export async function fetchPubMedIds(
   queryString: string,
   maxResults = 100,
   reldate?: number
-): Promise<string[]> {
+): Promise<{ pmids: string[]; totalCount: number }> {
   const params = new URLSearchParams({
     db: "pubmed",
     term: queryString,
@@ -251,14 +251,22 @@ export async function fetchPubMedIds(
     params.set("reldate", String(reldate));
   }
 
-  const res = await fetch(`${BASE_URL}/esearch.fcgi?${params}`);
+  params.set("sort", "pub+date");
+
+  const res = await fetch(`${BASE_URL}/esearch.fcgi`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params,
+  });
   if (!res.ok) throw new Error(`ESearch failed: HTTP ${res.status}`);
 
   const data = (await res.json()) as {
-    esearchresult?: { idlist?: string[] };
+    esearchresult?: { idlist?: string[]; count?: string };
   };
 
-  return data.esearchresult?.idlist ?? [];
+  const pmids = data.esearchresult?.idlist ?? [];
+  const totalCount = parseInt(data.esearchresult?.count ?? "0", 10);
+  return { pmids, totalCount };
 }
 
 /**

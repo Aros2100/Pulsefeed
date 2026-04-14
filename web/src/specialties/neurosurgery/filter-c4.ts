@@ -86,7 +86,10 @@ export async function runImportCircle4(
     try {
       await sleep(RATE_LIMIT_MS);
 
-      const pmids = await fetchPubMedIds(filter.query_string, filter.max_results ?? 500, reldate);
+      const { pmids, totalCount } = await fetchPubMedIds(filter.query_string, filter.max_results ?? 500, reldate);
+      if (totalCount > pmids.length) {
+        console.error(`[import] ESearch returned ${totalCount} total hits but retmax=${filter.max_results ?? 500} — ${totalCount - pmids.length} articles not fetched`);
+      }
       filterFetched = pmids.length;
       if (!pmids.length) continue;
 
