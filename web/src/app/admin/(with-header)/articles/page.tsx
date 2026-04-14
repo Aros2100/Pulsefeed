@@ -9,7 +9,7 @@ export default async function AdminArticlesPage() {
 
   const [subspecialties, specialtiesData] = await Promise.all([
     getSubspecialties(ACTIVE_SPECIALTY),
-    admin.rpc("get_distinct_specialties"),
+    (admin as any).rpc("get_distinct_specialties"),
   ]);
 
   const specialtySet = new Set<string>(
