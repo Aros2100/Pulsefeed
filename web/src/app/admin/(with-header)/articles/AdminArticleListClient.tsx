@@ -5,13 +5,14 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
-type Period = "today" | "week" | "month" | "year";
+type Period = "today" | "week" | "month" | "year" | "last_year";
 
 const PERIOD_LABELS: Record<Period, string> = {
-  today: "Today",
-  week:  "This week",
-  month: "This month",
-  year:  "This year",
+  today:     "Today",
+  week:      "This week",
+  month:     "This month",
+  year:      "This year",
+  last_year: "Last year",
 };
 
 function getPubDateRange(period: Period): { from: string; to: string } {
@@ -27,6 +28,10 @@ function getPubDateRange(period: Period): { from: string; to: string } {
   if (period === "month") {
     return { from: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`, to };
   }
+  if (period === "last_year") {
+    const y = today.getFullYear() - 1;
+    return { from: `${y}-01-01`, to: `${y}-12-31` };
+  }
   return { from: `${today.getFullYear()}-01-01`, to };
 }
 
@@ -38,9 +43,9 @@ function PillButton({ label, active, onClick }: { label: string; active: boolean
         padding: "5px 12px", fontSize: "12px",
         fontWeight: active ? 700 : 400,
         borderRadius: "20px",
-        border: `1px solid ${active ? "#1a1a1a" : "#dde3ed"}`,
-        background: active ? "#1a1a1a" : "#fff",
-        color: active ? "#fff" : "#5a6a85",
+        border: `1px solid ${active ? "var(--pf-dark)" : "var(--color-border-tertiary)"}`,
+        background: active ? "var(--pf-dark)" : "var(--pf-white)",
+        color: active ? "var(--pf-white)" : "var(--color-text-secondary)",
         cursor: "pointer", whiteSpace: "nowrap",
       }}
     >
@@ -111,7 +116,7 @@ function authorCount(authors: unknown): number {
 
 function SortArrow({ field, sortBy, sortDir }: { field: SortField; sortBy: SortField; sortDir: "asc" | "desc" }) {
   if (field !== sortBy) return <span style={{ color: "#ccc", marginLeft: "4px" }}>↕</span>;
-  return <span style={{ color: "#E83B2A", marginLeft: "4px" }}>{sortDir === "asc" ? "↑" : "↓"}</span>;
+  return <span style={{ color: "var(--pf-red)", marginLeft: "4px" }}>{sortDir === "asc" ? "↑" : "↓"}</span>;
 }
 
 function SelectFilter({ value, onChange, options, placeholder, disabled }: {
@@ -131,12 +136,13 @@ function SelectFilter({ value, onChange, options, placeholder, disabled }: {
         width: "100%",
         padding: "6px 8px",
         fontSize: "12px",
-        border: `1px solid ${disabled ? "#eef0f4" : active ? "#1a1a1a" : "#dde3ed"}`,
+        border: `1px solid ${disabled ? "var(--color-background-secondary)" : active ? "var(--pf-red)" : "var(--color-border-tertiary)"}`,
         borderRadius: "6px",
-        background: active ? "#1a1a1a" : disabled ? "#f8f9fb" : "#fff",
-        color: disabled ? "#bbb" : active ? "#fff" : "#5a6a85",
+        background: active ? "var(--pf-red)" : disabled ? "var(--pf-surface)" : "var(--pf-white)",
+        color: disabled ? "#bbb" : active ? "var(--pf-white)" : "var(--color-text-secondary)",
         cursor: disabled ? "default" : "pointer",
         outline: "none",
+        fontWeight: active ? 700 : 400,
       }}
     >
       <option value="">{placeholder}</option>
@@ -172,7 +178,7 @@ function filtersFromParams(sp: URLSearchParams): Filters {
     sort_by:         (SORT_FIELDS as readonly string[]).includes(sortBy) ? sortBy as SortField : "imported_at",
     sort_dir:        sortDir === "asc" ? "asc" : "desc",
     page:            Math.max(1, parseInt(sp.get("page") ?? "1", 10)),
-    period: (["today","week","month","year"].includes(sp.get("period") ?? "")) ? sp.get("period") as Period : null,
+    period: (["today","week","month","year","last_year"].includes(sp.get("period") ?? "")) ? sp.get("period") as Period : null,
   };
 }
 
@@ -357,8 +363,11 @@ export default function AdminArticleListClient({
     }));
   }
 
+  function setPeriod(p: Period | null) {
+    setFiltersState((prev) => ({ ...prev, period: p, page: 1 }));
+  }
+
   const hasActiveFilters = !!(
-    filters.period ||
     filters.subspecialty || filters.article_type || filters.search ||
     filters.mesh_term || filters.geo_continent || filters.geo_region || filters.geo_country || filters.geo_state ||
     filters.geo_city
@@ -369,8 +378,8 @@ export default function AdminArticleListClient({
 
   const thStyle: React.CSSProperties = {
     padding: "10px 14px", textAlign: "left", fontSize: "11px", fontWeight: 700,
-    textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85",
-    borderBottom: "1px solid #eef0f4", background: "#f8f9fb", whiteSpace: "nowrap",
+    textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-text-secondary)",
+    borderBottom: "1px solid var(--color-background-secondary)", background: "var(--pf-surface)", whiteSpace: "nowrap",
     userSelect: "none",
   };
 
@@ -390,37 +399,10 @@ export default function AdminArticleListClient({
       {/* Sidebar */}
       <div style={{
         width: "180px", flexShrink: 0,
-        background: "#fff", borderRadius: "10px",
+        background: "var(--pf-white)", borderRadius: "10px",
         boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
         padding: "16px", display: "flex", flexDirection: "column", gap: "20px",
       }}>
-
-        {/* Period */}
-        <div>
-          <div style={sectionLabel}>Period</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-            {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => {
-              const active = filters.period === p;
-              return (
-                <button
-                  key={p}
-                  onClick={() => { setFilter("period", active ? null : p); setFilter("page", 1); }}
-                  style={{
-                    textAlign: "left", border: "none", borderRadius: "6px",
-                    padding: "5px 10px", fontSize: "13px", cursor: "pointer",
-                    background: active ? "#1a1a1a" : "transparent",
-                    color: active ? "#fff" : "#5a6a85",
-                    fontWeight: active ? 600 : 400,
-                  }}
-                >
-                  {PERIOD_LABELS[p]}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div style={{ borderTop: "1px solid #eef0f4" }} />
 
         {/* Specialty */}
         <div>
@@ -442,7 +424,7 @@ export default function AdminArticleListClient({
           </div>
         </div>
 
-        <div style={{ borderTop: "1px solid #eef0f4" }} />
+        <div style={{ borderTop: "1px solid var(--color-background-secondary)" }} />
 
         {/* Location */}
         <div>
@@ -485,7 +467,7 @@ export default function AdminArticleListClient({
           </div>
         </div>
 
-        <div style={{ borderTop: "1px solid #eef0f4" }} />
+        <div style={{ borderTop: "1px solid var(--color-background-secondary)" }} />
 
         {/* Article type */}
         <div>
@@ -512,7 +494,7 @@ export default function AdminArticleListClient({
 
         {hasActiveFilters && (
           <>
-            <div style={{ borderTop: "1px solid #eef0f4" }} />
+            <div style={{ borderTop: "1px solid var(--color-background-secondary)" }} />
             <button
               onClick={() => { setSearchInput(""); setMeshInput(""); setFiltersState(EMPTY_FILTERS); }}
               style={{
@@ -530,35 +512,82 @@ export default function AdminArticleListClient({
       {/* Main content */}
       <div style={{ flex: 1, minWidth: 0 }}>
 
-        {/* Search bar */}
+        {/* Search + Period bar */}
         <div style={{
-          background: "#fff", borderRadius: "10px",
+          background: "var(--pf-white)", borderRadius: "10px",
           boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
           marginBottom: "12px", padding: "12px 16px",
-          display: "flex", gap: "10px",
+          display: "flex", flexDirection: "column", gap: "10px",
         }}>
-          <input
-            type="text"
-            placeholder="Search title or journal…"
-            value={searchInput}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            style={{
-              flex: 2, padding: "7px 12px",
-              border: "1px solid #dde3ed", borderRadius: "20px",
-              fontSize: "13px", outline: "none", boxSizing: "border-box",
-            }}
-          />
-          <MeshAutocomplete value={meshInput} onChange={handleMeshChange} />
+          {/* Period toggle row — segmented control */}
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <div style={{
+              display: "inline-flex",
+              border: "1px solid var(--color-border-tertiary)",
+              borderRadius: "8px",
+              overflow: "hidden",
+              background: "var(--color-background-secondary)",
+            }}>
+              {([
+                { label: "Today",      value: "today"     },
+                { label: "This week",  value: "week"      },
+                { label: "This month", value: "month"     },
+                { label: "This year",  value: "year"      },
+                { label: "Last year",  value: "last_year" },
+                { label: "All",        value: null        },
+              ] as { label: string; value: Period | null }[]).map(({ label, value }, i, arr) => {
+                const active = filters.period === value;
+                return (
+                  <button
+                    key={label}
+                    onClick={() => setPeriod(value)}
+                    style={{
+                      padding: "6px 14px",
+                      fontSize: "10px",
+                      fontWeight: active ? 700 : 500,
+                      border: "none",
+                      borderRight: i < arr.length - 1 ? "1px solid var(--color-border-tertiary)" : "none",
+                      background: active ? "var(--pf-red)" : "transparent",
+                      color: active ? "var(--pf-white)" : "var(--color-text-secondary)",
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                      transition: "background 0.12s ease, color 0.12s ease",
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Search inputs row */}
+          <div style={{ display: "flex", gap: "10px" }}>
+            <input
+              type="text"
+              placeholder="Search title, abstract or PMID…"
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              style={{
+                flex: 2, padding: "7px 12px",
+                border: "1px solid var(--color-border-tertiary)", borderRadius: "20px",
+                fontSize: "13px", outline: "none", boxSizing: "border-box",
+              }}
+            />
+            <MeshAutocomplete value={meshInput} onChange={handleMeshChange} />
+          </div>
         </div>
 
         {/* Table */}
         <div style={{
-          background: "#fff", borderRadius: "10px",
+          background: "var(--pf-white)", borderRadius: "10px",
           boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
           overflow: "hidden",
         }}>
-          <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#5a6a85" }}>
+          <div style={{ background: "var(--color-background-secondary)", borderBottom: "1px solid var(--color-border-tertiary)", padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--color-text-secondary)" }}>
               {loading ? "Loading…" : `${total.toLocaleString("da-DK")} articles`}
             </span>
             {totalPages > 1 && (
@@ -601,10 +630,10 @@ export default function AdminArticleListClient({
                   {rows.map((a, i) => {
                     const count = authorCount(a.authors);
                     return (
-                      <tr key={a.id} style={{ background: i % 2 === 0 ? "#fff" : "#fafbfc" }}>
+                      <tr key={a.id} style={{ background: i % 2 === 0 ? "var(--pf-white)" : "var(--pf-surface)" }}>
                         <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", maxWidth: "340px" }}>
                           <Link href={`/admin/articles/${a.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-                            <div style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                            <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--pf-dark)", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                               {a.title}
                             </div>
                             {count > 0 && (
@@ -612,7 +641,7 @@ export default function AdminArticleListClient({
                             )}
                           </Link>
                         </td>
-                        <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", fontSize: "12px", color: "#5a6a85", whiteSpace: "nowrap" }}>
+                        <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f3f7", fontSize: "12px", color: "var(--color-text-secondary)", whiteSpace: "nowrap" }}>
                           {fmt(a.pubmed_indexed_at ?? null)}
                         </td>
                       </tr>
@@ -624,7 +653,7 @@ export default function AdminArticleListClient({
           )}
 
           {!loading && totalPages > 1 && (
-            <div style={{ padding: "14px 20px", borderTop: "1px solid #eef0f4", display: "flex", justifyContent: "center", alignItems: "center", gap: "6px" }}>
+            <div style={{ padding: "14px 20px", borderTop: "1px solid var(--color-background-secondary)", display: "flex", justifyContent: "center", alignItems: "center", gap: "6px" }}>
               <PageButton label="«" disabled={page === 1} onClick={() => setFilter("page", 1)} />
               <PageButton label="‹" disabled={page === 1} onClick={() => setFilter("page", page - 1)} />
               {getPaginationRange(page, totalPages).map((p, i) =>
@@ -667,14 +696,14 @@ function MeshAutocomplete({ value, onChange }: { value: string; onChange: (v: st
         onChange={(e) => handleInput(e.target.value)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder="MeSH term…"
-        style={{ width: "100%", padding: "7px 12px", border: "1px solid #dde3ed", borderRadius: "20px", fontSize: "13px", outline: "none", boxSizing: "border-box" }}
+        style={{ width: "100%", padding: "7px 12px", border: "1px solid var(--color-border-tertiary)", borderRadius: "20px", fontSize: "13px", outline: "none", boxSizing: "border-box" }}
       />
       {open && options.length > 0 && (
-        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", border: "1px solid #dde3ed", borderRadius: "6px", zIndex: 100, maxHeight: "200px", overflowY: "auto", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
+        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "var(--pf-white)", border: "1px solid var(--color-border-tertiary)", borderRadius: "6px", zIndex: 100, maxHeight: "200px", overflowY: "auto", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
           {options.map((t) => (
             <div key={t} onMouseDown={() => { onChange(t); setOpen(false); }}
               style={{ padding: "8px 12px", fontSize: "12px", cursor: "pointer" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f7fa")}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-background-secondary)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "")}
             >
               {t}
@@ -693,9 +722,9 @@ function PageButton({ label, disabled, active, onClick }: { label: string; disab
       disabled={disabled}
       style={{
         padding: "5px 10px", fontSize: "12px", borderRadius: "6px", cursor: disabled ? "default" : "pointer",
-        background: active ? "#1a1a1a" : "#fff",
-        color: active ? "#fff" : disabled ? "#ccc" : "#5a6a85",
-        border: `1px solid ${active ? "#1a1a1a" : "#dde3ed"}`,
+        background: active ? "var(--pf-dark)" : "var(--pf-white)",
+        color: active ? "var(--pf-white)" : disabled ? "#ccc" : "var(--color-text-secondary)",
+        border: `1px solid ${active ? "var(--pf-dark)" : "var(--color-border-tertiary)"}`,
         fontWeight: active ? 700 : 400,
       }}
     >

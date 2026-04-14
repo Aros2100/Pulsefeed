@@ -424,14 +424,20 @@ export default async function AdminArticleLogPage({
     admin.from("article_events").select("*").eq("article_id", id).order("sequence", { ascending: true }),
     admin.from("article_authors").select("author_id, position, authors(author_score, department, hospital, city, state, country, verified_by)").eq("article_id", id),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (admin as any).from("article_specialties").select("specialty, specialty_match").eq("article_id", id).order("specialty").limit(1).maybeSingle(),
+    (admin as any).from("article_specialties").select("specialty, specialty_match, scored_by, scored_at, source").eq("article_id", id).eq("specialty", ACTIVE_SPECIALTY).maybeSingle(),
     getSubspecialties(ACTIVE_SPECIALTY),
   ]);
 
   const article = articleResult.data;
   if (!article) notFound();
 
-  const specialtyRow = specialtyResult.data as { specialty: string; specialty_match: boolean | null } | null;
+  const specialtyRow = specialtyResult.data as {
+    specialty: string;
+    specialty_match: boolean | null;
+    scored_by: string | null;
+    scored_at: string | null;
+    source: string | null;
+  } | null;
 
   // Cast for typed access
   const a = article as unknown as ArticleData;
@@ -510,10 +516,11 @@ export default async function AdminArticleLogPage({
             })()
           } />
           <CardKVRow label="Specialty" value={
-            (() => {
-              const slug = specialtyRow?.specialty ?? (a.specialty_tags as string[] | null)?.[0];
-              return slug ? specialtyLabel(slug) : "—";
-            })()
+            specialtyRow?.specialty_match === true
+              ? specialtyLabel(specialtyRow.specialty)
+              : specialtyRow?.specialty_match === false
+                ? <Badge color="red">Rejected</Badge>
+                : <Badge color="gray">Pending</Badge>
           } />
         </CardBody>
       </Card>
@@ -597,22 +604,16 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="Specialty scoring" />
         <CardBody>
-          <CardKVRow label="AI beslutning" value={
-            a.ai_decision
-              ? <Badge color={a.ai_decision === "approved" ? "green" : "red"}>{a.ai_decision}</Badge>
-              : "—"
+          <CardKVRow label="Specialty match" value={
+            specialtyRow?.specialty_match === true ? <Badge color="green">Approved</Badge>
+            : specialtyRow?.specialty_match === false ? <Badge color="red">Rejected</Badge>
+            : <Badge color="gray">Pending</Badge>
           } />
-          <CardKVRow label="Confidence" value={
-            (raw.specialty_confidence as number | null) != null
-              ? `${(raw.specialty_confidence as number).toFixed(1)}%`
-              : "—"
-          } />
-          <CardKVRow label="Model" value={(raw.model_version as string | null) ?? "—"} />
-          <CardKVRow label="Scored at" value={
-            (raw.specialty_scored_at as string | null)
-              ? fmt(raw.specialty_scored_at as string)
-              : "—"
-          } />
+          <CardKVRow label="Source" value={specialtyRow?.source ?? "—"} />
+          <CardKVRow label="Model" value={specialtyRow?.scored_by ?? "—"} />
+          {specialtyRow?.specialty_match !== null && (
+            <CardKVRow label="Scored at" value={specialtyRow?.scored_at ? fmt(specialtyRow.scored_at) : "—"} />
+          )}
         </CardBody>
       </Card>
 
@@ -622,9 +623,9 @@ export default async function AdminArticleLogPage({
         <CardBody>
           <ArticleEditableFields
             articleId={id}
-            initialTags={(a.specialty_tags as string[] | null) ?? []}
+            initialTags={[]}
             initialSpecialtyMatch={specialtyRow?.specialty_match ?? null}
-            initialSpecialty={specialtyRow?.specialty ?? (a.specialty_tags as string[] | null)?.[0] ?? ""}
+            initialSpecialty={specialtyRow?.specialty ?? ACTIVE_SPECIALTY}
             initialSubspecialties={(Array.isArray(a.subspecialty_ai) ? a.subspecialty_ai : []) as string[]}
             subspecialties={subspecialtiesList}
           />

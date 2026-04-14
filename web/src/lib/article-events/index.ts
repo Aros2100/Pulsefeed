@@ -12,7 +12,10 @@ export type ArticleEventType =
   | "quality_check"
   | "auto_tagged"
   | "geo_updated"
-  | "authors_updated";
+  | "authors_updated"
+  | "specialty_scored"
+  | "subspecialty_scored"
+  | "article_type_scored";
 
 export async function logArticleEvent(
   articleId: string,

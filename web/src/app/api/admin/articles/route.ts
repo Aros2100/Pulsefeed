@@ -54,7 +54,16 @@ export async function GET(request: NextRequest) {
       .range(from, to);
   }
 
-  if (search)        query = query.ilike("title", `%${search}%`);
+  if (search) {
+    const isNumeric = /^\d+$/.test(search.trim());
+    if (isNumeric) {
+      query = query.eq("pmid", search.trim());
+    } else {
+      query = query.or(
+        `title.ilike.%${search.trim()}%,abstract.ilike.%${search.trim()}%`
+      );
+    }
+  }
   if (mesh_term)     query = query.contains("mesh_terms", [mesh_term]);
   if (subspecialty)  query = query.contains("subspecialty_ai", [subspecialty]);
   if (article_type)  query = query.eq("article_type", article_type);
