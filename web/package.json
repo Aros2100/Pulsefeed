@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "backfill:pubmed-dates": "tsx scripts/backfill-pubmed-dates.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
