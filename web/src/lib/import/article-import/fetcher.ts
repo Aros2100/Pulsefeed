@@ -74,6 +74,16 @@ function parsePubDateFull(pubDate: unknown): string | null {
   return yearOnly ? `${yearOnly[1]}-01-01` : null;
 }
 
+function parsePubMedHistoryDate(node: unknown): string | null {
+  if (!node || typeof node !== "object") return null;
+  const d = node as Record<string, unknown>;
+  const year = getText(d.Year);
+  const month = getText(d.Month).padStart(2, "0");
+  const day = getText(d.Day).padStart(2, "0");
+  if (!year || !month || !day) return null;
+  return `${year}-${month}-${day}`;
+}
+
 function parseDateCompleted(dc: unknown): string | null {
   if (!dc || typeof dc !== "object") return null;
   const d = dc as Record<string, unknown>;
@@ -440,14 +450,14 @@ export async function fetchArticleDetails(
         (d) => (d as Record<string, unknown>)["@_PubStatus"] === "pubmed"
       );
       const pubmedDate = pubmedDateEntry
-        ? parsePubDateFull(pubmedDateEntry)
+        ? parsePubMedHistoryDate(pubmedDateEntry)
         : null;
 
       const entrezDateEntry = pubMedDates.find(
         (d) => (d as Record<string, unknown>)["@_PubStatus"] === "entrez"
       );
       const pubmedIndexedAt = entrezDateEntry
-        ? parsePubDateFull(entrezDateEntry)
+        ? parsePubMedHistoryDate(entrezDateEntry)
         : null;
 
       results.push({
