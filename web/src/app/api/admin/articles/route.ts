@@ -64,7 +64,14 @@ export async function GET(request: NextRequest) {
       );
     }
   }
-  if (mesh_term)     query = query.contains("mesh_terms", [{ descriptor: mesh_term }]);
+  if (mesh_term) {
+    const { data: meshIds } = await supabase.rpc("filter_articles_by_mesh" as any, { p_descriptor: mesh_term });
+    const ids = (meshIds ?? []) as string[];
+    if (ids.length === 0) {
+      return NextResponse.json({ ok: true, rows: [], total: 0 });
+    }
+    query = query.in("id", ids);
+  }
   if (subspecialty)  query = query.contains("subspecialty", [subspecialty]);
   if (article_type)  query = query.eq("article_type", article_type);
   if (pub_date_from) query = query.gte("pubmed_indexed_at", pub_date_from);
