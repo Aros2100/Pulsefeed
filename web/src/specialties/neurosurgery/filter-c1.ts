@@ -70,7 +70,7 @@ export async function runImport(
     if (!filterLogId) {
       const { data: filterLog } = await admin
         .from("import_logs")
-        .insert({ filter_id: filter.id, status: "running", trigger })
+        .insert({ filter_id: filter.id, status: "running", trigger, circle: 1 })
         .select("id")
         .single();
       filterLogId = filterLog?.id ?? null;

@@ -76,7 +76,7 @@ export async function runImportCircle2(
 
     const { data: newLog } = await admin
       .from("import_logs")
-      .insert({ filter_id: filter?.id ?? null, status: "running", trigger })
+      .insert({ filter_id: filter?.id ?? null, status: "running", trigger, circle: 2 })
       .select("id")
       .single();
     logId = newLog?.id ?? null;
