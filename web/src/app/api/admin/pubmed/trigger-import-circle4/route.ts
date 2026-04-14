@@ -1,4 +1,4 @@
-import { NextResponse, after } from "next/server";
+import { NextResponse, type NextRequest, after } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { runImportCircle4 } from "@/specialties/neurosurgery/filter-c4";
 import { runCitationFetch } from "@/lib/import/fetch-citations";
@@ -7,9 +7,19 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const maxDuration = 300;
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
+
+  let mindate: string | undefined;
+  let maxdate: string | undefined;
+  try {
+    const body = (await request.json()) as { mindate?: string; maxdate?: string };
+    mindate = body.mindate || undefined;
+    maxdate = body.maxdate || undefined;
+  } catch {
+    // Body is optional
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = createAdminClient() as any;
@@ -29,7 +39,7 @@ export async function POST() {
   }
 
   after(async () => {
-    await runImportCircle4(undefined, false, undefined, "manual", 1);
+    await runImportCircle4(undefined, false, undefined, "manual", undefined, mindate, maxdate);
   });
 
   after(async () => {

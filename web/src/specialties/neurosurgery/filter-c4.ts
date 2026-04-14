@@ -30,7 +30,9 @@ export async function runImportCircle4(
   force = false,
   existingLogId?: string,
   trigger: "cron" | "manual" = "cron",
-  reldate?: number
+  reldate?: number,
+  mindate?: string,
+  maxdate?: string,
 ): Promise<ImportResult> {
   const admin = createAdminClient();
   const errors: string[] = [];
@@ -86,7 +88,7 @@ export async function runImportCircle4(
     try {
       await sleep(RATE_LIMIT_MS);
 
-      const { pmids, totalCount } = await fetchPubMedIds(filter.query_string, filter.max_results ?? 500, reldate);
+      const { pmids, totalCount } = await fetchPubMedIds(filter.query_string, filter.max_results ?? 500, reldate, mindate, maxdate);
       if (totalCount > pmids.length) {
         console.error(`[import] ESearch returned ${totalCount} total hits but retmax=${filter.max_results ?? 500} — ${totalCount - pmids.length} articles not fetched`);
       }

@@ -246,7 +246,9 @@ export interface ArticleDetails {
 export async function fetchPubMedIds(
   queryString: string,
   maxResults = 100,
-  reldate?: number
+  reldate?: number,
+  mindate?: string,
+  maxdate?: string,
 ): Promise<{ pmids: string[]; totalCount: number }> {
   const params = new URLSearchParams({
     db: "pubmed",
@@ -259,6 +261,13 @@ export async function fetchPubMedIds(
   if (reldate !== undefined) {
     params.set("datetype", "edat");
     params.set("reldate", String(reldate));
+  }
+
+  if (mindate) {
+    params.delete("reldate");
+    params.set("datetype", "edat");
+    params.set("mindate", mindate);
+    params.set("maxdate", maxdate ?? new Date().toISOString().slice(0, 10).replace(/-/g, "/"));
   }
 
   params.set("sort", "pub+date");

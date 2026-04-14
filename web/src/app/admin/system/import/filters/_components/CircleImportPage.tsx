@@ -179,6 +179,9 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 | 4 }) 
   // Import
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [mindate, setMindate] = useState("");
+  const [maxdate, setMaxdate] = useState("");
 
   // Logs
   const [logs, setLogs] = useState<ImportLog[]>([]);
@@ -380,7 +383,19 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 | 4 }) 
           : circle === 4
             ? "/api/admin/pubmed/trigger-import-circle4"
             : "/api/admin/pubmed/trigger-import-circle3";
-      const res = await fetch(url, { method: "POST" });
+
+      const bodyObj: Record<string, string> = {};
+      if (circle === 1 && c1FilterId) bodyObj.filterId = c1FilterId;
+      if (mindate) {
+        bodyObj.mindate = mindate.replace(/-/g, "/");
+        bodyObj.maxdate = (maxdate || new Date().toISOString().slice(0, 10)).replace(/-/g, "/");
+      }
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bodyObj),
+      });
       const d = await res.json();
       if (d.ok) {
         await fetchLogs();
@@ -487,6 +502,50 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 | 4 }) 
             </button>
           </div>
         </div>
+
+        {/* Advanced: date-range recovery */}
+        {circle !== 3 && (
+          <div style={{ marginBottom: "20px" }}>
+            <button
+              onClick={() => setShowAdvanced((v) => !v)}
+              style={{ fontSize: "12px", color: "#5a6a85", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}
+            >
+              {showAdvanced ? "Skjul avanceret" : "Avanceret"}
+            </button>
+            {showAdvanced && (
+              <div style={{
+                marginTop: 10, display: "flex", gap: 16, alignItems: "flex-end", flexWrap: "wrap",
+                padding: "14px 16px", background: "#f8f9fb", borderRadius: 8, border: "1px solid #e5e7eb",
+              }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                    Fra (EDAT)
+                  </label>
+                  <input
+                    type="date"
+                    value={mindate}
+                    onChange={(e) => setMindate(e.target.value)}
+                    style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "7px 10px", fontSize: "13px", color: "#1a1a1a", outline: "none" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                    Til (EDAT)
+                  </label>
+                  <input
+                    type="date"
+                    value={maxdate}
+                    onChange={(e) => setMaxdate(e.target.value)}
+                    style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "7px 10px", fontSize: "13px", color: "#1a1a1a", outline: "none" }}
+                  />
+                </div>
+                <div style={{ fontSize: 11, color: "#9ca3af", maxWidth: 220, lineHeight: 1.5 }}>
+                  Brug kun ved recovery — henter artikler inden for et specifikt EDAT-interval.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {importError && (
           <div style={{ padding: "10px 16px", borderRadius: "8px", background: "#fef2f2", border: "1px solid #fecaca", marginBottom: "20px", fontSize: "13px", color: "#b91c1c" }}>

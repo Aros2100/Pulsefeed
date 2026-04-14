@@ -15,6 +15,15 @@ export async function POST(request: NextRequest) {
   if (!auth.ok) return auth.response;
 
   const specialty = request.nextUrl.searchParams.get("specialty");
+  let mindate: string | undefined;
+  let maxdate: string | undefined;
+  try {
+    const body = (await request.json()) as { mindate?: string; maxdate?: string };
+    mindate = body.mindate || undefined;
+    maxdate = body.maxdate || undefined;
+  } catch {
+    // Body is optional
+  }
   if (!specialty || specialty !== ACTIVE_SPECIALTY) {
     return NextResponse.json(
       { ok: false, error: "Missing or invalid specialty" },
@@ -72,7 +81,7 @@ export async function POST(request: NextRequest) {
   // after() holder Vercel-funktionen i live efter response — erstatter void (fire-and-forget)
   // som fejlagtigt blev dræbt af Vercel inden importen nåede at færdiggøre.
   after(async () => {
-    await runImportCircle2(specialty, newLog.id, "manual", 1);
+    await runImportCircle2(specialty, newLog.id, "manual", undefined, mindate, maxdate);
   });
 
   after(async () => {

@@ -10,15 +10,19 @@ export async function POST(request: NextRequest) {
   if (!auth.ok) return auth.response;
 
   let filterId: string | undefined;
+  let mindate: string | undefined;
+  let maxdate: string | undefined;
   try {
-    const body = (await request.json()) as { filterId?: string };
+    const body = (await request.json()) as { filterId?: string; mindate?: string; maxdate?: string };
     filterId = body.filterId || undefined;
+    mindate = body.mindate || undefined;
+    maxdate = body.maxdate || undefined;
   } catch {
     // Body is optional
   }
 
   after(async () => {
-    await runImport(filterId, false, undefined, "manual", 1);
+    await runImport(filterId, false, undefined, "manual", undefined, mindate, maxdate);
   });
 
   after(async () => {

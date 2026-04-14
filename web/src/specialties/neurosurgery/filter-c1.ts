@@ -28,7 +28,9 @@ export async function runImport(
   force = false,
   existingLogId?: string,
   trigger: "cron" | "manual" = "cron",
-  reldate?: number
+  reldate?: number,
+  mindate?: string,
+  maxdate?: string,
 ): Promise<ImportResult> {
   const admin = createAdminClient();
   const errors: string[] = [];
@@ -86,7 +88,7 @@ export async function runImport(
       await sleep(RATE_LIMIT_MS);
 
       const tSearch = Date.now();
-      const { pmids, totalCount } = await fetchPubMedIds(filter.query_string, filter.max_results ?? 100, reldate);
+      const { pmids, totalCount } = await fetchPubMedIds(filter.query_string, filter.max_results ?? 100, reldate, mindate, maxdate);
       console.error(`[import] fetchPubMedIds: ${Date.now() - tSearch}ms`);
       if (totalCount > pmids.length) {
         console.error(`[import] ESearch returned ${totalCount} total hits but retmax=${filter.max_results ?? 100} — ${totalCount - pmids.length} articles not fetched`);
