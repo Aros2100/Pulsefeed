@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { ScoringClient } from "./ScoringClient";
 
 export const dynamic = "force-dynamic";
@@ -31,31 +32,65 @@ const headerLabel: React.CSSProperties = {
 
 type ModelVersion = { specialty: string; module: string; version: string };
 
+const MODULE_CONFIG: Record<string, {
+  label: string;
+  apiRoute: string;
+  requestBody: (specialty: string) => Record<string, unknown>;
+  showLimit?: boolean;
+}> = {
+  specialty_tag: {
+    label: "Specialty",
+    apiRoute: "/api/lab/score-batch",
+    requestBody: (specialty) => ({ specialty }),
+  },
+  subspecialty: {
+    label: "Subspecialty",
+    apiRoute: "/api/lab/score-subspecialty",
+    requestBody: (specialty) => ({ specialty }),
+  },
+  article_type: {
+    label: "Article Type",
+    apiRoute: "/api/lab/score-article-type",
+    requestBody: () => ({}),
+    showLimit: false,
+  },
+};
+
 export default async function ScoringPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
+  const specialty = ACTIVE_SPECIALTY;
 
-  const { data: modules } = await admin
+  const { data: allModules } = await admin
     .from("model_versions")
     .select("specialty, module, version")
     .eq("active", true)
-    .eq("module", "specialty_tag")
-    .order("specialty");
+    .in("module", ["specialty_tag", "subspecialty", "article_type"]);
 
-  const rows: ModelVersion[] = modules ?? [];
+  const rows: ModelVersion[] = allModules ?? [];
 
   // Fetch pending counts in parallel
   const pendingCounts = await Promise.all(
-    rows.map(async ({ specialty }) => {
-      const { count } = await admin
-        .from("article_specialties")
-        .select("*", { count: "exact", head: true })
-        .eq("specialty", specialty)
-        .is("specialty_match", null);
-      return [specialty, count ?? 0] as const;
+    rows.map(async ({ module: mod }) => {
+      if (mod === "specialty_tag") {
+        const { count } = await admin
+          .from("article_specialties")
+          .select("*", { count: "exact", head: true })
+          .eq("specialty", specialty)
+          .eq("source", "c2_filter")
+          .is("specialty_match", null);
+        return [mod, count ?? 0] as const;
+      }
+      if (mod === "subspecialty") {
+        const { data } = await admin.rpc("count_subspecialty_unscored", { p_specialty: specialty });
+        return [mod, (data as number | null) ?? 0] as const;
+      }
+      // article_type
+      const { data } = await admin.rpc("count_article_type_unscored");
+      return [mod, (data as number | null) ?? 0] as const;
     })
   );
-  const pendingBySpecialty = Object.fromEntries(pendingCounts);
+  const pendingByModule = Object.fromEntries(pendingCounts);
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -83,15 +118,17 @@ export default async function ScoringPage() {
           <p style={{ fontSize: "14px", color: "#5a6a85" }}>Ingen aktive scoring-moduler fundet.</p>
         )}
 
-        {rows.map(({ specialty, module: mod, version }) => {
-          const pending = pendingBySpecialty[specialty] ?? 0;
+        {rows.map(({ specialty: rowSpecialty, module: mod, version }) => {
+          const cfg = MODULE_CONFIG[mod];
+          if (!cfg) return null;
+          const pending = pendingByModule[mod] ?? 0;
           return (
-            <div key={`${specialty}-${mod}`} style={sectionCard}>
+            <div key={`${rowSpecialty}-${mod}`} style={sectionCard}>
               <div style={sectionHeader}>
                 <div>
-                  <span style={headerLabel}>{mod.replace(/_/g, " ")}</span>
+                  <span style={headerLabel}>{cfg.label}</span>
                   <span style={{ marginLeft: "8px", fontSize: "13px", fontWeight: 600, color: "#1a1a1a", textTransform: "capitalize" }}>
-                    {specialty}
+                    {rowSpecialty}
                   </span>
                   <span style={{ marginLeft: "8px", fontSize: "12px", color: "#888" }}>v{version}</span>
                 </div>
@@ -108,10 +145,13 @@ export default async function ScoringPage() {
               </div>
 
               <ScoringClient
-                specialty={specialty}
+                specialty={rowSpecialty}
                 module={mod}
                 version={version}
                 pendingCount={pending}
+                apiRoute={cfg.apiRoute}
+                requestBody={cfg.requestBody(rowSpecialty)}
+                showLimit={cfg.showLimit}
               />
             </div>
           );

@@ -22,20 +22,6 @@ export default async function LabPage() {
 
   const modules = [
     {
-      title: "Specialty",
-      description: "Validate AI tagging of articles to your specialty and train the model",
-      queue: specQueueCount,
-      href: "/admin/lab/specialty-tag",
-      color: "#E83B2A",
-    },
-    {
-      title: "Subspeciality",
-      description: "Classify articles into subspecialities and train the classification model",
-      queue: clsQueueCount,
-      href: "/admin/lab/subspecialty",
-      color: "#7c3aed",
-    },
-    {
       title: "Condensation",
       description: "Validate AI-generated headline, summary, bottom line, PICO and sample size",
       queue: cndQueueCount,
@@ -44,12 +30,31 @@ export default async function LabPage() {
       badge: "New",
     },
     {
+      title: "Specialty",
+      description: "Validate AI tagging of articles to your specialty and train the model",
+      queue: specQueueCount,
+      href: "/admin/lab/specialty-tag",
+      color: "#E83B2A",
+      badge: "Finished",
+      badgeColor: "#dc2626",
+    },
+    {
+      title: "Subspeciality",
+      description: "Classify articles into subspecialities and train the classification model",
+      queue: clsQueueCount,
+      href: "/admin/lab/subspecialty",
+      color: "#7c3aed",
+      badge: "Finished",
+      badgeColor: "#dc2626",
+    },
+    {
       title: "Article Type",
       description: "Classify articles as clinical study, review, guideline, surgical technique, case report or other",
       queue: atQueueCount,
       href: "/admin/lab/article-type",
       color: "#0284c7",
-      badge: "New",
+      badge: "Finished",
+      badgeColor: "#dc2626",
     },
   ];
 
@@ -110,7 +115,7 @@ export default async function LabPage() {
                         fontSize: "10px",
                         fontWeight: 700,
                         color: "#fff",
-                        background: m.color,
+                        background: m.badgeColor ?? m.color,
                         borderRadius: "4px",
                         padding: "2px 6px",
                         letterSpacing: "0.03em",
@@ -125,7 +130,7 @@ export default async function LabPage() {
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "16px", flexShrink: 0 }}>
-                  {m.queue > 0 && (
+                  {m.queue > 0 && !m.badge?.includes("Finished") && (
                     <span style={{
                       fontSize: "13px",
                       fontWeight: 600,

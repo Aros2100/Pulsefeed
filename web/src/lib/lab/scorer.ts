@@ -7,9 +7,8 @@ export const SCORING_MODEL = process.env.AI_SCORING_MODEL ?? "claude-haiku-4-5-2
 export const ANALYSIS_MODEL = process.env.AI_ANALYSIS_MODEL ?? "claude-sonnet-4-20250514";
 
 export interface ScoreResult {
-  confidence: number;
   ai_decision: "approved" | "rejected";
-  reason: string | null;
+  version: string;
 }
 
 export interface CondensationResult {
@@ -57,7 +56,7 @@ export async function scoreArticle(
   article: { id?: string; title: string; abstract: string | null },
   specialty: string,
   activePrompt: ActivePrompt
-): Promise<ScoreResult & { version: string }> {
+): Promise<ScoreResult> {
   const content = activePrompt.prompt
     .replace(/\{\{specialty\}\}|\{specialty\}/g, specialty)
     .replace(/\{\{title\}\}|\{title\}/g,         article.title)
@@ -73,15 +72,11 @@ export async function scoreArticle(
 
   try {
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as { decision?: string; confidence?: number; reason?: string };
-    const confidence = Math.min(100, Math.max(0, Math.round(Number(parsed.confidence ?? 50))));
-    const ai_decision: "approved" | "rejected" = parsed.decision === "approved" ? "approved" : "rejected";
-    const reason = typeof parsed.reason === "string" ? parsed.reason.slice(0, 500) : null;
-    return { confidence, ai_decision, reason, version: activePrompt.version };
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as { decision?: number };
+    const ai_decision: "approved" | "rejected" = parsed.decision === 1 ? "approved" : "rejected";
+    return { ai_decision, version: activePrompt.version };
   } catch {
-    const match = raw.match(/\d+/);
-    const confidence = match ? Math.min(100, Math.max(0, parseInt(match[0], 10))) : 50;
-    return { confidence, ai_decision: confidence >= 50 ? "approved" : "rejected", reason: null, version: activePrompt.version };
+    return { ai_decision: "rejected", version: activePrompt.version };
   }
 }
 

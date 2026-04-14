@@ -9,15 +9,16 @@ import { logArticleEvent } from "@/lib/article-events";
 
 const CONCURRENCY  = 1;    // sequential to avoid bursting the 50 req/min limit
 const DELAY_MS     = 1300; // 1300ms between requests ≈ 46 req/min, safely under 50
-const BATCH_LIMIT  = 100;
 
 const schema = z.object({
   specialty: z.string().refine(
     (v) => v === ACTIVE_SPECIALTY,
     { message: "Invalid specialty" }
   ),
-  scoreAll: z.boolean().default(false),
-  limit: z.number().int().positive().optional(),
+  scoreAll:  z.boolean().default(false),
+  limit:     z.number().int().positive().optional(),
+  edat_from: z.string().optional(),
+  edat_to:   z.string().optional(),
 });
 
 type Article = { id: string; title: string; abstract: string | null; specialty_tags: string[] | null };
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
   }
 
-  const { specialty, scoreAll, limit: userLimit } = result.data;
+  const { specialty, scoreAll, limit: userLimit, edat_from, edat_to } = result.data;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
@@ -78,47 +79,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
-  // Count how many scored-but-not-validated articles already exist.
-  // Only score enough new articles to fill up to BATCH_LIMIT (100).
-  const { data: alreadyScoredCount } = await admin.rpc(
-    "count_scored_not_validated",
-    { p_specialty: specialty },
-  );
-  const existing = Number(alreadyScoredCount ?? 0);
-  const remaining = Math.max(0, BATCH_LIMIT - existing);
-
-  if (!scoreAll && remaining === 0) {
-    // Already have ≥100 scored articles waiting for validation — nothing to score
-    const stream = new ReadableStream({
-      start(controller) {
-        const encoder = new TextEncoder();
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, scored: 0, failed: 0, total: 0 })}\n\n`));
-        controller.close();
-      },
-    });
-    return new Response(stream, {
-      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
-    });
-  }
-
   const v = activePrompt.version;
 
-  // Fetch article IDs from article_specialties based on scoring need
-  const { data: pendingIds } = scoreAll
-    // scoreAll=true: re-score articles not yet scored OR scored with a different model version
-    ? await admin
-        .from("article_specialties")
-        .select("article_id")
-        .eq("specialty", specialty)
-        .or(`specialty_match.is.null,scored_by.neq.${v}`)
-    // scoreAll=false: only articles not yet scored
-    : await admin
-        .from("article_specialties")
-        .select("article_id")
-        .eq("specialty", specialty)
-        .is("specialty_match", null);
-
-  const ids = (pendingIds ?? []).map((r: { article_id: string }) => r.article_id);
+  // Fetch article IDs — scoreAll re-scores already-scored articles too
+  let ids: string[];
+  if (scoreAll) {
+    const { data } = await admin
+      .from("article_specialties")
+      .select("article_id")
+      .eq("specialty", specialty)
+      .or(`specialty_match.is.null,scored_by.neq.${v}`);
+    ids = (data ?? []).map((r: { article_id: string }) => r.article_id);
+  } else {
+    const { data } = await admin.rpc("get_specialty_scoring_candidates", {
+      p_specialty: specialty,
+      p_limit:     userLimit ?? 100,
+      p_edat_from: edat_from ?? null,
+      p_edat_to:   edat_to   ?? null,
+    });
+    ids = (data ?? []).map((r: { article_id: string }) => r.article_id);
+  }
 
   if (ids.length === 0) {
     const emptyStream = new ReadableStream({
@@ -136,9 +116,7 @@ export async function POST(request: NextRequest) {
   const { data: articles, error: fetchError } = await admin
     .from("articles")
     .select("id, title, abstract, specialty_tags")
-    .in("id", ids)
-    .order("circle", { ascending: false, nullsFirst: false })
-    .limit(scoreAll ? BATCH_LIMIT : Math.min(userLimit ?? remaining, remaining));
+    .in("id", ids);
 
   if (fetchError) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
@@ -166,33 +144,22 @@ export async function POST(request: NextRequest) {
             limiter(async () => {
               try {
                 const score = await scoreWithDelay(article, specialty, activePrompt!);
-                const { error } = await admin
-                  .from("articles")
-                  .update({
-                    specialty_confidence: score.confidence,
-                    ai_decision:          score.ai_decision,
-                    specialty_reasoning:  score.reason,
-                    model_version:        score.version,
-                    specialty_scored_at:  new Date().toISOString(),
-                  })
-                  .eq("id", article.id);
-                if (error) throw new Error(error.message);
                 scored++;
                 if (score.ai_decision === "approved") approved++; else rejected++;
                 await admin
                   .from("article_specialties")
                   .update({
                     specialty_match: score.ai_decision === "approved" ? true : false,
+                    source:          "ai_score",
                     scored_by:       score.version,
                     scored_at:       new Date().toISOString(),
                   })
                   .eq("article_id", article.id)
                   .eq("specialty", specialty);
-                void logArticleEvent(article.id, "enriched", {
-                  ai_decision:          score.ai_decision,
-                  specialty_confidence: score.confidence,
-                  model_version:        score.version,
-                  specialty_tags:       article.specialty_tags,
+                void logArticleEvent(article.id, "specialty_scored", {
+                  specialty,
+                  decision: score.ai_decision,
+                  version:  score.version,
                 });
               } catch (e) {
                 console.error(`[score-batch] failed article ${article.id}:`, e);
@@ -203,18 +170,6 @@ export async function POST(request: NextRequest) {
             })
           )
         );
-
-        // Mark failed articles with null confidence so UI shows "Not scored"
-        if (failedIds.length > 0) {
-          await admin
-            .from("articles")
-            .update({
-              specialty_confidence: null,
-              ai_decision:          null,
-              specialty_scored_at:  new Date().toISOString(),
-            })
-            .in("id", failedIds);
-        }
 
         send({ done: true, scored, approved, rejected, failed: failedIds.length, total: toScore.length });
       } catch (e) {

@@ -152,15 +152,8 @@ export default async function ImportDashboardPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const a = admin as any;
 
-  // Direct article counts per circle+status (bypasses RPC for accuracy)
-  const countQ = (circle: number, status: string) =>
-    a.from("articles").select("id", { count: "exact", head: true })
-      .eq("circle", circle).eq("status", status) as Promise<{ count: number | null }>;
-
   const [
-    c1ApprovedRes, c2ApprovedRes, c2PendingRes, c2RejectedRes,
-    c3ApprovedRes, c3PendingRes, c3RejectedRes,
-    c4ApprovedRes,
+    statsResult,
     totalArticlesRes,
     authorsResult, unlinkedResult, unlinkedSlotsResult,
     latestC1LogResult, latestC2LogResult, latestC3LogResult, latestC4LogResult,
@@ -174,10 +167,7 @@ export default async function ImportDashboardPage() {
     authorUpdateEventsRes,
     c1ActiveRes, c4ActiveRes, c2ActiveRes,
   ] = await Promise.all([
-    // Article counts per circle+status
-    countQ(1, "approved"), countQ(2, "approved"), countQ(2, "pending"), countQ(2, "rejected"),
-    countQ(3, "approved"), countQ(3, "pending"), countQ(3, "rejected"),
-    countQ(4, "approved"),
+    a.rpc("get_specialty_article_stats", { specialty_slug: ACTIVE_SPECIALTY }),
     // Total articles
     admin.from("articles").select("id", { count: "exact", head: true }),
     // Authors
@@ -282,14 +272,19 @@ export default async function ImportDashboardPage() {
   ]);
 
   // ── Article stats ──
-  const c1Approved = (c1ApprovedRes as { count: number | null }).count ?? 0;
-  const c2Approved = (c2ApprovedRes as { count: number | null }).count ?? 0;
-  const c2Pending  = (c2PendingRes as { count: number | null }).count ?? 0;
-  const c2Rejected = (c2RejectedRes as { count: number | null }).count ?? 0;
-  const c3Approved = (c3ApprovedRes as { count: number | null }).count ?? 0;
-  const c3Pending  = (c3PendingRes as { count: number | null }).count ?? 0;
-  const c3Rejected = (c3RejectedRes as { count: number | null }).count ?? 0;
-  const c4Approved = (c4ApprovedRes as { count: number | null }).count ?? 0;
+  type StatRow = { circle: number; specialty_match: boolean | null; antal: number };
+  const stats = (statsResult.data ?? []) as StatRow[];
+  const getStat = (circle: number, match: boolean | null) =>
+    Number(stats.find(r => r.circle === circle && r.specialty_match === match)?.antal ?? 0);
+
+  const c1Approved = getStat(1, true);
+  const c2Approved = getStat(2, true);
+  const c2Pending  = getStat(2, null);
+  const c2Rejected = getStat(2, false);
+  const c3Approved = getStat(3, true);
+  const c3Pending  = getStat(3, null);
+  const c3Rejected = getStat(3, false) + getStat(1, false);
+  const c4Approved = getStat(4, true);
   const totalArticles = totalArticlesRes.count ?? 0;
 
   // Latest import per circle
@@ -603,6 +598,12 @@ export default async function ImportDashboardPage() {
         <div style={sectionCard}>
           <div style={sectionHeader}>
             <span style={headerLabel}>Authors changed pipeline</span>
+            <Link
+              href="/admin/system/import/author-update"
+              style={{ fontSize: "13px", fontWeight: 600, color: "#E83B2A", textDecoration: "none" }}
+            >
+              Administrér →
+            </Link>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", padding: "20px" }}>
