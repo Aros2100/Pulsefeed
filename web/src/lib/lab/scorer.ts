@@ -64,7 +64,9 @@ export async function scoreArticle(
 
   const message = await trackedCall(`specialty_tag_${activePrompt.version}`, {
     model: SCORING_MODEL,
-    max_tokens: 512,
+    max_tokens: 20,
+    thinking: { type: "disabled" },
+    system: "You respond only with valid JSON. No explanation, no reasoning, no other text.",
     messages: [{ role: "user", content }],
   }, article.id, "specialty");
 
