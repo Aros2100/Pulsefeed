@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
   // Det sikrer at næste request ser "running" med det samme (eliminerer race condition).
   const { data: newLog, error: logErr } = await admin
     .from("import_logs")
-    .insert({ filter_id: filterId, status: "running", trigger: "manual" })
+    .insert({ filter_id: filterId, status: "running", trigger: "manual", circle: 2 })
     .select("id")
     .single();
 
