@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
                   })
                   .eq("article_id", article.id)
                   .eq("specialty", specialty);
-                void logArticleEvent(article.id, "specialty_scored", {
+                void logArticleEvent(article.id, "enriched", {
                   specialty,
                   decision: score.ai_decision,
                   version:  score.version,
