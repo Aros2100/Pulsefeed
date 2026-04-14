@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     }
   }
   if (mesh_term)     query = query.contains("mesh_terms", [{ descriptor: mesh_term }]);
-  if (subspecialty)  query = query.contains("subspecialty_ai", [subspecialty]);
+  if (subspecialty)  query = query.contains("subspecialty", [subspecialty]);
   if (article_type)  query = query.eq("article_type", article_type);
   if (pub_date_from) query = query.gte("pubmed_indexed_at", pub_date_from);
   if (pub_date_to)   query = query.lte("pubmed_indexed_at", pub_date_to);
