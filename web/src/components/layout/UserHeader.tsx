@@ -10,9 +10,12 @@ interface Props {
   onModeChange: (mode: "user" | "admin") => void;
   onProfileClick?: () => void;
   user: { name: string; initials: string };
+  versionPill?: React.ReactNode;
+  version?: "v1" | "v2";
 }
 
-export default function UserHeader({ activePage, mode, onModeChange, onProfileClick, user }: Props) {
+export default function UserHeader({ activePage, mode, onModeChange, onProfileClick, user, versionPill, version }: Props) {
+  const showNav = version !== "v1";
   const router = useRouter();
 
   function handleModeUser() {
@@ -53,7 +56,7 @@ export default function UserHeader({ activePage, mode, onModeChange, onProfileCl
         </div>
 
         {/* Center — Nav links */}
-        <nav className="flex items-center gap-8">
+        <nav className="flex items-center gap-8" style={{ visibility: showNav ? undefined : "hidden" }}>
           <Link
             style={{ height: 80 }}
             href="/articles"
@@ -105,8 +108,11 @@ export default function UserHeader({ activePage, mode, onModeChange, onProfileCl
             </button>
           </div>
 
+          {/* Version pill (admin only) */}
+          {versionPill}
+
           {/* Bell */}
-          <NotificationBell />
+          {showNav && <NotificationBell />}
 
           {/* Avatar pill */}
           <div

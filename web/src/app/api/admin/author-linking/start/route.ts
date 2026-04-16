@@ -9,8 +9,15 @@ const schema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAdmin();
-  if (!auth.ok) return auth.response;
+  // Allow cron calls via CRON_SECRET
+  const authHeader = request.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
+  const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
+
+  if (!isCron) {
+    const auth = await requireAdmin();
+    if (!auth.ok) return auth.response;
+  }
 
   let importLogId: string | undefined;
   try {
