@@ -69,7 +69,7 @@ export default async function NightlyReport() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const a = admin as any;
 
-  const [c1Res, c4Res, c2Res, authorRes, syncRes] = await Promise.all([
+  const [c1Res, c4Res, c2Res, authorRes, syncRes, linkingRes] = await Promise.all([
     admin.from("import_logs").select("status, started_at, errors")
       .eq("circle", 1).order("started_at", { ascending: false }).limit(1).maybeSingle(),
     admin.from("import_logs").select("status, started_at, errors")
@@ -79,12 +79,15 @@ export default async function NightlyReport() {
     a.from("author_update_logs").select("status, started_at, errors")
       .order("started_at", { ascending: false }).limit(1).maybeSingle(),
     a.rpc("pubmed_sync_log_runs"),
+    a.from("author_linking_logs").select("status, started_at, errors")
+      .order("started_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   const c1     = c1Res.data     as CircleLog | null;
   const c4     = c4Res.data     as CircleLog | null;
   const c2     = c2Res.data     as CircleLog | null;
   const author = authorRes.data as AuthorLog  | null;
+  const linking = linkingRes.data as CircleLog | null;
   const syncs  = (syncRes.data ?? []) as SyncRun[];
   const sync   = syncs[0] ?? null;
   const syncTs = sync?.run_time ? sync.run_time + ":00Z" : null;
@@ -93,6 +96,7 @@ export default async function NightlyReport() {
     { label: "C1 Import",    ts: c1?.started_at ?? null,   status: jobStatus(c1),           error: firstError(c1?.errors) },
     { label: "C4 Import",    ts: c4?.started_at ?? null,   status: jobStatus(c4),           error: firstError(c4?.errors) },
     { label: "C2 Import",    ts: c2?.started_at ?? null,   status: jobStatus(c2),           error: firstError(c2?.errors) },
+    { label: "Author Linking", ts: linking?.started_at ?? null, status: jobStatus(linking),  error: firstError(linking?.errors) },
     { label: "PubMed Sync",  ts: syncTs,                   status: syncJobStatus(syncTs),   error: null },
     { label: "Author Update",ts: author?.started_at ?? null, status: jobStatus(author),     error: firstError(author?.errors) },
   ];

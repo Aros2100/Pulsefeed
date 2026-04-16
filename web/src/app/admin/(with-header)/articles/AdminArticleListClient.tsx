@@ -8,7 +8,7 @@ import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 type Period = "today" | "week" | "month" | "year" | "last_year";
 
 const PERIOD_LABELS: Record<Period, string> = {
-  today:     "Today",
+  today:     "24H",
   week:      "This week",
   month:     "This month",
   year:      "This year",
@@ -18,7 +18,10 @@ const PERIOD_LABELS: Record<Period, string> = {
 function getPubDateRange(period: Period): { from: string; to: string } {
   const today = new Date();
   const to = today.toISOString().slice(0, 10);
-  if (period === "today") return { from: to, to };
+  if (period === "today") {
+    const from = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    return { from: from.toISOString().slice(0, 10), to };
+  }
   if (period === "week") {
     const d = new Date(today);
     const day = d.getDay() || 7;
