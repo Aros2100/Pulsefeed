@@ -51,7 +51,7 @@ interface Props {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const GENERAL = "General neurosurgery";
+const GENERAL = "No subspecialty";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
