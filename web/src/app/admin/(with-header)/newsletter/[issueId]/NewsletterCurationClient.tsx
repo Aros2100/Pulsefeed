@@ -2,7 +2,6 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -125,7 +124,6 @@ function initSelectedMap(selections: EditionArticle[]): Record<string, string[]>
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function NewsletterCurationClient({ edition, subspecialties, articles, existingSelections }: Props) {
-  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
   const allSubspecialties = [...subspecialties.map((s) => s.name), GENERAL];
@@ -188,26 +186,22 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
     setSaving(true);
     try {
       if (isSelected) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (supabase as any)
-          .from("newsletter_edition_articles")
-          .delete()
-          .eq("edition_id", edition.id)
-          .eq("article_id", articleId)
-          .eq("subspecialty", activeSubspecialty);
-        if (error) throw error;
+        const res = await fetch("/api/admin/newsletter/selection", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ edition_id: edition.id, article_id: articleId, subspecialty: activeSubspecialty }),
+        });
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       } else {
         const curr = selectedMap[activeSubspecialty] ?? [];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (supabase as any)
-          .from("newsletter_edition_articles")
-          .insert({
-            edition_id: edition.id,
-            article_id: articleId,
-            subspecialty: activeSubspecialty,
-            sort_order: curr.length,
-          });
-        if (error) throw error;
+        const res = await fetch("/api/admin/newsletter/selection", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ edition_id: edition.id, article_id: articleId, subspecialty: activeSubspecialty, sort_order: curr.length }),
+        });
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
