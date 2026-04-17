@@ -1,5 +1,7 @@
 import Link from "next/link";
 import NightlyReport from "@/app/admin/_components/NightlyReport";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 function getISOWeek(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -7,6 +9,17 @@ function getISOWeek(date: Date): number {
   d.setUTCDate(d.getUTCDate() + 4 - day);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+function getThisWeekRange(): { start: string; end: string } {
+  const today = new Date();
+  const day = today.getDay() || 7;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - day + 1);
+  return {
+    start: monday.toISOString().slice(0, 10),
+    end: today.toISOString().slice(0, 10),
+  };
 }
 
 const navCards = [
@@ -19,6 +32,17 @@ const navCards = [
 
 export default async function AdminDashboard() {
   const weekNumber = getISOWeek(new Date());
+  const { start, end } = getThisWeekRange();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+  const { data: countResult, error: rpcError } = await admin.rpc("count_newsletter_articles", {
+    p_specialty: ACTIVE_SPECIALTY,
+    p_start: start,
+    p_end: end,
+  });
+  if (rpcError) console.error("[newsletter widget] count_newsletter_articles error:", rpcError.message, { start, end, specialty: ACTIVE_SPECIALTY });
+  const articleCount: number = Number(countResult ?? 0);
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 80px" }}>
@@ -37,12 +61,12 @@ export default async function AdminDashboard() {
               </div>
             </div>
             <Link
-              href="/admin/newsletter/select"
+              href="/admin/newsletter"
               style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "22px 24px", textDecoration: "none", color: "#1a1a1a" }}
             >
               <div>
                 <div style={{ fontSize: "18px", fontWeight: 700, lineHeight: 1.3 }}>Select articles · Week {weekNumber}</div>
-                <div style={{ fontSize: "13px", color: "#888", marginTop: "5px" }}>Last newsletter: Week 7 · 17 Feb</div>
+                <div style={{ fontSize: "13px", color: "#888", marginTop: "5px" }}>{articleCount} articles this week</div>
               </div>
               <div style={{ fontSize: "22px", color: "#ccc", flexShrink: 0 }}>→</div>
             </Link>
