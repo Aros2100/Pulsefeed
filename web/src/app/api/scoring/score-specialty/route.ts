@@ -92,7 +92,22 @@ export async function POST(request: NextRequest) {
   const toScore = (unscoredData ?? []) as Article[];
 
   if (toScore.length === 0) {
-    return NextResponse.json({ ok: true, scored: 0, failed: 0, total: 0 });
+    const emptyStream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, scored: 0, failed: 0, total: 0, approved: 0, rejected: 0 })}\n\n`));
+        controller.close();
+      },
+    });
+    return new Response(emptyStream, {
+      headers: {
+        "Content-Type":      "text/event-stream",
+        "Cache-Control":     "no-cache",
+        "Connection":        "keep-alive",
+        "Content-Encoding":  "none",
+        "X-Accel-Buffering": "no",
+      },
+    });
   }
 
   // Stream SSE progress events so the client can show a live countdown
@@ -129,7 +144,7 @@ export async function POST(request: NextRequest) {
                   .eq("specialty", specialty);
                 void logArticleEvent(article.id, "enriched", {
                   specialty,
-                  module:   "specialty_tag",
+                  module:   "specialty",
                   decision: score.ai_decision,
                   version:  score.version,
                 });
