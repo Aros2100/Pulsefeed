@@ -32,13 +32,14 @@ export default async function NewsletterSelectPage() {
   // Fetch articles from the last 14 days
   const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
 
-  let query = supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
     .from("articles")
-    .select("id, title, journal_abbr, published_date, authors, publication_types, news_value, clinical_relevance, enriched_at, short_resume, abstract, pico, pubmed_id, volume, issue, imported_at")
+    .select("id, title, journal_abbr, published_date, authors, article_type, news_value, clinical_relevance, enriched_at, short_resume, abstract, pico, pubmed_id, volume, issue, imported_at")
     .eq("status", "approved")
     .gte("imported_at", twoWeeksAgo)
-    .order("news_value", { ascending: false, nullsFirst: false })
-    .limit(50);
+    .order("imported_at", { ascending: false })
+    .limit(200);
 
   if (specialtySlugs.length > 0) {
     query = query.contains("specialty_tags", specialtySlugs);

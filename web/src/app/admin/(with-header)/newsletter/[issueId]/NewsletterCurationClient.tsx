@@ -18,7 +18,6 @@ export interface NLArticle {
   journal_abbr: string | null;
   pubmed_indexed_at: string | null;
   authors: unknown;
-  publication_types: string[] | null;
   news_value: number | null;
   clinical_relevance: string | null;
   short_resume: string | null;
@@ -52,7 +51,6 @@ interface Props {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const CAP = 5;
 const GENERAL = "General neurosurgery";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -136,6 +134,7 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null);
   const [selectedMap, setSelectedMap] = useState<Record<string, string[]>>(() => initSelectedMap(existingSelections));
   const [saving, setSaving] = useState(false);
+  const [articleTypeFilter, setArticleTypeFilter] = useState<string>("all");
 
   // Articles for the active subspecialty
   const subspecialtyArticles = useMemo(() => {
@@ -145,8 +144,18 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
     return articles.filter((a) => articleSubspecialties(a).includes(activeSubspecialty));
   }, [articles, activeSubspecialty]);
 
+  const articleTypes = useMemo(() => {
+    const types = subspecialtyArticles
+      .map((a) => a.article_type)
+      .filter((t): t is string => !!t);
+    return ["all", ...Array.from(new Set(types)).sort()];
+  }, [subspecialtyArticles]);
+
+  const visibleArticles = articleTypeFilter === "all"
+    ? subspecialtyArticles
+    : subspecialtyArticles.filter((a) => a.article_type === articleTypeFilter);
+
   const selectedForActive: string[] = selectedMap[activeSubspecialty] ?? [];
-  const isAtCap = selectedForActive.length >= CAP;
 
   const totalSelected = Object.values(selectedMap).reduce((s, ids) => s + ids.length, 0);
 
@@ -162,7 +171,6 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
 
   async function toggleArticle(articleId: string) {
     const isSelected = (selectedMap[activeSubspecialty] ?? []).includes(articleId);
-    if (!isSelected && isAtCap) return;
 
     // Optimistic update
     setSelectedMap((prev) => {
@@ -335,7 +343,7 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
             return (
               <div
                 key={sub}
-                onClick={() => { setActiveSubspecialty(sub); setActiveArticleId(null); }}
+                onClick={() => { setActiveSubspecialty(sub); setActiveArticleId(null); setArticleTypeFilter("all"); }}
                 style={{
                   padding: "10px 14px",
                   cursor: "pointer",
@@ -374,18 +382,32 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
             position: "sticky", top: 0, background: "#fafbfc", zIndex: 1,
             borderBottom: "1px solid #f0f0f0",
           }}>
-            {subspecialtyArticles.length} article{subspecialtyArticles.length !== 1 ? "s" : ""}
-            {isAtCap && <span style={{ marginLeft: "6px", color: "#f59e0b" }}>· cap reached</span>}
+            {visibleArticles.length} article{visibleArticles.length !== 1 ? "s" : ""}
+            {articleTypes.length > 1 && (
+              <select
+                value={articleTypeFilter}
+                onChange={(e) => setArticleTypeFilter(e.target.value)}
+                style={{
+                  fontSize: "11px", border: "1px solid #e2e8f0",
+                  borderRadius: "5px", padding: "2px 6px",
+                  background: "#fff", color: "#5a6a85",
+                  cursor: "pointer", marginLeft: "8px",
+                }}
+              >
+                {articleTypes.map((t) => (
+                  <option key={t} value={t}>{t === "all" ? "All types" : t}</option>
+                ))}
+              </select>
+            )}
           </div>
-          {subspecialtyArticles.length === 0 ? (
+          {visibleArticles.length === 0 ? (
             <div style={{ padding: "24px 14px", fontSize: "13px", color: "#94a3b8" }}>
               No articles this week
             </div>
-          ) : subspecialtyArticles.map((article) => {
+          ) : visibleArticles.map((article) => {
             const isActive = article.id === activeArticleId;
             const isSelected = selectedForActive.includes(article.id);
-            const isDimmed = isAtCap && !isSelected;
-            const pubType = article.publication_types?.[0];
+            const pubType = article.article_type;
 
             return (
               <div
@@ -397,7 +419,6 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
                   cursor: "pointer",
                   borderLeft: `3px solid ${isSelected ? "#15803d" : isActive ? "#E83B2A" : "transparent"}`,
                   background: isSelected ? "#f0fdf4" : isActive ? "#fff8f7" : "transparent",
-                  opacity: isDimmed ? 0.35 : 1,
                   transition: "background 0.1s",
                 }}
               >
@@ -488,7 +509,6 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
                   {activeArticle.pubmed_indexed_at && <><span style={{ color: "#888" }}>Indexed</span><span>{fmtDate(activeArticle.pubmed_indexed_at)}</span></>}
                   {activeArticle.volume && <><span style={{ color: "#888" }}>Vol / Issue</span><span>{activeArticle.volume}{activeArticle.issue ? ` / ${activeArticle.issue}` : ""}</span></>}
                   {activeArticle.article_type && <><span style={{ color: "#888" }}>Article type</span><span>{activeArticle.article_type}</span></>}
-                  {activeArticle.publication_types?.[0] && <><span style={{ color: "#888" }}>Publication type</span><span>{activeArticle.publication_types[0]}</span></>}
                   {activeArticle.sample_size ? <><span style={{ color: "#888" }}>Sample size</span><span>{activeArticle.sample_size.toLocaleString("en-GB")}</span></> : null}
                   <span style={{ color: "#888" }}>PubMed</span>
                   <span><a href={pubmedUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>PMID {activeArticle.pubmed_id} ↗</a></span>
@@ -537,21 +557,16 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
               <div style={{ paddingTop: "4px", paddingBottom: "40px" }}>
                 <button
                   onClick={() => toggleArticle(activeArticle.id)}
-                  disabled={!activeIsSelected && isAtCap}
                   style={{
                     width: "100%", fontSize: "14px", fontWeight: 600, fontFamily: "inherit",
-                    background: activeIsSelected ? "#f0fdf4" : (!activeIsSelected && isAtCap) ? "#f3f4f6" : "#1a1a1a",
-                    color: activeIsSelected ? "#15803d" : (!activeIsSelected && isAtCap) ? "#9ca3af" : "#fff",
+                    background: activeIsSelected ? "#f0fdf4" : "#1a1a1a",
+                    color: activeIsSelected ? "#15803d" : "#fff",
                     border: activeIsSelected ? "1px solid #bbf7d0" : "1px solid transparent",
                     borderRadius: "8px", padding: "12px 24px",
-                    cursor: (!activeIsSelected && isAtCap) ? "default" : "pointer",
+                    cursor: "pointer",
                   }}
                 >
-                  {activeIsSelected
-                    ? "✓ Selected — remove from newsletter"
-                    : (!activeIsSelected && isAtCap)
-                      ? `Max ${CAP} selected for this subspecialty`
-                      : "Add to newsletter"}
+                  {activeIsSelected ? "✓ Remove from newsletter" : "Add to newsletter"}
                 </button>
               </div>
 

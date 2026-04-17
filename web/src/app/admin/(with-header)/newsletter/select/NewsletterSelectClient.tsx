@@ -12,7 +12,7 @@ export interface NLArticle {
   journal_abbr: string | null;
   published_date: string | null;
   authors: unknown;
-  publication_types: string[] | null;
+  article_type: string | null;
   news_value: number | null;
   clinical_relevance: string | null;
   enriched_at: string | null;
@@ -69,13 +69,21 @@ function relevanceInfo(cr: string | null) {
   return { label: "Research only", bg: "#f0f0f0", color: "#666", key: "research" };
 }
 
-function filterAndSort(articles: NLArticle[], filter: RelevanceFilter, sort: SortBy): NLArticle[] {
+function filterAndSort(
+  articles: NLArticle[],
+  filter: RelevanceFilter,
+  sort: SortBy,
+  articleTypeFilter: string,
+): NLArticle[] {
   let result = [...articles];
   if (filter !== "all") {
     result = result.filter((a) => {
       const info = relevanceInfo(a.clinical_relevance);
       return info?.key === filter;
     });
+  }
+  if (articleTypeFilter !== "all") {
+    result = result.filter((a) => a.article_type === articleTypeFilter);
   }
   if (sort === "news_value") {
     result.sort((a, b) => (b.news_value ?? 0) - (a.news_value ?? 0));
@@ -105,7 +113,7 @@ async function saveFeedback(
       article_rank: articleRank,
       news_value: article.news_value,
       clinical_relevance: article.clinical_relevance,
-      article_type: article.publication_types?.[0] ?? null,
+      article_type: article.article_type ?? null,
       impact_factor: null,
     });
   if (error) console.error("newsletter_feedback insert failed:", error.message);
@@ -130,12 +138,18 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(articles[0]?.id ?? null);
   const [filter, setFilter] = useState<RelevanceFilter>("all");
-  const [sortBy, setSortBy] = useState<SortBy>("news_value");
+  const [sortBy, setSortBy] = useState<SortBy>("newest");
+  const [articleTypeFilter, setArticleTypeFilter] = useState<string>("all");
   const [panelWidth, setPanelWidth] = useState(420);
   const isDragging = useRef(false);
   const splitRef = useRef<HTMLDivElement>(null);
 
-  const filteredArticles = filterAndSort(articles, filter, sortBy);
+  const articleTypes = useMemo(() => {
+    const types = new Set(articles.map((a) => a.article_type).filter(Boolean) as string[]);
+    return Array.from(types).sort();
+  }, [articles]);
+
+  const filteredArticles = filterAndSort(articles, filter, sortBy, articleTypeFilter);
   const selectedArticles = articles.filter((a) => selectedIds.has(a.id));
   const remainingArticles = filteredArticles.filter((a) => !selectedIds.has(a.id));
 
@@ -232,7 +246,6 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
     { key: "newest", label: "Newest" },
   ];
 
-  const totalToReview = filteredArticles.length;
   const selectedCount = selectedIds.size;
 
   return (
@@ -276,7 +289,7 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
             background: "#EEF2F7", border: "1px solid #dde3ed",
             borderRadius: "20px", padding: "4px 14px",
           }}>
-            <span style={{ color: "#E83B2A" }}>{selectedCount}</span> of 5 selected
+            <span style={{ color: "#E83B2A" }}>{selectedCount}</span> selected
           </div>
         </div>
       </header>
@@ -330,6 +343,29 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
                 </button>
               ))}
             </div>
+            {articleTypes.length > 0 && (
+              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                <span style={{ fontSize: "11px", color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, minWidth: "60px" }}>
+                  Type
+                </span>
+                <select
+                  value={articleTypeFilter}
+                  onChange={(e) => setArticleTypeFilter(e.target.value)}
+                  style={{
+                    fontSize: "12px", color: "#5a6a85",
+                    background: "#fff", border: "1px solid #dde3ed",
+                    borderRadius: "20px", padding: "4px 10px",
+                    cursor: "pointer", fontFamily: "inherit",
+                    appearance: "none", WebkitAppearance: "none",
+                  }}
+                >
+                  <option value="all">All types</option>
+                  {articleTypes.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Article list */}
@@ -343,7 +379,7 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
                   textTransform: "uppercase", letterSpacing: "0.07em",
                   background: "#fafbfc", borderBottom: "1px solid #f0f0f0",
                 }}>
-                  Selected · {selectedCount} of 5
+                  Selected · {selectedCount}
                 </div>
                 {selectedArticles.map((article) => {
                   const rel = relevanceInfo(article.clinical_relevance);
@@ -367,13 +403,18 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
                         <div style={{ fontSize: "13px", fontWeight: 600, lineHeight: 1.4, color: "#1a1a1a" }}>
                           {article.title}
                         </div>
-                        {rel && (
-                          <div style={{ display: "flex", gap: "5px", marginTop: "6px" }}>
+                        <div style={{ display: "flex", gap: "5px", marginTop: "6px", flexWrap: "wrap" }}>
+                          {article.article_type && (
+                            <span style={{ fontSize: "10px", padding: "2px 7px", borderRadius: "10px", fontWeight: 600, background: "#f0f2f5", color: "#5a6a85" }}>
+                              {article.article_type}
+                            </span>
+                          )}
+                          {rel && (
                             <span style={{ fontSize: "10px", padding: "2px 7px", borderRadius: "10px", fontWeight: 600, background: rel.bg, color: rel.color }}>
                               {rel.label}
                             </span>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
                         {article.news_value && (
@@ -436,13 +477,18 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
                         <div style={{ fontSize: "13px", fontWeight: 600, lineHeight: 1.4, color: "#1a1a1a" }}>
                           {article.title}
                         </div>
-                        {rel && (
-                          <div style={{ display: "flex", gap: "5px", marginTop: "6px" }}>
+                        <div style={{ display: "flex", gap: "5px", marginTop: "6px", flexWrap: "wrap" }}>
+                          {article.article_type && (
+                            <span style={{ fontSize: "10px", padding: "2px 7px", borderRadius: "10px", fontWeight: 600, background: "#f0f2f5", color: "#5a6a85" }}>
+                              {article.article_type}
+                            </span>
+                          )}
+                          {rel && (
                             <span style={{ fontSize: "10px", padding: "2px 7px", borderRadius: "10px", fontWeight: 600, background: rel.bg, color: rel.color }}>
                               {rel.label}
                             </span>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
                         {article.news_value && (
@@ -539,11 +585,26 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
                   {activeArticle.journal_abbr && <><span style={{ color: "#888" }}>Journal</span><span>{activeArticle.journal_abbr}</span></>}
                   {activeArticle.published_date && <><span style={{ color: "#888" }}>Published</span><span>{formatFullDate(activeArticle.published_date)}</span></>}
                   {activeArticle.volume && <><span style={{ color: "#888" }}>Volume / Issue</span><span>{activeArticle.volume}{activeArticle.issue ? ` / ${activeArticle.issue}` : ""}</span></>}
-                  {activeArticle.publication_types?.[0] && <><span style={{ color: "#888" }}>Publication type</span><span>{activeArticle.publication_types[0]}</span></>}
+                  {activeArticle.article_type && <><span style={{ color: "#888" }}>Article type</span><span>{activeArticle.article_type}</span></>}
                   <span style={{ color: "#888" }}>PubMed</span>
                   <span><a href={pubmedUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>PMID {activeArticle.pubmed_id} ↗</a></span>
                 </div>
               </div>
+
+              {/* PICO */}
+              {pico && (pico.population || pico.intervention || pico.comparison || pico.outcome) && (
+                <div style={{ marginBottom: "20px" }}>
+                  <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700, marginBottom: "8px" }}>
+                    PICO
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: "6px 12px", fontSize: "13px" }}>
+                    {pico.population    && <><span style={{ color: "#888" }}>Population</span><span>{pico.population}</span></>}
+                    {pico.intervention  && <><span style={{ color: "#888" }}>Intervention</span><span>{pico.intervention}</span></>}
+                    {pico.comparison    && <><span style={{ color: "#888" }}>Comparison</span><span>{pico.comparison}</span></>}
+                    {pico.outcome       && <><span style={{ color: "#888" }}>Outcome</span><span>{pico.outcome}</span></>}
+                  </div>
+                </div>
+              )}
 
               {/* Abstract */}
               {activeArticle.abstract && (
@@ -586,16 +647,8 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ fontSize: "13px", color: "#888" }}>
-            <strong style={{ color: "#1a1a1a" }}>{selectedCount}</strong> of 5 selected
+            <strong style={{ color: "#1a1a1a" }}>{selectedCount}</strong> selected
           </span>
-          <div style={{ display: "flex", gap: "5px", marginLeft: "8px" }}>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} style={{
-                width: "10px", height: "10px", borderRadius: "50%",
-                background: i < selectedCount ? "#2d7a2d" : "#ddd",
-              }} />
-            ))}
-          </div>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: "10px" }}>
           <button
@@ -620,13 +673,13 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
           </button>
           <div style={{ width: "1px", height: "28px", background: "#eee", margin: "0 4px", alignSelf: "center" }} />
           <button
-            disabled={selectedCount !== 5}
+            disabled={selectedCount === 0}
             style={{
               fontSize: "13px", fontWeight: 600,
               background: "#1a1a1a", border: "none",
               color: "#fff", borderRadius: "7px", padding: "9px 20px",
-              cursor: selectedCount === 5 ? "pointer" : "default",
-              opacity: selectedCount === 5 ? 1 : 0.4,
+              cursor: selectedCount > 0 ? "pointer" : "default",
+              opacity: selectedCount > 0 ? 1 : 0.4,
             }}
           >
             Preview &amp; send →
