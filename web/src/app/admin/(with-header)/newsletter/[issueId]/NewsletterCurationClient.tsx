@@ -16,7 +16,7 @@ export interface NLArticle {
   id: string;
   title: string;
   journal_abbr: string | null;
-  published_date: string | null;
+  pubmed_indexed_at: string | null;
   authors: unknown;
   publication_types: string[] | null;
   news_value: number | null;
@@ -402,7 +402,7 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
                 }}
               >
                 <div style={{ fontSize: "10px", color: "#94a3b8", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                  {[article.journal_abbr, fmtShortDate(article.published_date)].filter(Boolean).join(" · ")}
+                  {[article.journal_abbr, fmtShortDate(article.pubmed_indexed_at)].filter(Boolean).join(" · ")}
                 </div>
                 <div style={{ fontSize: "12px", fontWeight: 600, lineHeight: 1.4, color: "#1a1a1a", marginBottom: "5px" }}>
                   {article.title}
@@ -438,7 +438,7 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
                 {activeArticle.title}
               </h2>
               <div style={{ fontSize: "13px", color: "#888", marginBottom: "24px" }}>
-                {fmtDate(activeArticle.published_date)}
+                {fmtDate(activeArticle.pubmed_indexed_at)}
                 {firstAuthor(activeArticle.authors) ? ` · ${firstAuthor(activeArticle.authors)}` : ""}
                 {" · "}
                 <a href={pubmedUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
@@ -485,7 +485,7 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "6px 12px", fontSize: "13px" }}>
                   {activeArticle.journal_abbr && <><span style={{ color: "#888" }}>Journal</span><span>{activeArticle.journal_abbr}</span></>}
-                  {activeArticle.published_date && <><span style={{ color: "#888" }}>Published</span><span>{fmtDate(activeArticle.published_date)}</span></>}
+                  {activeArticle.pubmed_indexed_at && <><span style={{ color: "#888" }}>Indexed</span><span>{fmtDate(activeArticle.pubmed_indexed_at)}</span></>}
                   {activeArticle.volume && <><span style={{ color: "#888" }}>Vol / Issue</span><span>{activeArticle.volume}{activeArticle.issue ? ` / ${activeArticle.issue}` : ""}</span></>}
                   {activeArticle.article_type && <><span style={{ color: "#888" }}>Article type</span><span>{activeArticle.article_type}</span></>}
                   {activeArticle.publication_types?.[0] && <><span style={{ color: "#888" }}>Publication type</span><span>{activeArticle.publication_types[0]}</span></>}

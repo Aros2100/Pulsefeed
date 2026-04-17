@@ -48,11 +48,10 @@ const MODULE_CONFIG: Record<string, {
     apiRoute: "/api/scoring/score-subspecialty",
     requestBody: (specialty) => ({ specialty }),
   },
-  article_type: {
+  article_type_prod: {
     label: "Article Type",
-    apiRoute: "/api/lab/score-article-type",
-    requestBody: () => ({}),
-    showLimit: false,
+    apiRoute: "/api/scoring/score-article-type",
+    requestBody: (specialty) => ({ specialty }),
   },
 };
 
@@ -65,7 +64,7 @@ export default async function ScoringPage() {
     .from("model_versions")
     .select("specialty, module, version")
     .eq("active", true)
-    .in("module", ["specialty_tag", "subspecialty", "article_type"]);
+    .in("module", ["specialty_tag", "subspecialty", "article_type_prod"]);
 
   const rows: ModelVersion[] = allModules ?? [];
 
@@ -85,8 +84,8 @@ export default async function ScoringPage() {
         const { data } = await admin.rpc("count_subspecialty_unscored", { p_specialty: specialty });
         return [mod, (data as number | null) ?? 0] as const;
       }
-      // article_type
-      const { data } = await admin.rpc("count_article_type_unscored");
+      // article_type_prod
+      const { data } = await admin.rpc("count_article_type_unscored", { p_specialty: specialty });
       return [mod, (data as number | null) ?? 0] as const;
     })
   );

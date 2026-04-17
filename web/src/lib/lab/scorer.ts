@@ -1,7 +1,7 @@
 import { trackedCall } from "@/lib/ai/tracked-client";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSubspecialties } from "@/lib/lab/classification-options";
-import { ARTICLE_TYPE_OPTIONS } from "@/lib/lab/article-type-options";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 export const SCORING_MODEL = process.env.AI_SCORING_MODEL ?? "claude-haiku-4-5-20251001";
 export const ANALYSIS_MODEL = process.env.AI_ANALYSIS_MODEL ?? "claude-sonnet-4-20250514";
@@ -185,7 +185,7 @@ export interface ClassificationDriftResult {
   version: string;
 }
 
-export async function scoreClassificationDrift(
+export async function scoreSubspecialty(
   article: { id?: string; title: string; abstract: string | null },
   specialty: string,
   activePrompt: ActivePrompt
@@ -232,7 +232,7 @@ export async function scoreClassificationDrift(
       if (name) {
         mapped.push(name);
       } else {
-        console.warn(`[scoreClassificationDrift] unknown code ${code} for article ${article.id}`);
+        console.warn(`[scoreSubspecialty] unknown code ${code} for article ${article.id}`);
       }
     }
 
@@ -244,7 +244,7 @@ export async function scoreClassificationDrift(
 
     return { subspecialty, version: activePrompt.version };
   } catch {
-    console.error(`[scoreClassificationDrift] failed to parse for article ${article.id}: ${raw}`);
+    console.error(`[scoreSubspecialty] failed to parse for article ${article.id}: ${raw}`);
     return { subspecialty: ["Unknown"], version: activePrompt.version };
   }
 }
@@ -255,39 +255,6 @@ export interface ArticleTypeResult {
   rationale: string;
   version: string;
 }
-
-const ARTICLE_TYPE_ALIASES: Record<string, string> = {
-  // Review variants
-  "Systematic Review":           "Review",
-  "Narrative Review":            "Review",
-  "Scoping Review":              "Review",
-  "Literature Review":           "Review",
-  // Meta-analysis variants
-  "Network Meta-analysis":       "Meta-analysis",
-  "Systematic Meta-analysis":    "Meta-analysis",
-  // Case variants
-  "Case Report":                 "Case",
-  "Case Series":                 "Case",
-  // Intervention study variants
-  "Clinical Trial":              "Intervention study",
-  "RCT":                         "Intervention study",
-  "Randomized Controlled Trial": "Intervention study",
-  // Non-interventional study variants
-  "Cohort Study":                "Non-interventional study",
-  "Observational Study":         "Non-interventional study",
-  "Retrospective Study":         "Non-interventional study",
-  "Cross-sectional Study":       "Non-interventional study",
-  // Surgical Technique variants
-  "Technical Note":              "Surgical Technique",
-  // Letters & Notices variants
-  "Editorial":                   "Letters & Notices",
-  "Letter":                      "Letters & Notices",
-  "Letter to the Editor":        "Letters & Notices",
-  "Comment":                     "Letters & Notices",
-  "Erratum":                     "Letters & Notices",
-  // Legacy fallback
-  "Other":                       "Unclassified",
-};
 
 export async function scoreArticleType(
   article: {
@@ -301,6 +268,54 @@ export async function scoreArticleType(
   },
   activePrompt: ActivePrompt
 ): Promise<ArticleTypeResult> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+  const { data: typeRows } = await admin
+    .from("article_types")
+    .select("code, name")
+    .eq("specialty", ACTIVE_SPECIALTY)
+    .eq("active", true);
+
+  const articleTypeSet = new Set<string>(
+    (typeRows ?? []).map((r: { code: number; name: string }) => r.name)
+  );
+
+  const rawAliases: Record<string, string> = {
+    // Review variants
+    "Systematic Review":           "Review",
+    "Narrative Review":            "Review",
+    "Scoping Review":              "Review",
+    "Literature Review":           "Review",
+    // Meta-analysis variants
+    "Network Meta-analysis":       "Meta-analysis",
+    "Systematic Meta-analysis":    "Meta-analysis",
+    // Case variants
+    "Case Report":                 "Case",
+    "Case Series":                 "Case",
+    // Intervention study variants
+    "Clinical Trial":              "Intervention study",
+    "RCT":                         "Intervention study",
+    "Randomized Controlled Trial": "Intervention study",
+    // Non-interventional study variants
+    "Cohort Study":                "Non-interventional study",
+    "Observational Study":         "Non-interventional study",
+    "Retrospective Study":         "Non-interventional study",
+    "Cross-sectional Study":       "Non-interventional study",
+    // Surgical Technique variants
+    "Technical Note":              "Surgical Technique",
+    // Letters & Notices variants
+    "Editorial":                   "Letters & Notices",
+    "Letter":                      "Letters & Notices",
+    "Letter to the Editor":        "Letters & Notices",
+    "Comment":                     "Letters & Notices",
+    "Erratum":                     "Letters & Notices",
+    // Legacy fallback
+    "Other":                       "Unclassified",
+  };
+  const aliasMap: Record<string, string> = Object.fromEntries(
+    Object.entries(rawAliases).filter(([, target]) => articleTypeSet.has(target))
+  );
+
   const journal = article.journal_abbr ?? article.journal_title ?? "Unknown";
   const meshTerms = Array.isArray(article.mesh_terms)
     ? (article.mesh_terms as string[]).join(", ")
@@ -323,7 +338,6 @@ export async function scoreArticleType(
   }, article.id, "article_type");
 
   const raw = (message.content[0] as { type: string; text: string }).text.trim();
-  const articleTypeSet = new Set<string>(ARTICLE_TYPE_OPTIONS);
 
   try {
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -338,7 +352,7 @@ export async function scoreArticleType(
       typeof rawType === "string"
         ? articleTypeSet.has(rawType)
           ? rawType
-          : ARTICLE_TYPE_ALIASES[rawType] ?? "Unclassified"
+          : aliasMap[rawType] ?? "Unclassified"
         : "Unclassified";
     const confidence = Math.min(99, Math.max(1, Math.round(Number(parsed.confidence ?? 50))));
     const rationale = typeof parsed.rationale === "string" ? parsed.rationale.slice(0, 500) : "";
@@ -351,6 +365,70 @@ export async function scoreArticleType(
       rationale: "Failed to parse AI response",
       version: activePrompt.version,
     };
+  }
+}
+
+export interface ArticleTypeProdResult {
+  article_type: string;
+  version: string;
+}
+
+export async function scoreArticleTypeProd(
+  article: {
+    id?: string;
+    title: string;
+    abstract: string | null;
+    journal_abbr?: string | null;
+    journal_title?: string | null;
+    mesh_terms?: unknown;
+    publication_types?: unknown;
+  },
+  activePrompt: ActivePrompt
+): Promise<ArticleTypeProdResult> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+  const { data: typeRows } = await admin
+    .from("article_types")
+    .select("code, name")
+    .eq("specialty", ACTIVE_SPECIALTY)
+    .eq("active", true);
+
+  const codeMap = new Map<number, string>(
+    (typeRows ?? []).map((r: { code: number; name: string }) => [r.code, r.name])
+  );
+
+  const journal = article.journal_abbr ?? article.journal_title ?? "Unknown";
+  const meshTerms = Array.isArray(article.mesh_terms)
+    ? (article.mesh_terms as string[]).join(", ")
+    : "None";
+  const pubTypes = Array.isArray(article.publication_types)
+    ? (article.publication_types as string[]).join(", ")
+    : "None";
+
+  const content = activePrompt.prompt
+    .replace(/\{\{title\}\}|\{title\}/g,                           article.title)
+    .replace(/\{\{journal\}\}|\{journal\}/g,                       journal)
+    .replace(/\{\{abstract\}\}|\{abstract\}/g,                     article.abstract ?? "No abstract available")
+    .replace(/\{\{mesh_terms\}\}|\{mesh_terms\}/g,                 meshTerms)
+    .replace(/\{\{publication_types\}\}|\{publication_types\}/g,   pubTypes);
+
+  const message = await trackedCall(`article_type_prod_${activePrompt.version}`, {
+    model: SCORING_MODEL,
+    max_tokens: 20,
+    thinking: { type: "disabled" },
+    system: "You respond only with valid JSON. No explanation, no reasoning, no other text.",
+    messages: [{ role: "user", content }],
+  }, article.id, "article_type");
+
+  const raw = (message.content[0] as { type: string; text: string }).text.trim();
+
+  try {
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as { article_type?: number };
+    const article_type = codeMap.get(Number(parsed.article_type)) ?? "Unclassified";
+    return { article_type, version: activePrompt.version };
+  } catch {
+    return { article_type: "Unclassified", version: activePrompt.version };
   }
 }
 

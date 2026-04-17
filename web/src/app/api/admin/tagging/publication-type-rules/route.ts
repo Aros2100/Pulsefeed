@@ -1,12 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 export async function GET() {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
 
-  const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
 
   const [rulesRes, articleTypesRes, studyDesignsRes] = await Promise.all([
     admin
@@ -14,9 +16,11 @@ export async function GET() {
       .select("*")
       .order("pubmed_type"),
     admin
-      .from("article_type_categories")
-      .select("*")
-      .order("name"),
+      .from("article_types")
+      .select("id, code, name, is_study_type")
+      .eq("specialty", ACTIVE_SPECIALTY)
+      .eq("active", true)
+      .order("sort_order"),
     admin
       .from("study_design_categories")
       .select("*")
@@ -51,7 +55,8 @@ export async function PUT(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  const { error } = await admin
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (admin as any)
     .from("publication_type_rules")
     .update({
       article_type: body.article_type ?? null,

@@ -4,7 +4,7 @@ import pLimit from "p-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-import { getActivePrompt, scoreSubspecialty, type ActivePrompt, type ClassificationDriftResult } from "@/lib/lab/scorer";
+import { getActivePrompt, scoreArticleTypeProd, type ActivePrompt, type ArticleTypeProdResult } from "@/lib/lab/scorer";
 import { logArticleEvent } from "@/lib/article-events";
 
 const CONCURRENCY  = 1;
@@ -24,28 +24,26 @@ type Article = { id: string; title: string; abstract: string | null };
 
 async function classifyWithDelay(
   article: Article,
-  specialty: string,
   activePrompt: ActivePrompt
 ) {
   await new Promise((r) => setTimeout(r, DELAY_MS));
-  return classifyWithRetry(article, specialty, activePrompt);
+  return classifyWithRetry(article, activePrompt);
 }
 
 async function classifyWithRetry(
   article: Article,
-  specialty: string,
   activePrompt: ActivePrompt,
   retries = 3
-) {
+): Promise<ArticleTypeProdResult> {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      console.log("[scoring/score-subspecialty] article id:", article.id);
-      return await scoreSubspecialty(article, specialty, activePrompt);
+      console.log("[scoring/score-article-type] article id:", article.id);
+      return await scoreArticleTypeProd(article, activePrompt);
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
       if (status === 429 && attempt < retries - 1) {
         const waitMs = (attempt + 1) * 60_000;
-        console.warn(`[scoring/score-subspecialty] rate limited — waiting ${waitMs / 1000}s before retry ${attempt + 1}/${retries - 1}`);
+        console.warn(`[scoring/score-article-type] rate limited — waiting ${waitMs / 1000}s before retry ${attempt + 1}/${retries - 1}`);
         await new Promise((r) => setTimeout(r, waitMs));
         continue;
       }
@@ -74,13 +72,13 @@ export async function POST(request: NextRequest) {
 
   let activePrompt;
   try {
-    activePrompt = await getActivePrompt(specialty, "subspecialty");
+    activePrompt = await getActivePrompt(specialty, "article_type_prod");
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
   const { data: unscoredData, error: fetchError } = await admin.rpc(
-    "get_subspecialty_unscored_articles",
+    "get_article_type_unscored_articles",
     {
       p_specialty: specialty,
       p_limit:     limit ?? 50,
@@ -110,27 +108,27 @@ export async function POST(request: NextRequest) {
           toScore.map((article) =>
             limiter(async () => {
               try {
-                const cls = await classifyWithDelay(article, specialty, activePrompt!);
+                const cls = await classifyWithDelay(article, activePrompt!);
                 const { error } = await admin
                   .from("articles")
                   .update({
-                    subspecialty:               cls.subspecialty,
-                    subspecialty_ai:            cls.subspecialty,
-                    subspecialty_model_version: cls.version,
-                    subspecialty_scored_at:     new Date().toISOString(),
+                    article_type:               cls.article_type,
+                    article_type_model_version: cls.version,
+                    article_type_scored_at:     new Date().toISOString(),
+                    article_type_method:        "ai",
                   })
                   .eq("id", article.id);
                 if (error) throw new Error(error.message);
                 scored++;
                 void logArticleEvent(article.id, "enriched", {
-                  module:      "subspecialty",
-                  subspecialty: cls.subspecialty,
-                  version:     cls.version,
+                  module:       "article_type",
+                  article_type: cls.article_type,
+                  version:      cls.version,
                 });
               } catch (e) {
                 const status = (e as { status?: number })?.status;
                 const msg = (e as Error)?.message ?? String(e);
-                console.error(`[scoring/score-subspecialty] failed article ${article.id} (status=${status}): ${msg}`);
+                console.error(`[scoring/score-article-type] failed article ${article.id} (status=${status}): ${msg}`);
                 failedIds.push(article.id);
               }
               send({ scored, failed: failedIds.length, total: toScore.length });
