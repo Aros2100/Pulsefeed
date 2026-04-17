@@ -5,7 +5,7 @@
       "schedule": "0 2 * * *"
     },
     {
-      "path": "/api/admin/pubmed/trigger-import-daily",
+      "path": "/api/admin/author-linking/start",
       "schedule": "0 3 * * *"
     }
   ]
