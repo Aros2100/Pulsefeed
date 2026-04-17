@@ -15,7 +15,6 @@ const schema = z.object({
     (v) => v === ACTIVE_SPECIALTY,
     { message: "Invalid specialty" }
   ),
-  scoreAll:  z.boolean().default(false),
   limit:     z.number().int().positive().optional(),
   edat_from: z.string().optional(),
   edat_to:   z.string().optional(),
@@ -68,7 +67,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
   }
 
-  const { specialty, scoreAll, limit: userLimit, edat_from, edat_to } = result.data;
+  const { specialty, limit: userLimit, edat_from, edat_to } = result.data;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
@@ -79,26 +78,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
-  const v = activePrompt.version;
-
-  // Fetch article IDs — scoreAll re-scores already-scored articles too
-  let ids: string[];
-  if (scoreAll) {
-    const { data } = await admin
-      .from("article_specialties")
-      .select("article_id")
-      .eq("specialty", specialty)
-      .or(`specialty_match.is.null,scored_by.neq.${v}`);
-    ids = (data ?? []).map((r: { article_id: string }) => r.article_id);
-  } else {
-    const { data } = await admin.rpc("get_specialty_scoring_candidates", {
-      p_specialty: specialty,
-      p_limit:     userLimit ?? 100,
-      p_edat_from: edat_from ?? null,
-      p_edat_to:   edat_to   ?? null,
-    });
-    ids = (data ?? []).map((r: { article_id: string }) => r.article_id);
-  }
+  // Fetch article IDs
+  const { data } = await admin.rpc("get_specialty_scoring_candidates", {
+    p_specialty: specialty,
+    p_limit:     userLimit ?? 100,
+    p_edat_from: edat_from ?? null,
+    p_edat_to:   edat_to   ?? null,
+  });
+  const ids: string[] = (data ?? []).map((r: { article_id: string }) => r.article_id);
 
   if (ids.length === 0) {
     const emptyStream = new ReadableStream({
