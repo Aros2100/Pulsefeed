@@ -179,6 +179,10 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
           ← Admin
         </Link>
         <span style={{ color: "#dde3ed" }}>·</span>
+        <Link href={`/admin/newsletter/${edition.id}`} style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none", whiteSpace: "nowrap" }}>
+          ← Curation
+        </Link>
+        <span style={{ color: "#dde3ed" }}>·</span>
         <span style={{ fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap" }}>
           Week {edition.week_number} · {edition.year}
         </span>
