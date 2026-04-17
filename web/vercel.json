@@ -7,6 +7,10 @@
     {
       "path": "/api/admin/author-linking/start",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/nightly-check",
+      "schedule": "0 6 * * *"
     }
   ]
 }
