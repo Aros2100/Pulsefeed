@@ -134,6 +134,7 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null);
   const [selectedMap, setSelectedMap] = useState<Record<string, string[]>>(() => initSelectedMap(existingSelections));
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [articleTypeFilter, setArticleTypeFilter] = useState<string>("all");
 
   // Articles for the active subspecialty
@@ -183,6 +184,7 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
       };
     });
 
+    setError(null);
     setSaving(true);
     try {
       if (isSelected) {
@@ -207,7 +209,8 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
           });
         if (error) throw error;
       }
-    } catch {
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Save failed");
       // Revert optimistic update
       setSelectedMap((prev) => {
         const curr = prev[activeSubspecialty] ?? [];
@@ -324,6 +327,17 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
           </button>
         </div>
       </div>
+
+      {/* ── Error banner ────────────────────────────────────────────────────── */}
+      {error && (
+        <div style={{
+          background: "#fff5f5", borderBottom: "1px solid #fecaca",
+          padding: "8px 20px", fontSize: "13px", color: "#b91c1c",
+          flexShrink: 0,
+        }}>
+          {error}
+        </div>
+      )}
 
       {/* ── Three-column body ────────────────────────────────────────────────── */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
