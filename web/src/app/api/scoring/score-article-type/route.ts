@@ -45,7 +45,6 @@ async function classifyWithRetry(
 ): Promise<ArticleTypeProdResult> {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      console.log("[scoring/score-article-type] article id:", article.id);
       return await scoreArticleTypeProd(article, activePrompt);
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;

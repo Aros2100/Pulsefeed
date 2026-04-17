@@ -20,7 +20,7 @@ const schema = z.object({
   edat_to:   z.string().optional(),
 });
 
-type Article = { id: string; title: string; abstract: string | null; specialty_tags: string[] | null };
+type Article = { id: string; title: string; abstract: string | null };
 
 async function scoreWithDelay(
   article: Article,
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
   let activePrompt;
   try {
-    activePrompt = await getActivePrompt(specialty, "specialty_tag");
+    activePrompt = await getActivePrompt(specialty, "specialty");
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
 
   const { data: articles, error: fetchError } = await admin
     .from("articles")
-    .select("id, title, abstract, specialty_tags")
+    .select("id, title, abstract")
     .in("id", ids);
 
   if (fetchError) {

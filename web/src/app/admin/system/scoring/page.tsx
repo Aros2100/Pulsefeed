@@ -64,14 +64,14 @@ export default async function ScoringPage() {
     .from("model_versions")
     .select("specialty, module, version")
     .eq("active", true)
-    .in("module", ["specialty_tag", "subspecialty", "article_type_prod"]);
+    .in("module", ["specialty", "subspecialty", "article_type_prod"]);
 
   const rows: ModelVersion[] = allModules ?? [];
 
   // Fetch pending counts in parallel
   const pendingCounts = await Promise.all(
     rows.map(async ({ module: mod }) => {
-      if (mod === "specialty_tag") {
+      if (mod === "specialty") {
         const { count } = await admin
           .from("article_specialties")
           .select("*", { count: "exact", head: true })

@@ -62,7 +62,7 @@ export async function scoreArticle(
     .replace(/\{\{title\}\}|\{title\}/g,         article.title)
     .replace(/\{\{abstract\}\}|\{abstract\}/g,   article.abstract ?? "No abstract available");
 
-  const message = await trackedCall(`specialty_tag_${activePrompt.version}`, {
+  const message = await trackedCall(`specialty_${activePrompt.version}`, {
     model: SCORING_MODEL,
     max_tokens: 20,
     thinking: { type: "disabled" },
@@ -141,6 +141,8 @@ export async function scoreSubspecialtyLab(
   const message = await trackedCall(`subspecialty_${activePrompt.version}`, {
     model: SCORING_MODEL,
     max_tokens: 512,
+    thinking: { type: "disabled" },
+    system: "You respond only with valid JSON. No explanation, no reasoning, no other text.",
     messages: [{ role: "user", content }],
   }, article.id, "subspecialty_lab");
 
@@ -208,7 +210,7 @@ export async function scoreSubspecialty(
     .replace(/\{\{title\}\}|\{title\}/g,       article.title)
     .replace(/\{\{abstract\}\}|\{abstract\}/g, article.abstract ?? "No abstract available");
 
-  const message = await trackedCall(`subspecialty_drift_${activePrompt.version}`, {
+  const message = await trackedCall(`subspecialty_${activePrompt.version}`, {
     model: SCORING_MODEL,
     max_tokens: 32,
     thinking: { type: "disabled" },
@@ -334,6 +336,8 @@ export async function scoreArticleType(
   const message = await trackedCall(`article_type_${activePrompt.version}`, {
     model: SCORING_MODEL,
     max_tokens: 512,
+    thinking: { type: "disabled" },
+    system: "You respond only with valid JSON. No explanation, no reasoning, no other text.",
     messages: [{ role: "user", content }],
   }, article.id, "article_type");
 
