@@ -40,12 +40,12 @@ const MODULE_CONFIG: Record<string, {
 }> = {
   specialty_tag: {
     label: "Specialty",
-    apiRoute: "/api/lab/score-batch",
+    apiRoute: "/api/scoring/score-batch",
     requestBody: (specialty) => ({ specialty }),
   },
   subspecialty: {
     label: "Subspecialty",
-    apiRoute: "/api/lab/score-subspecialty",
+    apiRoute: "/api/scoring/score-subspecialty",
     requestBody: (specialty) => ({ specialty }),
   },
   article_type: {
@@ -130,7 +130,7 @@ export default async function ScoringPage() {
                   <span style={{ marginLeft: "8px", fontSize: "13px", fontWeight: 600, color: "#1a1a1a", textTransform: "capitalize" }}>
                     {rowSpecialty}
                   </span>
-                  <span style={{ marginLeft: "8px", fontSize: "12px", color: "#888" }}>v{version}</span>
+                  <span style={{ marginLeft: "8px", fontSize: "12px", color: "#888" }}>{version}</span>
                 </div>
                 <span style={{
                   fontSize: "12px",

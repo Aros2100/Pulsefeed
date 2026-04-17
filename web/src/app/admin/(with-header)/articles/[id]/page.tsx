@@ -159,11 +159,47 @@ function ImportedCard({ p }: { p: P }) {
 
 function EnrichedCard({ p }: { p: P }) {
   const conf = p.specialty_confidence as number | null;
+  const module = p.module as string | null;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-      <KV label="AI beslutning"       value={p.ai_decision ? <Badge color={p.ai_decision === "approved" ? "green" : "red"}>{String(p.ai_decision)}</Badge> : null} />
-      <KV label="Specialty confidence" value={conf != null ? `${conf.toFixed(1)}%` : null} />
-      <KV label="Model"               value={p.model_version as string | null} />
+      {module && (
+        <KV label="Modul" value={<Badge color="purple">{module}</Badge>} />
+      )}
+      {/* Specialty scoring */}
+      {p.ai_decision != null && (
+        <KV label="AI beslutning" value={
+          <Badge color={p.ai_decision === "approved" ? "green" : "red"}>{String(p.ai_decision)}</Badge>
+        } />
+      )}
+      {conf != null && (
+        <KV label="Confidence" value={`${conf}%`} />
+      )}
+      {p.reason != null && (
+        <KV label="Reason" value={String(p.reason)} />
+      )}
+      {/* Subspecialty scoring */}
+      {Array.isArray(p.subspecialty) && (p.subspecialty as string[]).length > 0 && (
+        <KV label="Subspecialty" value={
+          <span style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+            {(p.subspecialty as string[]).map((s) => (
+              <Badge key={s} color="purple">{s}</Badge>
+            ))}
+          </span>
+        } />
+      )}
+      {/* Article type scoring */}
+      {p.article_type != null && (
+        <KV label="Article type" value={<Badge color="blue">{String(p.article_type)}</Badge>} />
+      )}
+      {p.confidence != null && p.article_type != null && (
+        <KV label="Confidence" value={`${p.confidence}%`} />
+      )}
+      {/* Version */}
+      {p.version != null && (
+        <KV label="Version" value={String(p.version)} />
+      )}
+      {/* Legacy felter */}
       {Array.isArray(p.specialty_tags) && (p.specialty_tags as string[]).length > 0 && (
         <KV label="Specialty tags" value={
           <span style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
@@ -1018,7 +1054,7 @@ export default async function AdminArticleLogPage({
   const SECTIONS: { title: string; types: string[]; alwaysShow?: boolean }[] = [
     { title: "Indlæsning af artikel",    types: ["imported"],      alwaysShow: true },
     { title: "Indlæsning af forfattere", types: ["author_linked"], alwaysShow: true },
-    { title: "Speciale scoring",         types: ["enriched"] },
+    { title: "AI Scoring",               types: ["enriched"] },
     { title: "Auto-Tagging",            types: ["auto_tagged"] },
     { title: "Validering",               types: ["lab_decision"] },
     { title: "Bibliometri",              types: ["citation_count_updated"] },

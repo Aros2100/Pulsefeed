@@ -239,11 +239,22 @@ export function ScoringClient({
         {phase.kind === "idle" && pendingCount === 0 && (
           <span style={{ fontSize: "13px", color: "#15803d", fontWeight: 600 }}>Ingen artikler afventer</span>
         )}
-        {phase.kind === "done" && (
+        {phase.kind === "done" && (phase.approved + phase.rejected) > 0 && (
           <span style={{ fontSize: "13px", fontWeight: 600 }}>
             <span style={{ color: "#15803d" }}>{phase.approved} inkluderet</span>
             <span style={{ color: "#5a6a85", margin: "0 6px" }}>·</span>
             <span style={{ color: "#d97706" }}>{phase.rejected} ekskluderet</span>
+            {phase.failed > 0 && (
+              <>
+                <span style={{ color: "#5a6a85", margin: "0 6px" }}>·</span>
+                <span style={{ color: "#b91c1c" }}>{phase.failed} fejlet</span>
+              </>
+            )}
+          </span>
+        )}
+        {phase.kind === "done" && (phase.approved + phase.rejected) === 0 && (
+          <span style={{ fontSize: "13px", fontWeight: 600 }}>
+            <span style={{ color: "#15803d" }}>{phase.scored} scoret</span>
             {phase.failed > 0 && (
               <>
                 <span style={{ color: "#5a6a85", margin: "0 6px" }}>·</span>

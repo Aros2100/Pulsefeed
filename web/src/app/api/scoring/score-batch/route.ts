@@ -4,7 +4,7 @@ import pLimit from "p-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-import { getActivePrompt, scoreArticleLab, type ActivePrompt } from "@/lib/lab/scorer";
+import { getActivePrompt, scoreArticle, type ActivePrompt } from "@/lib/lab/scorer";
 import { logArticleEvent } from "@/lib/article-events";
 
 const CONCURRENCY  = 1;    // sequential to avoid bursting the 50 req/min limit
@@ -40,12 +40,12 @@ async function scoreWithRetry(
 ) {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      return await scoreArticleLab(article, specialty, activePrompt);
+      return await scoreArticle(article, specialty, activePrompt);
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
       if (status === 429 && attempt < retries - 1) {
         const waitMs = (attempt + 1) * 60_000; // 60s, 120s, 180s
-        console.warn(`[lab/score-batch] rate limited — waiting ${waitMs / 1000}s before retry ${attempt + 1}/${retries - 1}`);
+        console.warn(`[scoring/score-batch] rate limited — waiting ${waitMs / 1000}s before retry ${attempt + 1}/${retries - 1}`);
         await new Promise((r) => setTimeout(r, waitMs));
         continue;
       }
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
   let activePrompt;
   try {
-    activePrompt = await getActivePrompt(specialty, "specialty_tag_lab");
+    activePrompt = await getActivePrompt(specialty, "specialty_tag");
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
@@ -149,25 +149,21 @@ export async function POST(request: NextRequest) {
                 await admin
                   .from("article_specialties")
                   .update({
-                    specialty_match:      score.ai_decision === "approved" ? true : false,
-                    source:               "lab_ai",
-                    scored_by:            score.version,
-                    scored_at:            new Date().toISOString(),
-                    specialty_confidence: score.confidence,
-                    specialty_reason:     score.reason,
+                    specialty_match: score.ai_decision === "approved" ? true : false,
+                    source:          "ai_score",
+                    scored_by:       score.version,
+                    scored_at:       new Date().toISOString(),
                   })
                   .eq("article_id", article.id)
                   .eq("specialty", specialty);
                 void logArticleEvent(article.id, "enriched", {
                   specialty,
-                  module:     "specialty_tag_lab",
-                  decision:   score.ai_decision,
-                  confidence: score.confidence,
-                  reason:     score.reason,
-                  version:    score.version,
+                  module:   "specialty_tag",
+                  decision: score.ai_decision,
+                  version:  score.version,
                 });
               } catch (e) {
-                console.error(`[lab/score-batch] failed article ${article.id}:`, e);
+                console.error(`[scoring/score-batch] failed article ${article.id}:`, e);
                 failedIds.push(article.id);
               }
               // Emit progress after every article (success or failure)

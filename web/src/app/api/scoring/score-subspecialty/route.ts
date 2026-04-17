@@ -4,18 +4,20 @@ import pLimit from "p-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-import { getActivePrompt, scoreSubspecialtyLab, type ActivePrompt } from "@/lib/lab/scorer";
+import { getActivePrompt, scoreClassificationDrift, type ActivePrompt, type ClassificationDriftResult } from "@/lib/lab/scorer";
+import { logArticleEvent } from "@/lib/article-events";
 
 const CONCURRENCY  = 1;
 const DELAY_MS     = 1300;
-const BATCH_LIMIT  = 50;
 
 const schema = z.object({
   specialty: z.string().refine(
     (v) => v === ACTIVE_SPECIALTY,
     { message: "Invalid specialty" }
   ),
-  scoreAll: z.boolean().optional().default(false),
+  limit:     z.number().int().positive().optional(),
+  edat_from: z.string().optional(),
+  edat_to:   z.string().optional(),
 });
 
 type Article = { id: string; title: string; abstract: string | null };
@@ -37,13 +39,13 @@ async function classifyWithRetry(
 ) {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      console.log("[score-subspecialty] article id:", article.id);
-      return await scoreSubspecialtyLab(article, specialty, activePrompt);
+      console.log("[scoring/score-subspecialty] article id:", article.id);
+      return await scoreClassificationDrift(article, specialty, activePrompt);
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
       if (status === 429 && attempt < retries - 1) {
         const waitMs = (attempt + 1) * 60_000;
-        console.warn(`[score-subspecialty] rate limited — waiting ${waitMs / 1000}s before retry ${attempt + 1}/${retries - 1}`);
+        console.warn(`[scoring/score-subspecialty] rate limited — waiting ${waitMs / 1000}s before retry ${attempt + 1}/${retries - 1}`);
         await new Promise((r) => setTimeout(r, waitMs));
         continue;
       }
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
   }
 
-  const { specialty, scoreAll } = result.data;
+  const { specialty, limit, edat_from, edat_to } = result.data;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
@@ -77,60 +79,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
-  let articles: Article[] | null;
-  let fetchError: { message: string } | null;
-
-  if (scoreAll) {
-    // Re-score articles where subspecialty_ai is NULL and not yet validated
-    const { data: rescoreIds } = await admin.rpc("get_subspecialty_rescore_candidates", {
+  const { data: unscoredData, error: fetchError } = await admin.rpc(
+    "get_subspecialty_unscored_articles",
+    {
       p_specialty: specialty,
-      p_limit: 50,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const candidateIds: string[] = ((rescoreIds ?? []) as any[]).map((r) => r.id ?? r);
-
-    const res = await admin
-      .from("articles")
-      .select("id, title, abstract")
-      .in("id", candidateIds.length > 0 ? candidateIds : ["00000000-0000-0000-0000-000000000000"])
-      .limit(50);
-    articles = res.data as Article[] | null;
-    fetchError = res.error;
-  } else {
-    // Normal Lab-scoring: fill up to BATCH_LIMIT
-    const { data: alreadyScoredCount } = await admin.rpc(
-      "count_subspecialty_not_validated",
-      { p_specialty: specialty },
-    );
-    const existing = Number(alreadyScoredCount ?? 0);
-    const remaining = Math.max(0, BATCH_LIMIT - existing);
-
-    if (remaining === 0) {
-      const stream = new ReadableStream({
-        start(controller) {
-          const encoder = new TextEncoder();
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, scored: 0, failed: 0, total: 0 })}\n\n`));
-          controller.close();
-        },
-      });
-      return new Response(stream, {
-        headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive", "Content-Encoding": "none", "X-Accel-Buffering": "no" },
-      });
+      p_limit:     limit ?? 50,
+      p_edat_from: edat_from ?? null,
+      p_edat_to:   edat_to   ?? null,
     }
-
-    const { data: unscoredData, error: unscoredError } = await admin.rpc(
-      "get_subspecialty_unscored_articles",
-      { p_specialty: specialty, p_limit: remaining }
-    );
-    articles = unscoredData as Article[] | null;
-    fetchError = unscoredError;
-  }
+  );
+  const toScore = (unscoredData ?? []) as Article[];
 
   if (fetchError) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
   }
-
-  const toScore = (articles ?? []) as Article[];
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -152,18 +114,23 @@ export async function POST(request: NextRequest) {
                 const { error } = await admin
                   .from("articles")
                   .update({
-                    subspecialty_ai:              cls.subspecialty,
-                    subspecialty_reason:        cls.reason,
+                    subspecialty:               cls.subspecialty,
+                    subspecialty_ai:            cls.subspecialty,
                     subspecialty_model_version: cls.version,
                     subspecialty_scored_at:     new Date().toISOString(),
                   })
                   .eq("id", article.id);
                 if (error) throw new Error(error.message);
                 scored++;
+                void logArticleEvent(article.id, "enriched", {
+                  module:      "subspecialty",
+                  subspecialty: cls.subspecialty,
+                  version:     cls.version,
+                });
               } catch (e) {
                 const status = (e as { status?: number })?.status;
                 const msg = (e as Error)?.message ?? String(e);
-                console.error(`[score-subspecialty] failed article ${article.id} (status=${status}): ${msg}`);
+                console.error(`[scoring/score-subspecialty] failed article ${article.id} (status=${status}): ${msg}`);
                 failedIds.push(article.id);
               }
               send({ scored, failed: failedIds.length, total: toScore.length });
@@ -171,9 +138,9 @@ export async function POST(request: NextRequest) {
           )
         );
 
-        send({ done: true, scored, failed: failedIds.length, total: toScore.length });
+        send({ done: true, scored, failed: failedIds.length, total: toScore.length, approved: 0, rejected: 0 });
       } catch (e) {
-        send({ done: true, error: String(e), scored, failed: failedIds.length, total: toScore.length });
+        send({ done: true, error: String(e), scored, failed: failedIds.length, total: toScore.length, approved: 0, rejected: 0 });
       } finally {
         controller.close();
       }

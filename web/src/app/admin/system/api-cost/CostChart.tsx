@@ -15,7 +15,7 @@ type Period = "today" | "week" | "month" | "all";
 
 const TASKS = [
   { key: "specialty",      label: "Speciale",     color: "#3B8BD4" },
-  { key: "classification", label: "Subspeciale",  color: "#1D9E75" },
+  { key: "subspecialty",   label: "Subspeciale",  color: "#1D9E75" },
   { key: "article_type",   label: "Artikel type", color: "#D85A30" },
   { key: "condensation",   label: "Kondensering", color: "#7F77DD" },
   { key: "geo",            label: "Geo",          color: "#888780" },

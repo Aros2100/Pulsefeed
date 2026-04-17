@@ -23,7 +23,7 @@ export interface CondensationResult {
   version: string;
 }
 
-export interface ClassificationResult {
+export interface SubspecialtyLabResult {
   subspecialty: string[];
   reason: string;
   version: string;
@@ -82,11 +82,54 @@ export async function scoreArticle(
   }
 }
 
-export async function scoreClassification(
+export interface ScoreResultLab {
+  ai_decision: "approved" | "rejected";
+  confidence: number;
+  reason: string;
+  version: string;
+}
+
+export async function scoreArticleLab(
   article: { id?: string; title: string; abstract: string | null },
   specialty: string,
   activePrompt: ActivePrompt
-): Promise<ClassificationResult> {
+): Promise<ScoreResultLab> {
+  const content = activePrompt.prompt
+    .replace(/\{\{specialty\}\}|\{specialty\}/g, specialty)
+    .replace(/\{\{title\}\}|\{title\}/g,         article.title)
+    .replace(/\{\{abstract\}\}|\{abstract\}/g,   article.abstract ?? "No abstract available");
+
+  const message = await trackedCall(`specialty_tag_lab_${activePrompt.version}`, {
+    model: SCORING_MODEL,
+    max_tokens: 100,
+    thinking: { type: "disabled" },
+    system: "You respond only with valid JSON. No explanation, no reasoning, no other text.",
+    messages: [{ role: "user", content }],
+  }, article.id, "specialty_lab");
+
+  const raw = (message.content[0] as { type: string; text: string }).text.trim();
+
+  try {
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as {
+      decision?: number;
+      confidence?: number;
+      reason?: string;
+    };
+    const ai_decision: "approved" | "rejected" = parsed.decision === 1 ? "approved" : "rejected";
+    const confidence = Math.min(99, Math.max(1, Math.round(Number(parsed.confidence ?? 50))));
+    const reason = typeof parsed.reason === "string" ? parsed.reason.slice(0, 500) : "";
+    return { ai_decision, confidence, reason, version: activePrompt.version };
+  } catch {
+    return { ai_decision: "rejected", confidence: 50, reason: "Failed to parse AI response", version: activePrompt.version };
+  }
+}
+
+export async function scoreSubspecialtyLab(
+  article: { id?: string; title: string; abstract: string | null },
+  specialty: string,
+  activePrompt: ActivePrompt
+): Promise<SubspecialtyLabResult> {
   const subspecialties = await getSubspecialties(specialty);
 
   const content = activePrompt.prompt
@@ -99,7 +142,7 @@ export async function scoreClassification(
     model: SCORING_MODEL,
     max_tokens: 512,
     messages: [{ role: "user", content }],
-  }, article.id, "classification");
+  }, article.id, "subspecialty_lab");
 
   const raw = (message.content[0] as { type: string; text: string }).text.trim();
 
@@ -134,6 +177,74 @@ export async function scoreClassification(
       reason: "Failed to parse AI response",
       version: activePrompt.version,
     };
+  }
+}
+
+export interface ClassificationDriftResult {
+  subspecialty: string[];
+  version: string;
+}
+
+export async function scoreClassificationDrift(
+  article: { id?: string; title: string; abstract: string | null },
+  specialty: string,
+  activePrompt: ActivePrompt
+): Promise<ClassificationDriftResult> {
+  const admin = createAdminClient();
+
+  const { data: subspecialtyRows } = await admin
+    .from("subspecialties")
+    .select("code, name")
+    .eq("specialty", specialty)
+    .eq("active", true)
+    .not("code", "is", null);
+
+  const codeMap = new Map<number, string>(
+    (subspecialtyRows ?? []).map((r: { code: number; name: string }) => [r.code, r.name])
+  );
+
+  const content = activePrompt.prompt
+    .replace(/\{\{title\}\}|\{title\}/g,       article.title)
+    .replace(/\{\{abstract\}\}|\{abstract\}/g, article.abstract ?? "No abstract available");
+
+  const message = await trackedCall(`subspecialty_drift_${activePrompt.version}`, {
+    model: SCORING_MODEL,
+    max_tokens: 32,
+    thinking: { type: "disabled" },
+    system: "You respond only with valid JSON. No explanation, no reasoning, no other text.",
+    messages: [{ role: "user", content }],
+  }, article.id, "subspecialty");
+
+  const raw = (message.content[0] as { type: string; text: string }).text.trim();
+
+  try {
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as {
+      subspecialty?: number[];
+    };
+
+    const codes = Array.isArray(parsed.subspecialty) ? parsed.subspecialty : [];
+
+    const mapped: string[] = [];
+    for (const code of codes) {
+      const name = codeMap.get(Number(code));
+      if (name) {
+        mapped.push(name);
+      } else {
+        console.warn(`[scoreClassificationDrift] unknown code ${code} for article ${article.id}`);
+      }
+    }
+
+    const PEDIATRIC = "Pediatric and foetal neurosurgery";
+    const maxSubs = mapped.includes(PEDIATRIC) ? 3 : 2;
+    const subspecialty = mapped.slice(0, maxSubs);
+
+    if (subspecialty.length === 0) subspecialty.push("Unknown");
+
+    return { subspecialty, version: activePrompt.version };
+  } catch {
+    console.error(`[scoreClassificationDrift] failed to parse for article ${article.id}: ${raw}`);
+    return { subspecialty: ["Unknown"], version: activePrompt.version };
   }
 }
 
