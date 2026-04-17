@@ -180,7 +180,7 @@ export async function scoreSubspecialtyLab(
   }
 }
 
-export interface ClassificationDriftResult {
+export interface SubspecialtyResult {
   subspecialty: string[];
   version: string;
 }
@@ -189,7 +189,7 @@ export async function scoreSubspecialty(
   article: { id?: string; title: string; abstract: string | null },
   specialty: string,
   activePrompt: ActivePrompt
-): Promise<ClassificationDriftResult> {
+): Promise<SubspecialtyResult> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
@@ -418,7 +418,7 @@ export async function scoreArticleTypeProd(
     thinking: { type: "disabled" },
     system: "You respond only with valid JSON. No explanation, no reasoning, no other text.",
     messages: [{ role: "user", content }],
-  }, article.id, "article_type");
+  }, article.id, "article_type_prod");
 
   const raw = (message.content[0] as { type: string; text: string }).text.trim();
 

@@ -40,7 +40,7 @@ const MODULE_CONFIG: Record<string, {
 }> = {
   specialty_tag: {
     label: "Specialty",
-    apiRoute: "/api/scoring/score-batch",
+    apiRoute: "/api/scoring/score-specialty",
     requestBody: (specialty) => ({ specialty }),
   },
   subspecialty: {

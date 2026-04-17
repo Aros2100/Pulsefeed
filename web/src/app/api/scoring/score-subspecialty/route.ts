@@ -4,7 +4,7 @@ import pLimit from "p-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-import { getActivePrompt, scoreSubspecialty, type ActivePrompt, type ClassificationDriftResult } from "@/lib/lab/scorer";
+import { getActivePrompt, scoreSubspecialty, type ActivePrompt, type SubspecialtyResult } from "@/lib/lab/scorer";
 import { logArticleEvent } from "@/lib/article-events";
 
 const CONCURRENCY  = 1;

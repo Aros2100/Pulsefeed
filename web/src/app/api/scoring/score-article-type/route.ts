@@ -20,7 +20,15 @@ const schema = z.object({
   edat_to:   z.string().optional(),
 });
 
-type Article = { id: string; title: string; abstract: string | null };
+type Article = {
+  id: string;
+  title: string;
+  abstract: string | null;
+  journal_abbr: string | null;
+  journal_title: string | null;
+  mesh_terms: unknown;
+  publication_types: unknown;
+};
 
 async function classifyWithDelay(
   article: Article,
