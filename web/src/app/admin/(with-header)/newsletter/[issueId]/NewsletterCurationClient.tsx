@@ -310,6 +310,7 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
           </span>
           <button
             disabled={totalSelected === 0}
+            onClick={() => router.push(`/admin/newsletter/${edition.id}/review`)}
             style={{
               fontSize: "13px", fontWeight: 600, fontFamily: "inherit",
               background: totalSelected > 0 ? "#1a1a1a" : "#f3f4f6",
@@ -319,7 +320,7 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
               whiteSpace: "nowrap",
             }}
           >
-            Review &amp; approve →
+            Go to newsletter →
           </button>
         </div>
       </div>
@@ -374,7 +375,7 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
         </div>
 
         {/* Col 2: Article list for active subspecialty (260px) */}
-        <div style={{ width: "260px", flexShrink: 0, borderRight: "1px solid #dde3ed", background: "#fafbfc", overflowY: "auto" }}>
+        <div style={{ width: "390px", flexShrink: 0, borderRight: "1px solid #dde3ed", background: "#fafbfc", overflowY: "auto" }}>
           <div style={{
             padding: "10px 14px 6px",
             fontSize: "10px", color: "#94a3b8",
