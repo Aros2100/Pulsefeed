@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 type FieldErrors = Partial<
   Record<"firstName" | "lastName" | "email" | "password", string>
@@ -164,7 +165,7 @@ export default function RegisterPage() {
                   fontWeight: 600,
                 }}
               >
-                Neurosurgery
+                <span style={{ textTransform: "capitalize" }}>{ACTIVE_SPECIALTY}</span>
               </span>
             </div>
 

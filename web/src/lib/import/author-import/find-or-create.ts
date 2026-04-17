@@ -376,9 +376,7 @@ export async function findOrCreateAuthor(
   }
 
   // ── 1.5. OpenAlex lookup ──────────────────────────────────────────────────
-  const openAlexResult = preResolvedOA !== undefined
-    ? preResolvedOA
-    : await fetchOpenAlexId(newOrcid, normalized, parsed.institution);
+  const openAlexResult = preResolvedOA ?? null;
   const openAlexId = openAlexResult?.id ?? null;
   const openAlexInstitution = openAlexResult?.institution ?? null;
   if (openAlexId) {
@@ -603,13 +601,26 @@ export async function linkAuthorsToArticle(
   const preResolvedOAMap = new Map<number, OpenAlexIdResult | null>();
   await Promise.all(
     authors.map((author, i) => {
+      // Skip: already matched via DOI, no name, or no ORCID
       if (oaMatchMap.has(i) || (!author.lastName && !author.orcid)) return Promise.resolve();
+      const orcid = author.orcid ? normalizeOrcid(author.orcid) : null;
+      if (!orcid) {
+        preResolvedOAMap.set(i, null);
+        return Promise.resolve();
+      }
       return oaLimit(async () => {
-        const orcid = author.orcid ? normalizeOrcid(author.orcid) : null;
-        const name = normalizeAuthorName([author.foreName, author.lastName].filter(Boolean).join(" ").trim());
-        const primaryAff = author.affiliations[0] ?? null;
-        const geoParsed = primaryAff ? await geoParseAffiliation(primaryAff) : null;
-        preResolvedOAMap.set(i, await fetchOpenAlexId(orcid, name, geoParsed?.institution ?? null));
+        // Check DB first — if ORCID already known, no API call needed
+        const { data: existing } = await admin
+          .from("authors")
+          .select("id")
+          .eq("orcid", orcid)
+          .maybeSingle();
+        if (existing) {
+          preResolvedOAMap.set(i, null);
+          return;
+        }
+        // ORCID not in DB — fetch from OpenAlex
+        preResolvedOAMap.set(i, await fetchOpenAlexId(orcid, "", null));
       });
     })
   );

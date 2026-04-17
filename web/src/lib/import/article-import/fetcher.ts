@@ -21,11 +21,6 @@ export function toArray<T>(v: T | T[] | undefined | null): T[] {
   return Array.isArray(v) ? v : [v];
 }
 
-function decodeXmlEntities(str: string): string {
-  return str
-    .replace(/&#x([0-9a-fA-F]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)));
-}
 
 export function getText(v: unknown): string {
   if (typeof v === "string") return v;
@@ -347,7 +342,7 @@ export async function fetchArticleDetails(
       if (!pubmedId) continue;
 
       // Title
-      const title = decodeXmlEntities(getText(art?.ArticleTitle));
+      const title = decodeHtmlEntities(getText(art?.ArticleTitle));
 
       // Abstract (may have multiple structured parts)
       const abstractParts = toArray(
@@ -355,7 +350,7 @@ export async function fetchArticleDetails(
       );
       const abstract =
         abstractParts.length > 0
-          ? decodeXmlEntities(
+          ? decodeHtmlEntities(
               abstractParts
                 .map((part) => {
                   const p = part as Record<string, unknown>;

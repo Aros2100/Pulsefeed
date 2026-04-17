@@ -4,10 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AuthorSearch, { type AuthorMeta } from "@/components/AuthorSearch";
 import AuthorGeoFields from "@/components/authors/AuthorGeoFields";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 const TOTAL_STEPS = 3;
 
-const MANDATORY_SUBSPECIALTY = "Neurosurgery";
+const MANDATORY_SUBSPECIALTY = ACTIVE_SPECIALTY.charAt(0).toUpperCase() + ACTIVE_SPECIALTY.slice(1);
 const MAX_SUBSPECIALTIES = 3;
 
 function Spinner() {
@@ -169,7 +170,7 @@ export default function OnboardingFlow({ initialAuthorQuery = "", subspecialties
       step: "complete",
       subspecialties: [MANDATORY_SUBSPECIALTY, ...selectedSubspecialties],
     });
-    if (ok) router.replace("/");
+    if (ok) router.replace("/home");
   }
 
   function toggleSubspecialty(s: string) {

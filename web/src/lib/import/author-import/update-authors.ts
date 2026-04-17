@@ -32,6 +32,7 @@ export type BatchOptions = {
   dryRun: boolean;
   limit?: number;
   articleId?: string;
+  triggeredBy?: "manual" | "cron";
 };
 
 export type BatchResult = {
@@ -376,6 +377,14 @@ export async function runAuthorUpdateBatch(options: BatchOptions): Promise<Batch
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const a = admin as any;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: logRow } = await (admin as any)
+    .from("author_update_logs")
+    .insert({ dry_run: dryRun, triggered_by: options.triggeredBy ?? "manual" })
+    .select("id")
+    .single();
+  const logId = (logRow as { id: string } | null)?.id ?? null;
+
   const batch: BatchResult = {
     processed: 0,
     scenarioA: 0,
@@ -428,6 +437,20 @@ export async function runAuthorUpdateBatch(options: BatchOptions): Promise<Batch
 
   console.log(`\n[update-authors] FÆRDIG — processed=${batch.processed} A=${batch.scenarioA} B=${batch.scenarioB} C=${batch.scenarioC} unmatched=${batch.unmatched} errors=${batch.errors.length}`);
   console.log(`${"─".repeat(60)}\n`);
+
+  if (logId) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (admin as any).from("author_update_logs").update({
+      status:       batch.errors.length > 0 && batch.processed === 0 ? "failed" : "completed",
+      completed_at: new Date().toISOString(),
+      processed:    batch.processed,
+      scenario_a:   batch.scenarioA,
+      scenario_b:   batch.scenarioB,
+      scenario_c:   batch.scenarioC,
+      unmatched:    batch.unmatched,
+      errors:       batch.errors.length > 0 ? batch.errors : null,
+    }).eq("id", logId);
+  }
 
   return batch;
 }

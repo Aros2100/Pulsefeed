@@ -122,7 +122,7 @@ export default function AuthorLinkingPage() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/author-linking/status");
+      const res = await fetch("/api/admin/author-linking/status", { cache: "no-store" });
       const json = (await res.json()) as StatusResponse;
       if (json.ok) setStatus(json);
     } catch (e) {
