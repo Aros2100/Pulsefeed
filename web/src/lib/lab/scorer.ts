@@ -190,7 +190,8 @@ export async function scoreClassificationDrift(
   specialty: string,
   activePrompt: ActivePrompt
 ): Promise<ClassificationDriftResult> {
-  const admin = createAdminClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
 
   const { data: subspecialtyRows } = await admin
     .from("subspecialties")
