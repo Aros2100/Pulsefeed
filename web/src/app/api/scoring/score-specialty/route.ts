@@ -78,38 +78,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
-  // Fetch article IDs
-  const { data } = await admin.rpc("get_specialty_scoring_candidates", {
+  const { data: unscoredData, error: fetchError } = await admin.rpc("get_specialty_unscored_articles", {
     p_specialty: specialty,
     p_limit:     userLimit ?? 100,
     p_edat_from: edat_from ?? null,
     p_edat_to:   edat_to   ?? null,
   });
-  const ids: string[] = (data ?? []).map((r: { article_id: string }) => r.article_id);
-
-  if (ids.length === 0) {
-    const emptyStream = new ReadableStream({
-      start(controller) {
-        const encoder = new TextEncoder();
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, scored: 0, failed: 0, total: 0 })}\n\n`));
-        controller.close();
-      },
-    });
-    return new Response(emptyStream, {
-      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive", "Content-Encoding": "none", "X-Accel-Buffering": "no" },
-    });
-  }
-
-  const { data: articles, error: fetchError } = await admin
-    .from("articles")
-    .select("id, title, abstract")
-    .in("id", ids);
 
   if (fetchError) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
   }
 
-  const toScore = (articles ?? []) as Article[];
+  const toScore = (unscoredData ?? []) as Article[];
+
+  if (toScore.length === 0) {
+    return NextResponse.json({ ok: true, scored: 0, failed: 0, total: 0 });
+  }
 
   // Stream SSE progress events so the client can show a live countdown
   const stream = new ReadableStream({
