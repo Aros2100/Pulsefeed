@@ -150,9 +150,14 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
     return ["all", ...Array.from(new Set(types)).sort()];
   }, [subspecialtyArticles]);
 
-  const visibleArticles = articleTypeFilter === "all"
+  const visibleArticles = (articleTypeFilter === "all"
     ? subspecialtyArticles
-    : subspecialtyArticles.filter((a) => a.article_type === articleTypeFilter);
+    : subspecialtyArticles.filter((a) => a.article_type === articleTypeFilter)
+  ).sort((a, b) => {
+    if (!a.pubmed_indexed_at) return 1;
+    if (!b.pubmed_indexed_at) return -1;
+    return new Date(b.pubmed_indexed_at).getTime() - new Date(a.pubmed_indexed_at).getTime();
+  });
 
   const selectedForActive: string[] = selectedMap[activeSubspecialty] ?? [];
 
