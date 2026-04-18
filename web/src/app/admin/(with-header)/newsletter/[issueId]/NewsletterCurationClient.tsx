@@ -281,6 +281,10 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
           <span style={{ fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap" }}>
             Week {edition.week_number} · {edition.year}
           </span>
+          <span style={{ color: "#dde3ed" }}>·</span>
+          <span style={{ fontSize: "13px", color: "#5a6a85", whiteSpace: "nowrap" }}>
+            {articles.length} articles
+          </span>
           <button
             onClick={() => navigate(next.week, next.year)}
             disabled={isNextFuture}
