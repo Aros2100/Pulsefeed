@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
   let activePrompt;
   try {
-    activePrompt = await getActivePrompt(specialty, "specialty_tag_lab");
+    activePrompt = await getActivePrompt(specialty, "specialty_lab");
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
                   .eq("specialty", specialty);
                 void logArticleEvent(article.id, "enriched", {
                   specialty,
-                  module:     "specialty_tag_lab",
+                  module:     "specialty_lab",
                   decision:   score.ai_decision,
                   confidence: score.confidence,
                   reason:     score.reason,
