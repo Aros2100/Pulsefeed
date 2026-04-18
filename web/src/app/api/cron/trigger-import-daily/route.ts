@@ -3,6 +3,7 @@ import { runImport } from "@/specialties/neurosurgery/filter-c1";
 import { runImportCircle4 } from "@/specialties/neurosurgery/filter-c4";
 import { runImportCircle2 } from "@/specialties/neurosurgery/filter-c2";
 import { runAutoTagSpecialty } from "@/lib/auto-tag/run-auto-tag-specialty";
+import { runAutoTagArticleType } from "@/lib/auto-tag/run-auto-tag-article-type";
 import { runPubmedSync } from "@/lib/pubmed/sync-runner";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
@@ -22,6 +23,7 @@ export async function POST(request: NextRequest) {
       await runImportCircle4(undefined, false, undefined, "cron", 1);
       await runImportCircle2(ACTIVE_SPECIALTY, undefined, "cron", 1);
       await runAutoTagSpecialty(ACTIVE_SPECIALTY);
+      await runAutoTagArticleType();
       await runPubmedSync({ esearchRetmax: 500 });
     } catch (e) {
       console.error("[trigger-import-daily] failed:", e);

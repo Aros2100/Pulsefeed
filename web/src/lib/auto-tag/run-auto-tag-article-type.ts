@@ -1,0 +1,103 @@
+import { createAdminClient } from "@/lib/supabase/admin";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
+import { logArticleEvent } from "@/lib/article-events";
+
+function normalize(s: string): string {
+  return s.toLowerCase().replace(/,/g, "").trim();
+}
+
+export async function runAutoTagArticleType(): Promise<{ scored: number; skipped: number; approved: number }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createAdminClient() as any;
+
+  // Fetch active rules
+  const { data: rulesData, error: rulesError } = await admin
+    .from("article_type_rules")
+    .select("publication_type, article_type, priority")
+    .eq("is_active", true);
+
+  if (rulesError) throw new Error(rulesError.message);
+
+  const rules = (rulesData ?? []) as { publication_type: string; article_type: string; priority: number }[];
+  const priorityMap = new Map<string, { article_type: string; priority: number }>();
+  for (const rule of rules) {
+    priorityMap.set(normalize(rule.publication_type), { article_type: rule.article_type, priority: rule.priority });
+  }
+
+  if (priorityMap.size === 0) return { scored: 0, skipped: 0, approved: 0 };
+
+  // Fetch candidates
+  const allArticles: { id: string; publication_types: string[] | null }[] = [];
+  const PAGE = 1000;
+  for (let offset = 0; ; offset += PAGE) {
+    const { data } = await admin.rpc("get_article_type_candidates", {
+      p_specialty: ACTIVE_SPECIALTY,
+      p_offset: offset,
+      p_limit: PAGE,
+    });
+    if (!data || data.length === 0) break;
+    allArticles.push(...data);
+    if (data.length < PAGE) break;
+  }
+
+  let scored = 0;
+  let skipped = 0;
+
+  // Score
+  for (const article of allArticles) {
+    const pubTypes = article.publication_types ?? [];
+    let matched: string | null = null;
+    let matchedRaw: string | null = null;
+    let matchedPriority = Infinity;
+
+    for (const pt of pubTypes) {
+      const rule = priorityMap.get(normalize(pt));
+      if (rule && rule.priority < matchedPriority) {
+        matched = rule.article_type;
+        matchedRaw = pt;
+        matchedPriority = rule.priority;
+      }
+    }
+
+    if (!matched || !matchedRaw) {
+      skipped++;
+    } else {
+      await admin.from("articles").update({
+        article_type:               matched,
+        article_type_ai:            matched,
+        article_type_confidence:    95,
+        article_type_rationale:     `Classified by publication type: ${matchedRaw}`,
+        article_type_method:        "deterministic",
+        article_type_validated:     false,
+        article_type_scored_at:     new Date().toISOString(),
+        article_type_model_version: "deterministic-v2",
+      }).eq("id", article.id);
+      scored++;
+    }
+  }
+
+  // Godkend alle deterministisk scorede
+  const { data: toApprove } = await admin
+    .from("articles")
+    .select("id, article_type_ai")
+    .eq("article_type_method", "deterministic")
+    .eq("article_type_validated", false);
+
+  const approveIds = (toApprove ?? []).map((a: { id: string }) => a.id);
+
+  if (approveIds.length > 0) {
+    await admin.from("articles").update({ article_type_validated: true }).in("id", approveIds);
+    await Promise.all(
+      (toApprove ?? []).map((a: { id: string; article_type_ai: string | null }) =>
+        logArticleEvent(a.id, "auto_tagged", {
+          module: "article_type",
+          method: "deterministic",
+          article_type: a.article_type_ai,
+        })
+      )
+    );
+  }
+
+  console.log(`[auto-tag-article-type] scored=${scored} skipped=${skipped} approved=${approveIds.length}`);
+  return { scored, skipped, approved: approveIds.length };
+}
