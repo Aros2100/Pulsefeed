@@ -73,6 +73,11 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse;
   }
 
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && bearer === cronSecret) {
+    return supabaseResponse;
+  }
+
   // Protected route + not logged in → redirect to /login
   if (!user && !isPublicPath(pathname)) {
     const loginUrl = request.nextUrl.clone();
