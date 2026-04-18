@@ -162,6 +162,7 @@ export default function ArticleTypeClient({
   const [pendingFilter,   setPendingFilter]   = useState<string>("All");
   const [selectedIds,     setSelectedIds]     = useState<Set<string>>(new Set());
   const [approving,       setApproving]       = useState(false);
+  const [approveProgress, setApproveProgress] = useState<{ done: number; total: number } | null>(null);
   const [loadingFilter,   setLoadingFilter]   = useState(false);
 
   /* ── Derived state ──────────────────────────────────────────── */
@@ -351,6 +352,15 @@ export default function ArticleTypeClient({
     if (selectedIds.size === 0) return;
     setApproving(true);
     const ids = [...selectedIds];
+    const total = ids.length;
+    setApproveProgress({ done: 0, total });
+    const startTime = Date.now();
+    const estimatedMs = total * 80;
+    const ticker = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const simulated = Math.min(Math.floor((elapsed / estimatedMs) * total), total - 1);
+      setApproveProgress({ done: simulated, total });
+    }, 200);
     try {
       const res = await fetch("/api/admin/article-type/batch-approve", {
         method: "POST",
@@ -365,7 +375,9 @@ export default function ArticleTypeClient({
     } catch {
       showToast("Netværksfejl", false);
     } finally {
+      clearInterval(ticker);
       setApproving(false);
+      setApproveProgress(null);
     }
   }
 
@@ -527,7 +539,9 @@ export default function ArticleTypeClient({
                 whiteSpace: "nowrap",
               }}
             >
-              {approving ? "Godkender…" : `Godkend valgte (${selectedIds.size})`}
+              {approving && approveProgress
+                ? `Godkender… ${approveProgress.done}/${approveProgress.total}`
+                : `Godkend valgte (${selectedIds.size})`}
             </button>
           </div>
 
