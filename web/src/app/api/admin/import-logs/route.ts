@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   const specialty  = searchParams.get("specialty");
   const circleStr  = searchParams.get("circle");
   const circle     = circleStr ? parseInt(circleStr) : null;
-  const limit = Math.min(Math.max(1, parseInt(searchParams.get("limit") ?? "10")), 100);
+  const limit = Math.min(Math.max(1, parseInt(searchParams.get("limit") ?? "10")), 500);
 
   const admin = createAdminClient();
 

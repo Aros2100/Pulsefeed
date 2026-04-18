@@ -248,8 +248,8 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 | 4 }) 
   /* ── Fetch logs ── */
   const fetchLogs = useCallback(async () => {
     const params = circle === 3
-      ? "circle=3&limit=100"
-      : `specialty=${specialty}&circle=${circle}&limit=100`;
+      ? "circle=3&limit=500"
+      : `specialty=${specialty}&circle=${circle}&limit=500`;
     const res = await fetch(`/api/admin/import-logs?${params}`);
     const d = await res.json();
     if (d.ok) {
