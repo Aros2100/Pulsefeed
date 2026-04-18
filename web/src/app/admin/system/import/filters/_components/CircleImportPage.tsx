@@ -248,8 +248,8 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 | 4 }) 
   /* ── Fetch logs ── */
   const fetchLogs = useCallback(async () => {
     const params = circle === 3
-      ? "circle=3&limit=10"
-      : `specialty=${specialty}&circle=${circle}&limit=10`;
+      ? "circle=3&limit=100"
+      : `specialty=${specialty}&circle=${circle}&limit=100`;
     const res = await fetch(`/api/admin/import-logs?${params}`);
     const d = await res.json();
     if (d.ok) {
@@ -684,26 +684,28 @@ export default function CircleImportPage({ circle }: { circle: 1 | 2 | 3 | 4 }) 
           ) : logs.length === 0 ? (
             <div style={{ padding: "32px", textAlign: "center", fontSize: "13px", color: "#888" }}>Ingen import-kørsler endnu</div>
           ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  {["Dato", "Importeret", "Skipped", "Tid", "Status"].map((h) => (
-                    <th key={h} style={thStyle}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {logs.slice(0, 10).map((log) => (
-                  <tr key={log.id}>
-                    <td style={{ ...tdStyle, whiteSpace: "nowrap", color: "#5a6a85" }}>{fmt(log.started_at)}</td>
-                    <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>{log.articles_imported}</td>
-                    <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums", color: "#888" }}>{log.articles_skipped}</td>
-                    <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums", color: "#888" }}>{logDuration(log)}</td>
-                    <td style={tdStyle}><StatusBadge status={log.status} /></td>
+            <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    {["Dato", "Importeret", "Skipped", "Tid", "Status"].map((h) => (
+                      <th key={h} style={thStyle}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {logs.map((log) => (
+                    <tr key={log.id}>
+                      <td style={{ ...tdStyle, whiteSpace: "nowrap", color: "#5a6a85" }}>{fmt(log.started_at)}</td>
+                      <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>{log.articles_imported}</td>
+                      <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums", color: "#888" }}>{log.articles_skipped}</td>
+                      <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums", color: "#888" }}>{logDuration(log)}</td>
+                      <td style={tdStyle}><StatusBadge status={log.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
