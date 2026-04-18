@@ -99,7 +99,7 @@ export async function scoreArticleLab(
     .replace(/\{\{title\}\}|\{title\}/g,         article.title)
     .replace(/\{\{abstract\}\}|\{abstract\}/g,   article.abstract ?? "No abstract available");
 
-  const message = await trackedCall(`specialty_tag_lab_${activePrompt.version}`, {
+  const message = await trackedCall(`specialty_lab_${activePrompt.version}`, {
     model: SCORING_MODEL,
     max_tokens: 100,
     thinking: { type: "disabled" },
