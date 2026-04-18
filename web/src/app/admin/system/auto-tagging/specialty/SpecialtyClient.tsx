@@ -348,6 +348,16 @@ export default function TaggingClient({
     const total = ids.length;
     setBusyBatchApprove(true);
     setApproveProgress({ done: 0, total });
+
+    // Start simuleret tæller
+    const startTime = Date.now();
+    const estimatedMs = total * 80; // ~80ms per artikel
+    const ticker = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const simulated = Math.min(Math.floor((elapsed / estimatedMs) * total), total - 1);
+      setApproveProgress({ done: simulated, total });
+    }, 200);
+
     let totalApproved = 0;
     try {
       for (let i = 0; i < ids.length; i += 500) {
@@ -371,6 +381,7 @@ export default function TaggingClient({
     } catch {
       showToast("Netværksfejl", false);
     } finally {
+      clearInterval(ticker);
       setBusyBatchApprove(false);
       setApproveProgress(null);
     }
