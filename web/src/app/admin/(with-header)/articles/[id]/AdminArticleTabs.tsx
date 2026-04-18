@@ -8,11 +8,12 @@ interface Props {
   geo:       React.ReactNode;
   system:    React.ReactNode;
   historik:  React.ReactNode;
+  note:      React.ReactNode;
 }
 
-type Tab = "pubmed" | "berigelse" | "geo" | "system" | "historik";
+type Tab = "pubmed" | "berigelse" | "geo" | "system" | "historik" | "note";
 
-export default function AdminArticleTabs({ pubmed, berigelse, geo, system, historik }: Props) {
+export default function AdminArticleTabs({ pubmed, berigelse, geo, system, historik, note }: Props) {
   const [tab, setTab] = useState<Tab>("pubmed");
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
@@ -40,6 +41,7 @@ export default function AdminArticleTabs({ pubmed, berigelse, geo, system, histo
         <button style={tabStyle(tab === "geo")}        onClick={() => setTab("geo")}>Geo</button>
         <button style={tabStyle(tab === "system")}     onClick={() => setTab("system")}>System</button>
         <button style={tabStyle(tab === "historik")}   onClick={() => setTab("historik")}>Historik</button>
+        <button style={tabStyle(tab === "note")}       onClick={() => setTab("note")}>Note</button>
       </div>
 
       {tab === "pubmed"    && pubmed}
@@ -47,6 +49,7 @@ export default function AdminArticleTabs({ pubmed, berigelse, geo, system, histo
       {tab === "geo"       && geo}
       {tab === "system"    && system}
       {tab === "historik"  && historik}
+      {tab === "note"      && note}
     </div>
   );
 }

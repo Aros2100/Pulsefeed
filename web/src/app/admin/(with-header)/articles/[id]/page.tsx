@@ -5,6 +5,7 @@ import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import ArticleStamkort, { type ArticleData } from "@/components/articles/ArticleStamkort";
 import AdminArticleTabs from "./AdminArticleTabs";
 import ArticleEditableFields from "./ArticleEditableFields";
+import ArticleNoteTab from "./ArticleNoteTab";
 import { getSubspecialties } from "@/lib/lab/classification-options";
 import GeoCard from "./GeoCard";
 
@@ -1173,6 +1174,7 @@ export default async function AdminArticleLogPage({
           geo={geoTab}
           system={systemTab}
           historik={historikTab}
+          note={<ArticleNoteTab articleId={id} initialNote={(raw.admin_note as string | null) ?? ""} />}
         />
       </div>
     </div>
