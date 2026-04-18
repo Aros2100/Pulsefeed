@@ -422,7 +422,7 @@ export async function scoreArticleTypeProd(
     thinking: { type: "disabled" },
     system: "You respond only with valid JSON. No explanation, no reasoning, no other text.",
     messages: [{ role: "user", content }],
-  }, article.id, "article_type_prod");
+  }, article.id, "article_type");
 
   const raw = (message.content[0] as { type: string; text: string }).text.trim();
 
