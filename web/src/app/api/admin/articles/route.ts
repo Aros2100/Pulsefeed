@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
   if (search) {
     const isNumeric = /^\d+$/.test(search.trim());
     if (isNumeric) {
-      query = query.eq("pmid", search.trim());
+      query = query.eq("pubmed_id", search.trim());
     } else {
       query = query.or(
         `title.ilike.%${search.trim()}%,abstract.ilike.%${search.trim()}%`
