@@ -4,14 +4,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import NewsletterCurationClient from "./NewsletterCurationClient";
 
-function getThisWeekRange(): { start: string; end: string } {
-  const today = new Date();
-  const day = today.getDay() || 7;
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - day + 1);
+function getWeekRange(week: number, year: number): { start: string; end: string } {
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const jan4Day = jan4.getUTCDay() || 7;
+  const weekStart = new Date(jan4);
+  weekStart.setUTCDate(jan4.getUTCDate() - (jan4Day - 1) + (week - 1) * 7);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
   return {
-    start: monday.toISOString().slice(0, 10),
-    end: today.toISOString().slice(0, 10),
+    start: weekStart.toISOString().slice(0, 10),
+    end: weekEnd.toISOString().slice(0, 10),
   };
 }
 
@@ -43,7 +45,7 @@ export default async function NewsletterCurationPage({ params }: { params: Promi
     .eq("active", true)
     .order("sort_order");
 
-  const { start: weekFrom, end: weekTo } = getThisWeekRange();
+  const { start: weekFrom, end: weekTo } = getWeekRange(edition.week_number, edition.year);
 
   // Fetch articles via RPC (cast needed until types are regenerated)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
