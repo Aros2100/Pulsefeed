@@ -2,7 +2,6 @@ import { NextResponse, after } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { runImportCircle3 } from "@/specialties/neurosurgery/filter-c3";
 import { runCitationFetch } from "@/lib/import/fetch-citations";
-import { runAILocationParsing } from "@/lib/geo/ai-location-scorer";
 import { runPublicationTypeMapping } from "@/lib/tagging/publication-type-mapper";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -49,14 +48,6 @@ export async function POST() {
 
   after(async () => {
     await runCitationFetch(200);
-  });
-
-  after(async () => {
-    try {
-      const aiResult = await runAILocationParsing(200);
-    } catch (e) {
-      console.error("[geo/ai-parse] failed:", e);
-    }
   });
 
   after(() => {

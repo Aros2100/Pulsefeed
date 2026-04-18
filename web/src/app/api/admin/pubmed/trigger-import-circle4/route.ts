@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest, after } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { runImportCircle4 } from "@/specialties/neurosurgery/filter-c4";
 import { runCitationFetch } from "@/lib/import/fetch-citations";
-import { runAILocationParsing } from "@/lib/geo/ai-location-scorer";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const maxDuration = 300;
@@ -44,14 +43,6 @@ export async function POST(request: NextRequest) {
 
   after(async () => {
     await runCitationFetch(200);
-  });
-
-  after(async () => {
-    try {
-      await runAILocationParsing(200);
-    } catch (e) {
-      console.error("[geo/ai-parse] failed:", e);
-    }
   });
 
   return NextResponse.json({ ok: true });

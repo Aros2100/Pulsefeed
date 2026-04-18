@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest, after } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { runImport } from "@/specialties/neurosurgery/filter-c1";
 import { runCitationFetch } from "@/lib/import/fetch-citations";
-import { runAILocationParsing } from "@/lib/geo/ai-location-scorer";
 import { runPublicationTypeMapping } from "@/lib/tagging/publication-type-mapper";
 
 export async function POST(request: NextRequest) {
@@ -27,14 +26,6 @@ export async function POST(request: NextRequest) {
 
   after(async () => {
     await runCitationFetch(200);
-  });
-
-  after(async () => {
-    try {
-      const aiResult = await runAILocationParsing(200);
-    } catch (e) {
-      console.error("[geo/ai-parse] failed:", e);
-    }
   });
 
   after(() => {
