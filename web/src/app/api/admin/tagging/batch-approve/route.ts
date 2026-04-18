@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       .from("article_specialties")
       .update({
         specialty_match: true,
-        scored_by: "human",
+        scored_by: "mesh_auto_tagging",
         scored_at: now,
       })
       .in("article_id", chunk)

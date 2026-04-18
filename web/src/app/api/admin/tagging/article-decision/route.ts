@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     .from("article_specialties")
     .update({
       specialty_match: decision === "approved" ? true : false,
-      scored_by: "human",
+      scored_by: "mesh_auto_tagging",
       scored_at: now,
     })
     .eq("article_id", articleId)
