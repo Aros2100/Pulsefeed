@@ -68,6 +68,8 @@ interface ArticleRow {
   specialty_tags: string[];
   abstract: string | null;
   evidence_score: number | null;
+  article_type: string | null;
+  subspecialty: string[] | null;
 }
 
 type SortField = "title" | "journal_abbr" | "pubmed_indexed_at" | "imported_at" | "circle" | "evidence_score";
@@ -639,8 +641,22 @@ export default function AdminArticleListClient({
                             <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--pf-dark)", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                               {a.title}
                             </div>
-                            {count > 0 && (
-                              <div style={{ fontSize: "11px", color: "#aaa", marginTop: "2px" }}>{count} authors</div>
+                            {(count > 0 || a.article_type || (a.subspecialty && a.subspecialty.length > 0)) && (
+                              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px", marginTop: "4px" }}>
+                                {count > 0 && (
+                                  <span style={{ fontSize: "11px", color: "#aaa" }}>{count} authors</span>
+                                )}
+                                {a.article_type && (
+                                  <span style={{ fontSize: "10px", padding: "1px 5px", borderRadius: "8px", background: "#f0f2f5", color: "#5a6a85", fontWeight: 600 }}>
+                                    {a.article_type}
+                                  </span>
+                                )}
+                                {(a.subspecialty ?? []).map((s) => (
+                                  <span key={s} style={{ fontSize: "10px", padding: "1px 5px", borderRadius: "8px", background: "#f5f3ff", color: "#6d28d9", fontWeight: 600 }}>
+                                    {s}
+                                  </span>
+                                ))}
+                              </div>
                             )}
                           </Link>
                         </td>

@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     query = supabase
       .from("articles")
       .select(
-        `id, title, journal_abbr, pubmed_indexed_at, imported_at, authors, circle, specialty_tags, abstract, evidence_score, article_type,
+        `id, title, journal_abbr, pubmed_indexed_at, imported_at, authors, circle, specialty_tags, abstract, evidence_score, article_type, subspecialty,
          article_specialties!inner(specialty, specialty_match)`,
         { count: "exact" }
       )
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     query = supabase
       .from("articles")
       .select(
-        "id, title, journal_abbr, pubmed_indexed_at, imported_at, authors, circle, specialty_tags, abstract, evidence_score, article_type",
+        "id, title, journal_abbr, pubmed_indexed_at, imported_at, authors, circle, specialty_tags, abstract, evidence_score, article_type, subspecialty",
         { count: "exact" }
       )
       .order(sort_by, { ascending })
