@@ -38,7 +38,7 @@ const MODULE_CONFIG: Record<string, {
   requestBody: (specialty: string) => Record<string, unknown>;
   showLimit?: boolean;
 }> = {
-  specialty_tag: {
+  specialty: {
     label: "Specialty",
     apiRoute: "/api/scoring/score-specialty",
     requestBody: (specialty) => ({ specialty }),
