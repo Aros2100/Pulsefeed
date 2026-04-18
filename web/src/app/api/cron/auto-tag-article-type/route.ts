@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { runAutoTagSpecialty } from "@/lib/auto-tag/run-auto-tag-specialty";
-import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
+import { runAutoTagArticleType } from "@/lib/auto-tag/run-auto-tag-article-type";
 
 export async function POST(req: NextRequest) {
   const auth = req.headers.get("Authorization");
@@ -9,7 +8,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await runAutoTagSpecialty(ACTIVE_SPECIALTY);
+    const result = await runAutoTagArticleType();
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 500 });
