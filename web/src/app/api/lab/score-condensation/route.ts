@@ -36,7 +36,7 @@ async function condenseWithRetry(
 ) {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      return await scoreCondensation(article, specialty, activePrompt, "condensation_lab");
+      return await scoreCondensation(article, specialty, activePrompt, "condensation");
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
       if (status === 429 && attempt < retries - 1) {
