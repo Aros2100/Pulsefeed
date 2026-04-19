@@ -156,13 +156,8 @@ export default async function CondensationOverviewPage() {
                 valueColor: "#5a6a85",
               },
             ]}
-            actionLabel={
-              textQueueCount > 0
-                ? `Start session · ${textQueueCount} artikler →`
-                : "Start session →"
-            }
-            actionHref="/admin/lab/condensation/text"
-            actionColor="#059669"
+            actionLabel="Validering afsluttet"
+            actionColor="#94a3b8"
           />
 
           {/* Card 2: SARI-validering */}

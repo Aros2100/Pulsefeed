@@ -18,7 +18,7 @@ interface SectionCardProps {
   badges: Badge[];
   kpis: KPI[];
   actionLabel: string;
-  actionHref: string;
+  actionHref?: string;
   actionColor?: string;
   /** Optional extra element rendered next to the action button (e.g. a client component) */
   secondaryAction?: React.ReactNode;
@@ -133,23 +133,42 @@ export function SectionCard({
 
         {/* Actions */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <Link
-            href={actionHref}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              borderRadius: "8px",
-              padding: "10px 20px",
-              background: actionColor,
-              color: "#fff",
-              fontSize: "13px",
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            {actionLabel}
-          </Link>
+          {actionHref ? (
+            <Link
+              href={actionHref}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                borderRadius: "8px",
+                padding: "10px 20px",
+                background: actionColor,
+                color: "#fff",
+                fontSize: "13px",
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
+              {actionLabel}
+            </Link>
+          ) : (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                borderRadius: "8px",
+                padding: "10px 20px",
+                background: actionColor,
+                color: "#fff",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: "default",
+              }}
+            >
+              {actionLabel}
+            </span>
+          )}
           {secondaryAction}
         </div>
       </div>
