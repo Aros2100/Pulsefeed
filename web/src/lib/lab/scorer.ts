@@ -474,12 +474,10 @@ export async function scoreCondensation(
     const short_resume   = typeof parsed.short_resume === "string"   ? parsed.short_resume   : "";
     const bottom_line    = typeof parsed.bottom_line === "string"    ? parsed.bottom_line    : "";
 
-    const limitWords = (s: string, n: number) => { const w = s.trim().split(/\s+/); return w.length <= n ? s : null; };
-
-    const sari_subject    = typeof parsed.sari_subject    === "string" ? limitWords(parsed.sari_subject,    25) : null;
-    const sari_action     = typeof parsed.sari_action     === "string" ? limitWords(parsed.sari_action,     25) : null;
-    const sari_result     = typeof parsed.sari_result     === "string" ? limitWords(parsed.sari_result,     25) : null;
-    const sari_implication = typeof parsed.sari_implication === "string" ? limitWords(parsed.sari_implication, 25) : null;
+    const sari_subject    = typeof parsed.sari_subject    === "string" ? parsed.sari_subject    : null;
+    const sari_action     = typeof parsed.sari_action     === "string" ? parsed.sari_action     : null;
+    const sari_result     = typeof parsed.sari_result     === "string" ? parsed.sari_result     : null;
+    const sari_implication = typeof parsed.sari_implication === "string" ? parsed.sari_implication : null;
 
     const rawSize = Number(parsed.sample_size);
     const sample_size = Number.isFinite(rawSize) && rawSize > 0 ? Math.round(rawSize) : null;
