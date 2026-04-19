@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import Link from "next/link";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -90,6 +90,7 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
     initSections(editionArticles, articleDetails)
   );
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Display order: named subspecialties by sort_order, then "No subspecialty"
   const sectionOrder = useMemo(() => {
@@ -136,26 +137,31 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
 
   async function save() {
     setSaving(true);
+    setSaveError(null);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any)
-        .from("newsletter_editions")
-        .update({ content: { ...(edition.content ?? {}), intro } })
-        .eq("id", edition.id);
+      const introRes = await fetch("/api/admin/newsletter/edition", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: edition.id, intro }),
+      });
+      const introJson = await introRes.json();
+      if (!introJson.ok) throw new Error(introJson.error ?? `HTTP ${introRes.status}`);
 
       const updates = Object.values(sections).flatMap((items) =>
         items.map((item, idx) => ({ id: item.id, sort_order: idx, featured: item.featured }))
       );
 
-      await Promise.all(
-        updates.map(({ id, sort_order, featured }) =>
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (supabase as any)
-            .from("newsletter_edition_articles")
-            .update({ sort_order, featured })
-            .eq("id", id)
-        )
-      );
+      if (updates.length > 0) {
+        const articlesRes = await fetch("/api/admin/newsletter/edition-article", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ updates }),
+        });
+        const articlesJson = await articlesRes.json();
+        if (!articlesJson.ok) throw new Error(articlesJson.error ?? `HTTP ${articlesRes.status}`);
+      }
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Save failed");
     } finally {
       setSaving(false);
     }
@@ -200,6 +206,16 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
           </button>
         </div>
       </div>
+
+      {/* ── Error banner ────────────────────────────────────────────────────── */}
+      {saveError && (
+        <div style={{
+          background: "#fff5f5", borderBottom: "1px solid #fecaca",
+          padding: "8px 20px", fontSize: "13px", color: "#b91c1c",
+        }}>
+          {saveError}
+        </div>
+      )}
 
       {/* ── Body ────────────────────────────────────────────────────────────── */}
       <div style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 24px 80px" }}>
