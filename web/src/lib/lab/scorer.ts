@@ -15,10 +15,10 @@ export interface CondensationResult {
   short_headline: string;
   short_resume: string;
   bottom_line: string;
-  pico_population: string | null;
-  pico_intervention: string | null;
-  pico_comparison: string | null;
-  pico_outcome: string | null;
+  sari_subject: string | null;
+  sari_action: string | null;
+  sari_result: string | null;
+  sari_implication: string | null;
   sample_size: number | null;
   version: string;
 }
@@ -463,10 +463,10 @@ export async function scoreCondensation(
       short_headline?: string;
       short_resume?: string;
       bottom_line?: string;
-      pico_population?: string;
-      pico_intervention?: string;
-      pico_comparison?: string;
-      pico_outcome?: string;
+      sari_subject?: string;
+      sari_action?: string;
+      sari_result?: string;
+      sari_implication?: string;
       sample_size?: unknown;
     };
 
@@ -474,23 +474,23 @@ export async function scoreCondensation(
     const short_resume   = typeof parsed.short_resume === "string"   ? parsed.short_resume   : "";
     const bottom_line    = typeof parsed.bottom_line === "string"    ? parsed.bottom_line    : "";
 
-    const pico_population   = typeof parsed.pico_population === "string"   ? parsed.pico_population   : null;
-    const pico_intervention = typeof parsed.pico_intervention === "string" ? parsed.pico_intervention : null;
-    const pico_comparison   = typeof parsed.pico_comparison === "string"   ? parsed.pico_comparison   : null;
-    const pico_outcome      = typeof parsed.pico_outcome === "string"      ? parsed.pico_outcome      : null;
+    const sari_subject    = typeof parsed.sari_subject    === "string" ? parsed.sari_subject    : null;
+    const sari_action     = typeof parsed.sari_action     === "string" ? parsed.sari_action     : null;
+    const sari_result     = typeof parsed.sari_result     === "string" ? parsed.sari_result     : null;
+    const sari_implication = typeof parsed.sari_implication === "string" ? parsed.sari_implication : null;
 
     const rawSize = Number(parsed.sample_size);
     const sample_size = Number.isFinite(rawSize) && rawSize > 0 ? Math.round(rawSize) : null;
 
     return {
       short_headline, short_resume, bottom_line,
-      pico_population, pico_intervention, pico_comparison, pico_outcome,
+      sari_subject, sari_action, sari_result, sari_implication,
       sample_size, version: activePrompt.version,
     };
   } catch {
     return {
       short_headline: "", short_resume: "", bottom_line: "",
-      pico_population: null, pico_intervention: null, pico_comparison: null, pico_outcome: null,
+      sari_subject: null, sari_action: null, sari_result: null, sari_implication: null,
       sample_size: null, version: activePrompt.version,
     };
   }

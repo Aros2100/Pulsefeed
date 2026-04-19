@@ -1,7 +1,6 @@
 "use client";
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -84,8 +83,6 @@ function initSections(
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function NewsletterReviewClient({ edition, subspecialties, editionArticles, articleDetails }: Props) {
-  const supabase = useMemo(() => createClient(), []);
-
   const [intro, setIntro] = useState<string>(
     (edition.content as Record<string, string> | null)?.intro ?? ""
   );
@@ -128,11 +125,13 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
       ...prev,
       [subspecialty]: (prev[subspecialty] ?? []).filter((item) => item.id !== itemId),
     }));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any)
-      .from("newsletter_edition_articles")
-      .delete()
-      .eq("id", itemId);
+    const res = await fetch("/api/admin/newsletter/edition-article", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: itemId }),
+    });
+    const json = await res.json();
+    if (!json.ok) window.location.reload();
   }
 
   async function save() {

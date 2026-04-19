@@ -122,16 +122,16 @@ export async function POST(request: NextRequest) {
               try {
                 const cnd = await condenseWithDelay(article, specialty, activePrompt!);
                 const updatePayload = {
-                  short_headline:             cnd.short_headline,
-                  short_resume:               cnd.short_resume,
-                  bottom_line:                cnd.bottom_line,
-                  pico_population:            cnd.pico_population,
-                  pico_intervention:          cnd.pico_intervention,
-                  pico_comparison:            cnd.pico_comparison,
-                  pico_outcome:               cnd.pico_outcome,
-                  sample_size:                cnd.sample_size,
-                  condensed_model_version:    cnd.version,
-                  condensed_at:               new Date().toISOString(),
+                  short_headline:          cnd.short_headline,
+                  short_resume:            cnd.short_resume,
+                  bottom_line:             cnd.bottom_line,
+                  sari_subject:            cnd.sari_subject,
+                  sari_action:             cnd.sari_action,
+                  sari_result:             cnd.sari_result,
+                  sari_implication:        cnd.sari_implication,
+                  sample_size:             cnd.sample_size,
+                  condensed_model_version: cnd.version,
+                  condensed_at:            new Date().toISOString(),
                 };
                 const { data, error } = await admin
                   .from("articles")

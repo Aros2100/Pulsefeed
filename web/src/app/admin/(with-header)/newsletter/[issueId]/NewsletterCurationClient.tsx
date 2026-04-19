@@ -28,10 +28,10 @@ export interface NLArticle {
   article_type: string | null;
   short_headline: string | null;
   bottom_line: string | null;
-  pico_population: string | null;
-  pico_intervention: string | null;
-  pico_comparison: string | null;
-  pico_outcome: string | null;
+  sari_subject: string | null;
+  sari_action: string | null;
+  sari_result: string | null;
+  sari_implication: string | null;
   sample_size: number | null;
 }
 
@@ -161,10 +161,12 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
 
   const selectedForActive: string[] = selectedMap[activeSubspecialty] ?? [];
 
-  const totalSelected = Object.values(selectedMap).reduce((s, ids) => s + ids.length, 0);
+  const totalSelected = new Set(Object.values(selectedMap).flat()).size;
 
   const activeArticle = articles.find((a) => a.id === activeArticleId) ?? null;
-  const activeIsSelected = activeArticleId ? selectedForActive.includes(activeArticleId) : false;
+  const activeIsSelected = activeArticleId
+    ? Object.values(selectedMap).some((ids) => ids.includes(activeArticleId))
+    : false;
 
   function countFor(sub: string): { total: number; selected: number } {
     const total = sub === GENERAL
@@ -247,9 +249,9 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
 
   const pubmedUrl = activeArticle ? `https://pubmed.ncbi.nlm.nih.gov/${activeArticle.pubmed_id}/` : "#";
 
-  const hasPico = activeArticle && (
-    activeArticle.pico_population || activeArticle.pico_intervention ||
-    activeArticle.pico_comparison || activeArticle.pico_outcome
+  const hasSari = activeArticle && (
+    activeArticle.sari_subject || activeArticle.sari_action ||
+    activeArticle.sari_result || activeArticle.sari_implication
   );
 
   return (
@@ -533,17 +535,17 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
                 </div>
               </div>
 
-              {/* PICO */}
-              {hasPico && (
+              {/* SARI */}
+              {hasSari && (
                 <div style={{ marginBottom: "20px" }}>
                   <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700, marginBottom: "8px" }}>
-                    PICO
+                    SARI
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "6px 12px", fontSize: "13px" }}>
-                    {activeArticle.pico_population    && <><span style={{ color: "#888" }}>Population</span><span>{activeArticle.pico_population}</span></>}
-                    {activeArticle.pico_intervention  && <><span style={{ color: "#888" }}>Intervention</span><span>{activeArticle.pico_intervention}</span></>}
-                    {activeArticle.pico_comparison    && <><span style={{ color: "#888" }}>Comparison</span><span>{activeArticle.pico_comparison}</span></>}
-                    {activeArticle.pico_outcome       && <><span style={{ color: "#888" }}>Outcome</span><span>{activeArticle.pico_outcome}</span></>}
+                    {activeArticle.sari_subject    && <><span style={{ color: "#888" }}>Subject</span><span>{activeArticle.sari_subject}</span></>}
+                    {activeArticle.sari_action     && <><span style={{ color: "#888" }}>Action</span><span>{activeArticle.sari_action}</span></>}
+                    {activeArticle.sari_result     && <><span style={{ color: "#888" }}>Result</span><span>{activeArticle.sari_result}</span></>}
+                    {activeArticle.sari_implication && <><span style={{ color: "#888" }}>Implication</span><span>{activeArticle.sari_implication}</span></>}
                   </div>
                 </div>
               )}
