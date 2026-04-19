@@ -194,7 +194,7 @@ export default async function CondensationOverviewPage() {
                 ? `Start session · ${picoQueueCount} artikler →`
                 : "Start session →"
             }
-            actionHref="/admin/lab/condensation/pico"
+            actionHref="/admin/lab/condensation/sari"
             actionColor="#059669"
           />
 

@@ -21,6 +21,7 @@ const schema = z.object({
     (v) => v === ACTIVE_SPECIALTY,
     { message: "Invalid specialty" }
   ),
+  module:  z.string().optional(),
   run_id: z.string().uuid().nullable().optional(),
   regression_comments: z.array(regressionCommentSchema).optional(),
 });
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: parsed.error.issues[0].message }, { status: 400 });
   }
 
-  const { current_prompt, feedback, fp_patterns, fn_patterns, specialty, run_id, regression_comments } = parsed.data;
+  const { current_prompt, feedback, fp_patterns, fn_patterns, specialty, module, run_id, regression_comments } = parsed.data;
 
   const regressionSection = regression_comments && regression_comments.length > 0
     ? `\n\nThe domain expert also reviewed regression cases (articles where the new prompt disagrees with earlier correct decisions) and provided these comments:\n<regression_comments>\n${regression_comments.map((c, i) => `${i + 1}. ${c.title ? `"${c.title}" — ` : ""}${c.comment}`).join("\n")}\n</regression_comments>\n\nUse these regression comments to avoid introducing new errors while fixing the prompt.`
@@ -49,7 +50,25 @@ export async function POST(request: NextRequest) {
   const promptForOptimization = current_prompt
     .replace(subspecialties.join(", "), "{{subspecialty_list}}");
 
-  const userMessage = `You are refining an AI scoring prompt for ${specialty} article relevance.
+  const userMessage = module?.startsWith("condensation")
+    ? `You are refining an AI condensation prompt for ${specialty} neurosurgery articles. The prompt produces structured output with fields: short_headline, short_resume, bottom_line, sari_subject, sari_action, sari_result, sari_implication, sample_size.
+
+The current candidate prompt is:
+<current_prompt>
+${promptForOptimization}
+</current_prompt>
+
+This prompt was generated based on these quality patterns:
+Quality issues (false_positive_patterns): ${fp_patterns.join("; ")}
+Content gaps (false_negative_patterns): ${fn_patterns.join("; ")}
+
+The domain expert has reviewed the prompt and provided this feedback:
+<feedback>
+${feedback}
+</feedback>${regressionSection}
+
+Rewrite the prompt incorporating the expert's feedback while maintaining corrections for the quality patterns above. Keep {{title}} and {{abstract}} as placeholders. The prompt must still instruct the model to produce all output fields. Keep the JSON response format instruction at the end. Respond with the refined prompt text only — no explanation, no markdown.`
+    : `You are refining an AI scoring prompt for ${specialty} article relevance.
 
 The current candidate prompt is:
 <current_prompt>

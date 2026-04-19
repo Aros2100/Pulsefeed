@@ -217,6 +217,7 @@ export default function PatternAnalysis({
           fp_patterns:    result.false_positive_patterns,
           fn_patterns:    result.false_negative_patterns,
           specialty,
+          module,
           run_id:         runId,
         }),
       });

@@ -19,6 +19,7 @@ type DisagreementRow = {
   decision: string;
   ai_decision: string;
   disagreement_reason: string | null;
+  comment: string | null;
   articles: { title: string; abstract: string | null } | null;
 };
 
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
   // Fetch disagreements joined with article details
   const { data: rawData, error: fetchError } = await admin
     .from("lab_decisions")
-    .select("decision, ai_decision, disagreement_reason, articles!inner(title, abstract)")
+    .select("decision, ai_decision, disagreement_reason, comment, articles!inner(title, abstract)")
     .eq("specialty", specialty)
     .eq("module", module)
     .not("ai_decision", "is", null)
@@ -128,6 +129,43 @@ Analyze the TRENDS — not individual articles. Identify:
 2. What subspecialties does the AI under-assign or miss? (max 5 patterns, put in false_negative_patterns)
 3. What specific changes to the prompt would improve classification accuracy?
 4. Write an improved prompt. Must use {{title}}, {{abstract}}, and {{subspecialty_list}} as placeholders.
+
+Respond in JSON only — no markdown, no backticks:
+{
+  "false_positive_patterns": ["pattern 1", ...],
+  "false_negative_patterns": ["pattern 1", ...],
+  "recommended_changes": "...",
+  "improved_prompt": "..."
+}`;
+  } else if (module === "condensation_sari") {
+    const rejectionList = rows.slice(0, 50).map((d, i) => {
+      const title    = d.articles?.title ?? "Unknown title";
+      const abstract = d.articles?.abstract
+        ? d.articles.abstract.slice(0, 300) + (d.articles.abstract.length > 300 ? "…" : "")
+        : "No abstract";
+      const reason     = d.disagreement_reason ? `\n  Reason: ${d.disagreement_reason}` : "";
+      const commentStr = d.comment ? `\n  Field feedback: ${d.comment}` : "";
+      return `${i + 1}. ${title}${reason}${commentStr}\n  Abstract: ${abstract}`;
+    }).join("\n\n");
+
+    userMessage = `You are analyzing cases where an AI model's SARI output was rejected by a human expert neurosurgeon. SARI stands for Subject, Action, Result, Implication — a 4-field structured summary of a research article.
+
+The AI used this prompt (version: ${activePrompt.version}):
+
+<current_prompt>
+${promptForOptimization}
+</current_prompt>
+
+REJECTED SARI OUTPUTS — Human expert rejected the AI's SARI fields (${rows.length} cases):
+${rejectionList}
+
+Analyze the TRENDS — not individual articles. The rejection reasons are structured as field-level feedback (S/A/R/I/N keys). Focus on which SARI fields are most often wrong and why.
+
+Identify:
+1. What quality issues appear most often in rejected SARI fields? (max 5 patterns, put in false_positive_patterns)
+2. What content is consistently missing or incomplete in the SARI output? (max 5 patterns, put in false_negative_patterns)
+3. What specific changes to the prompt would improve SARI output quality?
+4. Write an improved prompt. Must use {{title}} and {{abstract}} as placeholders. The prompt must still produce all condensation fields (short_headline, short_resume, bottom_line, sari_subject, sari_action, sari_result, sari_implication, sample_size) — do NOT remove any fields.
 
 Respond in JSON only — no markdown, no backticks:
 {
