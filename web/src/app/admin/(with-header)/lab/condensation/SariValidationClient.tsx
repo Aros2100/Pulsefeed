@@ -101,8 +101,9 @@ export default function SariValidationClient({ specialty, label }: Props) {
   const [loading, setLoading]       = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const [verdicts, setVerdicts]     = useState<Record<string, { decision: "approved" | "rejected"; comment: string }>>({});
-  const [comments, setComments]     = useState<Record<string, string>>({});
+  const [verdicts, setVerdicts]         = useState<Record<string, { decision: "approved" | "rejected"; comment: string }>>({});
+  const [rejectChecked, setRejectChecked] = useState<Record<string, Record<string, boolean>>>({});
+  const [rejectTexts, setRejectTexts]     = useState<Record<string, Record<string, string>>>({});
   const [pendingReject, setPendingReject] = useState<string | null>(null);
   const [saving, setSaving]         = useState(false);
   const [toast, setToast]           = useState<string | null>(null);
@@ -174,6 +175,54 @@ export default function SariValidationClient({ specialty, label }: Props) {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
+  // ── SARI reject fields ───────────────────────────────────────────────────
+
+  const SARI_FIELDS = [
+    { key: "S", label: "Subject" },
+    { key: "A", label: "Action" },
+    { key: "R", label: "Result" },
+    { key: "I", label: "Implication" },
+    { key: "N", label: "Sample size" },
+  ] as const;
+
+  function isFieldChecked(articleId: string, key: string): boolean {
+    return rejectChecked[articleId]?.[key] ?? false;
+  }
+
+  function getFieldText(articleId: string, key: string): string {
+    return rejectTexts[articleId]?.[key] ?? "";
+  }
+
+  function toggleField(articleId: string, key: string) {
+    setRejectChecked((prev) => ({
+      ...prev,
+      [articleId]: { ...(prev[articleId] ?? {}), [key]: !isFieldChecked(articleId, key) },
+    }));
+  }
+
+  function setFieldText(articleId: string, key: string, value: string) {
+    setRejectTexts((prev) => ({
+      ...prev,
+      [articleId]: { ...(prev[articleId] ?? {}), [key]: value },
+    }));
+  }
+
+  function canConfirmReject(articleId: string): boolean {
+    return SARI_FIELDS.some(
+      ({ key }) => isFieldChecked(articleId, key) && getFieldText(articleId, key).trim().length > 0
+    );
+  }
+
+  function buildComment(articleId: string): string {
+    const fields: Record<string, string> = {};
+    for (const { key } of SARI_FIELDS) {
+      if (isFieldChecked(articleId, key) && getFieldText(articleId, key).trim()) {
+        fields[key] = getFieldText(articleId, key).trim();
+      }
+    }
+    return JSON.stringify({ fields });
+  }
+
   // ── Verdict handling ────────────────────────────────────────────────────
 
   function approveArticle(articleId: string) {
@@ -186,20 +235,12 @@ export default function SariValidationClient({ specialty, label }: Props) {
   }
 
   function confirmReject(articleId: string) {
-    setVerdicts((prev) => ({ ...prev, [articleId]: { decision: "rejected", comment: comments[articleId] ?? "" } }));
+    setVerdicts((prev) => ({ ...prev, [articleId]: { decision: "rejected", comment: buildComment(articleId) } }));
     setPendingReject(null);
   }
 
   function cancelReject() {
     setPendingReject(null);
-  }
-
-  function getComment(articleId: string): string {
-    return comments[articleId] ?? "";
-  }
-
-  function setComment(articleId: string, value: string) {
-    setComments((prev) => ({ ...prev, [articleId]: value }));
   }
 
   // ── Clear pending reject on article change ──────────────────────────────
@@ -482,24 +523,53 @@ export default function SariValidationClient({ specialty, label }: Props) {
                 <div style={{ padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
                   {isPendingReject ? (
                     <>
-                      <textarea
-                        value={getComment(currentArticle.id)}
-                        onChange={(e) => setComment(currentArticle.id, e.target.value)}
-                        placeholder="Beskriv hvad der er galt..."
-                        autoFocus
-                        style={{
-                          width: "100%", minHeight: "60px", padding: "8px 10px", fontSize: "12px",
-                          border: "1px solid #fecaca", borderRadius: "5px", resize: "vertical",
-                          outline: "none", fontFamily: "inherit", background: "#fff",
-                        }}
-                      />
-                      <div style={{ display: "flex", gap: "6px" }}>
+                      {/* Checkboxes */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {SARI_FIELDS.map(({ key, label }) => {
+                          const checked = isFieldChecked(currentArticle.id, key);
+                          return (
+                            <div key={key}>
+                              <label style={{ display: "flex", alignItems: "center", gap: "7px", cursor: "pointer", fontSize: "12px", fontWeight: 600, color: "#1a1a1a" }}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleField(currentArticle.id, key)}
+                                  style={{ width: "14px", height: "14px", cursor: "pointer", accentColor: "#dc2626" }}
+                                />
+                                <span style={{ fontFamily: "monospace", color: "#dc2626", marginRight: "2px" }}>{key}</span>
+                                {label}
+                              </label>
+                              {checked && (
+                                <input
+                                  type="text"
+                                  value={getFieldText(currentArticle.id, key)}
+                                  onChange={(e) => setFieldText(currentArticle.id, key, e.target.value)}
+                                  placeholder={`Beskriv problem med ${label}…`}
+                                  autoFocus
+                                  style={{
+                                    marginTop: "4px", marginLeft: "21px",
+                                    width: "calc(100% - 21px)", padding: "5px 8px", fontSize: "11px",
+                                    border: "1px solid #fecaca", borderRadius: "4px",
+                                    outline: "none", fontFamily: "inherit", background: "#fff",
+                                    boxSizing: "border-box",
+                                  }}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
                         <button
                           onClick={() => confirmReject(currentArticle.id)}
+                          disabled={!canConfirmReject(currentArticle.id)}
                           style={{
                             borderRadius: "5px", padding: "5px 14px", fontSize: "11px", fontWeight: 600,
-                            background: "#dc2626", border: "1px solid #dc2626", color: "#fff",
-                            cursor: "pointer", whiteSpace: "nowrap",
+                            background: canConfirmReject(currentArticle.id) ? "#dc2626" : "#f3f4f6",
+                            border: `1px solid ${canConfirmReject(currentArticle.id) ? "#dc2626" : "#e5e7eb"}`,
+                            color: canConfirmReject(currentArticle.id) ? "#fff" : "#9ca3af",
+                            cursor: canConfirmReject(currentArticle.id) ? "pointer" : "not-allowed",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Bekræft afvisning
@@ -528,7 +598,7 @@ export default function SariValidationClient({ specialty, label }: Props) {
                           cursor: "pointer", whiteSpace: "nowrap",
                         }}
                       >
-                        ✓ Godkend
+                        Agree
                       </button>
                       <button
                         onClick={() => startReject(currentArticle.id)}
@@ -540,7 +610,7 @@ export default function SariValidationClient({ specialty, label }: Props) {
                           cursor: "pointer", whiteSpace: "nowrap",
                         }}
                       >
-                        ✗ Afvis
+                        Disagree
                       </button>
                     </div>
                   )}
