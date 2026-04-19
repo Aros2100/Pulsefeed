@@ -302,7 +302,7 @@ export default function SariValidationClient({ specialty, label }: Props) {
       .map((a) => ({
         article_id: a.id,
         decision:   verdicts[a.id].decision,
-        comment:    getComment(a.id),
+        comment:    verdicts[a.id].comment,
       }));
 
     if (toSave.length === 0) return;
