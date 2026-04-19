@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient();
 
   const { data: articles, error } = await admin.rpc(
-    "get_pico_not_validated_articles",
+    "get_sari_not_validated_articles",
     { p_specialty: specialty, p_limit: 100 },
   );
 

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface PicoArticle {
+interface SariArticle {
   id: string;
   title: string;
   journal_abbr: string | null;
@@ -14,10 +14,10 @@ interface PicoArticle {
   abstract: string | null;
   pubmed_id: string | null;
   authors: unknown;
-  pico_population: string | null;
-  pico_intervention: string | null;
-  pico_comparison: string | null;
-  pico_outcome: string | null;
+  sari_subject: string | null;
+  sari_action: string | null;
+  sari_result: string | null;
+  sari_implication: string | null;
   sample_size: number | null;
   condensed_model_version: string | null;
 }
@@ -73,7 +73,7 @@ function Spinner({ size = 12 }: { size?: number }) {
   );
 }
 
-function PicoRow({ label, value }: { label: string; value: string | null }) {
+function SariRow({ label, value }: { label: string; value: string | null }) {
   return (
     <div style={{ marginBottom: "8px" }}>
       <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#5a6a85", marginBottom: "2px" }}>
@@ -93,10 +93,10 @@ interface Props {
   label: string;
 }
 
-export default function PicoValidationClient({ specialty, label }: Props) {
+export default function SariValidationClient({ specialty, label }: Props) {
   const router = useRouter();
 
-  const [articles, setArticles]     = useState<PicoArticle[]>([]);
+  const [articles, setArticles]     = useState<SariArticle[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading]       = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -118,8 +118,8 @@ export default function PicoValidationClient({ specialty, label }: Props) {
     async function load() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/admin/training/condensation-pico-articles?specialty=${specialty}`, { signal: abort.signal });
-        const d = await res.json() as { ok: boolean; articles?: PicoArticle[] };
+        const res = await fetch(`/api/admin/training/condensation-sari-articles?specialty=${specialty}`, { signal: abort.signal });
+        const d = await res.json() as { ok: boolean; articles?: SariArticle[] };
         if (!d.ok) { setLoading(false); return; }
         const list = d.articles ?? [];
         setArticles(list);
@@ -163,10 +163,10 @@ export default function PicoValidationClient({ specialty, label }: Props) {
   }, []);
 
   useEffect(() => {
-    window.history.pushState({ picoGuard: true }, "");
+    window.history.pushState({ sariGuard: true }, "");
     function onPopState() {
       if (hasUnsavedRef.current) {
-        window.history.pushState({ picoGuard: true }, "");
+        window.history.pushState({ sariGuard: true }, "");
         setPendingHref("__back__");
       }
     }
@@ -239,7 +239,7 @@ export default function PicoValidationClient({ specialty, label }: Props) {
       const res = await fetch("/api/lab/condensation-sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ specialty, module: "condensation_pico", decisions: toSave }),
+        body: JSON.stringify({ specialty, module: "condensation_sari", decisions: toSave }),
       });
       const data = await res.json() as { ok: boolean; reviewed?: number; error?: string };
 
@@ -284,14 +284,14 @@ export default function PicoValidationClient({ specialty, label }: Props) {
   const isRejected = currentVerdict?.decision === "rejected";
   const isPendingReject = currentArticle ? pendingReject === currentArticle.id : false;
 
-  // PICO content
-  const picoFields = currentArticle ? [
-    currentArticle.pico_population,
-    currentArticle.pico_intervention,
-    currentArticle.pico_comparison,
-    currentArticle.pico_outcome,
+  // SARI content
+  const sariFields = currentArticle ? [
+    currentArticle.sari_subject,
+    currentArticle.sari_action,
+    currentArticle.sari_result,
+    currentArticle.sari_implication,
   ] : [];
-  const allPicoNull = picoFields.every((f) => f == null);
+  const allSariNull = sariFields.every((f) => f == null);
 
   // ── Loading / empty states ──────────────────────────────────────────────
 
@@ -307,7 +307,7 @@ export default function PicoValidationClient({ specialty, label }: Props) {
     return (
       <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f5f7fa", gap: "12px" }}>
         <div style={{ fontSize: "18px", fontWeight: 700, color: "#1a1a1a" }}>Ingen artikler at validere</div>
-        <div style={{ fontSize: "14px", color: "#888" }}>Alle PICO-felter for {label} er allerede valideret.</div>
+        <div style={{ fontSize: "14px", color: "#888" }}>Alle SARI-felter for {label} er allerede valideret.</div>
         <button onClick={() => router.push("/admin/lab/condensation")} style={{ marginTop: "12px", borderRadius: "8px", padding: "10px 20px", background: "#1a1a1a", color: "#fff", border: "none", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
           ← Tilbage til Kondensering
         </button>
@@ -327,7 +327,7 @@ export default function PicoValidationClient({ specialty, label }: Props) {
         </a>
         <span style={{ color: "#dde3ed", flexShrink: 0 }}>·</span>
         <span style={{ fontSize: "13px", color: "#1a1a1a", fontWeight: 600, flexShrink: 0 }}>
-          PICO-validering · {label}
+          SARI-validering · {label}
         </span>
 
         <div style={{ flex: 1 }} />
@@ -422,7 +422,7 @@ export default function PicoValidationClient({ specialty, label }: Props) {
             </div>
           </div>
 
-          {/* RIGHT — PICO validation */}
+          {/* RIGHT — SARI validation */}
           <div style={{ width: "420px", flexShrink: 0, display: "flex", flexDirection: "column", background: "#fafbfc" }}>
             <div style={{ flex: 1, padding: "28px 24px 24px", display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto" }}>
 
@@ -441,7 +441,7 @@ export default function PicoValidationClient({ specialty, label }: Props) {
                   justifyContent: "space-between",
                 }}>
                   <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#5a6a85" }}>
-                    PICO & Sample
+                    SARI & Sample
                   </span>
                   {isApproved && <span style={{ fontSize: "10px", fontWeight: 700, color: "#15803d" }}>Godkendt</span>}
                   {isRejected && <span style={{ fontSize: "10px", fontWeight: 700, color: "#dc2626" }}>Afvist</span>}
@@ -449,19 +449,19 @@ export default function PicoValidationClient({ specialty, label }: Props) {
 
                 {/* Content */}
                 <div style={{ padding: "14px 16px" }}>
-                  {allPicoNull ? (
+                  {allSariNull ? (
                     <div style={{ fontSize: "13px", color: "#aaa", fontStyle: "italic" }}>
                       Ikke relevant for denne artikeltype
                     </div>
                   ) : (
                     <>
-                      <PicoRow label="Population" value={currentArticle.pico_population} />
-                      <PicoRow label="Intervention" value={currentArticle.pico_intervention} />
-                      <PicoRow label="Comparison" value={currentArticle.pico_comparison} />
-                      <PicoRow label="Outcome" value={currentArticle.pico_outcome} />
+                      <SariRow label="Subject"    value={currentArticle.sari_subject} />
+                      <SariRow label="Action"     value={currentArticle.sari_action} />
+                      <SariRow label="Result"     value={currentArticle.sari_result} />
+                      <SariRow label="Implication" value={currentArticle.sari_implication} />
                     </>
                   )}
-                  <div style={{ marginTop: allPicoNull ? "8px" : "4px", paddingTop: "8px", borderTop: "1px solid #f0f0f0" }}>
+                  <div style={{ marginTop: allSariNull ? "8px" : "4px", paddingTop: "8px", borderTop: "1px solid #f0f0f0" }}>
                     <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#5a6a85" }}>
                       Sample Size
                     </span>

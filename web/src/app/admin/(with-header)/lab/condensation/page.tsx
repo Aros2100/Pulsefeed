@@ -16,7 +16,7 @@ function fmtDate(iso: string | null): string {
 
 const CND_MODULES = [
   { module: "condensation_text", label: "Tekst" },
-  { module: "condensation_pico", label: "PICO" },
+  { module: "condensation_sari", label: "SARI" },
 ] as const;
 
 export default async function CondensationOverviewPage() {
@@ -54,13 +54,13 @@ export default async function CondensationOverviewPage() {
       .from("lab_decisions")
       .select("*", { count: "exact", head: true })
       .eq("specialty", specialty)
-      .eq("module", "condensation_pico")
+      .eq("module", "condensation_sari")
       .not("ai_decision", "is", null),
     admin
       .from("lab_decisions")
       .select("*", { count: "exact", head: true })
       .eq("specialty", specialty)
-      .eq("module", "condensation_pico")
+      .eq("module", "condensation_sari")
       .eq("decision", "rejected"),
 
     // Last decision across condensation modules
@@ -80,7 +80,7 @@ export default async function CondensationOverviewPage() {
   // Per-module stats
   const moduleStats = [
     { label: "Tekst", total: textTotalResult.count ?? 0, rejected: textRejectedResult.count ?? 0 },
-    { label: "PICO", total: picoTotalResult.count ?? 0, rejected: picoRejectedResult.count ?? 0 },
+    { label: "SARI", total: picoTotalResult.count ?? 0, rejected: picoRejectedResult.count ?? 0 },
   ];
 
   // Aggregate stats
@@ -120,7 +120,7 @@ export default async function CondensationOverviewPage() {
             Kondensering
           </h1>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
-            Validér AI-genereret overskrift, resumé, bottom line, PICO og sample size
+            Validér AI-genereret overskrift, resumé, bottom line, SARI og sample size
           </p>
         </div>
 
@@ -165,9 +165,9 @@ export default async function CondensationOverviewPage() {
             actionColor="#059669"
           />
 
-          {/* Card 2: PICO-validering */}
+          {/* Card 2: SARI-validering */}
           <SectionCard
-            headerLabel="PICO-validering"
+            headerLabel="SARI-validering"
             badges={[{ label: "Aktiv", color: "#059669" }]}
             kpis={[
               {
