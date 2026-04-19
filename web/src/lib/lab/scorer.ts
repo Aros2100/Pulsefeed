@@ -474,7 +474,7 @@ export async function scoreCondensation(
     const short_resume   = typeof parsed.short_resume === "string"   ? parsed.short_resume   : "";
     const bottom_line    = typeof parsed.bottom_line === "string"    ? parsed.bottom_line    : "";
 
-    const limitWords = (s: string, n: number) => s.split(/\s+/).slice(0, n).join(" ");
+    const limitWords = (s: string, n: number) => { const w = s.trim().split(/\s+/); return w.length <= n ? s : null; };
 
     const sari_subject    = typeof parsed.sari_subject    === "string" ? limitWords(parsed.sari_subject,    20) : null;
     const sari_action     = typeof parsed.sari_action     === "string" ? limitWords(parsed.sari_action,     20) : null;
