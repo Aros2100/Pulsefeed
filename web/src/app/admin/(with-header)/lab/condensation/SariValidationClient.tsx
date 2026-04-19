@@ -105,6 +105,7 @@ export default function SariValidationClient({ specialty, label }: Props) {
   const [rejectChecked, setRejectChecked] = useState<Record<string, Record<string, boolean>>>({});
   const [rejectTexts, setRejectTexts]     = useState<Record<string, Record<string, string>>>({});
   const [pendingReject, setPendingReject] = useState<string | null>(null);
+  const [scoringProgress, setScoringProgress] = useState<{ scored: number; total: number } | null>(null);
   const [saving, setSaving]         = useState(false);
   const [toast, setToast]           = useState<string | null>(null);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
@@ -136,7 +137,8 @@ export default function SariValidationClient({ specialty, label }: Props) {
             const lines = decoder.decode(value).split("\n").filter((l) => l.startsWith("data:"));
             for (const line of lines) {
               try {
-                const parsed = JSON.parse(line.slice(5).trim()) as { done?: boolean };
+                const parsed = JSON.parse(line.slice(5).trim()) as { done?: boolean; scored?: number; total?: number };
+                if (parsed.total) setScoringProgress({ scored: parsed.scored ?? 0, total: parsed.total });
                 if (parsed.done) break outer;
               } catch { /* ignore malformed lines */ }
             }
@@ -368,8 +370,15 @@ export default function SariValidationClient({ specialty, label }: Props) {
 
   if (loading) {
     return (
-      <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f5f7fa", color: "#888", fontSize: "14px" }}>
-        Loading articles…
+      <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f5f7fa", color: "#888", fontSize: "14px", gap: "8px" }}>
+        {scoringProgress ? (
+          <>
+            <div>Scoring articles…</div>
+            <div style={{ fontSize: "13px", color: "#aaa" }}>{scoringProgress.scored} / {scoringProgress.total}</div>
+          </>
+        ) : (
+          <div>Loading articles…</div>
+        )}
       </div>
     );
   }
