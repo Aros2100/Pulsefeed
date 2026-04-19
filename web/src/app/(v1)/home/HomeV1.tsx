@@ -2,14 +2,9 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import type { NewsletterArticle, NewsletterContent } from "@/lib/newsletter/send";
+import KPIOverviewV1 from "@/components/KPIOverviewV1";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
-function nextSaturday(): string {
-  const d = new Date();
-  const day = d.getDay(); // 0 = Sun, 6 = Sat
-  const daysUntilSat = day === 6 ? 7 : (6 - day);
-  d.setDate(d.getDate() + daysUntilSat);
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
-}
 
 function formatDate(d: string | null): string {
   if (!d) return "";
@@ -123,7 +118,7 @@ export default async function HomeV1() {
     </div>
   ) : null;
 
-  const [{ data: profile }, { data: editionRaw }] = await Promise.all([
+  const [{ data: profile }, { data: editionRaw }, { data: subsRows }] = await Promise.all([
     supabase
       .from("users")
       .select("name, subspecialties")
@@ -138,6 +133,12 @@ export default async function HomeV1() {
       .order("week_number", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from("subspecialties")
+      .select("name, short_name")
+      .eq("specialty", ACTIVE_SPECIALTY)
+      .eq("active", true),
   ]);
   const edition = editionRaw as { week_number: number; year: number; content: NewsletterContent } | null;
 
@@ -145,24 +146,23 @@ export default async function HomeV1() {
   const userSubspecialties: string[] = Array.isArray(profile?.subspecialties)
     ? (profile.subspecialties as string[])
     : [];
+  const shortNameMap: Record<string, string> = Object.fromEntries(
+    ((subsRows ?? []) as { name: string; short_name: string | null }[])
+      .map((r) => [r.name, r.short_name ?? r.name])
+  );
 
   // Case A — no published edition yet
   if (!edition) {
-    const subsLabel = userSubspecialties.length > 0
-      ? userSubspecialties.join(", ")
-      : "your specialty";
-
     return (
       <>
         {previewBanner}
-        <div style={{ maxWidth: "620px", margin: "0 auto", padding: "80px 24px 0", textAlign: "center" }}>
-          <div style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a", marginBottom: "12px" }}>
-            Welcome, {firstName}
+        <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 40px" }}>
+          <div style={{ maxWidth: "620px", marginBottom: "24px" }}>
+            <div style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a" }}>
+              Welcome, {firstName}
+            </div>
           </div>
-          <div style={{ fontSize: "14px", color: "#888", lineHeight: 1.7, maxWidth: "420px", margin: "0 auto" }}>
-            Your first newsletter will arrive {nextSaturday()}.
-            {" "}We&apos;ll send you the latest research within {subsLabel}.
-          </div>
+          <KPIOverviewV1 userSubspecialties={userSubspecialties} shortNameMap={shortNameMap} />
         </div>
       </>
     );
@@ -185,10 +185,10 @@ export default async function HomeV1() {
   return (
     <>
       {previewBanner}
-      <div style={{ maxWidth: "620px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
-        {/* Header */}
-        <div style={{ marginBottom: "32px" }}>
+      {/* Header + KPI widget — wider container */}
+      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 0" }}>
+        <div style={{ maxWidth: "620px", marginBottom: "24px" }}>
           <div style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a" }}>
             Welcome back, {firstName}
           </div>
@@ -197,13 +197,19 @@ export default async function HomeV1() {
           </div>
         </div>
 
+        <KPIOverviewV1 userSubspecialties={userSubspecialties} shortNameMap={shortNameMap} />
+      </div>
+
+      {/* Newsletter content — narrow reading width */}
+      <div style={{ maxWidth: "620px", margin: "0 auto", padding: "0 24px 80px" }}>
+
         {!hasContent && (
-          <div style={{ fontSize: "14px", color: "#888" }}>No articles in this edition.</div>
+          <div style={{ fontSize: "14px", color: "#888", marginTop: "28px" }}>No articles in this edition.</div>
         )}
 
         {/* General section first */}
         {(content.general?.length ?? 0) > 0 && (
-          <div style={{ marginBottom: "32px" }}>
+          <div style={{ marginBottom: "32px", marginTop: "28px" }}>
             <SectionHeading>General</SectionHeading>
             {content.general.map((a) => (
               <ArticleCard key={a.id} article={a} />
@@ -214,8 +220,8 @@ export default async function HomeV1() {
         {/* Subspecialty sections matching user's selection */}
         {visibleSubspecialties
           .filter((s) => s.articles.length > 0)
-          .map((s) => (
-            <div key={s.name} style={{ marginBottom: "32px" }}>
+          .map((s, i) => (
+            <div key={s.name} style={{ marginBottom: "32px", marginTop: i === 0 && (content.general?.length ?? 0) === 0 ? "28px" : 0 }}>
               <SectionHeading>{s.name}</SectionHeading>
               {s.articles.map((a) => (
                 <ArticleCard key={a.id} article={a} />

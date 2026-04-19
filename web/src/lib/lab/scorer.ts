@@ -128,7 +128,8 @@ export async function scoreArticleLab(
 export async function scoreSubspecialtyLab(
   article: { id?: string; title: string; abstract: string | null },
   specialty: string,
-  activePrompt: ActivePrompt
+  activePrompt: ActivePrompt,
+  task = "subspecialty"
 ): Promise<SubspecialtyLabResult> {
   const subspecialties = await getSubspecialties(specialty);
 
@@ -144,7 +145,7 @@ export async function scoreSubspecialtyLab(
     thinking: { type: "disabled" },
     system: "You respond only with valid JSON. No explanation, no reasoning, no other text.",
     messages: [{ role: "user", content }],
-  }, article.id, "subspecialty_lab");
+  }, article.id, task);
 
   const raw = (message.content[0] as { type: string; text: string }).text.trim();
 
@@ -268,7 +269,8 @@ export async function scoreArticleType(
     mesh_terms?: unknown;
     publication_types?: unknown;
   },
-  activePrompt: ActivePrompt
+  activePrompt: ActivePrompt,
+  task = "article_type"
 ): Promise<ArticleTypeResult> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
@@ -339,7 +341,7 @@ export async function scoreArticleType(
     thinking: { type: "disabled" },
     system: "You respond only with valid JSON. No explanation, no reasoning, no other text.",
     messages: [{ role: "user", content }],
-  }, article.id, "article_type");
+  }, article.id, task);
 
   const raw = (message.content[0] as { type: string; text: string }).text.trim();
 
@@ -439,7 +441,8 @@ export async function scoreArticleTypeProd(
 export async function scoreCondensation(
   article: { id?: string; title: string; abstract: string | null },
   specialty: string,
-  activePrompt: ActivePrompt
+  activePrompt: ActivePrompt,
+  task = "condensation"
 ): Promise<CondensationResult> {
   const content = activePrompt.prompt
     .replace(/\{\{specialty\}\}|\{specialty\}/g, specialty)
@@ -450,7 +453,7 @@ export async function scoreCondensation(
     model: SCORING_MODEL,
     max_tokens: 2048,
     messages: [{ role: "user", content }],
-  }, article.id, "condensation");
+  }, article.id, task);
 
   const raw = (message.content[0] as { type: string; text: string }).text.trim();
 
