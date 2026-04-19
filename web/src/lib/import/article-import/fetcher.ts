@@ -294,6 +294,7 @@ export async function fetchArticleDetails(
     ignoreAttributes: false,
     attributeNamePrefix: "@_",
     textNodeName: "#text",
+    processEntities: false,
     isArray: (name) =>
       [
         "PubmedArticle",

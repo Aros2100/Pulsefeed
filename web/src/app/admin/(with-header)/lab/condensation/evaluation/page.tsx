@@ -15,7 +15,7 @@ function fmtDate(iso: string | null): string {
 
 const TABS = [
   { key: "text", label: "Tekst", module: "condensation_text" },
-  { key: "pico", label: "PICO",  module: "condensation_pico" },
+  { key: "sari", label: "SARI",  module: "condensation_sari" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -48,11 +48,11 @@ interface ArticleDetail {
   short_headline: string | null;
   short_resume:   string | null;
   bottom_line:    string | null;
-  pico_population:   string | null;
-  pico_intervention: string | null;
-  pico_comparison:   string | null;
-  pico_outcome:      string | null;
-  sample_size:       number | null;
+  sari_subject:     string | null;
+  sari_action:      string | null;
+  sari_result:      string | null;
+  sari_implication: string | null;
+  sample_size:      number | null;
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -124,13 +124,13 @@ function ArticleRow({ row, article, tab }: { row: RejectionRow; article: Article
         </div>
       )}
 
-      {article && tab === "pico" && (article.pico_population || article.pico_intervention || article.pico_comparison || article.pico_outcome) && (
+      {article && tab === "sari" && (article.sari_subject || article.sari_action || article.sari_result || article.sari_implication) && (
         <div style={{ marginTop: "10px", padding: "10px 12px", background: "#fef2f2", borderRadius: "6px", borderLeft: "3px solid #fecaca", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
           {[
-            { label: "P", value: article.pico_population },
-            { label: "I", value: article.pico_intervention },
-            { label: "C", value: article.pico_comparison },
-            { label: "O", value: article.pico_outcome },
+            { label: "S", value: article.sari_subject },
+            { label: "A", value: article.sari_action },
+            { label: "R", value: article.sari_result },
+            { label: "I", value: article.sari_implication },
           ].filter((p) => p.value).map((p) => (
             <div key={p.label}>
               <span style={{ fontSize: "10px", fontWeight: 700, color: "#888" }}>{p.label}: </span>
@@ -212,7 +212,7 @@ export default async function CondensationEvaluationPage({ searchParams }: Props
   const [articlesForMap, allAccRes] = await Promise.all([
     articleIds.length > 0
       ? admin.from("articles")
-          .select("id, title, journal_abbr, abstract, short_headline, short_resume, bottom_line, pico_population, pico_intervention, pico_comparison, pico_outcome, sample_size")
+          .select("id, title, journal_abbr, abstract, short_headline, short_resume, bottom_line, sari_subject, sari_action, sari_result, sari_implication, sample_size")
           .in("id", articleIds)
       : Promise.resolve({ data: null }),
     admin.from("lab_decisions")
