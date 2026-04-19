@@ -10,7 +10,7 @@ const schema = z.object({
     (v) => v === ACTIVE_SPECIALTY,
     { message: "Invalid specialty" }
   ),
-  module: z.enum(["condensation_text", "condensation_pico"]),
+  module: z.enum(["condensation_text", "condensation_pico", "condensation_sari"]),
   decisions: z.array(z.object({
     article_id:     z.string().uuid(),
     decision:       z.enum(["approved", "rejected"]),
@@ -99,6 +99,16 @@ export async function POST(request: NextRequest) {
       logArticleEvent(d.article_id, "lab_decision", {
         module,
         decision: d.decision,
+      })
+    )
+  );
+
+  void Promise.all(
+    decisions.map((d) =>
+      admin.from("article_events").insert({
+        article_id: d.article_id,
+        event_type: "condensation_validated",
+        meta: { module, decision: d.decision },
       })
     )
   );

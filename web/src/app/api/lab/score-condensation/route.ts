@@ -138,6 +138,11 @@ export async function POST(request: NextRequest) {
                   .update(updatePayload)
                   .eq("id", article.id);
                 if (error) throw new Error(error.message);
+                void admin.from("article_events").insert({
+                  article_id: article.id,
+                  event_type: "condensation_scored",
+                  meta: { version: cnd.version },
+                });
                 scored++;
               } catch (e) {
                 console.error(`[score-condensation] failed article ${article.id}:`, e);
