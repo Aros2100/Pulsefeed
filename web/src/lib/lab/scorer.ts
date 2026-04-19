@@ -476,10 +476,10 @@ export async function scoreCondensation(
 
     const limitWords = (s: string, n: number) => { const w = s.trim().split(/\s+/); return w.length <= n ? s : null; };
 
-    const sari_subject    = typeof parsed.sari_subject    === "string" ? limitWords(parsed.sari_subject,    20) : null;
-    const sari_action     = typeof parsed.sari_action     === "string" ? limitWords(parsed.sari_action,     20) : null;
-    const sari_result     = typeof parsed.sari_result     === "string" ? limitWords(parsed.sari_result,     20) : null;
-    const sari_implication = typeof parsed.sari_implication === "string" ? limitWords(parsed.sari_implication, 20) : null;
+    const sari_subject    = typeof parsed.sari_subject    === "string" ? limitWords(parsed.sari_subject,    25) : null;
+    const sari_action     = typeof parsed.sari_action     === "string" ? limitWords(parsed.sari_action,     25) : null;
+    const sari_result     = typeof parsed.sari_result     === "string" ? limitWords(parsed.sari_result,     25) : null;
+    const sari_implication = typeof parsed.sari_implication === "string" ? limitWords(parsed.sari_implication, 25) : null;
 
     const rawSize = Number(parsed.sample_size);
     const sample_size = Number.isFinite(rawSize) && rawSize > 0 ? Math.round(rawSize) : null;
