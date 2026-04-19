@@ -17,7 +17,8 @@ export async function GET(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  const { data: articles, error } = await admin.rpc(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: articles, error } = await (admin as any).rpc(
     "get_sari_not_validated_articles",
     { p_specialty: specialty, p_limit: 50 },
   );
