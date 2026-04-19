@@ -118,6 +118,36 @@ export default function SariValidationClient({ specialty, label }: Props) {
 
     async function load() {
       setLoading(true);
+
+      // 1. Score first
+      try {
+        const scoreRes = await fetch("/api/lab/score-condensation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ specialty }),
+          signal: abort.signal,
+        });
+        const reader = scoreRes.body?.getReader();
+        const decoder = new TextDecoder();
+        if (reader) {
+          outer: while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const lines = decoder.decode(value).split("\n").filter((l) => l.startsWith("data:"));
+            for (const line of lines) {
+              try {
+                const parsed = JSON.parse(line.slice(5).trim()) as { done?: boolean };
+                if (parsed.done) break outer;
+              } catch { /* ignore malformed lines */ }
+            }
+          }
+        }
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+        console.error("[SariValidationClient] scoring failed:", e);
+      }
+
+      // 2. Load articles for validation
       try {
         const res = await fetch(`/api/admin/training/condensation-sari-articles?specialty=${specialty}`, { signal: abort.signal });
         const d = await res.json() as { ok: boolean; articles?: SariArticle[] };
