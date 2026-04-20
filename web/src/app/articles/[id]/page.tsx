@@ -29,7 +29,8 @@ export default async function ArticleDetailPage({
   const meshCount    = Array.isArray(article.mesh_terms)  ? article.mesh_terms.length  : 0;
   const grantCount   = Array.isArray(article.grants)      ? article.grants.length      : 0;
   const isEnriched   = !!article.enriched_at;
-  const hasSari = !!(article.sari_subject || article.sari_action || article.sari_result || article.sari_implication);
+  const articleData = article as unknown as ArticleData;
+  const hasSari = !!(articleData.sari_subject || articleData.sari_action || articleData.sari_result || articleData.sari_implication);
 
   const navItems = [
     { id: "facts",      label: "Facts" },
