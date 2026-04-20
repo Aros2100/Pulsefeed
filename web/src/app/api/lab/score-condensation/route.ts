@@ -74,16 +74,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
 
-  const { data: alreadyScoredCount } = await admin.rpc(
-    "count_condensation_not_validated",
-    { p_specialty: specialty },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: rpcArticles, error: rpcError } = await (admin as any).rpc(
+    "get_condensation_unscored_articles",
+    { p_specialty: specialty, p_limit: BATCH_LIMIT },
   );
-  const existing  = Number(alreadyScoredCount ?? 0);
-  const remaining = Math.max(0, BATCH_LIMIT - existing);
+  if (rpcError) return NextResponse.json({ ok: false, error: rpcError.message }, { status: 500 });
+  const toScore = (rpcArticles ?? []) as Article[];
 
-  let toScore: Article[];
-
-  if (remaining === 0) {
+  if (toScore.length === 0) {
     const stream = new ReadableStream({
       start(controller) {
         const encoder = new TextEncoder();
@@ -94,14 +93,6 @@ export async function POST(request: NextRequest) {
     return new Response(stream, {
       headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
     });
-  } else {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: rpcArticles, error: rpcError } = await (admin as any).rpc(
-      "get_condensation_unscored_articles",
-      { p_specialty: specialty, p_limit: remaining },
-    );
-    if (rpcError) return NextResponse.json({ ok: false, error: rpcError.message }, { status: 500 });
-    toScore = (rpcArticles ?? []) as Article[];
   }
 
   const stream = new ReadableStream({

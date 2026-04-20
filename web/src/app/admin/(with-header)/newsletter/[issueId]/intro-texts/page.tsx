@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import NewsletterAiClient from "./NewsletterAiClient";
 
-export default async function NewsletterAiTeksterPage({ params }: { params: Promise<{ issueId: string }> }) {
+export default async function NewsletterIntroTextsPage({ params }: { params: Promise<{ issueId: string }> }) {
   const { issueId } = await params;
 
   const supabase = await createClient();

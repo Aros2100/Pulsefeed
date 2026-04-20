@@ -31,16 +31,14 @@ export async function POST(request: NextRequest) {
     .map((a) => `- ${a.title}${a.article_type ? ` · ${a.article_type}` : ""}`)
     .join("\n");
 
-  const tone = "Write in a confident, collegial tone — as one neurosurgeon briefing another. Avoid listing facts mechanically. Maximum 2 sentences. No more. Return only the text, nothing else.";
-
   const prompt = type === "global"
-    ? `You are the editor of PulseFeed — a weekly medical newsletter for neurosurgeons. Write a short 2-sentence intro in English that highlights what makes these three articles worth reading this week. The articles will appear at the bottom of the newsletter — write the intro so it creates anticipation for them. Write in a confident, collegial tone — as one neurosurgeon briefing another. One or two sentences maximum. If you write more than two sentences, you have failed. Return only the text, nothing else.\n\nArticles:\n${articleList}`
-    : `You are the editor of PulseFeed — a weekly medical newsletter for neurosurgeons. Write a short comment in English about this week's articles within ${subspecialty ?? "this subspecialty"}. Highlight what is noteworthy. Be direct and precise — no filler phrases. One or two sentences maximum. If you write more than two sentences, you have failed. Return only the text, nothing else.\n\nArticles:\n${articleList}`;
+    ? `Write exactly 2 short sentences. Each sentence maximum 20 words. Stop after the second sentence. Write the two sentences as a single paragraph with no line breaks between them.\n\nYou are the editor of PulseFeed — a weekly medical newsletter for neurosurgeons. Write a short intro in English that highlights what makes these three articles worth reading this week. The articles will appear at the bottom of the newsletter — write the intro so it creates anticipation for them. Write in a confident, collegial tone — as one neurosurgeon briefing another. Return only the text, nothing else.\n\nArticles:\n${articleList}`
+    : `Write exactly 2 short sentences. Each sentence maximum 20 words. Stop after the second sentence. Write the two sentences as a single paragraph with no line breaks between them.\n\nYou are the editor of PulseFeed — a weekly medical newsletter for neurosurgeons. Write a short comment in English about this week's articles within ${subspecialty ?? "this subspecialty"}. Highlight what is noteworthy. Be direct and precise — no filler phrases. Return only the text, nothing else.\n\nArticles:\n${articleList}`;
 
   try {
     const message = await trackedCall("newsletter_generate_text", {
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 100,
+      max_tokens: 120,
       messages: [{ role: "user", content: prompt }],
     });
 

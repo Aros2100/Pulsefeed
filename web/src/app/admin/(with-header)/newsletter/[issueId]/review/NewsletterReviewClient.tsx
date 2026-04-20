@@ -201,8 +201,8 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
           ← Admin
         </Link>
         <span style={{ color: "#dde3ed" }}>·</span>
-        <Link href={`/admin/newsletter/${edition.id}`} style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none", whiteSpace: "nowrap" }}>
-          ← Curation
+        <Link href={`/admin/newsletter/${edition.id}/selection`} style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none", whiteSpace: "nowrap" }}>
+          ← Selection
         </Link>
         <span style={{ color: "#dde3ed" }}>·</span>
         <span style={{ fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap" }}>
@@ -228,7 +228,7 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
             Save →
           </button>
           <Link
-            href={`/admin/newsletter/${edition.id}/ai-tekster`}
+            href={`/admin/newsletter/${edition.id}/intro-texts`}
             style={{
               fontSize: "13px", fontWeight: 600,
               background: "#059669", color: "#fff",
@@ -236,7 +236,7 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
               textDecoration: "none", whiteSpace: "nowrap",
             }}
           >
-            Next →
+            Intro texts →
           </Link>
         </div>
       </div>

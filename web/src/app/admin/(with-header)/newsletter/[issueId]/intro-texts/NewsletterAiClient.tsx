@@ -52,8 +52,8 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
 
   // Global articles (is_global = true)
   const globalArticles = useMemo(() => {
-    console.log("[ai-tekster] editionArticles:", editionArticles);
-    console.log("[ai-tekster] is_global count:", editionArticles.filter((ea) => ea.is_global).length);
+    console.log("[intro-texts] editionArticles:", editionArticles);
+    console.log("[intro-texts] is_global count:", editionArticles.filter((ea) => ea.is_global).length);
     return editionArticles
       .filter((ea) => ea.is_global)
       .map((ea) => detailMap.get(ea.article_id))
@@ -117,7 +117,7 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
           ),
         },
       };
-      console.log("[ai-tekster] save body:", JSON.stringify(patchBody));
+      console.log("[intro-texts] save body:", JSON.stringify(patchBody));
       const res = await fetch("/api/admin/newsletter/edition", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -177,7 +177,7 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
               textDecoration: "none", whiteSpace: "nowrap",
             }}
           >
-            Next →
+            Preview →
           </Link>
         </div>
       </div>

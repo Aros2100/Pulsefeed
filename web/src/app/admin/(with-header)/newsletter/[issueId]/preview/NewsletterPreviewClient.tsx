@@ -1,13 +1,15 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import TestSendButton from "./TestSendButton";
+import { renderNewsletterHtml, type Article, type Section } from "@/lib/newsletter/render";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Subspecialty { id: string; name: string; sort_order: number }
 interface EditionArticle { id: string; article_id: string; subspecialty: string; sort_order: number; is_global: boolean }
-interface ArticleDetail { id: string; title: string; article_type: string | null; journal_title: string | null; pubmed_id: string }
+interface ArticleDetail { id: string; title: string; article_type: string | null; journal_abbr: string | null; pubmed_id: string }
 interface FirstAuthor { article_id: string; authors: { display_name: string | null; country: string | null } }
 
 interface Props {
@@ -16,16 +18,20 @@ interface Props {
   editionArticles: EditionArticle[];
   articleDetails: ArticleDetail[];
   firstAuthors: FirstAuthor[];
+  firstName: string;
+  pubmedTotal: number;
+  pubmedBySubspecialty: Record<string, number>;
 }
 
 const ARTICLES_PER_SUB: Record<number, number> = { 1: 5, 2: 4, 3: 3 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function NewsletterPreviewClient({ edition, subspecialties, editionArticles, articleDetails, firstAuthors }: Props) {
+export default function NewsletterPreviewClient({ edition, subspecialties, editionArticles, articleDetails, firstAuthors, firstName, pubmedTotal, pubmedBySubspecialty }: Props) {
   const router = useRouter();
   const [subCount, setSubCount] = useState<1 | 2 | 3>(2);
   const [approving, setApproving] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const content = edition.content as Record<string, unknown> | null;
   const globalIntro = typeof content?.global_intro === "string" ? content.global_intro : "";
@@ -34,33 +40,76 @@ export default function NewsletterPreviewClient({ edition, subspecialties, editi
   const detailMap = useMemo(() => new Map(articleDetails.map((a) => [a.id, a])), [articleDetails]);
   const authorMap = useMemo(() => new Map(firstAuthors.map((r) => [r.article_id, r.authors])), [firstAuthors]);
 
-  // Active subspecialties with articles, limited by selector
-  const activeSubs = useMemo(() => {
-    const withArticles = new Set(editionArticles.map((ea) => ea.subspecialty));
-    return subspecialties
-      .filter((s) => withArticles.has(s.name))
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .slice(0, subCount);
-  }, [subspecialties, editionArticles, subCount]);
+  // Saturday label for header
+  const satLabel = useMemo(() => {
+    const jan4 = new Date(Date.UTC(edition.year, 0, 4));
+    const dayOfWeek = jan4.getUTCDay() || 7;
+    const monday = new Date(jan4);
+    monday.setUTCDate(jan4.getUTCDate() - (dayOfWeek - 1) + (edition.week_number - 1) * 7);
+    const sat = new Date(monday);
+    sat.setUTCDate(monday.getUTCDate() + 5);
+    return sat.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  }, [edition.week_number, edition.year]);
+
+  // Topbar label includes weekday
+  const saturdayLabel = useMemo(() => {
+    const jan4 = new Date(Date.UTC(edition.year, 0, 4));
+    const dayOfWeek = jan4.getUTCDay() || 7;
+    const monday = new Date(jan4);
+    monday.setUTCDate(jan4.getUTCDate() - (dayOfWeek - 1) + (edition.week_number - 1) * 7);
+    const sat = new Date(monday);
+    sat.setUTCDate(monday.getUTCDate() + 5);
+    return sat.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  }, [edition.week_number, edition.year]);
+
+  function toArticle(ea: EditionArticle): Article | null {
+    const d = detailMap.get(ea.article_id);
+    if (!d) return null;
+    const author = authorMap.get(ea.article_id);
+    const lastName = author?.display_name ? author.display_name.split(" ").pop() ?? null : null;
+    return { title: d.title, article_type: d.article_type, journal_abbr: d.journal_abbr, pubmed_id: d.pubmed_id, authorLastName: lastName, country: author?.country ?? null };
+  }
 
   const limit = ARTICLES_PER_SUB[subCount];
 
-  function getSubArticles(subName: string): ArticleDetail[] {
-    return editionArticles
-      .filter((ea) => ea.subspecialty === subName)
+  const { sections, globalArticles } = useMemo(() => {
+    const withArticles = new Set(editionArticles.map((ea) => ea.subspecialty));
+    const activeSubs = subspecialties
+      .filter((s) => withArticles.has(s.name))
       .sort((a, b) => a.sort_order - b.sort_order)
-      .slice(0, limit)
-      .map((ea) => detailMap.get(ea.article_id))
-      .filter((a): a is ArticleDetail => a !== undefined);
-  }
+      .slice(0, subCount);
 
-  const globalArticles = useMemo(() =>
-    editionArticles
+    const sections: Section[] = activeSubs.map((sub) => ({
+      name: sub.name,
+      comment: subspecialtyComments[sub.name] ?? "",
+      articles: editionArticles
+        .filter((ea) => ea.subspecialty === sub.name)
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .slice(0, limit)
+        .map(toArticle)
+        .filter((a): a is Article => a !== null),
+    }));
+
+    const globalArticles = editionArticles
       .filter((ea) => ea.is_global)
-      .map((ea) => detailMap.get(ea.article_id))
-      .filter((a): a is ArticleDetail => a !== undefined),
-    [editionArticles, detailMap]
+      .map(toArticle)
+      .filter((a): a is Article => a !== null);
+
+    return { sections, globalArticles };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editionArticles, subspecialties, subCount, limit, detailMap, authorMap, subspecialtyComments]);
+
+  const html = useMemo(() =>
+    renderNewsletterHtml({ weekNumber: edition.week_number, year: edition.year, satLabel, firstName, pubmedTotal, pubmedBySubspecialty, globalIntro, sections, globalArticles }),
+    [edition.week_number, edition.year, satLabel, firstName, pubmedTotal, pubmedBySubspecialty, globalIntro, sections, globalArticles]
   );
+
+  const handleIframeLoad = useCallback(() => {
+    const iframe = iframeRef.current;
+    if (iframe?.contentDocument?.body) {
+      iframe.style.height = iframe.contentDocument.body.scrollHeight + "px";
+    }
+  }, []);
 
   async function approve() {
     setApproving(true);
@@ -79,14 +128,6 @@ export default function NewsletterPreviewClient({ edition, subspecialties, editi
     }
   }
 
-  const weekDate = (() => {
-    // Approximate date from week_number + year (ISO week → Monday)
-    const jan4 = new Date(edition.year, 0, 4);
-    const monday = new Date(jan4);
-    monday.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7) + (edition.week_number - 1) * 7);
-    return monday.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
-  })();
-
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#e8ecf0", color: "#1a1a1a", minHeight: "100vh" }}>
 
@@ -98,14 +139,14 @@ export default function NewsletterPreviewClient({ edition, subspecialties, editi
         boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
       }}>
         <Link
-          href={`/admin/newsletter/${edition.id}/ai-tekster`}
+          href={`/admin/newsletter/${edition.id}/intro-texts`}
           style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none", whiteSpace: "nowrap" }}
         >
-          ← AI texts
+          ← Intro texts
         </Link>
         <span style={{ color: "#dde3ed" }}>·</span>
         <span style={{ fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap" }}>
-          Week {edition.week_number} · {edition.year}
+          Week {edition.week_number} · Neurosurgery · {saturdayLabel}
         </span>
 
         {/* Subscriber selector */}
@@ -129,6 +170,7 @@ export default function NewsletterPreviewClient({ edition, subspecialties, editi
         </div>
 
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "10px" }}>
+          <TestSendButton editionId={edition.id} />
           <button
             onClick={approve}
             disabled={approving}
@@ -144,150 +186,23 @@ export default function NewsletterPreviewClient({ edition, subspecialties, editi
         </div>
       </div>
 
-      {/* ── Email preview ─────────────────────────────────────────────────── */}
+      {/* ── Email preview (iframe) ─────────────────────────────────────────── */}
       <div style={{ padding: "32px 24px 80px" }}>
         <div style={{
           maxWidth: "620px", margin: "0 auto",
-          background: "#fff",
           borderRadius: "4px",
           boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           overflow: "hidden",
+          background: "#fff",
         }}>
-
-          {/* Email header */}
-          <div style={{
-            background: "#fff",
-            borderBottom: "1px solid #e5e7eb",
-            padding: "20px 32px",
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-          }}>
-            <span style={{ fontSize: "16px", fontWeight: 700, color: "#1a1a1a", letterSpacing: "0.02em" }}>
-              Pulse<span style={{ color: "#E83B2A" }}>Feed</span>
-            </span>
-            <span style={{ fontSize: "11px", color: "#9ca3af", letterSpacing: "0.04em" }}>
-              {weekDate}
-            </span>
-          </div>
-
-          {/* Body */}
-          <div style={{ padding: "32px 32px 0" }}>
-
-            {/* Global intro — top of email, no divider */}
-            {globalIntro && (
-              <p style={{
-                fontSize: "14px", lineHeight: 1.75, color: "#374151",
-                marginBottom: "28px", marginTop: 0,
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontStyle: "italic",
-              }}>
-                {globalIntro}
-              </p>
-            )}
-
-            {/* Subspecialty sections */}
-            {activeSubs.map((sub) => {
-              const articles = getSubArticles(sub.name);
-              const comment = subspecialtyComments[sub.name] ?? "";
-              return (
-                <div key={sub.id}>
-                  <SectionDivider label={sub.name} />
-                  {comment && (
-                    <p style={{ fontSize: "14px", lineHeight: 1.75, color: "#374151", marginBottom: "20px", marginTop: 0 }}>
-                      {comment}
-                    </p>
-                  )}
-                  <ArticleList articles={articles} authorMap={authorMap} />
-                </div>
-              );
-            })}
-
-            {/* Global highlights */}
-            {globalArticles.length > 0 && (
-              <div>
-                <SectionDivider label="This week's highlights" highlight />
-                <ArticleList articles={globalArticles} authorMap={authorMap} />
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div style={{
-            borderTop: "1px solid #e5e7eb",
-            padding: "24px 32px",
-            marginTop: "32px",
-            textAlign: "center",
-          }}>
-            <p style={{ fontSize: "11px", color: "#9ca3af", margin: "0 0 6px", lineHeight: 1.6 }}>
-              PulseFeed sends every Saturday
-            </p>
-            <p style={{ fontSize: "11px", color: "#9ca3af", margin: 0, lineHeight: 1.6 }}>
-              <span style={{ color: "#6b7280", textDecoration: "underline", cursor: "default" }}>Manage preferences</span>
-              {" · "}
-              <span style={{ color: "#6b7280", textDecoration: "underline", cursor: "default" }}>Unsubscribe</span>
-            </p>
-          </div>
+          <iframe
+            ref={iframeRef}
+            srcDoc={html}
+            style={{ width: "100%", border: "none", display: "block", minHeight: "600px" }}
+            onLoad={handleIframeLoad}
+          />
         </div>
       </div>
-    </div>
-  );
-}
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function SectionDivider({ label, highlight }: { label: string; highlight?: boolean }) {
-  return (
-    <div style={{ marginBottom: "16px" }}>
-      <div style={{
-        display: "flex", alignItems: "center", gap: "12px",
-        marginBottom: "4px",
-      }}>
-        <div style={{ flex: 1, height: "1px", background: highlight ? "#d1fae5" : "#e5e7eb" }} />
-        <span style={{
-          fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em",
-          textTransform: "uppercase",
-          color: highlight ? "#059669" : "#9ca3af",
-          whiteSpace: "nowrap",
-        }}>
-          {label}
-        </span>
-        <div style={{ flex: 1, height: "1px", background: highlight ? "#d1fae5" : "#e5e7eb" }} />
-      </div>
-    </div>
-  );
-}
-
-function ArticleList({ articles, authorMap }: { articles: ArticleDetail[]; authorMap: Map<string, { display_name: string | null; country: string | null }> }) {
-  return (
-    <div style={{ marginBottom: "24px" }}>
-      {articles.map((a, i) => {
-        const author = authorMap.get(a.id);
-        const meta = [
-          a.article_type,
-          a.journal_title,
-          author?.display_name ? author.display_name.split(" ").pop() : null,
-          author?.country,
-        ].filter(Boolean).join(" · ");
-
-        return (
-          <div key={a.id} style={{
-            paddingBottom: i < articles.length - 1 ? "14px" : 0,
-            marginBottom: i < articles.length - 1 ? "14px" : 0,
-            borderBottom: i < articles.length - 1 ? "1px solid #f3f4f6" : undefined,
-          }}>
-            <a
-              href={`https://pubmed.ncbi.nlm.nih.gov/${a.pubmed_id}/`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a", textDecoration: "none", lineHeight: 1.45, display: "block", marginBottom: "4px" }}
-            >
-              {a.title}
-            </a>
-            {meta && (
-              <span style={{ fontSize: "11px", color: "#9ca3af", lineHeight: 1.4 }}>{meta}</span>
-            )}
-          </div>
-        );
-      })}
     </div>
   );
 }

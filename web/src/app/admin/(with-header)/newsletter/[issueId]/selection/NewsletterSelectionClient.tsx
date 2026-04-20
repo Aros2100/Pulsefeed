@@ -123,7 +123,7 @@ function initSelectedMap(selections: EditionArticle[]): Record<string, string[]>
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function NewsletterCurationClient({ edition, subspecialties, articles, existingSelections }: Props) {
+export default function NewsletterSelectionClient({ edition, subspecialties, articles, existingSelections }: Props) {
   const router = useRouter();
 
   const allSubspecialties = [...subspecialties.map((s) => s.name), GENERAL];
@@ -321,14 +321,14 @@ export default function NewsletterCurationClient({ edition, subspecialties, arti
             onClick={() => router.push(`/admin/newsletter/${edition.id}/review`)}
             style={{
               fontSize: "13px", fontWeight: 600, fontFamily: "inherit",
-              background: totalSelected > 0 ? "#1a1a1a" : "#f3f4f6",
+              background: totalSelected > 0 ? "#059669" : "#f3f4f6",
               color: totalSelected > 0 ? "#fff" : "#9ca3af",
               border: "none", borderRadius: "7px", padding: "7px 16px",
               cursor: totalSelected > 0 ? "pointer" : "default",
               whiteSpace: "nowrap",
             }}
           >
-            Go to newsletter →
+            Review →
           </button>
         </div>
       </div>
