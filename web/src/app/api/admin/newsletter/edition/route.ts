@@ -4,8 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 
 const patchSchema = z.object({
-  id:    z.string().uuid(),
-  intro: z.string(),
+  id:      z.string().min(1),
+  content: z.record(z.unknown()),
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -19,12 +19,15 @@ export async function PATCH(request: NextRequest) {
   try { body = await request.json(); }
   catch { return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 }); }
 
+  console.log("[edition PATCH] received:", JSON.stringify(body));
+
   const result = patchSchema.safeParse(body);
   if (!result.success) {
+    console.log("[edition PATCH] validation error:", result.error.issues);
     return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
   }
 
-  const { id, intro } = result.data;
+  const { id, content } = result.data;
 
   const { data: current, error: fetchError } = await admin
     .from("newsletter_editions")
@@ -34,9 +37,11 @@ export async function PATCH(request: NextRequest) {
 
   if (fetchError) return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
 
+  const updatedContent = { ...(current?.content ?? {}), ...content };
+
   const { error } = await admin
     .from("newsletter_editions")
-    .update({ content: { ...(current?.content ?? {}), intro } })
+    .update({ content: updatedContent })
     .eq("id", id);
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

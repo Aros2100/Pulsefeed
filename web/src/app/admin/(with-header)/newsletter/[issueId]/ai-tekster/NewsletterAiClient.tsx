@@ -39,13 +39,8 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
   const [globalIntro, setGlobalIntro] = useState<string>(
     typeof content?.global_intro === "string" ? content.global_intro : ""
   );
-  const [comments, setComments] = useState<Record<string, string>>(() => {
-    const saved = content?.subspecialty_comments;
-    if (saved && typeof saved === "object" && !Array.isArray(saved)) {
-      return saved as Record<string, string>;
-    }
-    return {};
-  });
+  const savedComments = (content?.subspecialty_comments ?? {}) as Record<string, string>;
+  const [comments, setComments] = useState<Record<string, string>>(savedComments);
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -113,13 +108,20 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
     setSaving(true);
     setSaveError(null);
     try {
+      const patchBody = {
+        id: edition.id,
+        content: {
+          global_intro: globalIntro,
+          subspecialty_comments: Object.fromEntries(
+            Object.entries(comments).map(([k, v]) => [k, v ?? ""])
+          ),
+        },
+      };
+      console.log("[ai-tekster] save body:", JSON.stringify(patchBody));
       const res = await fetch("/api/admin/newsletter/edition", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: edition.id,
-          content: { global_intro: globalIntro, subspecialty_comments: comments },
-        }),
+        body: JSON.stringify(patchBody),
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
