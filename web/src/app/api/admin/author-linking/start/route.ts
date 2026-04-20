@@ -1,8 +1,10 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { runAuthorLinking } from "@/lib/import/author-linker";
+
+export const maxDuration = 300;
 
 const schema = z.object({
   import_log_id: z.string().uuid().optional(),
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Fire-and-forget
-  void runAuthorLinking(log.id, importLogId);
+  after(() => runAuthorLinking(log.id, importLogId));
 
   return NextResponse.json({ ok: true, logId: log.id });
 }

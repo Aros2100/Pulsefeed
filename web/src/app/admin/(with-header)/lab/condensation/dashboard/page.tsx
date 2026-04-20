@@ -27,7 +27,7 @@ function accColor(v: number | null): string {
 
 const TABS = [
   { key: "text", label: "Tekst", module: "condensation_text" },
-  { key: "pico", label: "PICO",  module: "condensation_pico" },
+  { key: "sari", label: "SARI",  module: "condensation_sari" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -125,7 +125,7 @@ export default async function CondensationDashboardPage({ searchParams }: Props)
     version: string;
     active: boolean;
     text: number | null;
-    pico: number | null;
+    sari: number | null;
     average: number | null;
   };
 
@@ -141,13 +141,13 @@ export default async function CondensationDashboardPage({ searchParams }: Props)
       version: ver,
       active: v.active as boolean,
       text: dimAccuracies["text"],
-      pico: dimAccuracies["pico"],
+      sari: dimAccuracies["sari"],
       average: null,
     };
   });
 
   for (const r of summaryRows) {
-    const vals = [r.text, r.pico].filter((v): v is number => v != null);
+    const vals = [r.text, r.sari].filter((v): v is number => v != null);
     r.average = vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
   }
 
@@ -297,7 +297,7 @@ export default async function CondensationDashboardPage({ searchParams }: Props)
               }}>
                 <div>Version</div>
                 <div>Tekst</div>
-                <div>PICO</div>
+                <div>SARI</div>
                 <div>Samlet</div>
               </div>
               {summaryRows.map((r) => (
@@ -315,7 +315,7 @@ export default async function CondensationDashboardPage({ searchParams }: Props)
                     )}
                   </div>
                   <div style={{ color: accColor(r.text) }}>{r.text != null ? `${r.text}%` : "—"}</div>
-                  <div style={{ color: accColor(r.pico) }}>{r.pico != null ? `${r.pico}%` : "—"}</div>
+                  <div style={{ color: accColor(r.sari) }}>{r.sari != null ? `${r.sari}%` : "—"}</div>
                   <div style={{ fontWeight: 700, color: accColor(r.average) }}>{r.average != null ? `${r.average}%` : "—"}</div>
                 </div>
               ))}
