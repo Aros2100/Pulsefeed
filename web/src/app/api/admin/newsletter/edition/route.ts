@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 
 const patchSchema = z.object({
   id:      z.string().min(1),
-  content: z.record(z.unknown()),
+  content: z.object({}).passthrough(),
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -168,6 +168,17 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
           >
             Save →
           </button>
+          <Link
+            href={`/admin/newsletter/${edition.id}/preview`}
+            style={{
+              fontSize: "13px", fontWeight: 600,
+              background: "#059669", color: "#fff",
+              borderRadius: "7px", padding: "7px 16px",
+              textDecoration: "none", whiteSpace: "nowrap",
+            }}
+          >
+            Next →
+          </Link>
         </div>
       </div>
 

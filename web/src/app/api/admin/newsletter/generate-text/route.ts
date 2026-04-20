@@ -34,13 +34,13 @@ export async function POST(request: NextRequest) {
   const tone = "Write in a confident, collegial tone — as one neurosurgeon briefing another. Avoid listing facts mechanically. Maximum 2 sentences. No more. Return only the text, nothing else.";
 
   const prompt = type === "global"
-    ? `You are the editor of PulseFeed — a weekly medical newsletter for neurosurgeons. Write a short intro in English highlighting the two or three most important points across these articles. Be direct and precise — no filler phrases. ${tone}\n\nArticles:\n${articleList}`
-    : `You are the editor of PulseFeed — a weekly medical newsletter for neurosurgeons. Write a short comment in English about this week's articles within ${subspecialty ?? "this subspecialty"}. Highlight what is noteworthy. Be direct and precise — no filler phrases. ${tone}\n\nArticles:\n${articleList}`;
+    ? `You are the editor of PulseFeed — a weekly medical newsletter for neurosurgeons. Write a short 2-sentence intro in English that highlights what makes these three articles worth reading this week. The articles will appear at the bottom of the newsletter — write the intro so it creates anticipation for them. Write in a confident, collegial tone — as one neurosurgeon briefing another. One or two sentences maximum. If you write more than two sentences, you have failed. Return only the text, nothing else.\n\nArticles:\n${articleList}`
+    : `You are the editor of PulseFeed — a weekly medical newsletter for neurosurgeons. Write a short comment in English about this week's articles within ${subspecialty ?? "this subspecialty"}. Highlight what is noteworthy. Be direct and precise — no filler phrases. One or two sentences maximum. If you write more than two sentences, you have failed. Return only the text, nothing else.\n\nArticles:\n${articleList}`;
 
   try {
     const message = await trackedCall("newsletter_generate_text", {
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 150,
+      max_tokens: 100,
       messages: [{ role: "user", content: prompt }],
     });
 
