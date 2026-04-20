@@ -34,7 +34,7 @@ function esc(s: string): string {
 }
 
 function articleRow(a: Article): string {
-  const meta = [a.article_type, a.journal_abbr, a.authorLastName, a.country].filter(Boolean).map(esc).join(" · ");
+  const meta = [a.article_type, a.journal_abbr, a.authorLastName, a.country].filter((s): s is string => s !== null && s !== undefined).map(esc).join(" · ");
   return `
     <div style="margin-bottom:10px">
       <a href="https://pubmed.ncbi.nlm.nih.gov/${esc(a.pubmed_id)}/"
