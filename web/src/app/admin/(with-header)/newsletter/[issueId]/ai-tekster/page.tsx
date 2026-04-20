@@ -2,9 +2,9 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-import NewsletterReviewClient from "./NewsletterReviewClient";
+import NewsletterAiClient from "./NewsletterAiClient";
 
-export default async function NewsletterReviewPage({ params }: { params: Promise<{ issueId: string }> }) {
+export default async function NewsletterAiTeksterPage({ params }: { params: Promise<{ issueId: string }> }) {
   const { issueId } = await params;
 
   const supabase = await createClient();
@@ -43,13 +43,13 @@ export default async function NewsletterReviewPage({ params }: { params: Promise
   if (articleIds.length > 0) {
     const { data } = await admin
       .from("articles")
-      .select("id, title, journal_abbr, pubmed_indexed_at, article_type, news_value, pubmed_id")
+      .select("id, title, article_type")
       .in("id", articleIds);
     articleDetails = data ?? [];
   }
 
   return (
-    <NewsletterReviewClient
+    <NewsletterAiClient
       edition={edition}
       subspecialties={subspecialties ?? []}
       editionArticles={editionArticles ?? []}

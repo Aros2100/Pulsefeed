@@ -7,8 +7,6 @@ import ArticleViewTracker from "./ArticleViewTracker";
 import ShareButton from "./ShareButton";
 import BackButton from "./BackButton";
 
-interface PicoData { population?: string; intervention?: string; comparison?: string; outcome?: string }
-
 export default async function ArticleDetailPage({
   params,
 }: {
@@ -31,15 +29,14 @@ export default async function ArticleDetailPage({
   const meshCount    = Array.isArray(article.mesh_terms)  ? article.mesh_terms.length  : 0;
   const grantCount   = Array.isArray(article.grants)      ? article.grants.length      : 0;
   const isEnriched   = !!article.enriched_at;
-  const pico         = article.pico as PicoData | null;
-  const hasPico      = !!(pico?.population || pico?.intervention || pico?.comparison || pico?.outcome);
+  const hasSari = !!(article.sari_subject || article.sari_action || article.sari_result || article.sari_implication);
 
   const navItems = [
     { id: "facts",      label: "Facts" },
     article.keywords?.length ? { id: "keywords",   label: "Keywords",   badge: article.keywords.length } : null,
     meshCount             ? { id: "mesh",        label: "MeSH Terms", badge: meshCount }           : null,
     isEnriched            ? { id: "ai-summary",  label: "AI Summary", ai: true }                  : null,
-    isEnriched && hasPico ? { id: "pico",        label: "PICO",       ai: true }                  : null,
+    hasSari               ? { id: "sari",        label: "SARI",       ai: true }                  : null,
     authorCount           ? { id: "authors",     label: "Authors",    badge: authorCount }          : null,
     article.abstract      ? { id: "abstract",    label: "Abstract" }                               : null,
     grantCount            ? { id: "funding",     label: "Funding",    badge: grantCount }           : null,

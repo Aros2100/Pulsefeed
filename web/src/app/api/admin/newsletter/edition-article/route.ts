@@ -11,7 +11,7 @@ const patchSchema = z.object({
   updates: z.array(z.object({
     id:         z.string().uuid(),
     sort_order: z.number().int().min(0),
-    featured:   z.boolean(),
+    is_global:  z.boolean(),
   })).min(1),
 });
 
@@ -55,10 +55,10 @@ export async function PATCH(request: NextRequest) {
 
   const errors: string[] = [];
   await Promise.all(
-    result.data.updates.map(async ({ id, sort_order, featured }) => {
+    result.data.updates.map(async ({ id, sort_order, is_global }) => {
       const { error } = await admin
         .from("newsletter_edition_articles")
-        .update({ sort_order, featured })
+        .update({ sort_order, is_global })
         .eq("id", id);
       if (error) errors.push(error.message);
     })

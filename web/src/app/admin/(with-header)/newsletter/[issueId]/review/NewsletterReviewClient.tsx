@@ -15,7 +15,7 @@ interface EditionArticle {
   article_id: string;
   subspecialty: string;
   sort_order: number;
-  featured: boolean;
+  is_global: boolean;
 }
 
 interface ArticleDetail {
@@ -36,7 +36,7 @@ interface SectionItem {
   pubmed_indexed_at: string | null;
   article_type: string | null;
   news_value: number | null;
-  featured: boolean;
+  is_global: boolean;
 }
 
 interface Props {
@@ -73,24 +73,28 @@ function initSections(
       pubmed_indexed_at: detail.pubmed_indexed_at,
       article_type: detail.article_type,
       news_value: detail.news_value,
-      featured: ea.featured,
+      is_global: ea.is_global,
     });
   }
 
   return grouped;
 }
 
+const MAX_GLOBAL = 3;
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function NewsletterReviewClient({ edition, subspecialties, editionArticles, articleDetails }: Props) {
-  const [intro, setIntro] = useState<string>(
-    (edition.content as Record<string, string> | null)?.intro ?? ""
-  );
   const [sections, setSections] = useState<Record<string, SectionItem[]>>(() =>
     initSections(editionArticles, articleDetails)
   );
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  const globalCount = useMemo(
+    () => Object.values(sections).flat().filter((item) => item.is_global).length,
+    [sections]
+  );
 
   // Display order: named subspecialties by sort_order, then "No subspecialty"
   const sectionOrder = useMemo(() => {
@@ -111,13 +115,34 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
     });
   }
 
-  function toggleFeatured(subspecialty: string, itemId: string) {
+  function toggleGlobal(itemId: string) {
     setSections((prev) => {
-      const items = (prev[subspecialty] ?? []).map((item) => ({
-        ...item,
-        featured: item.id === itemId,
-      }));
-      return { ...prev, [subspecialty]: items };
+      const allItems = Object.values(prev).flat();
+      const target = allItems.find((item) => item.id === itemId);
+      if (!target) return prev;
+
+      // Toggle off if already global
+      if (target.is_global) {
+        const updated: Record<string, SectionItem[]> = {};
+        for (const [sub, items] of Object.entries(prev)) {
+          updated[sub] = items.map((item) =>
+            item.id === itemId ? { ...item, is_global: false } : item
+          );
+        }
+        return updated;
+      }
+
+      // No effect if max reached
+      if (globalCount >= MAX_GLOBAL) return prev;
+
+      // Toggle on
+      const updated: Record<string, SectionItem[]> = {};
+      for (const [sub, items] of Object.entries(prev)) {
+        updated[sub] = items.map((item) =>
+          item.id === itemId ? { ...item, is_global: true } : item
+        );
+      }
+      return updated;
     });
   }
 
@@ -139,16 +164,8 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
     setSaving(true);
     setSaveError(null);
     try {
-      const introRes = await fetch("/api/admin/newsletter/edition", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: edition.id, intro }),
-      });
-      const introJson = await introRes.json();
-      if (!introJson.ok) throw new Error(introJson.error ?? `HTTP ${introRes.status}`);
-
       const updates = Object.values(sections).flatMap((items) =>
-        items.map((item, idx) => ({ id: item.id, sort_order: idx, featured: item.featured }))
+        items.map((item, idx) => ({ id: item.id, sort_order: idx, is_global: item.is_global }))
       );
 
       if (updates.length > 0) {
@@ -192,6 +209,12 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
           Week {edition.week_number} · {edition.year}
         </span>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
+          <span style={{
+            fontSize: "12px", fontWeight: 600,
+            color: globalCount === MAX_GLOBAL ? "#059669" : "#94a3b8",
+          }}>
+            {globalCount}/{MAX_GLOBAL} global
+          </span>
           {saving && <span style={{ fontSize: "12px", color: "#94a3b8" }}>Saving…</span>}
           <button
             onClick={save}
@@ -204,6 +227,17 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
           >
             Save →
           </button>
+          <Link
+            href={`/admin/newsletter/${edition.id}/ai-tekster`}
+            style={{
+              fontSize: "13px", fontWeight: 600,
+              background: "#059669", color: "#fff",
+              borderRadius: "7px", padding: "7px 16px",
+              textDecoration: "none", whiteSpace: "nowrap",
+            }}
+          >
+            Next →
+          </Link>
         </div>
       </div>
 
@@ -219,30 +253,6 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
 
       {/* ── Body ────────────────────────────────────────────────────────────── */}
       <div style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 24px 80px" }}>
-
-        {/* Editorial intro */}
-        <div style={{ marginBottom: "36px" }}>
-          <div style={{
-            fontSize: "10px", letterSpacing: "0.08em", color: "#94a3b8",
-            textTransform: "uppercase", fontWeight: 700, marginBottom: "8px",
-          }}>
-            Editorial Intro
-          </div>
-          <textarea
-            value={intro}
-            onChange={(e) => setIntro(e.target.value)}
-            placeholder="Optional intro for this week's newsletter…"
-            rows={4}
-            style={{
-              width: "100%", fontSize: "14px", lineHeight: 1.7,
-              border: "1px solid #dde3ed", borderRadius: "8px",
-              padding: "12px 14px", resize: "vertical",
-              fontFamily: "inherit", color: "#1a1a1a",
-              background: "#fff", outline: "none",
-              boxSizing: "border-box",
-            }}
-          />
-        </div>
 
         {/* Subspecialty sections */}
         {sectionOrder.length === 0 ? (
@@ -271,8 +281,8 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
                   style={{
                     display: "flex", alignItems: "flex-start", gap: "12px",
                     padding: "12px 14px", marginBottom: "6px",
-                    background: item.featured ? "#fffbeb" : "#fff",
-                    border: `1px solid ${item.featured ? "#fde68a" : "#dde3ed"}`,
+                    background: item.is_global ? "#f0fdf4" : "#fff",
+                    border: `1px solid ${item.is_global ? "#86efac" : "#dde3ed"}`,
                     borderRadius: "8px",
                     transition: "background 0.1s, border-color 0.1s",
                   }}
@@ -307,8 +317,18 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
 
                   {/* Article info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "14px", fontWeight: 600, lineHeight: 1.45, marginBottom: "5px", color: "#1a1a1a" }}>
-                      {item.title}
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "5px" }}>
+                      {idx === 0 && (
+                        <span style={{
+                          fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em",
+                          textTransform: "uppercase", color: "#94a3b8",
+                        }}>
+                          Lead
+                        </span>
+                      )}
+                      <div style={{ fontSize: "14px", fontWeight: 600, lineHeight: 1.45, color: "#1a1a1a" }}>
+                        {item.title}
+                      </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                       {(item.journal_abbr || item.pubmed_indexed_at) && (
@@ -327,19 +347,25 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
                     </div>
                   </div>
 
-                  {/* Featured + remove */}
+                  {/* Global + remove */}
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
                     <button
-                      onClick={() => toggleFeatured(sub, item.id)}
-                      title={item.featured ? "Featured" : "Set as featured"}
+                      onClick={() => toggleGlobal(item.id)}
+                      disabled={!item.is_global && globalCount >= MAX_GLOBAL}
+                      title={item.is_global ? "Remove from global" : globalCount >= MAX_GLOBAL ? "Max 3 global articles" : "Mark as global"}
                       style={{
-                        fontSize: "16px", background: "none", border: "none",
-                        cursor: "pointer", padding: "2px 4px",
-                        opacity: item.featured ? 1 : 0.25,
-                        lineHeight: 1, transition: "opacity 0.15s",
+                        fontSize: "11px", fontWeight: 600, fontFamily: "inherit",
+                        padding: "3px 8px", borderRadius: "5px",
+                        border: item.is_global ? "1px solid #86efac" : "1px solid #e2e8f0",
+                        background: item.is_global ? "#dcfce7" : "none",
+                        color: item.is_global ? "#15803d" : "#94a3b8",
+                        cursor: (!item.is_global && globalCount >= MAX_GLOBAL) ? "default" : "pointer",
+                        opacity: (!item.is_global && globalCount >= MAX_GLOBAL) ? 0.4 : 1,
+                        transition: "all 0.15s",
+                        lineHeight: 1.4,
                       }}
                     >
-                      ⭐
+                      {item.is_global ? "Global ✓" : "Global"}
                     </button>
                     <button
                       onClick={() => removeArticle(sub, item.id)}

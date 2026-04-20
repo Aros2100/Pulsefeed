@@ -48,6 +48,11 @@ export interface ArticleData {
   pico_intervention: string | null;
   pico_comparison: string | null;
   pico_outcome: string | null;
+  // SARI (AI-scored)
+  sari_subject: string | null;
+  sari_action: string | null;
+  sari_result: string | null;
+  sari_implication: string | null;
   sample_size: number | null;
   condensed_model_version: string | null;
   condensed_at: string | null;
@@ -283,6 +288,32 @@ export default function ArticleStamkort({ article, authorIdByPosition, authorSco
                 </div>
               ))
             }
+          </CardBody>
+        </Card>
+      )}
+
+      {/* SARI */}
+      {(article.sari_subject || article.sari_action || article.sari_result || article.sari_implication) && (
+        <Card id="sari">
+          <CardHeader label="SARI" green />
+          <CardBody>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+              {[
+                { key: "Subject",     value: article.sari_subject },
+                { key: "Action",      value: article.sari_action },
+                { key: "Result",      value: article.sari_result },
+                { key: "Implication", value: article.sari_implication },
+              ].map(({ key, value }) => (
+                <div key={key} style={{ background: "#f7f9f7", borderRadius: "8px", padding: "12px 16px" }}>
+                  <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#3a7d44", marginBottom: "6px" }}>
+                    {key}
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#2a2a2a", lineHeight: 1.55 }}>
+                    {value ?? <span style={{ color: "#ccc" }}>—</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardBody>
         </Card>
       )}
