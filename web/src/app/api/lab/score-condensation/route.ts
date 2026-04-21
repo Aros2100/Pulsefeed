@@ -4,11 +4,11 @@ import pLimit from "p-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-import { getActivePrompt, scoreCondensation, scoreSari, type ActivePrompt } from "@/lib/lab/scorer";
+import { getActivePrompt, scoreSari, type ActivePrompt } from "@/lib/lab/scorer";
 
-const CONCURRENCY  = 1;
-const DELAY_MS     = 1300;
-const BATCH_LIMIT  = 10;
+const CONCURRENCY = 1;
+const DELAY_MS    = 1300;
+const BATCH_LIMIT = 10;
 
 const schema = z.object({
   specialty: z.string().refine(
@@ -18,38 +18,6 @@ const schema = z.object({
 });
 
 type Article = { id: string; title: string; abstract: string | null };
-
-async function condenseWithDelay(
-  article: Article,
-  specialty: string,
-  activePrompt: ActivePrompt
-) {
-  await new Promise((r) => setTimeout(r, DELAY_MS));
-  return condenseWithRetry(article, specialty, activePrompt);
-}
-
-async function condenseWithRetry(
-  article: Article,
-  specialty: string,
-  activePrompt: ActivePrompt,
-  retries = 3
-) {
-  for (let attempt = 0; attempt < retries; attempt++) {
-    try {
-      return await scoreCondensation(article, specialty, activePrompt, "condensation");
-    } catch (err: unknown) {
-      const status = (err as { status?: number })?.status;
-      if (status === 429 && attempt < retries - 1) {
-        const waitMs = (attempt + 1) * 60_000;
-        console.warn(`[score-condensation] rate limited — waiting ${waitMs / 1000}s before retry ${attempt + 1}/${retries - 1}`);
-        await new Promise((r) => setTimeout(r, waitMs));
-        continue;
-      }
-      throw err;
-    }
-  }
-  throw new Error("Max retries exceeded");
-}
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
@@ -67,13 +35,9 @@ export async function POST(request: NextRequest) {
   const { specialty } = result.data;
   const admin = createAdminClient();
 
-  let textPrompt: ActivePrompt;
-  let sariPrompt: ActivePrompt;
+  let activePrompt: ActivePrompt;
   try {
-    [textPrompt, sariPrompt] = await Promise.all([
-      getActivePrompt(specialty, "condensation"),
-      getActivePrompt(specialty, "condensation_sari"),
-    ]);
+    activePrompt = await getActivePrompt(specialty, "condensation");
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
@@ -115,14 +79,9 @@ export async function POST(request: NextRequest) {
           toScore.map((article) =>
             limiter(async () => {
               try {
-                const [cnd, sari] = await Promise.all([
-                  condenseWithDelay(article, specialty, textPrompt!),
-                  scoreSari(article, sariPrompt!),
-                ]);
+                await new Promise((r) => setTimeout(r, DELAY_MS));
+                const sari = await scoreSari(article, activePrompt);
                 const updatePayload = {
-                  short_headline:          cnd.short_headline,
-                  short_resume:            cnd.short_resume,
-                  bottom_line:             cnd.bottom_line,
                   sari_subject:            sari.sari_subject,
                   sari_action:             sari.sari_action,
                   sari_result:             sari.sari_result,
@@ -131,7 +90,7 @@ export async function POST(request: NextRequest) {
                   condensed_model_version: sari.version,
                   condensed_at:            new Date().toISOString(),
                 };
-                const { data, error } = await admin
+                const { error } = await admin
                   .from("articles")
                   .update(updatePayload)
                   .eq("id", article.id);
@@ -139,7 +98,7 @@ export async function POST(request: NextRequest) {
                 void admin.from("article_events").insert({
                   article_id: article.id,
                   event_type: "condensation_scored",
-                  meta: { version: cnd.version, sari_version: sari.version },
+                  meta: { sari_version: sari.version },
                 });
                 scored++;
               } catch (e) {
