@@ -191,10 +191,10 @@ export default function LoginPage() {
         {/* Header */}
         <div className="mb-8 text-center">
           <Image
-            src="/logo.png"
+            src="/logo-horizontal.svg"
             alt="PulseFeed"
-            width={160}
-            height={40}
+            width={194}
+            height={48}
             className="mx-auto mb-3 h-10 w-auto"
             priority
           />

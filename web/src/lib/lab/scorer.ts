@@ -438,6 +438,58 @@ export async function scoreArticleTypeProd(
   }
 }
 
+export interface SariResult {
+  sari_subject: string | null;
+  sari_action: string | null;
+  sari_result: string | null;
+  sari_implication: string | null;
+  sample_size: number | null;
+  version: string;
+}
+
+export async function scoreSari(
+  article: { id?: string; title: string; abstract: string | null },
+  activePrompt: ActivePrompt
+): Promise<SariResult> {
+  const content = activePrompt.prompt
+    .replace(/\{\{title\}\}|\{title\}/g,         article.title)
+    .replace(/\{\{abstract\}\}|\{abstract\}/g,   article.abstract ?? "No abstract available");
+
+  const message = await trackedCall(`sari_${activePrompt.version}`, {
+    model: SCORING_MODEL,
+    max_tokens: 512,
+    thinking: { type: "disabled" },
+    system: "You respond only with valid JSON. No explanation, no other text.",
+    messages: [{ role: "user", content }],
+  }, article.id, "sari");
+
+  const raw = (message.content[0] as { type: string; text: string }).text.trim();
+  try {
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as {
+      sari_subject?: string;
+      sari_action?: string;
+      sari_result?: string;
+      sari_implication?: string;
+      sample_size?: unknown;
+    };
+    const rawSize = Number(parsed.sample_size);
+    return {
+      sari_subject:    typeof parsed.sari_subject    === "string" ? parsed.sari_subject    : null,
+      sari_action:     typeof parsed.sari_action     === "string" ? parsed.sari_action     : null,
+      sari_result:     typeof parsed.sari_result     === "string" ? parsed.sari_result     : null,
+      sari_implication: typeof parsed.sari_implication === "string" ? parsed.sari_implication : null,
+      sample_size: Number.isFinite(rawSize) && rawSize > 0 ? Math.round(rawSize) : null,
+      version: activePrompt.version,
+    };
+  } catch {
+    return {
+      sari_subject: null, sari_action: null, sari_result: null, sari_implication: null,
+      sample_size: null, version: activePrompt.version,
+    };
+  }
+}
+
 export async function scoreCondensation(
   article: { id?: string; title: string; abstract: string | null },
   specialty: string,

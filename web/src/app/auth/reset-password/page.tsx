@@ -299,10 +299,10 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <Image
-            src="/logo.png"
+            src="/logo-horizontal.svg"
             alt="PulseFeed"
-            width={160}
-            height={40}
+            width={194}
+            height={48}
             className="mx-auto h-10 w-auto"
             priority
           />

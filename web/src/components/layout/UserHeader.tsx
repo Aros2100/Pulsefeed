@@ -35,23 +35,7 @@ export default function UserHeader({ activePage, mode, onModeChange, onProfileCl
         {/* Left — Logo */}
         <div className="flex items-center">
           <Link href="/" className="flex items-center">
-          <svg height="44" viewBox="0 0 220 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="38" height="38" rx="9" fill="#E8403A" />
-            <g transform="translate(19,19)" fill="white">
-              <rect x="-3.5" y="-10" width="7" height="9" rx="3.5" />
-              <rect x="-3.5" y="-10" width="7" height="9" rx="3.5" transform="rotate(45)" />
-              <rect x="-3.5" y="-10" width="7" height="9" rx="3.5" transform="rotate(90)" />
-              <rect x="-3.5" y="-10" width="7" height="9" rx="3.5" transform="rotate(135)" />
-              <rect x="-3.5" y="-10" width="7" height="9" rx="3.5" transform="rotate(180)" />
-              <rect x="-3.5" y="-10" width="7" height="9" rx="3.5" transform="rotate(225)" />
-              <rect x="-3.5" y="-10" width="7" height="9" rx="3.5" transform="rotate(270)" />
-              <rect x="-3.5" y="-10" width="7" height="9" rx="3.5" transform="rotate(315)" />
-              <circle r="3.5" fill="white" />
-            </g>
-            <text x="48" y="25" fontFamily="Arial, sans-serif" fontWeight="700" fontSize="20" fill="#E8403A">PULSE</text>
-            <text x="107" y="25" fontFamily="Arial, sans-serif" fontWeight="700" fontSize="20" fill="#5A5A5A">FEED</text>
-            <text x="48" y="34" fontFamily="Arial, sans-serif" fontSize="5.5" fill="#4a7080" letterSpacing="1.8">CLINICAL INTELLIGENCE</text>
-          </svg>
+          <img src="/logo-horizontal.svg" alt="PulseFeed" style={{ height: "44px", display: "block" }} />
           </Link>
         </div>
 

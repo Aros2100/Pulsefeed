@@ -19,8 +19,21 @@ function fmt(iso: string | null) {
   });
 }
 
+function fmtDate(iso: string | null) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString("da-DK", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 function specialtyLabel(slug: string) {
   return slug.charAt(0).toUpperCase() + slug.slice(1).replace(/-/g, " ");
+}
+
+function parseSubArray(val: unknown): string[] {
+  if (Array.isArray(val)) return val as string[];
+  if (typeof val === "string" && val.startsWith("{") && val.endsWith("}"))
+    return val.slice(1, -1).split(",").map((s) => s.replace(/^"|"$/g, "").trim()).filter(Boolean);
+  if (val) return [val as string];
+  return [];
 }
 
 // ── Timeline colours ──────────────────────────────────────────────────────────
@@ -113,9 +126,26 @@ function CardBody({ children }: { children: React.ReactNode }) {
 function CardKVRow({ label, value }: { label: string; value: React.ReactNode }) {
   if (!value && value !== 0) return null;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontSize: "14px" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontSize: "14px" }}>
       <span style={{ color: "#888" }}>{label}</span>
       <span style={{ color: "#1a1a1a" }}>{value}</span>
+    </div>
+  );
+}
+
+function NullableCardKVRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontSize: "14px" }}>
+      <span style={{ color: "#888" }}>{label}</span>
+      <span style={{ color: value ? "#1a1a1a" : "#bbb" }}>{value ?? "—"}</span>
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#5a6a85", marginBottom: "8px", marginTop: "16px", paddingTop: "12px", borderTop: "1px solid #f0f0f0" }}>
+      {children}
     </div>
   );
 }
@@ -167,7 +197,6 @@ function EnrichedCard({ p }: { p: P }) {
       {module && (
         <KV label="Modul" value={<Badge color="purple">{module}</Badge>} />
       )}
-      {/* Specialty scoring */}
       {p.ai_decision != null && (
         <KV label="AI beslutning" value={
           <Badge color={p.ai_decision === "approved" ? "green" : "red"}>{String(p.ai_decision)}</Badge>
@@ -179,7 +208,6 @@ function EnrichedCard({ p }: { p: P }) {
       {p.reason != null && (
         <KV label="Reason" value={String(p.reason)} />
       )}
-      {/* Subspecialty scoring */}
       {Array.isArray(p.subspecialty) && (p.subspecialty as string[]).length > 0 && (
         <KV label="Subspecialty" value={
           <span style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
@@ -189,18 +217,15 @@ function EnrichedCard({ p }: { p: P }) {
           </span>
         } />
       )}
-      {/* Article type scoring */}
       {p.article_type != null && (
         <KV label="Article type" value={<Badge color="blue">{String(p.article_type)}</Badge>} />
       )}
       {p.confidence != null && p.article_type != null && (
         <KV label="Confidence" value={`${p.confidence}%`} />
       )}
-      {/* Version */}
       {p.version != null && (
         <KV label="Version" value={String(p.version)} />
       )}
-      {/* Legacy felter */}
       {Array.isArray(p.specialty_tags) && (p.specialty_tags as string[]).length > 0 && (
         <KV label="Specialty tags" value={
           <span style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
@@ -461,7 +486,7 @@ export default async function AdminArticleLogPage({
     admin.from("article_events").select("*").eq("article_id", id).order("sequence", { ascending: true }),
     admin.from("article_authors").select("author_id, position, authors(author_score, department, hospital, city, state, country, verified_by)").eq("article_id", id),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (admin as any).from("article_specialties").select("specialty, specialty_match, scored_by, scored_at, source").eq("article_id", id).eq("specialty", ACTIVE_SPECIALTY).maybeSingle(),
+    (admin as any).from("article_specialties").select("specialty, specialty_match, scored_by, scored_at, source, specialty_confidence, specialty_reason").eq("article_id", id).eq("specialty", ACTIVE_SPECIALTY).maybeSingle(),
     getSubspecialties(ACTIVE_SPECIALTY),
   ]);
 
@@ -474,6 +499,8 @@ export default async function AdminArticleLogPage({
     scored_by: string | null;
     scored_at: string | null;
     source: string | null;
+    specialty_confidence: number | null;
+    specialty_reason: string | null;
   } | null;
 
   // Cast for typed access
@@ -508,149 +535,281 @@ export default async function AdminArticleLogPage({
     created_at: string;
   }[];
 
+  const pubmedUrl = `https://pubmed.ncbi.nlm.nih.gov/${a.pubmed_id}/`;
+  const pmcId = raw.pmc_id as string | null;
+  const citationsUrl = `https://europepmc.org/search?query=cites:MED:${a.pubmed_id}`;
+
+  const importedDisplay = (() => {
+    const d = new Date(a.imported_at);
+    const date = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+    return `${date} at ${time}`;
+  })();
+
   // ── PubMed tab ──────────────────────────────────────────────────────────────
 
   const pubmedTab = (
     <div style={{ padding: "4px 0 80px" }}>
       <ArticleStamkort article={a} authorIdByPosition={authorIdByPosition} authorScoreByPosition={authorScoreByPosition} authorGeoByPosition={authorGeoByPosition} />
+
+      {/* PubMed — øvrige felter */}
+      <Card>
+        <CardHeader label="PubMed — øvrige felter" />
+        <CardBody>
+          <CardKVRow label="Date completed" value={fmtDate(raw.date_completed as string | null)} />
+          <CardKVRow label="Modified at" value={fmtDate(raw.pubmed_modified_at as string | null)} />
+          <CardKVRow label="COI statement" value={raw.coi_statement as string | null} />
+          {(() => {
+            const grants = (raw.grants as Array<{ grantId?: string; agency?: string }> | null) ?? [];
+            if (!grants.length) return null;
+            return (
+              <>
+                <SectionLabel>Grants</SectionLabel>
+                {grants.map((g, i) => (
+                  <div key={i} style={{ fontSize: "13px", padding: "4px 0", borderBottom: "1px solid #f5f5f5" }}>
+                    {g.grantId && <span style={{ color: "#1a1a1a", fontWeight: 500 }}>{g.grantId}</span>}
+                    {g.agency && <span style={{ color: "#5a6a85", marginLeft: "8px" }}>{g.agency}</span>}
+                  </div>
+                ))}
+              </>
+            );
+          })()}
+          {(() => {
+            const substances = (raw.substances as Array<{ registryNumber?: string; name?: string }> | null) ?? [];
+            if (!substances.length) return null;
+            return (
+              <>
+                <SectionLabel>Substances / Chemicals</SectionLabel>
+                {substances.map((s, i) => (
+                  <div key={i} style={{ fontSize: "13px", padding: "4px 0", borderBottom: "1px solid #f5f5f5" }}>
+                    {s.name && <span style={{ color: "#1a1a1a" }}>{s.name}</span>}
+                    {s.registryNumber && <span style={{ color: "#888", marginLeft: "8px", fontFamily: "monospace", fontSize: "11px" }}>{s.registryNumber}</span>}
+                  </div>
+                ))}
+              </>
+            );
+          })()}
+        </CardBody>
+      </Card>
     </div>
   );
 
-  // ── Berigelse tab ───────────────────────────────────────────────────────────
+  // ── AI-scoring tab ──────────────────────────────────────────────────────────
 
-  const isEnriched = !!a.enriched_at;
-  const pico = a.pico as { population?: string; intervention?: string; comparison?: string; outcome?: string } | null;
-  const citationsUrl = `https://europepmc.org/search?query=cites:MED:${a.pubmed_id}`;
-
-  const berigelseTab = (
+  const aiScoringTab = (
     <div style={{ padding: "4px 0 80px" }}>
-      {/* Evidence Score */}
-      {a.evidence_score != null && (
-        <Card>
-          <CardHeader label="Evidence Score" />
-          <CardBody>
-            <EvidenceScore value={a.evidence_score} />
-          </CardBody>
-        </Card>
-      )}
 
-      {/* Klassifikation */}
+      {/* Specialty */}
       <Card>
-        <CardHeader label="Klassifikation" />
+        <CardHeader label="Specialty" />
         <CardBody>
-          <CardKVRow label="Article type" value={(raw.article_type as string | null) ?? "—"} />
-          <CardKVRow label="Subspecialty" value={
-            (() => {
-              const sub = a.subspecialty_ai;
-              const tags: string[] = Array.isArray(sub)
-                ? sub
-                : typeof sub === "string" && sub.startsWith("{") && sub.endsWith("}")
-                  ? sub.slice(1, -1).split(",").map((s: string) => s.replace(/^"|"$/g, "").trim()).filter(Boolean)
-                  : sub
-                    ? [sub as string]
-                    : [];
-              return tags.length > 0 ? tags.join(", ") : "—";
-            })()
-          } />
-          <CardKVRow label="Specialty" value={
-            specialtyRow?.specialty_match === true
-              ? specialtyLabel(specialtyRow.specialty)
-              : specialtyRow?.specialty_match === false
-                ? <Badge color="red">Rejected</Badge>
-                : <Badge color="gray">Pending</Badge>
-          } />
-        </CardBody>
-      </Card>
-
-      {/* Bibliometri */}
-      <Card>
-        <CardHeader label="Bibliometri" />
-        <CardBody>
-          <CardKVRow label="Impact Factor" value={a.impact_factor != null ? ifBadge(a.impact_factor) : "—"} />
-          <CardKVRow label="Journal H-index" value={a.journal_h_index != null ? String(a.journal_h_index) : "—"} />
-          <CardKVRow label="Citation Count" value={
-            <a href={citationsUrl} target="_blank" rel="noopener noreferrer"
-              style={{ color: "#1a6eb5", textDecoration: "none" }}>
-              {a.citation_count ?? "—"}{a.citation_count != null ? " ↗" : ""}
-            </a>
-          } />
-        </CardBody>
-      </Card>
-
-      {/* AI Summary */}
-      {isEnriched && a.short_resume && (
-        <Card>
-          <CardHeader label="AI Summary" green />
-          <CardBody>
-            <div style={{ fontSize: "15px", lineHeight: 1.75, color: "#1a1a1a" }}>
-              {a.short_resume}
-            </div>
-            <div style={{ display: "flex", gap: "32px", marginTop: "20px", paddingTop: "16px", borderTop: "1px solid #e8f0e8" }}>
-              <div>
-                <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>News Value</div>
-                <div style={{ fontSize: "18px", letterSpacing: "2px", color: "#f4a100" }}>
-                  {stars(a.news_value)}
-                </div>
-              </div>
-              {a.clinical_relevance && (
-                <div>
-                  <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>Clinical Relevance</div>
-                  <span style={{
-                    display: "inline-block", fontSize: "12px",
-                    background: a.clinical_relevance.toLowerCase().includes("practice") ? "#fff3e0" : "#e8f4e8",
-                    color:      a.clinical_relevance.toLowerCase().includes("practice") ? "#e65100"  : "#2d7a2d",
-                    padding: "4px 12px", borderRadius: "20px", fontWeight: 600,
-                  }}>
-                    {a.clinical_relevance}
-                  </span>
-                </div>
-              )}
-            </div>
-          </CardBody>
-        </Card>
-      )}
-
-      {/* PICO */}
-      {isEnriched && pico && (pico.population || pico.intervention || pico.comparison || pico.outcome) && (
-        <Card>
-          <CardHeader label="PICO" green />
-          <CardBody>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-              {([
-                { label: "Population",   value: pico.population },
-                { label: "Intervention", value: pico.intervention },
-                { label: "Comparison",   value: pico.comparison },
-                { label: "Outcome",      value: pico.outcome },
-              ] as { label: string; value: string | undefined }[])
-                .filter((p) => p.value)
-                .map((p) => (
-                  <div key={p.label} style={{ background: "#f9fafb", borderRadius: "8px", padding: "14px", border: "1px solid #eef2f7" }}>
-                    <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px", fontWeight: 600 }}>
-                      {p.label}
-                    </div>
-                    <div style={{ fontSize: "14px", lineHeight: 1.5, color: "#2a2a2a" }}>{p.value}</div>
-                  </div>
-                ))
-              }
-            </div>
-          </CardBody>
-        </Card>
-      )}
-
-      {/* Specialty scoring */}
-      <Card>
-        <CardHeader label="Specialty scoring" />
-        <CardBody>
-          <CardKVRow label="Specialty match" value={
+          <NullableCardKVRow label="Specialty match" value={
             specialtyRow?.specialty_match === true ? <Badge color="green">Approved</Badge>
             : specialtyRow?.specialty_match === false ? <Badge color="red">Rejected</Badge>
             : <Badge color="gray">Pending</Badge>
           } />
-          <CardKVRow label="Source" value={specialtyRow?.source ?? "—"} />
-          <CardKVRow label="Model" value={specialtyRow?.scored_by ?? "—"} />
-          {specialtyRow?.specialty_match !== null && (
-            <CardKVRow label="Scored at" value={specialtyRow?.scored_at ? fmt(specialtyRow.scored_at) : "—"} />
+          <NullableCardKVRow label="Source" value={specialtyRow?.source ?? null} />
+          <NullableCardKVRow label="Model" value={specialtyRow?.scored_by ?? null} />
+          <NullableCardKVRow label="Confidence" value={specialtyRow?.specialty_confidence != null ? `${specialtyRow.specialty_confidence}%` : null} />
+          <NullableCardKVRow label="Scored at" value={specialtyRow?.scored_at ? fmt(specialtyRow.scored_at) : null} />
+          <NullableCardKVRow label="Reason" value={specialtyRow?.specialty_reason ?? null} />
+          {(() => {
+            const legacyFields = [
+              raw.ai_decision,
+              raw.specialty_confidence,
+              raw.specialty_scored_at,
+              raw.specialty_reasoning,
+              raw.model_version,
+              raw.specialty_tags,
+            ];
+            const hasLegacy = legacyFields.some((f) =>
+              f != null && f !== "" && !(Array.isArray(f) && (f as unknown[]).length === 0)
+            );
+            if (!hasLegacy) return null;
+            return (
+              <>
+                <SectionLabel>Legacy felter (articles-tabel)</SectionLabel>
+                <CardKVRow label="ai_decision" value={raw.ai_decision as string | null} />
+                <CardKVRow label="specialty_confidence" value={raw.specialty_confidence != null ? `${raw.specialty_confidence}%` : null} />
+                <CardKVRow label="specialty_scored_at" value={raw.specialty_scored_at ? fmt(raw.specialty_scored_at as string) : null} />
+                <CardKVRow label="specialty_reasoning" value={raw.specialty_reasoning as string | null} />
+                <CardKVRow label="model_version" value={raw.model_version as string | null} />
+                <CardKVRow label="specialty_tags" value={(() => {
+                  const tags = parseSubArray(raw.specialty_tags);
+                  return tags.length > 0 ? tags.join(", ") : null;
+                })()} />
+              </>
+            );
+          })()}
+        </CardBody>
+      </Card>
+
+      {/* Article Type */}
+      <Card>
+        <CardHeader label="Article Type" />
+        <CardBody>
+          <CardKVRow label="article_type (auth.)" value={raw.article_type as string | null} />
+          <CardKVRow label="article_type_ai" value={raw.article_type_ai as string | null} />
+          <CardKVRow label="Confidence" value={raw.article_type_confidence != null ? `${raw.article_type_confidence}%` : null} />
+          <CardKVRow label="Method" value={raw.article_type_method as string | null} />
+          <CardKVRow label="Validated" value={raw.article_type_validated != null ? (
+            <Badge color={raw.article_type_validated ? "green" : "red"}>{raw.article_type_validated ? "Yes" : "No"}</Badge>
+          ) : null} />
+          <CardKVRow label="Scored at" value={raw.article_type_scored_at ? fmt(raw.article_type_scored_at as string) : null} />
+          <CardKVRow label="Model version" value={raw.article_type_model_version as string | null} />
+          <CardKVRow label="Rationale" value={raw.article_type_rationale as string | null} />
+        </CardBody>
+      </Card>
+
+      {/* Subspecialty */}
+      <Card>
+        <CardHeader label="Subspecialty" />
+        <CardBody>
+          {(() => {
+            const subAuth = parseSubArray(raw.subspecialty);
+            const subAi   = parseSubArray(a.subspecialty_ai);
+            const studyDesign = parseSubArray(raw.study_design_ai);
+            return (
+              <>
+                <CardKVRow label="subspecialty (auth.)" value={subAuth.length > 0 ? subAuth.join(", ") : null} />
+                <CardKVRow label="subspecialty_ai" value={subAi.length > 0 ? subAi.join(", ") : null} />
+                <CardKVRow label="Scored at" value={raw.subspecialty_scored_at ? fmt(raw.subspecialty_scored_at as string) : null} />
+                <CardKVRow label="Model version" value={a.subspecialty_model_version ? `v${a.subspecialty_model_version}` : null} />
+                <CardKVRow label="Reason" value={raw.subspecialty_reason as string | null} />
+                <CardKVRow label="Study design (AI)" value={studyDesign.length > 0 ? studyDesign.join(", ") : null} />
+              </>
+            );
+          })()}
+        </CardBody>
+      </Card>
+
+      {/* Kondensering */}
+      <Card>
+        <CardHeader label="Kondensering" />
+        <CardBody>
+          <CardKVRow label="Kondenseret" value={raw.condensed_at ? fmt(raw.condensed_at as string) : null} />
+          <CardKVRow label="Model version" value={a.condensed_model_version ? `v${a.condensed_model_version}` : null} />
+          <CardKVRow label="Beriget" value={a.enriched_at ? fmt(a.enriched_at) : null} />
+          {a.short_headline && (
+            <div style={{ marginTop: "12px" }}>
+              <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Short Headline</div>
+              <div style={{ fontSize: "15px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4 }}>{a.short_headline}</div>
+            </div>
           )}
+          {a.short_resume && (
+            <div style={{ marginTop: "12px" }}>
+              <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Short Resume</div>
+              <div style={{ fontSize: "14px", color: "#2a2a2a", lineHeight: 1.6 }}>{a.short_resume}</div>
+            </div>
+          )}
+          {(raw.long_resume as string | null) && (
+            <div style={{ marginTop: "12px" }}>
+              <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Long Resume</div>
+              <div style={{ fontSize: "14px", color: "#2a2a2a", lineHeight: 1.6 }}>{raw.long_resume as string}</div>
+            </div>
+          )}
+          {a.bottom_line && (
+            <div style={{ marginTop: "12px" }}>
+              <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Bottom Line</div>
+              <div style={{ background: "#f9fafb", borderLeft: "3px solid #7c3aed", padding: "10px 12px", fontSize: "14px", fontStyle: "italic", color: "#2a2a2a", lineHeight: 1.5 }}>
+                {a.bottom_line}
+              </div>
+            </div>
+          )}
+        </CardBody>
+      </Card>
+
+      {/* PICO */}
+      <Card>
+        <CardHeader label="PICO" />
+        <CardBody>
+          <NullableCardKVRow label="Population"   value={a.pico_population ?? null} />
+          <NullableCardKVRow label="Intervention" value={a.pico_intervention ?? null} />
+          <NullableCardKVRow label="Comparison"   value={a.pico_comparison ?? null} />
+          <NullableCardKVRow label="Outcome"      value={a.pico_outcome ?? null} />
+          <NullableCardKVRow label="Sample size"  value={a.sample_size != null ? `N = ${a.sample_size.toLocaleString("da-DK")}` : null} />
+        </CardBody>
+      </Card>
+
+      {/* SARI */}
+      <Card>
+        <CardHeader label="SARI" />
+        <CardBody>
+          <NullableCardKVRow label="Subject"    value={raw.sari_subject as string | null} />
+          <NullableCardKVRow label="Action"     value={raw.sari_action as string | null} />
+          <NullableCardKVRow label="Result"     value={raw.sari_result as string | null} />
+          <NullableCardKVRow label="Implication" value={raw.sari_implication as string | null} />
+        </CardBody>
+      </Card>
+
+      {/* Vurdering */}
+      <Card>
+        <CardHeader label="Vurdering" />
+        <CardBody>
+          {a.evidence_score != null && (
+            <div style={{ marginBottom: "12px" }}>
+              <EvidenceScore value={a.evidence_score} />
+            </div>
+          )}
+          {a.news_value != null && (
+            <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontSize: "14px" }}>
+              <span style={{ color: "#888" }}>News Value</span>
+              <span style={{ fontSize: "18px", letterSpacing: "2px", color: "#f4a100", lineHeight: 1 }}>{stars(a.news_value)}</span>
+            </div>
+          )}
+          {a.clinical_relevance && (
+            <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontSize: "14px" }}>
+              <span style={{ color: "#888" }}>Clinical Relevance</span>
+              <span>
+                <span style={{
+                  display: "inline-block", fontSize: "12px",
+                  background: a.clinical_relevance.toLowerCase().includes("practice") ? "#fff3e0" : "#e8f4e8",
+                  color:      a.clinical_relevance.toLowerCase().includes("practice") ? "#e65100"  : "#2d7a2d",
+                  padding: "4px 12px", borderRadius: "20px", fontWeight: 600,
+                }}>
+                  {a.clinical_relevance}
+                </span>
+              </span>
+            </div>
+          )}
+          {(() => {
+            const POPULATION_COLORS: Record<string, { bg: string; color: string; border: string }> = {
+              adult:         { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
+              pediatric:     { bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
+              neonatal:      { bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" },
+              mixed:         { bg: "#faf5ff", color: "#7c3aed", border: "#ddd6fe" },
+              not_specified: { bg: "#f9fafb", color: "#374151", border: "#d1d5db" },
+            };
+            const popStyle = a.patient_population
+              ? POPULATION_COLORS[a.patient_population.toLowerCase()] ?? { bg: "#f1f5f9", color: "#475569", border: "#e2e8f0" }
+              : null;
+            const trialUrl = a.trial_registration ? `https://clinicaltrials.gov/study/${a.trial_registration}` : null;
+            const pmcFullTextUrl = a.pmc_id ? `https://www.ncbi.nlm.nih.gov/pmc/articles/${a.pmc_id}/` : null;
+            return (
+              <>
+                <CardKVRow label="Patient population" value={a.patient_population && popStyle ? (
+                  <span style={{ fontSize: "12px", fontWeight: 600, borderRadius: "4px", padding: "2px 8px", background: popStyle.bg, color: popStyle.color, border: `1px solid ${popStyle.border}` }}>
+                    {a.patient_population}
+                  </span>
+                ) : null} />
+                <CardKVRow label="Time to read" value={a.time_to_read != null ? `${a.time_to_read} min` : null} />
+                <CardKVRow label="Full text" value={a.full_text_available != null ? (
+                  a.full_text_available
+                    ? pmcFullTextUrl
+                      ? <a href={pmcFullTextUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#15803d", fontWeight: 600, textDecoration: "none" }}>Tilgængelig ↗</a>
+                      : <Badge color="green">Tilgængelig</Badge>
+                    : <Badge color="gray">Kun abstract</Badge>
+                ) : null} />
+                <CardKVRow label="Trial registration" value={a.trial_registration && trialUrl ? (
+                  <a href={trialUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
+                    {a.trial_registration} ↗
+                  </a>
+                ) : null} />
+                <CardKVRow label="Auto tagged at" value={raw.auto_tagged_at ? fmt(raw.auto_tagged_at as string) : null} />
+                <CardKVRow label="Beriget" value={a.enriched_at ? fmt(a.enriched_at) : null} />
+              </>
+            );
+          })()}
         </CardBody>
       </Card>
 
@@ -666,245 +825,6 @@ export default async function AdminArticleLogPage({
             initialSubspecialties={(Array.isArray(a.subspecialty_ai) ? a.subspecialty_ai : []) as string[]}
             subspecialties={subspecialtiesList}
           />
-        </CardBody>
-      </Card>
-
-      {/* Subspecialer */}
-      {(a.subspecialty_ai ||
-        a.patient_population || a.time_to_read != null || a.full_text_available != null ||
-        a.trial_registration || (raw.geo_region as string | null)) && (() => {
-        const POPULATION_COLORS: Record<string, { bg: string; color: string; border: string }> = {
-          adult:         { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
-          pediatric:     { bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
-          neonatal:      { bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" },
-          mixed:         { bg: "#faf5ff", color: "#7c3aed", border: "#ddd6fe" },
-          not_specified: { bg: "#f9fafb", color: "#374151", border: "#d1d5db" },
-        };
-
-        const LANG_NAMES: Record<string, string> = {
-          eng: "English", fre: "French",  ger: "German",
-          spa: "Spanish", ita: "Italian", por: "Portuguese",
-          chi: "Chinese", jpn: "Japanese", rus: "Russian",
-        };
-
-        type ClsRow = [string, React.ReactNode];
-        const clsFr = (label: string, value: React.ReactNode | null | undefined): ClsRow | null => {
-          if (value === null || value === undefined) return null;
-          return [label, value];
-        };
-
-        // subspecialty_ai is TEXT[] — Supabase may return JS array or PG literal
-        const subTags: string[] = Array.isArray(a.subspecialty_ai)
-          ? a.subspecialty_ai
-          : typeof a.subspecialty_ai === "string" && a.subspecialty_ai.startsWith("{") && a.subspecialty_ai.endsWith("}")
-            ? a.subspecialty_ai.slice(1, -1).split(",").map((s: string) => s.replace(/^"|"$/g, "").trim()).filter(Boolean)
-            : a.subspecialty_ai
-              ? [a.subspecialty_ai]
-              : [];
-
-        const aiRows: ClsRow[] = [
-          clsFr("Subspecialty", subTags.length > 0 ? subTags.join(", ") : null),
-          clsFr("Model", a.subspecialty_model_version ? `v${a.subspecialty_model_version}` : null),
-        ].filter((r): r is ClsRow => r !== null);
-
-        const popStyle = a.patient_population
-          ? POPULATION_COLORS[a.patient_population.toLowerCase()] ?? { bg: "#f1f5f9", color: "#475569", border: "#e2e8f0" }
-          : null;
-
-        const pmcFullTextUrl = a.pmc_id
-          ? `https://www.ncbi.nlm.nih.gov/pmc/articles/${a.pmc_id}/`
-          : null;
-
-        const trialUrl = a.trial_registration
-          ? `https://clinicaltrials.gov/study/${a.trial_registration}`
-          : null;
-
-        const metaRows: ClsRow[] = [
-          a.time_to_read != null ? clsFr("Time to Read", `${a.time_to_read} min`) : null,
-          ["Patient Pop.", a.patient_population
-            ? (
-                <span style={{
-                  fontSize: "12px", fontWeight: 600, borderRadius: "4px", padding: "2px 8px",
-                  background: popStyle!.bg, color: popStyle!.color, border: `1px solid ${popStyle!.border}`,
-                }}>
-                  {a.patient_population}
-                </span>
-              )
-            : "—"
-          ] as ClsRow,
-          clsFr("Full Text", a.full_text_available
-            ? pmcFullTextUrl
-              ? <a href={pmcFullTextUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#15803d", fontWeight: 600, textDecoration: "none" }}>Tilgængelig ↗</a>
-              : <span style={{ color: "#15803d", fontWeight: 600 }}>Tilgængelig</span>
-            : a.full_text_available === false
-              ? <span style={{ color: "#888" }}>Kun abstract</span>
-              : null
-          ),
-          clsFr("Region", raw.geo_region as string | null),
-          ["Trial Reg.", a.trial_registration
-            ? (
-                <a href={trialUrl!} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
-                  {a.trial_registration} ↗
-                </a>
-              )
-            : "—"
-          ] as ClsRow,
-          a.language
-            ? clsFr("Language", LANG_NAMES[a.language] ?? a.language.toUpperCase())
-            : null,
-        ].filter((r): r is ClsRow => r !== null);
-
-        return (
-          <Card>
-            <CardHeader label="Subspecialer" />
-            <CardBody>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, fontSize: "14px" }}>
-                <div>
-                  <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#7c3aed", marginBottom: "8px" }}>
-                    AI-klassificeret
-                  </div>
-                  {aiRows.map(([label, value]) => (
-                    <div key={label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5" }}>
-                      <span style={{ color: "#888" }}>{label}</span>
-                      <span style={{ color: "#1a1a1a" }}>{value}</span>
-                    </div>
-                  ))}
-                  {a.subspecialty_reason && (
-                    <div style={{ marginTop: "8px", fontSize: "12px", color: "#666", fontStyle: "italic", lineHeight: 1.5 }}>
-                      {a.subspecialty_reason}
-                    </div>
-                  )}
-                </div>
-                {metaRows.length > 0 && (
-                  <div style={{ borderLeft: "1px solid #f0f0f0", paddingLeft: "20px" }}>
-                    <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "8px" }}>
-                      Metadata
-                    </div>
-                    {metaRows.map(([label, value]) => (
-                      <div key={label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", alignItems: "center" }}>
-                        <span style={{ color: "#888" }}>{label}</span>
-                        <span style={{ color: "#1a1a1a" }}>{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CardBody>
-          </Card>
-        );
-      })()}
-
-      {/* Kondensering */}
-      <Card>
-        <CardHeader label="Kondensering" />
-        <CardBody>
-          {!(raw.condensed_at as string | null) ? (
-            <div style={{ fontSize: "13px", color: "#aaa" }}>Ikke kondenseret endnu</div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, fontSize: "14px" }}>
-              {/* Left column: Tekst */}
-              <div>
-                <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#059669", marginBottom: "8px" }}>
-                  Tekst
-                </div>
-                {a.short_headline && (
-                  <div style={{ marginBottom: "8px" }}>
-                    <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>Headline</div>
-                    <div style={{ fontSize: "15px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4 }}>{a.short_headline}</div>
-                  </div>
-                )}
-                {a.short_resume && (
-                  <div style={{ marginBottom: "8px" }}>
-                    <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>Resumé</div>
-                    <div style={{ fontSize: "14px", color: "#2a2a2a", lineHeight: 1.6 }}>{a.short_resume}</div>
-                  </div>
-                )}
-                {a.bottom_line && (
-                  <div style={{ marginBottom: "8px" }}>
-                    <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>Bottom Line</div>
-                    <div style={{ background: "#f9fafb", borderLeft: "3px solid #7c3aed", padding: "10px 12px", fontSize: "14px", fontStyle: "italic", color: "#2a2a2a", lineHeight: 1.5 }}>
-                      {a.bottom_line}
-                    </div>
-                  </div>
-                )}
-                <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", marginTop: "4px" }}>
-                  <span style={{ color: "#888" }}>Model</span>
-                  <span style={{ color: "#1a1a1a" }}>{a.condensed_model_version ? `v${a.condensed_model_version}` : "—"}</span>
-                </div>
-              </div>
-
-              {/* Right column: PICO & Sample */}
-              {(() => {
-                const cndAuthors = (Array.isArray(a.authors) ? a.authors : []) as { foreName?: string; lastName?: string }[];
-                const firstName = cndAuthors.length > 0
-                  ? [cndAuthors[0].foreName, cndAuthors[0].lastName].filter(Boolean).join(" ")
-                  : null;
-                const lastAuthor = cndAuthors.length > 1 ? cndAuthors[cndAuthors.length - 1] : null;
-                const lastName = lastAuthor
-                  ? [lastAuthor.foreName, lastAuthor.lastName].filter(Boolean).join(" ")
-                  : null;
-                const firstAuthorId = authorIdByPosition.get(1) ?? null;
-                const lastAuthorId = cndAuthors.length > 1 ? (authorIdByPosition.get(cndAuthors.length) ?? null) : null;
-
-                const authorLink = (name: string, id: string | null) =>
-                  id
-                    ? <a href={`/admin/authors/${id}`} style={{ color: "#1a6eb5", textDecoration: "none" }}>{name}</a>
-                    : <>{name}</>;
-
-                return (
-                  <div style={{ borderLeft: "1px solid #f0f0f0", paddingLeft: "20px" }}>
-                    <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "8px" }}>
-                      PICO & Sample
-                    </div>
-                    {a.pico_population == null && a.pico_intervention == null && a.pico_comparison == null && a.pico_outcome == null ? (
-                      <div style={{ fontSize: "13px", color: "#aaa", fontStyle: "italic", marginBottom: "8px" }}>Ikke relevant</div>
-                    ) : (
-                      <>
-                        {[
-                          { label: "Population", value: a.pico_population },
-                          { label: "Intervention", value: a.pico_intervention },
-                          { label: "Comparison", value: a.pico_comparison },
-                          { label: "Outcome", value: a.pico_outcome },
-                        ].map((p) => (
-                          <div key={p.label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5" }}>
-                            <span style={{ color: "#888" }}>{p.label}</span>
-                            <span style={{ color: p.value ? "#1a1a1a" : "#aaa" }}>{p.value ?? "—"}</span>
-                          </div>
-                        ))}
-                      </>
-                    )}
-                    <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", marginTop: "4px" }}>
-                      <span style={{ color: "#888" }}>Sample Size</span>
-                      <span style={{ color: a.sample_size != null ? "#1a1a1a" : "#aaa", fontWeight: a.sample_size != null ? 600 : 400 }}>
-                        {a.sample_size != null ? `N = ${a.sample_size.toLocaleString("da-DK")}` : "—"}
-                      </span>
-                    </div>
-                    {firstName && (
-                      <>
-                        {lastName ? (
-                          <>
-                            <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5" }}>
-                              <span style={{ color: "#888" }}>Første forfatter</span>
-                              <span style={{ color: "#1a1a1a" }}>{authorLink(firstName, firstAuthorId)}</span>
-                            </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5" }}>
-                              <span style={{ color: "#888" }}>Sidste forfatter</span>
-                              <span style={{ color: "#1a1a1a" }}>{authorLink(lastName, lastAuthorId)}</span>
-                            </div>
-                          </>
-                        ) : (
-                          <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5" }}>
-                            <span style={{ color: "#888" }}>Forfatter</span>
-                            <span style={{ color: "#1a1a1a" }}>{authorLink(firstName, firstAuthorId)}</span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
         </CardBody>
       </Card>
     </div>
@@ -945,22 +865,39 @@ export default async function AdminArticleLogPage({
         aiLocationAttempted={raw.ai_location_attempted as boolean | null}
         locationParsedAt={raw.location_parsed_at as string | null}
       />
+
+      {/* Geo metadata */}
+      <Card>
+        <CardHeader label="Geo metadata" />
+        <CardBody>
+          <CardKVRow label="Geo source" value={raw.geo_source as string | null} />
+          <CardKVRow label="Confidence" value={raw.location_confidence ? (
+            <Badge color={(raw.location_confidence as string) === "high" ? "green" : "orange"}>
+              {raw.location_confidence as string} confidence
+            </Badge>
+          ) : null} />
+          <CardKVRow label="AI attempted" value={raw.ai_location_attempted != null ? (
+            <Badge color={raw.ai_location_attempted ? "purple" : "gray"}>
+              AI {raw.ai_location_attempted ? "ja" : "nej"}
+            </Badge>
+          ) : null} />
+          <CardKVRow label="Parsed at" value={raw.location_parsed_at ? fmt(raw.location_parsed_at as string) : null} />
+          <CardKVRow label="Countries" value={(() => {
+            const countries = parseSubArray(raw.article_countries);
+            return countries.length > 0 ? countries.join(", ") : null;
+          })()} />
+          <CardKVRow label="Cities" value={(() => {
+            const cities = parseSubArray(raw.article_cities);
+            return cities.length > 0 ? cities.join(", ") : null;
+          })()} />
+        </CardBody>
+      </Card>
     </div>
   );
 
-  // ── System tab ──────────────────────────────────────────────────────────────
+  // ── Import tab ──────────────────────────────────────────────────────────────
 
-  const importedDisplay = (() => {
-    const d = new Date(a.imported_at);
-    const date = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-    const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-    return `${date} at ${time}`;
-  })();
-
-  const pubmedUrl = `https://pubmed.ncbi.nlm.nih.gov/${a.pubmed_id}/`;
-  const pmcId = raw.pmc_id as string | null;
-
-  const systemTab = (
+  const importTab = (
     <div style={{ padding: "4px 0 80px" }}>
       {/* Import */}
       <Card>
@@ -969,17 +906,26 @@ export default async function AdminArticleLogPage({
           <CardKVRow label="Circle" value={
             (raw.circle as number | null) != null
               ? <Badge color="blue">{`Circle ${raw.circle}`}</Badge>
-              : "—"
+              : null
           } />
           <CardKVRow label="Imported at" value={importedDisplay} />
-          <CardKVRow label="Specialty Tag Approval" value={(() => {
+          <CardKVRow label="Approval method" value={(() => {
             const m = raw.approval_method as string | null;
-            if (m === "human")        return <Badge color="green">Approved by Editor</Badge>;
-            if (m === "mesh_auto_tag") return <span style={{ display: "inline-block", padding: "1px 7px", borderRadius: "999px", fontSize: "11px", fontWeight: 600, background: "#ecfeff", color: "#0891b2", border: "1px solid #a5f3fc" }}>Auto-approved by MeSH-terms</span>;
-            if (m === "journal")      return <Badge color="blue">Auto-approved by Journal</Badge>;
+            if (m === "human")         return <Badge color="green">Approved by Editor</Badge>;
+            if (m === "mesh_auto_tag") return <span style={{ display: "inline-block", padding: "1px 7px", borderRadius: "999px", fontSize: "11px", fontWeight: 600, background: "#ecfeff", color: "#0891b2", border: "1px solid #a5f3fc" }}>Auto-approved by MeSH</span>;
+            if (m === "journal")       return <Badge color="blue">Auto-approved by Journal</Badge>;
             return <span style={{ color: "#9ca3af" }}>Pending</span>;
           })()} />
-          <CardKVRow label="Source ID" value={(raw.source_id as string | null) ?? "—"} />
+          <CardKVRow label="Source ID" value={raw.source_id as string | null} />
+          <CardKVRow label="Status" value={raw.status ? (
+            <Badge color={(raw.status as string) === "approved" ? "green" : (raw.status as string) === "rejected" ? "red" : "orange"}>
+              {String(raw.status)}
+            </Badge>
+          ) : null} />
+          <CardKVRow label="Verified" value={<Badge color={raw.verified ? "green" : "red"}>{raw.verified ? "Yes" : "No"}</Badge>} />
+          <CardKVRow label="Authors unresolvable" value={raw.authors_unresolvable != null ? (
+            <Badge color={raw.authors_unresolvable ? "orange" : "gray"}>{raw.authors_unresolvable ? "Yes" : "No"}</Badge>
+          ) : null} />
         </CardBody>
       </Card>
 
@@ -1007,6 +953,17 @@ export default async function AdminArticleLogPage({
         </CardBody>
       </Card>
 
+      {/* Indeksering */}
+      <Card>
+        <CardHeader label="Indeksering (beregnet ved import)" />
+        <CardBody>
+          <CardKVRow label="Indexed date"  value={fmtDate(raw.indexed_date as string | null)} />
+          <CardKVRow label="Year"          value={raw.indexed_year  != null ? String(raw.indexed_year)  : null} />
+          <CardKVRow label="Month"         value={raw.indexed_month != null ? String(raw.indexed_month) : null} />
+          <CardKVRow label="Week"          value={raw.indexed_week  != null ? String(raw.indexed_week)  : null} />
+        </CardBody>
+      </Card>
+
       {/* PubMed Sync */}
       <Card>
         <CardHeader label="PubMed Sync" />
@@ -1021,19 +978,11 @@ export default async function AdminArticleLogPage({
           />
           <CardKVRow
             label="Retracted"
-            value={
-              raw.retracted === true
-                ? <Badge color="red">Yes</Badge>
-                : <Badge color="gray">No</Badge>
-            }
+            value={raw.retracted === true ? <Badge color="red">Yes</Badge> : <Badge color="gray">No</Badge>}
           />
           <CardKVRow
             label="Authors changed"
-            value={
-              raw.authors_changed === true
-                ? <Badge color="orange">Yes</Badge>
-                : <Badge color="gray">No</Badge>
-            }
+            value={raw.authors_changed === true ? <Badge color="orange">Yes</Badge> : <Badge color="gray">No</Badge>}
           />
           {raw.authors_changed === true && Array.isArray(raw.authors_raw_new) && (
             <CardKVRow
@@ -1041,6 +990,16 @@ export default async function AdminArticleLogPage({
               value={
                 <span style={{ color: "#9ca3af", fontSize: "13px" }}>
                   {(raw.authors_raw_new as unknown[]).length} authors pending review
+                </span>
+              }
+            />
+          )}
+          {raw.authors_raw_previous != null && Array.isArray(raw.authors_raw_previous) && (
+            <CardKVRow
+              label="Previous authors"
+              value={
+                <span style={{ color: "#9ca3af", fontSize: "13px" }}>
+                  {(raw.authors_raw_previous as unknown[]).length} authors (previous)
                 </span>
               }
             />
@@ -1129,6 +1088,40 @@ export default async function AdminArticleLogPage({
     </div>
   );
 
+  // ── Bibliometri tab ─────────────────────────────────────────────────────────
+
+  const bibliometriTab = (
+    <div style={{ padding: "4px 0 80px" }}>
+      <Card>
+        <CardHeader label="Bibliometri" />
+        <CardBody>
+          <SectionLabel>Journal metrics</SectionLabel>
+          <CardKVRow label="Impact Factor" value={a.impact_factor != null ? ifBadge(a.impact_factor) : null} />
+          <CardKVRow label="IF fetched at" value={raw.impact_factor_fetched_at ? fmt(raw.impact_factor_fetched_at as string) : null} />
+          <CardKVRow label="Journal H-index" value={a.journal_h_index != null ? String(a.journal_h_index) : null} />
+
+          <SectionLabel>Citationer</SectionLabel>
+          <CardKVRow label="Citation count" value={
+            <a href={citationsUrl} target="_blank" rel="noopener noreferrer"
+              style={{ color: "#1a6eb5", textDecoration: "none" }}>
+              {a.citation_count ?? "—"}{a.citation_count != null ? " ↗" : ""}
+            </a>
+          } />
+          <CardKVRow label="Citations fetched" value={raw.citations_fetched_at ? fmt(raw.citations_fetched_at as string) : null} />
+          <CardKVRow label="FWCI" value={raw.fwci != null ? (raw.fwci as number).toFixed(3) : null} />
+
+          <SectionLabel>OpenAlex</SectionLabel>
+          <CardKVRow label="OpenAlex Work" value={raw.openalex_work_id ? (
+            <a href={`https://openalex.org/works/${raw.openalex_work_id as string}`} target="_blank" rel="noopener noreferrer"
+              style={{ color: "#1a6eb5", textDecoration: "none" }}>
+              {String(raw.openalex_work_id)} ↗
+            </a>
+          ) : null} />
+        </CardBody>
+      </Card>
+    </div>
+  );
+
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", minHeight: "100vh" }}>
       <div style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px 0" }}>
@@ -1170,10 +1163,11 @@ export default async function AdminArticleLogPage({
       <div style={{ maxWidth: "860px", margin: "0 auto", padding: "0 24px" }}>
         <AdminArticleTabs
           pubmed={pubmedTab}
-          berigelse={berigelseTab}
+          aiScoring={aiScoringTab}
           geo={geoTab}
-          system={systemTab}
+          import_={importTab}
           historik={historikTab}
+          bibliometri={bibliometriTab}
           note={<ArticleNoteTab articleId={id} initialNote={(raw.admin_note as string | null) ?? ""} />}
         />
       </div>

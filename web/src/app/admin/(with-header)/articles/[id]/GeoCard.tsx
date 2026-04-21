@@ -386,41 +386,6 @@ export default function GeoCard(props: GeoCardProps) {
         </CardBody>
       </Card>
 
-      {/* Sektion 2: Parser (always read-only) */}
-      <Card>
-        <CardHeader label="Parser" />
-        <CardBody>
-          <div
-            style={{
-              display: "flex",
-              gap: "12px",
-              alignItems: "center",
-              flexWrap: "wrap",
-              fontSize: "13px",
-            }}
-          >
-            {props.locationConfidence && (
-              <Badge
-                color={
-                  props.locationConfidence === "high" ? "green" : "orange"
-                }
-              >
-                {props.locationConfidence} confidence
-              </Badge>
-            )}
-            {props.aiLocationAttempted != null && (
-              <Badge color={props.aiLocationAttempted ? "purple" : "gray"}>
-                AI {props.aiLocationAttempted ? "ja" : "nej"}
-              </Badge>
-            )}
-            {props.locationParsedAt && (
-              <span style={{ color: "#9ca3af", fontSize: "12px" }}>
-                Parset {fmt(props.locationParsedAt)}
-              </span>
-            )}
-          </div>
-        </CardBody>
-      </Card>
     </>
   );
 }

@@ -4,7 +4,7 @@ import pLimit from "p-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-import { getActivePrompt, scoreCondensation, type ActivePrompt } from "@/lib/lab/scorer";
+import { getActivePrompt, scoreCondensation, scoreSari, type ActivePrompt } from "@/lib/lab/scorer";
 
 const CONCURRENCY  = 1;
 const DELAY_MS     = 1300;
@@ -67,9 +67,13 @@ export async function POST(request: NextRequest) {
   const { specialty } = result.data;
   const admin = createAdminClient();
 
-  let activePrompt;
+  let textPrompt: ActivePrompt;
+  let sariPrompt: ActivePrompt;
   try {
-    activePrompt = await getActivePrompt(specialty, "condensation");
+    [textPrompt, sariPrompt] = await Promise.all([
+      getActivePrompt(specialty, "condensation"),
+      getActivePrompt(specialty, "condensation_sari"),
+    ]);
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
@@ -111,17 +115,20 @@ export async function POST(request: NextRequest) {
           toScore.map((article) =>
             limiter(async () => {
               try {
-                const cnd = await condenseWithDelay(article, specialty, activePrompt!);
+                const [cnd, sari] = await Promise.all([
+                  condenseWithDelay(article, specialty, textPrompt!),
+                  scoreSari(article, sariPrompt!),
+                ]);
                 const updatePayload = {
                   short_headline:          cnd.short_headline,
                   short_resume:            cnd.short_resume,
                   bottom_line:             cnd.bottom_line,
-                  sari_subject:            cnd.sari_subject,
-                  sari_action:             cnd.sari_action,
-                  sari_result:             cnd.sari_result,
-                  sari_implication:        cnd.sari_implication,
-                  sample_size:             cnd.sample_size,
-                  condensed_model_version: cnd.version,
+                  sari_subject:            sari.sari_subject,
+                  sari_action:             sari.sari_action,
+                  sari_result:             sari.sari_result,
+                  sari_implication:        sari.sari_implication,
+                  sample_size:             sari.sample_size,
+                  condensed_model_version: sari.version,
                   condensed_at:            new Date().toISOString(),
                 };
                 const { data, error } = await admin
@@ -132,7 +139,7 @@ export async function POST(request: NextRequest) {
                 void admin.from("article_events").insert({
                   article_id: article.id,
                   event_type: "condensation_scored",
-                  meta: { version: cnd.version },
+                  meta: { version: cnd.version, sari_version: sari.version },
                 });
                 scored++;
               } catch (e) {

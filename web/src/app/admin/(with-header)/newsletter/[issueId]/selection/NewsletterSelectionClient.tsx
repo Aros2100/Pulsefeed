@@ -16,6 +16,7 @@ export interface NLArticle {
   title: string;
   journal_abbr: string | null;
   pubmed_indexed_at: string | null;
+  imported_at: string | null;
   authors: unknown;
   news_value: number | null;
   clinical_relevance: string | null;
@@ -154,9 +155,9 @@ export default function NewsletterSelectionClient({ edition, subspecialties, art
     ? subspecialtyArticles
     : subspecialtyArticles.filter((a) => a.article_type === articleTypeFilter)
   ).sort((a, b) => {
-    if (!a.pubmed_indexed_at) return 1;
-    if (!b.pubmed_indexed_at) return -1;
-    return new Date(b.pubmed_indexed_at).getTime() - new Date(a.pubmed_indexed_at).getTime();
+    if (!a.imported_at) return 1;
+    if (!b.imported_at) return -1;
+    return new Date(b.imported_at).getTime() - new Date(a.imported_at).getTime();
   });
 
   const selectedForActive: string[] = selectedMap[activeSubspecialty] ?? [];

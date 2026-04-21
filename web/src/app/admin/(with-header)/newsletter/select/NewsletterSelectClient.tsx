@@ -268,9 +268,7 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
         padding: "0 32px",
         flexShrink: 0,
       }}>
-        <span style={{ fontWeight: 800, fontSize: "20px", letterSpacing: "0.06em" }}>
-          PULSE<span style={{ color: "#E83B2A" }}>FEED</span>
-        </span>
+        <img src="/logo-horizontal.svg" alt="PulseFeed" style={{ height: "29px", display: "block" }} />
         <div style={{
           fontSize: "14px", color: "#5a6a85",
           marginLeft: "24px", paddingLeft: "24px",
