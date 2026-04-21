@@ -120,7 +120,25 @@ export default function SariValidationClient({ specialty, label }: Props) {
     async function load() {
       setLoading(true);
 
-      // 1. Score first
+      // 1. Tjek om der allerede er scorede artikler klar
+      try {
+        const checkRes = await fetch(`/api/admin/training/condensation-sari-articles?specialty=${specialty}`, { signal: abort.signal });
+        const checkData = await checkRes.json() as { ok: boolean; articles?: SariArticle[] };
+        const existing = checkData.articles ?? [];
+
+        if (existing.length > 0) {
+          setArticles(existing);
+          setTotalCount(existing.length);
+          setSelectedId(existing[0]?.id ?? null);
+          setLoading(false);
+          return;
+        }
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+        console.error("[SariValidationClient] check failed:", e);
+      }
+
+      // 2. Ingen klar — score ny batch
       try {
         const scoreRes = await fetch("/api/lab/score-condensation", {
           method: "POST",
@@ -149,7 +167,7 @@ export default function SariValidationClient({ specialty, label }: Props) {
         console.error("[SariValidationClient] scoring failed:", e);
       }
 
-      // 2. Load articles for validation
+      // 3. Load efter scoring
       try {
         const res = await fetch(`/api/admin/training/condensation-sari-articles?specialty=${specialty}`, { signal: abort.signal });
         const d = await res.json() as { ok: boolean; articles?: SariArticle[] };
