@@ -28,6 +28,14 @@ function specialtyLabel(slug: string) {
   return slug.charAt(0).toUpperCase() + slug.slice(1).replace(/-/g, " ");
 }
 
+const MONTHS_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function fmtPublished(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return `${d.getUTCDate()} ${MONTHS_EN[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
 function parseSubArray(val: unknown): string[] {
   if (Array.isArray(val)) return val as string[];
   if (typeof val === "string" && val.startsWith("{") && val.endsWith("}"))
@@ -552,43 +560,28 @@ export default async function AdminArticleLogPage({
     <div style={{ padding: "4px 0 80px" }}>
       <ArticleStamkort article={a} authorIdByPosition={authorIdByPosition} authorScoreByPosition={authorScoreByPosition} authorGeoByPosition={authorGeoByPosition} />
 
-      {/* PubMed — øvrige felter */}
+      {/* Datoer */}
       <Card>
-        <CardHeader label="PubMed — øvrige felter" />
+        <CardHeader label="Datoer" />
         <CardBody>
-          <CardKVRow label="Date completed" value={fmtDate(raw.date_completed as string | null)} />
-          <CardKVRow label="Modified at" value={fmtDate(raw.pubmed_modified_at as string | null)} />
-          <CardKVRow label="COI statement" value={raw.coi_statement as string | null} />
-          {(() => {
-            const grants = (raw.grants as Array<{ grantId?: string; agency?: string }> | null) ?? [];
-            if (!grants.length) return null;
-            return (
-              <>
-                <SectionLabel>Grants</SectionLabel>
-                {grants.map((g, i) => (
-                  <div key={i} style={{ fontSize: "13px", padding: "4px 0", borderBottom: "1px solid #f5f5f5" }}>
-                    {g.grantId && <span style={{ color: "#1a1a1a", fontWeight: 500 }}>{g.grantId}</span>}
-                    {g.agency && <span style={{ color: "#5a6a85", marginLeft: "8px" }}>{g.agency}</span>}
-                  </div>
-                ))}
-              </>
-            );
-          })()}
-          {(() => {
-            const substances = (raw.substances as Array<{ registryNumber?: string; name?: string }> | null) ?? [];
-            if (!substances.length) return null;
-            return (
-              <>
-                <SectionLabel>Substances / Chemicals</SectionLabel>
-                {substances.map((s, i) => (
-                  <div key={i} style={{ fontSize: "13px", padding: "4px 0", borderBottom: "1px solid #f5f5f5" }}>
-                    {s.name && <span style={{ color: "#1a1a1a" }}>{s.name}</span>}
-                    {s.registryNumber && <span style={{ color: "#888", marginLeft: "8px", fontFamily: "monospace", fontSize: "11px" }}>{s.registryNumber}</span>}
-                  </div>
-                ))}
-              </>
-            );
-          })()}
+          <NullableCardKVRow label="Published"      value={fmtPublished(raw.published_date as string | null)} />
+          <NullableCardKVRow label="PubMed date"    value={fmtDate(raw.pubmed_date as string | null)} />
+          <NullableCardKVRow label="Indexed at"     value={fmtDate(raw.pubmed_indexed_at as string | null)} />
+          <NullableCardKVRow label="Date completed" value={fmtDate(raw.date_completed as string | null)} />
+          <NullableCardKVRow label="Modified at"    value={fmtDate(raw.pubmed_modified_at as string | null)} />
+        </CardBody>
+      </Card>
+
+      {/* Artikel metadata */}
+      <Card>
+        <CardHeader label="Artikel metadata" />
+        <CardBody>
+          <NullableCardKVRow label="COI statement" value={raw.coi_statement as string | null} />
+          <NullableCardKVRow label="Substances" value={(() => {
+            const subs = (raw.substances as Array<{ registryNumber?: string; name?: string }> | null) ?? [];
+            if (!subs.length) return null;
+            return subs.map((s) => [s.name, s.registryNumber ? `(${s.registryNumber})` : null].filter(Boolean).join(" ")).join(", ");
+          })()} />
         </CardBody>
       </Card>
     </div>
@@ -648,16 +641,16 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="Article Type" />
         <CardBody>
-          <CardKVRow label="article_type (auth.)" value={raw.article_type as string | null} />
-          <CardKVRow label="article_type_ai" value={raw.article_type_ai as string | null} />
-          <CardKVRow label="Confidence" value={raw.article_type_confidence != null ? `${raw.article_type_confidence}%` : null} />
-          <CardKVRow label="Method" value={raw.article_type_method as string | null} />
-          <CardKVRow label="Validated" value={raw.article_type_validated != null ? (
+          <NullableCardKVRow label="article_type (auth.)" value={raw.article_type as string | null} />
+          <NullableCardKVRow label="article_type_ai" value={raw.article_type_ai as string | null} />
+          <NullableCardKVRow label="Confidence" value={raw.article_type_confidence != null ? `${raw.article_type_confidence}%` : null} />
+          <NullableCardKVRow label="Method" value={raw.article_type_method as string | null} />
+          <NullableCardKVRow label="Validated" value={raw.article_type_validated != null ? (
             <Badge color={raw.article_type_validated ? "green" : "red"}>{raw.article_type_validated ? "Yes" : "No"}</Badge>
           ) : null} />
-          <CardKVRow label="Scored at" value={raw.article_type_scored_at ? fmt(raw.article_type_scored_at as string) : null} />
-          <CardKVRow label="Model version" value={raw.article_type_model_version as string | null} />
-          <CardKVRow label="Rationale" value={raw.article_type_rationale as string | null} />
+          <NullableCardKVRow label="Scored at" value={raw.article_type_scored_at ? fmt(raw.article_type_scored_at as string) : null} />
+          <NullableCardKVRow label="Model version" value={raw.article_type_model_version as string | null} />
+          <NullableCardKVRow label="Rationale" value={raw.article_type_rationale as string | null} />
         </CardBody>
       </Card>
 
@@ -671,12 +664,12 @@ export default async function AdminArticleLogPage({
             const studyDesign = parseSubArray(raw.study_design_ai);
             return (
               <>
-                <CardKVRow label="subspecialty (auth.)" value={subAuth.length > 0 ? subAuth.join(", ") : null} />
-                <CardKVRow label="subspecialty_ai" value={subAi.length > 0 ? subAi.join(", ") : null} />
-                <CardKVRow label="Scored at" value={raw.subspecialty_scored_at ? fmt(raw.subspecialty_scored_at as string) : null} />
-                <CardKVRow label="Model version" value={a.subspecialty_model_version ? `v${a.subspecialty_model_version}` : null} />
-                <CardKVRow label="Reason" value={raw.subspecialty_reason as string | null} />
-                <CardKVRow label="Study design (AI)" value={studyDesign.length > 0 ? studyDesign.join(", ") : null} />
+                <NullableCardKVRow label="subspecialty (auth.)" value={subAuth.length > 0 ? subAuth.join(", ") : null} />
+                <NullableCardKVRow label="subspecialty_ai" value={subAi.length > 0 ? subAi.join(", ") : null} />
+                <NullableCardKVRow label="Scored at" value={raw.subspecialty_scored_at ? fmt(raw.subspecialty_scored_at as string) : null} />
+                <NullableCardKVRow label="Model version" value={a.subspecialty_model_version ? `v${a.subspecialty_model_version}` : null} />
+                <NullableCardKVRow label="Reason" value={raw.subspecialty_reason as string | null} />
+                <NullableCardKVRow label="Study design (AI)" value={studyDesign.length > 0 ? studyDesign.join(", ") : null} />
               </>
             );
           })()}
@@ -687,9 +680,9 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="Kondensering" />
         <CardBody>
-          <CardKVRow label="Kondenseret" value={raw.condensed_at ? fmt(raw.condensed_at as string) : null} />
-          <CardKVRow label="Model version" value={a.condensed_model_version ? `v${a.condensed_model_version}` : null} />
-          <CardKVRow label="Beriget" value={a.enriched_at ? fmt(a.enriched_at) : null} />
+          <NullableCardKVRow label="Kondenseret" value={raw.condensed_at ? fmt(raw.condensed_at as string) : null} />
+          <NullableCardKVRow label="Model version" value={a.condensed_model_version ? `v${a.condensed_model_version}` : null} />
+          <NullableCardKVRow label="Beriget" value={a.enriched_at ? fmt(a.enriched_at) : null} />
           {a.short_headline && (
             <div style={{ marginTop: "12px" }}>
               <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Short Headline</div>
@@ -787,26 +780,26 @@ export default async function AdminArticleLogPage({
             const pmcFullTextUrl = a.pmc_id ? `https://www.ncbi.nlm.nih.gov/pmc/articles/${a.pmc_id}/` : null;
             return (
               <>
-                <CardKVRow label="Patient population" value={a.patient_population && popStyle ? (
+                <NullableCardKVRow label="Patient population" value={a.patient_population && popStyle ? (
                   <span style={{ fontSize: "12px", fontWeight: 600, borderRadius: "4px", padding: "2px 8px", background: popStyle.bg, color: popStyle.color, border: `1px solid ${popStyle.border}` }}>
                     {a.patient_population}
                   </span>
                 ) : null} />
-                <CardKVRow label="Time to read" value={a.time_to_read != null ? `${a.time_to_read} min` : null} />
-                <CardKVRow label="Full text" value={a.full_text_available != null ? (
+                <NullableCardKVRow label="Time to read" value={a.time_to_read != null ? `${a.time_to_read} min` : null} />
+                <NullableCardKVRow label="Full text" value={a.full_text_available != null ? (
                   a.full_text_available
                     ? pmcFullTextUrl
                       ? <a href={pmcFullTextUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#15803d", fontWeight: 600, textDecoration: "none" }}>Tilgængelig ↗</a>
                       : <Badge color="green">Tilgængelig</Badge>
                     : <Badge color="gray">Kun abstract</Badge>
                 ) : null} />
-                <CardKVRow label="Trial registration" value={a.trial_registration && trialUrl ? (
+                <NullableCardKVRow label="Trial registration" value={a.trial_registration && trialUrl ? (
                   <a href={trialUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
                     {a.trial_registration} ↗
                   </a>
                 ) : null} />
-                <CardKVRow label="Auto tagged at" value={raw.auto_tagged_at ? fmt(raw.auto_tagged_at as string) : null} />
-                <CardKVRow label="Beriget" value={a.enriched_at ? fmt(a.enriched_at) : null} />
+                <NullableCardKVRow label="Auto tagged at" value={raw.auto_tagged_at ? fmt(raw.auto_tagged_at as string) : null} />
+                <NullableCardKVRow label="Beriget" value={a.enriched_at ? fmt(a.enriched_at) : null} />
               </>
             );
           })()}
@@ -870,23 +863,23 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="Geo metadata" />
         <CardBody>
-          <CardKVRow label="Geo source" value={raw.geo_source as string | null} />
-          <CardKVRow label="Confidence" value={raw.location_confidence ? (
+          <NullableCardKVRow label="Geo source" value={raw.geo_source as string | null} />
+          <NullableCardKVRow label="Confidence" value={raw.location_confidence ? (
             <Badge color={(raw.location_confidence as string) === "high" ? "green" : "orange"}>
               {raw.location_confidence as string} confidence
             </Badge>
           ) : null} />
-          <CardKVRow label="AI attempted" value={raw.ai_location_attempted != null ? (
+          <NullableCardKVRow label="AI attempted" value={raw.ai_location_attempted != null ? (
             <Badge color={raw.ai_location_attempted ? "purple" : "gray"}>
               AI {raw.ai_location_attempted ? "ja" : "nej"}
             </Badge>
           ) : null} />
-          <CardKVRow label="Parsed at" value={raw.location_parsed_at ? fmt(raw.location_parsed_at as string) : null} />
-          <CardKVRow label="Countries" value={(() => {
+          <NullableCardKVRow label="Parsed at" value={raw.location_parsed_at ? fmt(raw.location_parsed_at as string) : null} />
+          <NullableCardKVRow label="Countries" value={(() => {
             const countries = parseSubArray(raw.article_countries);
             return countries.length > 0 ? countries.join(", ") : null;
           })()} />
-          <CardKVRow label="Cities" value={(() => {
+          <NullableCardKVRow label="Cities" value={(() => {
             const cities = parseSubArray(raw.article_cities);
             return cities.length > 0 ? cities.join(", ") : null;
           })()} />
@@ -903,27 +896,27 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="Import" />
         <CardBody>
-          <CardKVRow label="Circle" value={
+          <NullableCardKVRow label="Circle" value={
             (raw.circle as number | null) != null
               ? <Badge color="blue">{`Circle ${raw.circle}`}</Badge>
               : null
           } />
-          <CardKVRow label="Imported at" value={importedDisplay} />
-          <CardKVRow label="Approval method" value={(() => {
+          <NullableCardKVRow label="Imported at" value={importedDisplay} />
+          <NullableCardKVRow label="Approval method" value={(() => {
             const m = raw.approval_method as string | null;
             if (m === "human")         return <Badge color="green">Approved by Editor</Badge>;
             if (m === "mesh_auto_tag") return <span style={{ display: "inline-block", padding: "1px 7px", borderRadius: "999px", fontSize: "11px", fontWeight: 600, background: "#ecfeff", color: "#0891b2", border: "1px solid #a5f3fc" }}>Auto-approved by MeSH</span>;
             if (m === "journal")       return <Badge color="blue">Auto-approved by Journal</Badge>;
             return <span style={{ color: "#9ca3af" }}>Pending</span>;
           })()} />
-          <CardKVRow label="Source ID" value={raw.source_id as string | null} />
-          <CardKVRow label="Status" value={raw.status ? (
+          <NullableCardKVRow label="Source ID" value={raw.source_id as string | null} />
+          <NullableCardKVRow label="Status" value={raw.status ? (
             <Badge color={(raw.status as string) === "approved" ? "green" : (raw.status as string) === "rejected" ? "red" : "orange"}>
               {String(raw.status)}
             </Badge>
           ) : null} />
-          <CardKVRow label="Verified" value={<Badge color={raw.verified ? "green" : "red"}>{raw.verified ? "Yes" : "No"}</Badge>} />
-          <CardKVRow label="Authors unresolvable" value={raw.authors_unresolvable != null ? (
+          <NullableCardKVRow label="Verified" value={<Badge color={raw.verified ? "green" : "red"}>{raw.verified ? "Yes" : "No"}</Badge>} />
+          <NullableCardKVRow label="Authors unresolvable" value={raw.authors_unresolvable != null ? (
             <Badge color={raw.authors_unresolvable ? "orange" : "gray"}>{raw.authors_unresolvable ? "Yes" : "No"}</Badge>
           ) : null} />
         </CardBody>
@@ -933,23 +926,21 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="IDs" />
         <CardBody>
-          <CardKVRow label="Article UUID" value={
+          <NullableCardKVRow label="Article UUID" value={
             <span style={{ fontFamily: "monospace", fontSize: "12px" }}>{a.id}</span>
           } />
-          <CardKVRow label="PubMed ID" value={
+          <NullableCardKVRow label="PubMed ID" value={
             <a href={pubmedUrl} target="_blank" rel="noopener noreferrer"
               style={{ color: "#1a6eb5", textDecoration: "none" }}>
               PMID {a.pubmed_id} ↗
             </a>
           } />
-          {pmcId && (
-            <CardKVRow label="PMC ID" value={
-              <a href={`https://www.ncbi.nlm.nih.gov/pmc/articles/${pmcId}/`} target="_blank" rel="noopener noreferrer"
-                style={{ color: "#1a6eb5", textDecoration: "none" }}>
-                {pmcId} ↗
-              </a>
-            } />
-          )}
+          <NullableCardKVRow label="PMC ID" value={pmcId ? (
+            <a href={`https://www.ncbi.nlm.nih.gov/pmc/articles/${pmcId}/`} target="_blank" rel="noopener noreferrer"
+              style={{ color: "#1a6eb5", textDecoration: "none" }}>
+              {pmcId} ↗
+            </a>
+          ) : null} />
         </CardBody>
       </Card>
 
@@ -957,10 +948,10 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="Indeksering (beregnet ved import)" />
         <CardBody>
-          <CardKVRow label="Indexed date"  value={fmtDate(raw.indexed_date as string | null)} />
-          <CardKVRow label="Year"          value={raw.indexed_year  != null ? String(raw.indexed_year)  : null} />
-          <CardKVRow label="Month"         value={raw.indexed_month != null ? String(raw.indexed_month) : null} />
-          <CardKVRow label="Week"          value={raw.indexed_week  != null ? String(raw.indexed_week)  : null} />
+          <NullableCardKVRow label="Indexed date"  value={fmtDate(raw.indexed_date as string | null)} />
+          <NullableCardKVRow label="Year"          value={raw.indexed_year  != null ? String(raw.indexed_year)  : null} />
+          <NullableCardKVRow label="Month"         value={raw.indexed_month != null ? String(raw.indexed_month) : null} />
+          <NullableCardKVRow label="Week"          value={raw.indexed_week  != null ? String(raw.indexed_week)  : null} />
         </CardBody>
       </Card>
 
@@ -968,42 +959,38 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="PubMed Sync" />
         <CardBody>
-          <CardKVRow
+          <NullableCardKVRow
             label="Last synced"
             value={
               (raw.pubmed_synced_at as string | null)
                 ? fmt(raw.pubmed_synced_at as string)
-                : <span style={{ color: "#9ca3af" }}>Not yet synced</span>
+                : null
             }
           />
-          <CardKVRow
+          <NullableCardKVRow
             label="Retracted"
             value={raw.retracted === true ? <Badge color="red">Yes</Badge> : <Badge color="gray">No</Badge>}
           />
-          <CardKVRow
+          <NullableCardKVRow
             label="Authors changed"
             value={raw.authors_changed === true ? <Badge color="orange">Yes</Badge> : <Badge color="gray">No</Badge>}
           />
-          {raw.authors_changed === true && Array.isArray(raw.authors_raw_new) && (
-            <CardKVRow
-              label="New authors data"
-              value={
-                <span style={{ color: "#9ca3af", fontSize: "13px" }}>
-                  {(raw.authors_raw_new as unknown[]).length} authors pending review
-                </span>
-              }
-            />
-          )}
-          {raw.authors_raw_previous != null && Array.isArray(raw.authors_raw_previous) && (
-            <CardKVRow
-              label="Previous authors"
-              value={
-                <span style={{ color: "#9ca3af", fontSize: "13px" }}>
-                  {(raw.authors_raw_previous as unknown[]).length} authors (previous)
-                </span>
-              }
-            />
-          )}
+          <NullableCardKVRow
+            label="New authors data"
+            value={raw.authors_changed === true && Array.isArray(raw.authors_raw_new) ? (
+              <span style={{ color: "#9ca3af", fontSize: "13px" }}>
+                {(raw.authors_raw_new as unknown[]).length} authors pending review
+              </span>
+            ) : null}
+          />
+          <NullableCardKVRow
+            label="Previous authors"
+            value={raw.authors_raw_previous != null && Array.isArray(raw.authors_raw_previous) ? (
+              <span style={{ color: "#9ca3af", fontSize: "13px" }}>
+                {(raw.authors_raw_previous as unknown[]).length} authors (previous)
+              </span>
+            ) : null}
+          />
         </CardBody>
       </Card>
     </div>
@@ -1095,23 +1082,31 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="Bibliometri" />
         <CardBody>
-          <SectionLabel>Journal metrics</SectionLabel>
-          <CardKVRow label="Impact Factor" value={a.impact_factor != null ? ifBadge(a.impact_factor) : null} />
-          <CardKVRow label="IF fetched at" value={raw.impact_factor_fetched_at ? fmt(raw.impact_factor_fetched_at as string) : null} />
-          <CardKVRow label="Journal H-index" value={a.journal_h_index != null ? String(a.journal_h_index) : null} />
+          {(a.impact_factor != null || raw.impact_factor_fetched_at != null || a.journal_h_index != null) && (
+            <>
+              <SectionLabel>Journal metrics</SectionLabel>
+              <NullableCardKVRow label="Impact Factor" value={a.impact_factor != null ? ifBadge(a.impact_factor) : null} />
+              <NullableCardKVRow label="IF fetched at" value={raw.impact_factor_fetched_at ? fmt(raw.impact_factor_fetched_at as string) : null} />
+              <NullableCardKVRow label="Journal H-index" value={a.journal_h_index != null ? String(a.journal_h_index) : null} />
+            </>
+          )}
 
-          <SectionLabel>Citationer</SectionLabel>
-          <CardKVRow label="Citation count" value={
-            <a href={citationsUrl} target="_blank" rel="noopener noreferrer"
-              style={{ color: "#1a6eb5", textDecoration: "none" }}>
-              {a.citation_count ?? "—"}{a.citation_count != null ? " ↗" : ""}
-            </a>
-          } />
-          <CardKVRow label="Citations fetched" value={raw.citations_fetched_at ? fmt(raw.citations_fetched_at as string) : null} />
-          <CardKVRow label="FWCI" value={raw.fwci != null ? (raw.fwci as number).toFixed(3) : null} />
+          {(a.citation_count != null || raw.citations_fetched_at != null || raw.fwci != null) && (
+            <>
+              <SectionLabel>Citationer</SectionLabel>
+              <NullableCardKVRow label="Citation count" value={
+                <a href={citationsUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ color: "#1a6eb5", textDecoration: "none" }}>
+                  {a.citation_count ?? "—"}{a.citation_count != null ? " ↗" : ""}
+                </a>
+              } />
+              <NullableCardKVRow label="Citations fetched" value={raw.citations_fetched_at ? fmt(raw.citations_fetched_at as string) : null} />
+              <NullableCardKVRow label="FWCI" value={raw.fwci != null ? (raw.fwci as number).toFixed(3) : null} />
+            </>
+          )}
 
           <SectionLabel>OpenAlex</SectionLabel>
-          <CardKVRow label="OpenAlex Work" value={raw.openalex_work_id ? (
+          <NullableCardKVRow label="OpenAlex Work" value={raw.openalex_work_id ? (
             <a href={`https://openalex.org/works/${raw.openalex_work_id as string}`} target="_blank" rel="noopener noreferrer"
               style={{ color: "#1a6eb5", textDecoration: "none" }}>
               {String(raw.openalex_work_id)} ↗
