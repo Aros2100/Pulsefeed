@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-import ArticleStamkort, { type ArticleData } from "@/components/articles/ArticleStamkort";
+import type { ArticleData } from "@/components/articles/ArticleStamkort";
+import CollapseAuthors from "@/components/articles/CollapseAuthors";
+import CopyButton from "@/components/articles/CopyButton";
 import AdminArticleTabs from "./AdminArticleTabs";
 import ArticleEditableFields from "./ArticleEditableFields";
 import ArticleNoteTab from "./ArticleNoteTab";
@@ -44,24 +46,45 @@ function parseSubArray(val: unknown): string[] {
   return [];
 }
 
+function decodeHtml(text: string): string {
+  return text
+    .replace(/&amp;/g,  "&")
+    .replace(/&lt;/g,   "<")
+    .replace(/&gt;/g,   ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-fA-F]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g,            (_, dec) => String.fromCodePoint(parseInt(dec, 10)));
+}
+
+const LANGUAGE_NAMES: Record<string, string> = {
+  eng: "English", fre: "French",  ger: "German",
+  spa: "Spanish", ita: "Italian", por: "Portuguese",
+  chi: "Chinese", jpn: "Japanese", rus: "Russian",
+};
+
+interface AuthorRaw { lastName?: string; foreName?: string; affiliation?: string | null; affiliations?: string[] | null; orcid?: string | null }
+interface MeshTerm  { descriptor?: string; major?: boolean; qualifiers?: string[] }
+interface Grant     { grantId?: string | null; agency?: string | null }
+function cast<T>(v: unknown): T[] { return Array.isArray(v) ? (v as T[]) : []; }
+
 // ── Timeline colours ──────────────────────────────────────────────────────────
 
 const COLORS: Record<string, { dot: string; border: string; bg: string; label: string }> = {
-  imported:       { dot: "#3b82f6", border: "#bfdbfe", bg: "#eff6ff",  label: "Article imported" },
-  enriched:       { dot: "#8b5cf6", border: "#ddd6fe", bg: "#f5f3ff",  label: "AI Berigelse" },
-  lab_decision:   { dot: "#10b981", border: "#a7f3d0", bg: "#f0fdf4",  label: "Lab" },
-  feedback:       { dot: "#f59e0b", border: "#fde68a", bg: "#fffbeb",  label: "Feedback" },
-  status_changed: { dot: "#f97316", border: "#fed7aa", bg: "#fff7ed",  label: "Status ændret" },
-  verified:       { dot: "#10b981", border: "#a7f3d0", bg: "#f0fdf4",  label: "Verificeret" },
-  author_linked:  { dot: "#3b82f6", border: "#bfdbfe", bg: "#eff6ff",  label: "Authors linked to article" },
-  quality_check:          { dot: "#6b7280", border: "#d1d5db", bg: "#f9fafb",  label: "Quality Check" },
-  auto_tagged:            { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff",  label: "Auto-Tagged" },
-  citation_count_updated: { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff",  label: "Citation count updated" },
+  imported:               { dot: "#3b82f6", border: "#bfdbfe", bg: "#eff6ff", label: "Article imported" },
+  enriched:               { dot: "#8b5cf6", border: "#ddd6fe", bg: "#f5f3ff", label: "AI Berigelse" },
+  lab_decision:           { dot: "#10b981", border: "#a7f3d0", bg: "#f0fdf4", label: "Lab" },
+  feedback:               { dot: "#f59e0b", border: "#fde68a", bg: "#fffbeb", label: "Feedback" },
+  status_changed:         { dot: "#f97316", border: "#fed7aa", bg: "#fff7ed", label: "Status ændret" },
+  verified:               { dot: "#10b981", border: "#a7f3d0", bg: "#f0fdf4", label: "Verificeret" },
+  author_linked:          { dot: "#3b82f6", border: "#bfdbfe", bg: "#eff6ff", label: "Authors linked to article" },
+  quality_check:          { dot: "#6b7280", border: "#d1d5db", bg: "#f9fafb", label: "Quality Check" },
+  auto_tagged:            { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff", label: "Auto-Tagged" },
+  citation_count_updated: { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff", label: "Citation count updated" },
 };
-
 const FALLBACK_COLOR = { dot: "#6b7280", border: "#d1d5db", bg: "#f9fafb", label: "Event" };
 
-// ── Badge / KV ────────────────────────────────────────────────────────────────
+// ── UI primitives ─────────────────────────────────────────────────────────────
 
 function Badge({ color, children }: { color: string; children: React.ReactNode }) {
   const styles: Record<string, { bg: string; color: string; border: string }> = {
@@ -90,17 +113,9 @@ function KV({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-// ── Card helpers (same style as ArticleStamkort) ─────────────────────────────
-
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{
-      background: "#fff",
-      borderRadius: "10px",
-      boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
-      marginBottom: "12px",
-      overflow: "hidden",
-    }}>
+    <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", marginBottom: "12px", overflow: "hidden" }}>
       {children}
     </div>
   );
@@ -108,19 +123,8 @@ function Card({ children }: { children: React.ReactNode }) {
 
 function CardHeader({ label, green }: { label: string; green?: boolean }) {
   return (
-    <div style={{
-      background: green ? "#f0f7ee" : "#EEF2F7",
-      borderBottom: `1px solid ${green ? "#c8e6c0" : "#dde3ed"}`,
-      padding: "10px 24px",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-    }}>
-      <div style={{
-        fontSize: "11px", letterSpacing: "0.08em",
-        color: green ? "#3a7d44" : "#5a6a85",
-        textTransform: "uppercase", fontWeight: 700,
-      }}>
+    <div style={{ background: green ? "#f0f7ee" : "#EEF2F7", borderBottom: `1px solid ${green ? "#c8e6c0" : "#dde3ed"}`, padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: green ? "#3a7d44" : "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
         {label}
       </div>
     </div>
@@ -131,29 +135,30 @@ function CardBody({ children }: { children: React.ReactNode }) {
   return <div style={{ padding: "20px 24px" }}>{children}</div>;
 }
 
-function CardKVRow({ label, value }: { label: string; value: React.ReactNode }) {
-  if (!value && value !== 0) return null;
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontSize: "14px" }}>
-      <span style={{ color: "#888" }}>{label}</span>
-      <span style={{ color: "#1a1a1a" }}>{value}</span>
-    </div>
-  );
-}
-
-function NullableCardKVRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontSize: "14px" }}>
-      <span style={{ color: "#888" }}>{label}</span>
-      <span style={{ color: value ? "#1a1a1a" : "#bbb" }}>{value ?? "—"}</span>
-    </div>
-  );
-}
-
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#5a6a85", marginBottom: "8px", marginTop: "16px", paddingTop: "12px", borderTop: "1px solid #f0f0f0" }}>
       {children}
+    </div>
+  );
+}
+
+function DescriptionRow({ label, value, description }: {
+  label: string;
+  value: React.ReactNode;
+  description: string;
+}) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "60% 40%", padding: "8px 0", borderBottom: "1px solid #f5f5f5", gap: "16px", alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "8px", alignItems: "start" }}>
+        <span style={{ color: "#888", fontSize: "13px", paddingTop: "1px" }}>{label}</span>
+        <span style={{ color: value !== null && value !== undefined && value !== "—" ? "#1a1a1a" : "#bbb", fontSize: "14px" }}>
+          {value ?? "—"}
+        </span>
+      </div>
+      <span style={{ color: "#9ca3af", fontSize: "12px", lineHeight: 1.5, paddingTop: "1px", borderLeft: "1px solid #f0f0f0", paddingLeft: "16px" }}>
+        {description}
+      </span>
     </div>
   );
 }
@@ -171,75 +176,44 @@ function ImportedCard({ p }: { p: P }) {
       : <span style={{ color: "#9ca3af" }}>—</span>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-      {circle != null && (
-        <KV label="Circle" value={<Badge color="blue">{`Circle ${circle}`}</Badge>} />
-      )}
-      {p.status != null && (
-        <KV label="Status" value={
-          <Badge color={p.status === "approved" ? "green" : "orange"}>{String(p.status)}</Badge>
-        } />
-      )}
+      {circle != null && <KV label="Circle" value={<Badge color="blue">{`Circle ${circle}`}</Badge>} />}
+      {p.status != null && <KV label="Status" value={<Badge color={p.status === "approved" ? "green" : "orange"}>{String(p.status)}</Badge>} />}
       {Array.isArray(p.specialty_tags) && (p.specialty_tags as string[]).length > 0 && (
         <KV label="Specialty" value={
           <span style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-            {(p.specialty_tags as string[]).map((s) => (
-              <Badge key={s} color="blue">{specialtyLabel(s)}</Badge>
-            ))}
+            {(p.specialty_tags as string[]).map((s) => <Badge key={s} color="blue">{specialtyLabel(s)}</Badge>)}
           </span>
         } />
       )}
       <KV label="Approval method" value={approvalBadge} />
-      {circle === 2 && p.source_id != null && (
-        <KV label="Source ID" value={String(p.source_id)} />
-      )}
+      {circle === 2 && p.source_id != null && <KV label="Source ID" value={String(p.source_id)} />}
     </div>
   );
 }
 
 function EnrichedCard({ p }: { p: P }) {
-  const conf = p.specialty_confidence as number | null;
+  const conf   = p.specialty_confidence as number | null;
   const module = p.module as string | null;
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-      {module && (
-        <KV label="Modul" value={<Badge color="purple">{module}</Badge>} />
-      )}
-      {p.ai_decision != null && (
-        <KV label="AI beslutning" value={
-          <Badge color={p.ai_decision === "approved" ? "green" : "red"}>{String(p.ai_decision)}</Badge>
-        } />
-      )}
-      {conf != null && (
-        <KV label="Confidence" value={`${conf}%`} />
-      )}
-      {p.reason != null && (
-        <KV label="Reason" value={String(p.reason)} />
-      )}
+      {module && <KV label="Modul" value={<Badge color="purple">{module}</Badge>} />}
+      {p.ai_decision != null && <KV label="AI beslutning" value={<Badge color={p.ai_decision === "approved" ? "green" : "red"}>{String(p.ai_decision)}</Badge>} />}
+      {conf != null && <KV label="Confidence" value={`${conf}%`} />}
+      {p.reason != null && <KV label="Reason" value={String(p.reason)} />}
       {Array.isArray(p.subspecialty) && (p.subspecialty as string[]).length > 0 && (
         <KV label="Subspecialty" value={
           <span style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-            {(p.subspecialty as string[]).map((s) => (
-              <Badge key={s} color="purple">{s}</Badge>
-            ))}
+            {(p.subspecialty as string[]).map((s) => <Badge key={s} color="purple">{s}</Badge>)}
           </span>
         } />
       )}
-      {p.article_type != null && (
-        <KV label="Article type" value={<Badge color="blue">{String(p.article_type)}</Badge>} />
-      )}
-      {p.confidence != null && p.article_type != null && (
-        <KV label="Confidence" value={`${p.confidence}%`} />
-      )}
-      {p.version != null && (
-        <KV label="Version" value={String(p.version)} />
-      )}
+      {p.article_type != null && <KV label="Article type" value={<Badge color="blue">{String(p.article_type)}</Badge>} />}
+      {p.confidence != null && p.article_type != null && <KV label="Confidence" value={`${p.confidence}%`} />}
+      {p.version != null && <KV label="Version" value={String(p.version)} />}
       {Array.isArray(p.specialty_tags) && (p.specialty_tags as string[]).length > 0 && (
         <KV label="Specialty tags" value={
           <span style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-            {(p.specialty_tags as string[]).map((s) => (
-              <Badge key={s} color="purple">{specialtyLabel(s)}</Badge>
-            ))}
+            {(p.specialty_tags as string[]).map((s) => <Badge key={s} color="purple">{specialtyLabel(s)}</Badge>)}
           </span>
         } />
       )}
@@ -252,10 +226,8 @@ function LabDecisionCard({ p, statusChange, verifiedChange }: { p: P; statusChan
   const aiVerdict     = p.ai_verdict as string | null;
   const confidence    = p.confidence as number | null;
   const agree         = !aiVerdict || editorVerdict === aiVerdict;
-  const verdictColor  = (v: string) =>
-    v === "approved" || v === "relevant" ? "green" : v === "unsure" ? "orange" : "red";
-  const statusColor   = (v: string) =>
-    v === "approved" ? "green" : v === "rejected" ? "red" : "orange";
+  const verdictColor  = (v: string) => v === "approved" || v === "relevant" ? "green" : v === "unsure" ? "orange" : "red";
+  const statusColor   = (v: string) => v === "approved" ? "green" : v === "rejected" ? "red" : "orange";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       <KV label="Modul"      value={p.module as string | null} />
@@ -264,17 +236,12 @@ function LabDecisionCard({ p, statusChange, verifiedChange }: { p: P; statusChan
         <KV label="AI beslutning" value={
           <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <Badge color={verdictColor(aiVerdict)}>{aiVerdict}</Badge>
-            {agree
-              ? <span style={{ fontSize: "11px", color: "#15803d" }}>✓ enig</span>
-              : <span style={{ fontSize: "11px", color: "#b91c1c" }}>✗ uenig</span>
-            }
+            {agree ? <span style={{ fontSize: "11px", color: "#15803d" }}>✓ enig</span> : <span style={{ fontSize: "11px", color: "#b91c1c" }}>✗ uenig</span>}
           </span>
         } />
       )}
       {confidence != null && <KV label="AI confidence" value={`${confidence.toFixed(1)}%`} />}
-      {p.disagreement_reason ? (
-        <KV label="Årsag til uenighed" value={<span style={{ color: "#b91c1c" }}>{String(p.disagreement_reason)}</span>} />
-      ) : null}
+      {p.disagreement_reason ? <KV label="Årsag til uenighed" value={<span style={{ color: "#b91c1c" }}>{String(p.disagreement_reason)}</span>} /> : null}
       {statusChange?.from != null && statusChange?.to != null && (
         <KV label="Status" value={
           <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -300,10 +267,8 @@ function LabDecisionCard({ p, statusChange, verifiedChange }: { p: P; statusChan
 function FeedbackCard({ p }: { p: P }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-      <KV label="Uge / År"        value={p.week != null ? `Uge ${p.week}, ${p.year}` : null} />
-      {p.decision ? (
-        <KV label="Beslutning" value={<Badge color={p.decision === "selected" ? "green" : "gray"}>{String(p.decision)}</Badge>} />
-      ) : null}
+      <KV label="Uge / År"          value={p.week != null ? `Uge ${p.week}, ${p.year}` : null} />
+      {p.decision ? <KV label="Beslutning" value={<Badge color={p.decision === "selected" ? "green" : "gray"}>{String(p.decision)}</Badge>} /> : null}
       {p.news_value != null         && <KV label="Nyhedsværdi"    value={`${p.news_value} / 5`} />}
       {p.clinical_relevance != null && <KV label="Klinisk relevans" value={String(p.clinical_relevance)} />}
     </div>
@@ -314,9 +279,7 @@ function StatusChangedCard({ p }: { p: P }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       {p.from ? <KV label="Fra" value={<Badge color="gray">{String(p.from)}</Badge>} /> : null}
-      {p.to ? <KV label="Til" value={
-        <Badge color={p.to === "approved" ? "green" : p.to === "rejected" ? "red" : "orange"}>{String(p.to)}</Badge>
-      } /> : null}
+      {p.to ? <KV label="Til" value={<Badge color={p.to === "approved" ? "green" : p.to === "rejected" ? "red" : "orange"}>{String(p.to)}</Badge>} /> : null}
       {p.reason ? <KV label="Årsag" value={String(p.reason)} /> : null}
     </div>
   );
@@ -346,9 +309,7 @@ function QualityCheckCard({ p }: { p: P }) {
   const passed = p.passed as boolean | null;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-      {passed != null && (
-        <KV label="Resultat" value={<Badge color={passed ? "green" : "red"}>{passed ? "Passed" : "Failed"}</Badge>} />
-      )}
+      {passed != null && <KV label="Resultat" value={<Badge color={passed ? "green" : "red"}>{passed ? "Passed" : "Failed"}</Badge>} />}
       {p.message ? <KV label="Besked" value={String(p.message)} /> : null}
     </div>
   );
@@ -376,7 +337,6 @@ function AutoTaggedCard({ p }: { p: P }) {
   const threshold = p.threshold as number | null;
   const source    = p.source as string | null;
   const terms     = (p.matched_terms ?? []) as { term: string; approve_rate: number; total_decisions: number }[];
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       {score != null && <KV label="Mesh Score" value={<><strong>{score}</strong>{threshold != null && <span style={{ color: "#888" }}> / {threshold}</span>}</>} />}
@@ -400,23 +360,19 @@ function AutoTaggedCard({ p }: { p: P }) {
 
 function EventCard({ eventType, payload }: { eventType: string; payload: P }) {
   switch (eventType) {
-    case "imported":       return <ImportedCard      p={payload} />;
-    case "enriched":       return <EnrichedCard      p={payload} />;
-    case "lab_decision":   return <LabDecisionCard   p={payload} />;
-    case "feedback":       return <FeedbackCard      p={payload} />;
-    case "status_changed": return <StatusChangedCard p={payload} />;
-    case "verified":       return <VerifiedCard      p={payload} />;
-    case "author_linked":  return <AuthorLinkedCard  p={payload} />;
-    case "quality_check":          return <QualityCheckCard          p={payload} />;
-    case "auto_tagged":            return <AutoTaggedCard            p={payload} />;
-    case "impact_factor_updated":  return <ImpactFactorUpdatedCard   p={payload} />;
-    case "citation_count_updated": return <CitationCountUpdatedCard  p={payload} />;
+    case "imported":              return <ImportedCard           p={payload} />;
+    case "enriched":              return <EnrichedCard           p={payload} />;
+    case "lab_decision":          return <LabDecisionCard        p={payload} />;
+    case "feedback":              return <FeedbackCard           p={payload} />;
+    case "status_changed":        return <StatusChangedCard      p={payload} />;
+    case "verified":              return <VerifiedCard           p={payload} />;
+    case "author_linked":         return <AuthorLinkedCard       p={payload} />;
+    case "quality_check":         return <QualityCheckCard       p={payload} />;
+    case "auto_tagged":           return <AutoTaggedCard         p={payload} />;
+    case "impact_factor_updated": return <ImpactFactorUpdatedCard p={payload} />;
+    case "citation_count_updated":return <CitationCountUpdatedCard p={payload} />;
     default:
-      return (
-        <pre style={{ fontSize: "11px", color: "#6b7280", margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-          {JSON.stringify(payload, null, 2)}
-        </pre>
-      );
+      return <pre style={{ fontSize: "11px", color: "#6b7280", margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{JSON.stringify(payload, null, 2)}</pre>;
   }
 }
 
@@ -428,20 +384,14 @@ function EvidenceScore({ value }: { value: number }) {
   const bg    = pct >= 70 ? "#f0fdf4" : pct >= 40 ? "#fffbeb" : "#fef2f2";
   const label = pct >= 70 ? "Strong" : pct >= 40 ? "Moderate" : "Limited";
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: "16px",
-      background: bg, borderRadius: "8px", padding: "12px 16px",
-      border: `1px solid ${color}22`,
-    }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "16px", background: bg, borderRadius: "8px", padding: "12px 16px", border: `1px solid ${color}22` }}>
       <div style={{ textAlign: "center", minWidth: "56px" }}>
         <div style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1, color }}>{pct}</div>
         <div style={{ fontSize: "10px", color: "#888", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: "2px" }}>/ 100</div>
       </div>
       <div style={{ flex: 1 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" }}>
-          <span style={{ fontSize: "12px", fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            {label} evidence
-          </span>
+          <span style={{ fontSize: "12px", fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label} evidence</span>
         </div>
         <div style={{ height: "6px", borderRadius: "3px", background: "#e5e7eb", overflow: "hidden" }}>
           <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: "3px" }} />
@@ -460,9 +410,7 @@ function ifBadge(value: number): React.ReactNode {
   const label  = isGold ? "Gold" : isSilver ? "Silver" : "Low";
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-      <span style={{ fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px", background: bg, color, border: `1px solid ${border}` }}>
-        {label}
-      </span>
+      <span style={{ fontSize: "11px", fontWeight: 700, borderRadius: "4px", padding: "2px 7px", background: bg, color, border: `1px solid ${border}` }}>{label}</span>
       <span>{value.toFixed(3)}</span>
     </span>
   );
@@ -471,12 +419,7 @@ function ifBadge(value: number): React.ReactNode {
 function stars(value: number | null): React.ReactNode {
   if (!value) return null;
   const v = Math.round(Math.max(1, Math.min(5, value)));
-  return (
-    <>
-      {"★".repeat(v)}
-      <span style={{ color: "#ddd" }}>{"★".repeat(5 - v)}</span>
-    </>
-  );
+  return <><span>{"★".repeat(v)}</span><span style={{ color: "#ddd" }}>{"★".repeat(5 - v)}</span></>;
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -511,13 +454,9 @@ export default async function AdminArticleLogPage({
     specialty_reason: string | null;
   } | null;
 
-  // Cast for typed access
-  const a = article as unknown as ArticleData;
-
-  // Raw article for fields not on ArticleData
+  const a   = article as unknown as ArticleData;
   const raw = article as Record<string, unknown>;
 
-  // Map position → author_id and author_score for linking author names + scores
   const authorIdByPosition = new Map(
     (authorLinksResult.data ?? []).map((r) => [r.position as number, r.author_id as string])
   );
@@ -530,22 +469,15 @@ export default async function AdminArticleLogPage({
       .map((r) => [r.position as number, (r as unknown as LinkedAuthorRow).authors!.author_score as number])
   );
   const authorGeoByPosition = new Map(
-    (authorLinksResult.data ?? []).map((r) => [
-      r.position as number,
-      (r as unknown as LinkedAuthorRow).authors ?? null,
-    ])
+    (authorLinksResult.data ?? []).map((r) => [r.position as number, (r as unknown as LinkedAuthorRow).authors ?? null])
   );
 
-  const events = (eventsResult.data ?? []) as {
-    id: string;
-    event_type: string;
-    payload: P;
-    created_at: string;
-  }[];
+  const events = (eventsResult.data ?? []) as { id: string; event_type: string; payload: P; created_at: string }[];
 
-  const pubmedUrl = `https://pubmed.ncbi.nlm.nih.gov/${a.pubmed_id}/`;
-  const pmcId = raw.pmc_id as string | null;
+  const pubmedUrl    = `https://pubmed.ncbi.nlm.nih.gov/${a.pubmed_id}/`;
+  const pmcId        = raw.pmc_id as string | null;
   const citationsUrl = `https://europepmc.org/search?query=cites:MED:${a.pubmed_id}`;
+  const doiUrl       = a.doi ? `https://doi.org/${a.doi}` : null;
 
   const importedDisplay = (() => {
     const d = new Date(a.imported_at);
@@ -554,36 +486,336 @@ export default async function AdminArticleLogPage({
     return `${date} at ${time}`;
   })();
 
+  // ── Article data ─────────────────────────────────────────────────────────────
+
+  const authors   = cast<AuthorRaw>(a.authors);
+  const meshTerms = cast<MeshTerm>(a.mesh_terms);
+  const grants    = cast<Grant>(a.grants);
+  const abstract  = a.abstract ? decodeHtml(a.abstract) : null;
+
+  const abstractSections = abstract
+    ? abstract.split(/\n/).reduce<{ label: string; text: string }[]>((acc, line) => {
+        const match = line.match(/^([A-Z][A-Z /]+):?\s+(.+)/);
+        if (match) { acc.push({ label: match[1], text: match[2] }); }
+        else if (acc.length > 0) { acc[acc.length - 1].text += " " + line; }
+        else { acc.push({ label: "", text: line }); }
+        return acc;
+      }, [])
+    : null;
+
+  const publishedDisplay = (() => {
+    if (!a.published_date) return a.published_year ? String(a.published_year) : null;
+    const d = new Date(a.published_date);
+    return `${d.getUTCDate()} ${MONTHS_EN[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  })();
+
+  const firstAuthorCitation = authors.length > 0
+    ? `${authors[0].lastName ?? ""}${authors.length > 1 ? " et al." : ""}`
+    : "";
+  const citationText = [
+    firstAuthorCitation,
+    a.title ? ` ${a.title}.` : "",
+    a.journal_abbr ? ` ${a.journal_abbr}.` : "",
+    publishedDisplay ? ` ${publishedDisplay};` : "",
+    a.volume ?? "",
+    a.issue ? `(${a.issue})` : "",
+    a.article_number ? `:${a.article_number}.` : ".",
+    doiUrl ? ` doi:${a.doi}` : "",
+  ].filter(Boolean).join("");
+
   // ── PubMed tab ──────────────────────────────────────────────────────────────
 
   const pubmedTab = (
     <div style={{ padding: "4px 0 80px" }}>
-      <ArticleStamkort article={a} authorIdByPosition={authorIdByPosition} authorScoreByPosition={authorScoreByPosition} authorGeoByPosition={authorGeoByPosition} />
+
+      {/* Identifikation */}
+      <Card>
+        <CardHeader label="Identifikation" />
+        <CardBody>
+          <DescriptionRow
+            label="PMID"
+            value={<a href={pubmedUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>{a.pubmed_id} ↗</a>}
+            description="PubMed's unique identifier for this article. Use this ID to look up the article directly in PubMed."
+          />
+          <DescriptionRow
+            label="DOI"
+            value={a.doi && doiUrl ? <a href={doiUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>{a.doi} ↗</a> : null}
+            description="Digital Object Identifier — a permanent link to the published article. More stable than a URL."
+          />
+          <DescriptionRow
+            label="PMC ID"
+            value={pmcId ? <a href={`https://www.ncbi.nlm.nih.gov/pmc/articles/${pmcId}/`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>{pmcId} ↗</a> : null}
+            description="PubMed Central ID. Present only if the article is available as open-access full text in PMC."
+          />
+          <DescriptionRow
+            label="Article number"
+            value={a.article_number ?? null}
+            description="Publisher-assigned article number, used instead of page numbers in many modern journals."
+          />
+          <DescriptionRow
+            label="ISSN (print)"
+            value={a.issn_print ?? null}
+            description="International Standard Serial Number for the print edition of the journal."
+          />
+          <DescriptionRow
+            label="ISSN (electronic)"
+            value={a.issn_electronic ?? null}
+            description="International Standard Serial Number for the online/electronic edition of the journal."
+          />
+        </CardBody>
+      </Card>
+
+      {/* Journal */}
+      <Card>
+        <CardHeader label="Journal" />
+        <CardBody>
+          <DescriptionRow
+            label="Journal"
+            value={a.journal_title ?? null}
+            description="Full name of the journal in which the article was published."
+          />
+          <DescriptionRow
+            label="Abbreviation"
+            value={a.journal_abbr ?? null}
+            description="Standard NLM abbreviation of the journal name, used in citations."
+          />
+          <DescriptionRow
+            label="Volume"
+            value={a.volume ?? null}
+            description="Journal volume number for the issue containing this article."
+          />
+          <DescriptionRow
+            label="Issue"
+            value={a.issue ?? null}
+            description="Issue number within the volume."
+          />
+          <DescriptionRow
+            label="Published year"
+            value={a.published_year != null ? String(a.published_year) : null}
+            description="Year the article was published, as reported by the publisher."
+          />
+        </CardBody>
+      </Card>
 
       {/* Datoer */}
       <Card>
         <CardHeader label="Datoer" />
         <CardBody>
-          <NullableCardKVRow label="Published"      value={fmtPublished(raw.published_date as string | null)} />
-          <NullableCardKVRow label="PubMed date"    value={fmtDate(raw.pubmed_date as string | null)} />
-          <NullableCardKVRow label="Indexed at"     value={fmtDate(raw.pubmed_indexed_at as string | null)} />
-          <NullableCardKVRow label="Date completed" value={fmtDate(raw.date_completed as string | null)} />
-          <NullableCardKVRow label="Modified at"    value={fmtDate(raw.pubmed_modified_at as string | null)} />
+          <DescriptionRow
+            label="Published"
+            value={fmtPublished(a.published_date)}
+            description="Full publication date as reported by the publisher. May differ from the PubMed indexing date."
+          />
+          <DescriptionRow
+            label="PubMed date"
+            value={fmtDate(raw.pubmed_date as string | null)}
+            description="The date the article first appeared in PubMed search results (PubStatus: pubmed)."
+          />
+          <DescriptionRow
+            label="Indexed at"
+            value={fmtDate(raw.pubmed_indexed_at as string | null)}
+            description="The date PubMed registered the article in its database (Entrez date). This is the date used for filtering in PulseFeeds."
+          />
+          <DescriptionRow
+            label="Date completed"
+            value={fmtDate(raw.date_completed as string | null)}
+            description="The date PubMed completed full indexing of the article, including MeSH term assignment."
+          />
+          <DescriptionRow
+            label="Modified at"
+            value={fmtDate(raw.pubmed_modified_at as string | null)}
+            description="The date the article's PubMed record was last modified. Useful for detecting corrections or retractions."
+          />
         </CardBody>
       </Card>
 
-      {/* Artikel metadata */}
+      {/* Artikel */}
       <Card>
-        <CardHeader label="Artikel metadata" />
+        <CardHeader label="Artikel" />
         <CardBody>
-          <NullableCardKVRow label="COI statement" value={raw.coi_statement as string | null} />
-          <NullableCardKVRow label="Substances" value={(() => {
-            const subs = (raw.substances as Array<{ registryNumber?: string; name?: string }> | null) ?? [];
-            if (!subs.length) return null;
-            return subs.map((s) => [s.name, s.registryNumber ? `(${s.registryNumber})` : null].filter(Boolean).join(" ")).join(", ");
-          })()} />
+          <DescriptionRow
+            label="Title"
+            value={a.title}
+            description="Full title of the article as recorded in PubMed."
+          />
+          {/* Abstract — text block, not grid cell */}
+          <div style={{ display: "grid", gridTemplateColumns: "60% 40%", padding: "8px 0", borderBottom: "1px solid #f5f5f5", gap: "16px", alignItems: "start" }}>
+            <div>
+              <span style={{ color: "#888", fontSize: "13px", display: "block", marginBottom: "8px" }}>Abstract</span>
+              {abstract ? (
+                abstractSections && abstractSections.some((s) => s.label) ? (
+                  <div>
+                    {abstractSections.map((s, i) => (
+                      <div key={i} style={{ marginBottom: i < abstractSections.length - 1 ? "14px" : 0 }}>
+                        {s.label && (
+                          <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#5a6a85", display: "block", marginBottom: "4px" }}>
+                            {s.label}
+                          </span>
+                        )}
+                        <span style={{ fontSize: "14px", lineHeight: 1.7, color: "#2a2a2a" }}>{s.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: "14px", lineHeight: 1.7, color: "#2a2a2a", margin: 0, whiteSpace: "pre-line" }}>{abstract}</p>
+                )
+              ) : (
+                <span style={{ color: "#bbb", fontSize: "14px" }}>—</span>
+              )}
+            </div>
+            <span style={{ color: "#9ca3af", fontSize: "12px", lineHeight: 1.5, paddingTop: "1px", borderLeft: "1px solid #f0f0f0", paddingLeft: "16px" }}>
+              Author-provided summary of the article. Structured abstracts are preserved with their section labels.
+            </span>
+          </div>
+          <DescriptionRow
+            label="Language"
+            value={a.language ? (LANGUAGE_NAMES[a.language] ?? a.language.toUpperCase()) : null}
+            description="Primary language of the article as recorded by PubMed."
+          />
+          <DescriptionRow
+            label="Publication types"
+            value={a.publication_types && a.publication_types.length > 0 ? a.publication_types.join(", ") : null}
+            description="PubMed classification of the article format, e.g. Journal Article, Review, Clinical Trial. An article can have multiple types."
+          />
+          <DescriptionRow
+            label="Keywords"
+            value={a.keywords && a.keywords.length > 0 ? a.keywords.join(", ") : null}
+            description="Author-supplied keywords describing the article's topics. Not controlled vocabulary — unlike MeSH terms."
+          />
+          <DescriptionRow
+            label="COI statement"
+            value={raw.coi_statement as string | null}
+            description="Conflict of interest statement as provided by the authors or publisher."
+          />
         </CardBody>
       </Card>
+
+      {/* MeSH Terms */}
+      <Card>
+        <CardHeader label="MeSH Terms" />
+        <CardBody>
+          <DescriptionRow
+            label="MeSH terms"
+            value={null}
+            description="Medical Subject Headings assigned by NLM indexers. Major topics are marked with an asterisk (*). Used for auto-tagging and specialty matching in PulseFeeds."
+          />
+          {meshTerms.length > 0 ? (
+            <div style={{ marginTop: "8px" }}>
+              {[...meshTerms]
+                .sort((ma, mb) => (ma.descriptor ?? "").localeCompare(mb.descriptor ?? ""))
+                .map((m, i) => (
+                  <div key={i} style={{ fontSize: "14px", color: "#444", padding: "6px 0", borderBottom: i < meshTerms.length - 1 ? "1px solid #f5f5f5" : undefined }}>
+                    {m.major
+                      ? <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{m.descriptor}*</span>
+                      : <span>{m.descriptor}</span>
+                    }
+                    {m.qualifiers && m.qualifiers.length > 0 && (
+                      <span style={{ color: "#bbb" }}> / {m.qualifiers.join(" / ")}</span>
+                    )}
+                  </div>
+                ))
+              }
+            </div>
+          ) : (
+            <div style={{ fontSize: "13px", color: "#9ca3af", marginTop: "8px" }}>No MeSH terms</div>
+          )}
+        </CardBody>
+      </Card>
+
+      {/* Forfattere */}
+      <Card>
+        <CardHeader label="Forfattere" />
+        <CardBody>
+          <DescriptionRow
+            label="Authors"
+            value={null}
+            description="Author list as recorded in PubMed, with affiliations and ORCID identifiers where available. Links to author profiles within PulseFeeds where matched."
+          />
+          {authors.length > 0 ? (
+            <div style={{ marginTop: "8px" }}>
+              <CollapseAuthors authors={authors.map((au, i) => ({
+                ...au,
+                affiliation: null,
+                id: authorIdByPosition?.get(i + 1) ?? undefined,
+                author_score: authorScoreByPosition?.get(i + 1) ?? undefined,
+                geo: authorGeoByPosition?.get(i + 1) ?? null,
+              }))} />
+            </div>
+          ) : (
+            <div style={{ fontSize: "13px", color: "#9ca3af", marginTop: "8px" }}>No authors</div>
+          )}
+        </CardBody>
+      </Card>
+
+      {/* Funding */}
+      <Card>
+        <CardHeader label="Funding" />
+        <CardBody>
+          <DescriptionRow
+            label="Grants"
+            value={null}
+            description="Funding sources reported by the authors, including grant IDs and funding agencies. Sourced directly from PubMed's grant data."
+          />
+          {grants.length > 0 ? (
+            <div style={{ marginTop: "8px" }}>
+              {grants.map((g, i) => (
+                <div key={i} style={{ fontSize: "14px", padding: "8px 0", borderBottom: i < grants.length - 1 ? "1px solid #f5f5f5" : undefined }}>
+                  {g.grantId && <span style={{ fontWeight: 600 }}>{g.grantId}</span>}
+                  {g.agency  && <span style={{ color: "#666" }}> — {decodeHtml(g.agency)}</span>}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: "13px", color: "#9ca3af", marginTop: "8px" }}>No funding data</div>
+          )}
+        </CardBody>
+      </Card>
+
+      {/* Substances */}
+      <Card>
+        <CardHeader label="Substances" />
+        <CardBody>
+          <DescriptionRow
+            label="Substances"
+            value={null}
+            description="Chemical substances and drugs mentioned in the article, from PubMed's MeSH chemical list. Includes registry numbers where available."
+          />
+          {(() => {
+            const subs = (raw.substances as Array<{ registryNumber?: string; name?: string }> | null) ?? [];
+            return subs.length > 0 ? (
+              <div style={{ marginTop: "8px" }}>
+                {subs.map((s, i) => (
+                  <div key={i} style={{ fontSize: "14px", padding: "6px 0", borderBottom: i < subs.length - 1 ? "1px solid #f5f5f5" : undefined, color: "#1a1a1a" }}>
+                    {s.name}
+                    {s.registryNumber && <span style={{ color: "#888" }}> — {s.registryNumber}</span>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: "13px", color: "#9ca3af", marginTop: "8px" }}>No substance data</div>
+            );
+          })()}
+        </CardBody>
+      </Card>
+
+      {/* Citation */}
+      <Card>
+        <CardHeader label="Citation" />
+        <CardBody>
+          <DescriptionRow
+            label="Vancouver"
+            value={null}
+            description="Auto-generated Vancouver-style citation based on PubMed data. Click to copy."
+          />
+          <div style={{ marginTop: "8px" }}>
+            <div style={{ fontSize: "13px", lineHeight: 1.6, color: "#444", background: "#f9fafb", borderRadius: "6px", padding: "14px", border: "1px solid #eef2f7", fontFamily: "Georgia, serif" }}>
+              {citationText}
+            </div>
+            <CopyButton text={citationText} />
+          </div>
+        </CardBody>
+      </Card>
+
     </div>
   );
 
@@ -596,41 +828,53 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="Specialty" />
         <CardBody>
-          <NullableCardKVRow label="Specialty match" value={
-            specialtyRow?.specialty_match === true ? <Badge color="green">Approved</Badge>
-            : specialtyRow?.specialty_match === false ? <Badge color="red">Rejected</Badge>
-            : <Badge color="gray">Pending</Badge>
-          } />
-          <NullableCardKVRow label="Source" value={specialtyRow?.source ?? null} />
-          <NullableCardKVRow label="Model" value={specialtyRow?.scored_by ?? null} />
-          <NullableCardKVRow label="Confidence" value={specialtyRow?.specialty_confidence != null ? `${specialtyRow.specialty_confidence}%` : null} />
-          <NullableCardKVRow label="Scored at" value={specialtyRow?.scored_at ? fmt(specialtyRow.scored_at) : null} />
-          <NullableCardKVRow label="Reason" value={specialtyRow?.specialty_reason ?? null} />
+          <DescriptionRow
+            label="Specialty match"
+            value={
+              specialtyRow?.specialty_match === true ? <Badge color="green">Approved</Badge>
+              : specialtyRow?.specialty_match === false ? <Badge color="red">Rejected</Badge>
+              : <Badge color="gray">Pending</Badge>
+            }
+            description="Whether this article has been approved as relevant to the active specialty. Approved = included in feeds. Rejected = excluded. Pending = not yet scored."
+          />
+          <DescriptionRow
+            label="Source"
+            value={specialtyRow?.source ?? null}
+            description="What triggered the specialty scoring — e.g. ai_score (AI model), mesh_auto_tag (automatic MeSH match), journal (journal whitelist), human (editor decision)."
+          />
+          <DescriptionRow
+            label="Model"
+            value={specialtyRow?.scored_by ?? null}
+            description="The prompt version used to score specialty relevance, e.g. v10. Tracks which model version produced the current result."
+          />
+          <DescriptionRow
+            label="Confidence"
+            value={specialtyRow?.specialty_confidence != null ? `${specialtyRow.specialty_confidence}%` : null}
+            description="The AI model's confidence in its specialty decision, expressed as a percentage. Higher values indicate more certain classifications."
+          />
+          <DescriptionRow
+            label="Scored at"
+            value={specialtyRow?.scored_at ? fmt(specialtyRow.scored_at) : null}
+            description="Timestamp of when the specialty scoring was last run for this article."
+          />
+          <DescriptionRow
+            label="Reason"
+            value={specialtyRow?.specialty_reason ?? null}
+            description="The AI model's explanation for its specialty decision. Only present for Lab-validated scores."
+          />
           {(() => {
-            const legacyFields = [
-              raw.ai_decision,
-              raw.specialty_confidence,
-              raw.specialty_scored_at,
-              raw.specialty_reasoning,
-              raw.model_version,
-              raw.specialty_tags,
-            ];
-            const hasLegacy = legacyFields.some((f) =>
-              f != null && f !== "" && !(Array.isArray(f) && (f as unknown[]).length === 0)
-            );
+            const legacyFields = [raw.ai_decision, raw.specialty_confidence, raw.specialty_scored_at, raw.specialty_reasoning, raw.model_version, raw.specialty_tags];
+            const hasLegacy = legacyFields.some((f) => f != null && f !== "" && !(Array.isArray(f) && (f as unknown[]).length === 0));
             if (!hasLegacy) return null;
             return (
               <>
                 <SectionLabel>Legacy felter (articles-tabel)</SectionLabel>
-                <CardKVRow label="ai_decision" value={raw.ai_decision as string | null} />
-                <CardKVRow label="specialty_confidence" value={raw.specialty_confidence != null ? `${raw.specialty_confidence}%` : null} />
-                <CardKVRow label="specialty_scored_at" value={raw.specialty_scored_at ? fmt(raw.specialty_scored_at as string) : null} />
-                <CardKVRow label="specialty_reasoning" value={raw.specialty_reasoning as string | null} />
-                <CardKVRow label="model_version" value={raw.model_version as string | null} />
-                <CardKVRow label="specialty_tags" value={(() => {
-                  const tags = parseSubArray(raw.specialty_tags);
-                  return tags.length > 0 ? tags.join(", ") : null;
-                })()} />
+                <DescriptionRow label="ai_decision"          value={raw.ai_decision as string | null}       description="Legacy field — the AI's raw decision before the article_specialties table was introduced. Will be removed in a future cleanup migration." />
+                <DescriptionRow label="specialty_confidence" value={raw.specialty_confidence != null ? `${raw.specialty_confidence}%` : null} description="Legacy confidence score stored directly on the articles table. Superseded by article_specialties.specialty_confidence." />
+                <DescriptionRow label="specialty_scored_at"  value={raw.specialty_scored_at ? fmt(raw.specialty_scored_at as string) : null} description="Legacy timestamp stored on the articles table. Superseded by article_specialties.scored_at." />
+                <DescriptionRow label="specialty_reasoning"  value={raw.specialty_reasoning as string | null} description="Legacy reasoning text stored on the articles table. Superseded by article_specialties.specialty_reason." />
+                <DescriptionRow label="model_version"        value={raw.model_version as string | null}      description="Legacy model version field on the articles table. Superseded by article_specialties.scored_by." />
+                <DescriptionRow label="specialty_tags"       value={(() => { const tags = parseSubArray(raw.specialty_tags); return tags.length > 0 ? tags.join(", ") : null; })()} description="Legacy array of specialty slugs stored directly on the articles table. Superseded by the article_specialties junction table." />
               </>
             );
           })()}
@@ -641,16 +885,14 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="Article Type" />
         <CardBody>
-          <NullableCardKVRow label="article_type (auth.)" value={raw.article_type as string | null} />
-          <NullableCardKVRow label="article_type_ai" value={raw.article_type_ai as string | null} />
-          <NullableCardKVRow label="Confidence" value={raw.article_type_confidence != null ? `${raw.article_type_confidence}%` : null} />
-          <NullableCardKVRow label="Method" value={raw.article_type_method as string | null} />
-          <NullableCardKVRow label="Validated" value={raw.article_type_validated != null ? (
-            <Badge color={raw.article_type_validated ? "green" : "red"}>{raw.article_type_validated ? "Yes" : "No"}</Badge>
-          ) : null} />
-          <NullableCardKVRow label="Scored at" value={raw.article_type_scored_at ? fmt(raw.article_type_scored_at as string) : null} />
-          <NullableCardKVRow label="Model version" value={raw.article_type_model_version as string | null} />
-          <NullableCardKVRow label="Rationale" value={raw.article_type_rationale as string | null} />
+          <DescriptionRow label="article_type (auth.)"       value={raw.article_type as string | null}          description="The authoritative article type for this article. Set by Lab validation or deterministic scoring. This field drives all downstream logic." />
+          <DescriptionRow label="article_type_ai"            value={raw.article_type_ai as string | null}       description="The article type suggested by the AI scoring model before Lab validation. May differ from the authoritative article_type if an editor corrected it." />
+          <DescriptionRow label="Confidence"                 value={raw.article_type_confidence != null ? `${raw.article_type_confidence}%` : null} description="The AI model's confidence in its article type classification, expressed as a percentage." />
+          <DescriptionRow label="Method"                     value={raw.article_type_method as string | null}   description="How the article type was determined — e.g. ai (AI model), deterministic (rule-based), lab (editor-validated)." />
+          <DescriptionRow label="Validated"                  value={raw.article_type_validated != null ? <Badge color={raw.article_type_validated ? "green" : "red"}>{raw.article_type_validated ? "Yes" : "No"}</Badge> : null} description="Whether an editor has reviewed and confirmed the article type in the Lab. Validated articles are used as training examples." />
+          <DescriptionRow label="Scored at"                  value={raw.article_type_scored_at ? fmt(raw.article_type_scored_at as string) : null} description="Timestamp of when the article type scoring was last run." />
+          <DescriptionRow label="Model version"              value={raw.article_type_model_version as string | null} description="The prompt version used for article type scoring." />
+          <DescriptionRow label="Rationale"                  value={raw.article_type_rationale as string | null} description="The AI model's explanation for its article type decision." />
         </CardBody>
       </Card>
 
@@ -659,17 +901,17 @@ export default async function AdminArticleLogPage({
         <CardHeader label="Subspecialty" />
         <CardBody>
           {(() => {
-            const subAuth = parseSubArray(raw.subspecialty);
-            const subAi   = parseSubArray(a.subspecialty_ai);
+            const subAuth     = parseSubArray(raw.subspecialty);
+            const subAi       = parseSubArray(a.subspecialty_ai);
             const studyDesign = parseSubArray(raw.study_design_ai);
             return (
               <>
-                <NullableCardKVRow label="subspecialty (auth.)" value={subAuth.length > 0 ? subAuth.join(", ") : null} />
-                <NullableCardKVRow label="subspecialty_ai" value={subAi.length > 0 ? subAi.join(", ") : null} />
-                <NullableCardKVRow label="Scored at" value={raw.subspecialty_scored_at ? fmt(raw.subspecialty_scored_at as string) : null} />
-                <NullableCardKVRow label="Model version" value={a.subspecialty_model_version ? `v${a.subspecialty_model_version}` : null} />
-                <NullableCardKVRow label="Reason" value={raw.subspecialty_reason as string | null} />
-                <NullableCardKVRow label="Study design (AI)" value={studyDesign.length > 0 ? studyDesign.join(", ") : null} />
+                <DescriptionRow label="subspecialty (auth.)" value={subAuth.length > 0 ? subAuth.join(", ") : null}                         description="The authoritative subspecialty classification — an array of subspecialty names. This field is used in feeds and newsletters." />
+                <DescriptionRow label="subspecialty_ai"       value={subAi.length > 0 ? subAi.join(", ") : null}                             description="The subspecialty classification suggested by the AI model. May differ from the authoritative subspecialty if corrected by an editor." />
+                <DescriptionRow label="Scored at"             value={raw.subspecialty_scored_at ? fmt(raw.subspecialty_scored_at as string) : null} description="Timestamp of when subspecialty scoring was last run for this article." />
+                <DescriptionRow label="Model version"         value={a.subspecialty_model_version ? `v${a.subspecialty_model_version}` : null} description="The prompt version used for subspecialty scoring." />
+                <DescriptionRow label="Reason"                value={raw.subspecialty_reason as string | null}                               description="The AI model's explanation for its subspecialty classification. Only present for Lab-scored articles." />
+                <DescriptionRow label="Study design (AI)"     value={studyDesign.length > 0 ? studyDesign.join(", ") : null}                 description="An array of study design tags assigned by the AI, e.g. RCT, cohort, case series. Experimental field — not yet used in production feeds." />
               </>
             );
           })()}
@@ -680,35 +922,21 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="Kondensering" />
         <CardBody>
-          <NullableCardKVRow label="Kondenseret" value={raw.condensed_at ? fmt(raw.condensed_at as string) : null} />
-          <NullableCardKVRow label="Model version" value={a.condensed_model_version ? `v${a.condensed_model_version}` : null} />
-          <NullableCardKVRow label="Beriget" value={a.enriched_at ? fmt(a.enriched_at) : null} />
-          {a.short_headline && (
-            <div style={{ marginTop: "12px" }}>
-              <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Short Headline</div>
-              <div style={{ fontSize: "15px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4 }}>{a.short_headline}</div>
-            </div>
-          )}
-          {a.short_resume && (
-            <div style={{ marginTop: "12px" }}>
-              <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Short Resume</div>
-              <div style={{ fontSize: "14px", color: "#2a2a2a", lineHeight: 1.6 }}>{a.short_resume}</div>
-            </div>
-          )}
-          {(raw.long_resume as string | null) && (
-            <div style={{ marginTop: "12px" }}>
-              <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Long Resume</div>
-              <div style={{ fontSize: "14px", color: "#2a2a2a", lineHeight: 1.6 }}>{raw.long_resume as string}</div>
-            </div>
-          )}
-          {a.bottom_line && (
-            <div style={{ marginTop: "12px" }}>
-              <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Bottom Line</div>
+          <DescriptionRow label="Kondenseret"    value={raw.condensed_at ? fmt(raw.condensed_at as string) : null}             description="Timestamp of when the condensation was last generated for this article." />
+          <DescriptionRow label="Model version"  value={a.condensed_model_version ? `v${a.condensed_model_version}` : null}   description="The prompt version used to generate the condensation." />
+          <DescriptionRow label="Enriched at"    value={a.enriched_at ? fmt(a.enriched_at) : null}                            description="Timestamp of when the full AI enrichment pipeline (summary, PICO, news value etc.) was last run." />
+          <DescriptionRow label="Short headline" value={a.short_headline ?? null}                                              description="A short, punchy headline generated by AI for use in newsletter and feed cards. Max ~10 words." />
+          <DescriptionRow label="Short resume"   value={a.short_resume ?? null}                                               description="A plain-language summary of the article generated by AI. Written for a clinical audience. Used in feed cards and newsletters." />
+          <DescriptionRow label="Long resume"    value={(raw.long_resume as string | null) ?? null}                           description="An extended AI-generated summary with more detail than the short resume. Not currently used in production UI." />
+          <DescriptionRow
+            label="Bottom line"
+            value={a.bottom_line ? (
               <div style={{ background: "#f9fafb", borderLeft: "3px solid #7c3aed", padding: "10px 12px", fontSize: "14px", fontStyle: "italic", color: "#2a2a2a", lineHeight: 1.5 }}>
                 {a.bottom_line}
               </div>
-            </div>
-          )}
+            ) : null}
+            description="A single-sentence clinical takeaway generated by AI — the most important implication for practice."
+          />
         </CardBody>
       </Card>
 
@@ -716,11 +944,11 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="PICO" />
         <CardBody>
-          <NullableCardKVRow label="Population"   value={a.pico_population ?? null} />
-          <NullableCardKVRow label="Intervention" value={a.pico_intervention ?? null} />
-          <NullableCardKVRow label="Comparison"   value={a.pico_comparison ?? null} />
-          <NullableCardKVRow label="Outcome"      value={a.pico_outcome ?? null} />
-          <NullableCardKVRow label="Sample size"  value={a.sample_size != null ? `N = ${a.sample_size.toLocaleString("da-DK")}` : null} />
+          <DescriptionRow label="Population"   value={a.pico_population ?? null}   description="Population: the patient group or study subjects studied in this article." />
+          <DescriptionRow label="Intervention" value={a.pico_intervention ?? null} description="Intervention: the treatment, procedure, or exposure being evaluated." />
+          <DescriptionRow label="Comparison"   value={a.pico_comparison ?? null}   description="Comparison: the control or comparator group, if any." />
+          <DescriptionRow label="Outcome"      value={a.pico_outcome ?? null}      description="Outcome: the primary endpoint or result being measured." />
+          <DescriptionRow label="Sample size"  value={a.sample_size != null ? `N = ${a.sample_size.toLocaleString("da-DK")}` : null} description="Total number of participants or cases included in the study, as extracted by AI." />
         </CardBody>
       </Card>
 
@@ -728,10 +956,10 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="SARI" />
         <CardBody>
-          <NullableCardKVRow label="Subject"    value={raw.sari_subject as string | null} />
-          <NullableCardKVRow label="Action"     value={raw.sari_action as string | null} />
-          <NullableCardKVRow label="Result"     value={raw.sari_result as string | null} />
-          <NullableCardKVRow label="Implication" value={raw.sari_implication as string | null} />
+          <DescriptionRow label="Subject"     value={raw.sari_subject as string | null}     description="Subject: what or who the article is about." />
+          <DescriptionRow label="Action"      value={raw.sari_action as string | null}      description="Action: what was done, tested, or investigated." />
+          <DescriptionRow label="Result"      value={raw.sari_result as string | null}      description="Result: what was found." />
+          <DescriptionRow label="Implication" value={raw.sari_implication as string | null} description="Implication: what the finding means for clinical practice or future research." />
         </CardBody>
       </Card>
 
@@ -739,32 +967,27 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="Vurdering" />
         <CardBody>
-          {a.evidence_score != null && (
-            <div style={{ marginBottom: "12px" }}>
-              <EvidenceScore value={a.evidence_score} />
-            </div>
-          )}
-          {a.news_value != null && (
-            <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontSize: "14px" }}>
-              <span style={{ color: "#888" }}>News Value</span>
+          <DescriptionRow
+            label="Evidence score"
+            value={a.evidence_score != null ? <EvidenceScore value={a.evidence_score} /> : null}
+            description="A composite score (0–100) reflecting the strength of evidence, based on article type, sample size, and study design. Strong ≥70, Moderate ≥40, Limited <40."
+          />
+          <DescriptionRow
+            label="News value"
+            value={a.news_value != null ? (
               <span style={{ fontSize: "18px", letterSpacing: "2px", color: "#f4a100", lineHeight: 1 }}>{stars(a.news_value)}</span>
-            </div>
-          )}
-          {a.clinical_relevance && (
-            <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontSize: "14px" }}>
-              <span style={{ color: "#888" }}>Clinical Relevance</span>
-              <span>
-                <span style={{
-                  display: "inline-block", fontSize: "12px",
-                  background: a.clinical_relevance.toLowerCase().includes("practice") ? "#fff3e0" : "#e8f4e8",
-                  color:      a.clinical_relevance.toLowerCase().includes("practice") ? "#e65100"  : "#2d7a2d",
-                  padding: "4px 12px", borderRadius: "20px", fontWeight: 600,
-                }}>
-                  {a.clinical_relevance}
-                </span>
+            ) : null}
+            description="Editorial news value score (1–5 stars) assigned by AI. Reflects how timely, surprising, or practice-changing the article is."
+          />
+          <DescriptionRow
+            label="Clinical relevance"
+            value={a.clinical_relevance ? (
+              <span style={{ display: "inline-block", fontSize: "12px", background: a.clinical_relevance.toLowerCase().includes("practice") ? "#fff3e0" : "#e8f4e8", color: a.clinical_relevance.toLowerCase().includes("practice") ? "#e65100" : "#2d7a2d", padding: "4px 12px", borderRadius: "20px", fontWeight: 600 }}>
+                {a.clinical_relevance}
               </span>
-            </div>
-          )}
+            ) : null}
+            description="AI-assigned label describing how directly the article is relevant to clinical practice, e.g. 'Practice-changing' or 'Background knowledge'."
+          />
           {(() => {
             const POPULATION_COLORS: Record<string, { bg: string; color: string; border: string }> = {
               adult:         { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
@@ -776,30 +999,49 @@ export default async function AdminArticleLogPage({
             const popStyle = a.patient_population
               ? POPULATION_COLORS[a.patient_population.toLowerCase()] ?? { bg: "#f1f5f9", color: "#475569", border: "#e2e8f0" }
               : null;
-            const trialUrl = a.trial_registration ? `https://clinicaltrials.gov/study/${a.trial_registration}` : null;
+            const trialUrl     = a.trial_registration ? `https://clinicaltrials.gov/study/${a.trial_registration}` : null;
             const pmcFullTextUrl = a.pmc_id ? `https://www.ncbi.nlm.nih.gov/pmc/articles/${a.pmc_id}/` : null;
             return (
               <>
-                <NullableCardKVRow label="Patient population" value={a.patient_population && popStyle ? (
-                  <span style={{ fontSize: "12px", fontWeight: 600, borderRadius: "4px", padding: "2px 8px", background: popStyle.bg, color: popStyle.color, border: `1px solid ${popStyle.border}` }}>
-                    {a.patient_population}
-                  </span>
-                ) : null} />
-                <NullableCardKVRow label="Time to read" value={a.time_to_read != null ? `${a.time_to_read} min` : null} />
-                <NullableCardKVRow label="Full text" value={a.full_text_available != null ? (
-                  a.full_text_available
-                    ? pmcFullTextUrl
-                      ? <a href={pmcFullTextUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#15803d", fontWeight: 600, textDecoration: "none" }}>Tilgængelig ↗</a>
-                      : <Badge color="green">Tilgængelig</Badge>
-                    : <Badge color="gray">Kun abstract</Badge>
-                ) : null} />
-                <NullableCardKVRow label="Trial registration" value={a.trial_registration && trialUrl ? (
-                  <a href={trialUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
-                    {a.trial_registration} ↗
-                  </a>
-                ) : null} />
-                <NullableCardKVRow label="Auto tagged at" value={raw.auto_tagged_at ? fmt(raw.auto_tagged_at as string) : null} />
-                <NullableCardKVRow label="Beriget" value={a.enriched_at ? fmt(a.enriched_at) : null} />
+                <DescriptionRow
+                  label="Patient population"
+                  value={a.patient_population && popStyle ? (
+                    <span style={{ fontSize: "12px", fontWeight: 600, borderRadius: "4px", padding: "2px 8px", background: popStyle.bg, color: popStyle.color, border: `1px solid ${popStyle.border}` }}>
+                      {a.patient_population}
+                    </span>
+                  ) : null}
+                  description="The primary patient age group studied — Adult, Pediatric, Neonatal, Mixed, or Not specified. Assigned by AI."
+                />
+                <DescriptionRow
+                  label="Time to read"
+                  value={a.time_to_read != null ? `${a.time_to_read} min` : null}
+                  description="Estimated reading time in minutes, calculated from abstract and full-text length."
+                />
+                <DescriptionRow
+                  label="Full text"
+                  value={a.full_text_available != null ? (
+                    a.full_text_available
+                      ? pmcFullTextUrl
+                        ? <a href={pmcFullTextUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#15803d", fontWeight: 600, textDecoration: "none" }}>Tilgængelig ↗</a>
+                        : <Badge color="green">Tilgængelig</Badge>
+                      : <Badge color="gray">Kun abstract</Badge>
+                  ) : null}
+                  description="Whether the full text of the article is freely available via PubMed Central (PMC)."
+                />
+                <DescriptionRow
+                  label="Trial registration"
+                  value={a.trial_registration && trialUrl ? (
+                    <a href={trialUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
+                      {a.trial_registration} ↗
+                    </a>
+                  ) : null}
+                  description="Clinical trial registration number, e.g. NCT number. Links to ClinicalTrials.gov."
+                />
+                <DescriptionRow
+                  label="Auto tagged at"
+                  value={raw.auto_tagged_at ? fmt(raw.auto_tagged_at as string) : null}
+                  description="Timestamp of when the article was auto-tagged via MeSH-based specialty matching."
+                />
               </>
             );
           })()}
@@ -832,15 +1074,15 @@ export default async function AdminArticleLogPage({
     <div style={{ padding: "4px 0 80px" }}>
       {/* Rå affiliationstekst */}
       <Card>
-        <CardHeader label="Rå affiliationstekst (første forfatter)" />
+        <CardHeader label="Rå affiliationstekst" />
         <CardBody>
-          {firstAuthorRawAffiliation ? (
-            <div style={{ fontSize: "13px", lineHeight: 1.6, color: "#2a2a2a", fontFamily: "monospace", background: "#f8f9fb", borderRadius: "6px", padding: "12px", border: "1px solid #e5e7eb", wordBreak: "break-word" }}>
-              {firstAuthorRawAffiliation}
-            </div>
-          ) : (
-            <div style={{ fontSize: "13px", color: "#aaa" }}>Ingen affiliationstekst</div>
-          )}
+          <DescriptionRow
+            label="First author affiliation"
+            value={firstAuthorRawAffiliation ? (
+              <span style={{ fontFamily: "monospace", fontSize: "12px", wordBreak: "break-word", lineHeight: 1.5 }}>{firstAuthorRawAffiliation}</span>
+            ) : null}
+            description="Raw affiliation text for the first author as received from PubMed. This is the input used by the geo parser."
+          />
         </CardBody>
       </Card>
 
@@ -863,26 +1105,44 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="Geo metadata" />
         <CardBody>
-          <NullableCardKVRow label="Geo source" value={raw.geo_source as string | null} />
-          <NullableCardKVRow label="Confidence" value={raw.location_confidence ? (
-            <Badge color={(raw.location_confidence as string) === "high" ? "green" : "orange"}>
-              {raw.location_confidence as string} confidence
-            </Badge>
-          ) : null} />
-          <NullableCardKVRow label="AI attempted" value={raw.ai_location_attempted != null ? (
-            <Badge color={raw.ai_location_attempted ? "purple" : "gray"}>
-              AI {raw.ai_location_attempted ? "ja" : "nej"}
-            </Badge>
-          ) : null} />
-          <NullableCardKVRow label="Parsed at" value={raw.location_parsed_at ? fmt(raw.location_parsed_at as string) : null} />
-          <NullableCardKVRow label="Countries" value={(() => {
-            const countries = parseSubArray(raw.article_countries);
-            return countries.length > 0 ? countries.join(", ") : null;
-          })()} />
-          <NullableCardKVRow label="Cities" value={(() => {
-            const cities = parseSubArray(raw.article_cities);
-            return cities.length > 0 ? cities.join(", ") : null;
-          })()} />
+          <DescriptionRow
+            label="Geo source"
+            value={raw.geo_source as string | null}
+            description="How the geo data was obtained — 'ror' (from ROR institution database), 'parser' (from affiliation text parsing), 'user' or 'admin' (manually set)."
+          />
+          <DescriptionRow
+            label="Confidence"
+            value={raw.location_confidence ? (
+              <Badge color={(raw.location_confidence as string) === "high" ? "green" : "orange"}>
+                {raw.location_confidence as string} confidence
+              </Badge>
+            ) : null}
+            description="Parser's confidence in the geo result — 'high' or 'low'. Based on how unambiguously the affiliation text could be parsed."
+          />
+          <DescriptionRow
+            label="AI attempted"
+            value={raw.ai_location_attempted != null ? (
+              <Badge color={raw.ai_location_attempted ? "purple" : "gray"}>
+                AI {raw.ai_location_attempted ? "ja" : "nej"}
+              </Badge>
+            ) : null}
+            description="Whether the AI fallback was invoked to assist geo parsing when the rule-based parser was insufficient."
+          />
+          <DescriptionRow
+            label="Parsed at"
+            value={raw.location_parsed_at ? fmt(raw.location_parsed_at as string) : null}
+            description="Timestamp of when geo parsing was last run for this article."
+          />
+          <DescriptionRow
+            label="Countries"
+            value={(() => { const c = parseSubArray(raw.article_countries); return c.length > 0 ? c.join(", ") : null; })()}
+            description="Aggregated list of all countries represented among the article's authors. Derived from author geo data."
+          />
+          <DescriptionRow
+            label="Cities"
+            value={(() => { const c = parseSubArray(raw.article_cities); return c.length > 0 ? c.join(", ") : null; })()}
+            description="Aggregated list of all cities represented among the article's authors. Derived from author geo data."
+          />
         </CardBody>
       </Card>
     </div>
@@ -896,29 +1156,47 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="Import" />
         <CardBody>
-          <NullableCardKVRow label="Circle" value={
-            (raw.circle as number | null) != null
-              ? <Badge color="blue">{`Circle ${raw.circle}`}</Badge>
-              : null
-          } />
-          <NullableCardKVRow label="Imported at" value={importedDisplay} />
-          <NullableCardKVRow label="Approval method" value={(() => {
-            const m = raw.approval_method as string | null;
-            if (m === "human")         return <Badge color="green">Approved by Editor</Badge>;
-            if (m === "mesh_auto_tag") return <span style={{ display: "inline-block", padding: "1px 7px", borderRadius: "999px", fontSize: "11px", fontWeight: 600, background: "#ecfeff", color: "#0891b2", border: "1px solid #a5f3fc" }}>Auto-approved by MeSH</span>;
-            if (m === "journal")       return <Badge color="blue">Auto-approved by Journal</Badge>;
-            return <span style={{ color: "#9ca3af" }}>Pending</span>;
-          })()} />
-          <NullableCardKVRow label="Source ID" value={raw.source_id as string | null} />
-          <NullableCardKVRow label="Status" value={raw.status ? (
-            <Badge color={(raw.status as string) === "approved" ? "green" : (raw.status as string) === "rejected" ? "red" : "orange"}>
-              {String(raw.status)}
-            </Badge>
-          ) : null} />
-          <NullableCardKVRow label="Verified" value={<Badge color={raw.verified ? "green" : "red"}>{raw.verified ? "Yes" : "No"}</Badge>} />
-          <NullableCardKVRow label="Authors unresolvable" value={raw.authors_unresolvable != null ? (
-            <Badge color={raw.authors_unresolvable ? "orange" : "gray"}>{raw.authors_unresolvable ? "Yes" : "No"}</Badge>
-          ) : null} />
+          <DescriptionRow
+            label="Circle"
+            value={(raw.circle as number | null) != null ? <Badge color="blue">{`Circle ${raw.circle}`}</Badge> : null}
+            description="Import circle determining how the article entered the system. C1 = journal whitelist, C2 = affiliation-based, C3 = Danish neurosurgical departments, C4 = MeSH-based."
+          />
+          <DescriptionRow
+            label="Imported at"
+            value={importedDisplay}
+            description="Timestamp of when the article was first imported into PulseFeeds."
+          />
+          <DescriptionRow
+            label="Approval method"
+            value={(() => {
+              const m = raw.approval_method as string | null;
+              if (m === "human")         return <Badge color="green">Approved by Editor</Badge>;
+              if (m === "mesh_auto_tag") return <span style={{ display: "inline-block", padding: "1px 7px", borderRadius: "999px", fontSize: "11px", fontWeight: 600, background: "#ecfeff", color: "#0891b2", border: "1px solid #a5f3fc" }}>Auto-approved by MeSH</span>;
+              if (m === "journal")       return <Badge color="blue">Auto-approved by Journal</Badge>;
+              return null;
+            })()}
+            description="What triggered the article's specialty approval — journal whitelist, MeSH auto-tag, or human editor."
+          />
+          <DescriptionRow
+            label="Source ID"
+            value={raw.source_id as string | null}
+            description="Reference to the source record that triggered this article's import, e.g. the journal whitelist entry or affiliation rule."
+          />
+          <DescriptionRow
+            label="Status"
+            value={raw.status ? <Badge color={(raw.status as string) === "approved" ? "green" : (raw.status as string) === "rejected" ? "red" : "orange"}>{String(raw.status)}</Badge> : null}
+            description="Legacy status field from before the article_specialties table. Reflects the article's approval state at time of import."
+          />
+          <DescriptionRow
+            label="Verified"
+            value={<Badge color={raw.verified ? "green" : "red"}>{raw.verified ? "Yes" : "No"}</Badge>}
+            description="Legacy boolean indicating whether the article was manually verified by an editor."
+          />
+          <DescriptionRow
+            label="Authors unresolvable"
+            value={raw.authors_unresolvable != null ? <Badge color={raw.authors_unresolvable ? "orange" : "gray"}>{raw.authors_unresolvable ? "Yes" : "No"}</Badge> : null}
+            description="Set to true if the author import pipeline was unable to resolve any authors to existing or new author records."
+          />
         </CardBody>
       </Card>
 
@@ -926,21 +1204,21 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="IDs" />
         <CardBody>
-          <NullableCardKVRow label="Article UUID" value={
-            <span style={{ fontFamily: "monospace", fontSize: "12px" }}>{a.id}</span>
-          } />
-          <NullableCardKVRow label="PubMed ID" value={
-            <a href={pubmedUrl} target="_blank" rel="noopener noreferrer"
-              style={{ color: "#1a6eb5", textDecoration: "none" }}>
-              PMID {a.pubmed_id} ↗
-            </a>
-          } />
-          <NullableCardKVRow label="PMC ID" value={pmcId ? (
-            <a href={`https://www.ncbi.nlm.nih.gov/pmc/articles/${pmcId}/`} target="_blank" rel="noopener noreferrer"
-              style={{ color: "#1a6eb5", textDecoration: "none" }}>
-              {pmcId} ↗
-            </a>
-          ) : null} />
+          <DescriptionRow
+            label="Article UUID"
+            value={<span style={{ fontFamily: "monospace", fontSize: "12px" }}>{a.id}</span>}
+            description="PulseFeeds' internal UUID for this article. Used as the primary key in all internal references."
+          />
+          <DescriptionRow
+            label="PubMed ID"
+            value={<a href={pubmedUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>PMID {a.pubmed_id} ↗</a>}
+            description="PubMed's unique identifier. Also used as the primary lookup key when syncing with PubMed."
+          />
+          <DescriptionRow
+            label="PMC ID"
+            value={pmcId ? <a href={`https://www.ncbi.nlm.nih.gov/pmc/articles/${pmcId}/`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>{pmcId} ↗</a> : null}
+            description="PubMed Central ID. Present only if the article has open-access full text in PMC."
+          />
         </CardBody>
       </Card>
 
@@ -948,10 +1226,10 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="Indeksering (beregnet ved import)" />
         <CardBody>
-          <NullableCardKVRow label="Indexed date"  value={fmtDate(raw.indexed_date as string | null)} />
-          <NullableCardKVRow label="Year"          value={raw.indexed_year  != null ? String(raw.indexed_year)  : null} />
-          <NullableCardKVRow label="Month"         value={raw.indexed_month != null ? String(raw.indexed_month) : null} />
-          <NullableCardKVRow label="Week"          value={raw.indexed_week  != null ? String(raw.indexed_week)  : null} />
+          <DescriptionRow label="Indexed date" value={fmtDate(raw.indexed_date as string | null)}                              description="The full indexing date, derived from pubmed_indexed_at. Used as the canonical date for all filtering and feed logic in PulseFeeds." />
+          <DescriptionRow label="Year"         value={raw.indexed_year  != null ? String(raw.indexed_year)  : null}            description="Year component of the indexing date. Pre-computed for efficient filtering." />
+          <DescriptionRow label="Month"        value={raw.indexed_month != null ? String(raw.indexed_month) : null}            description="Month component of the indexing date. Pre-computed for efficient filtering." />
+          <DescriptionRow label="Week"         value={raw.indexed_week  != null ? String(raw.indexed_week)  : null}            description="ISO week number of the indexing date. Used for weekly newsletter logic." />
         </CardBody>
       </Card>
 
@@ -959,37 +1237,34 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="PubMed Sync" />
         <CardBody>
-          <NullableCardKVRow
+          <DescriptionRow
             label="Last synced"
-            value={
-              (raw.pubmed_synced_at as string | null)
-                ? fmt(raw.pubmed_synced_at as string)
-                : null
-            }
+            value={(raw.pubmed_synced_at as string | null) ? fmt(raw.pubmed_synced_at as string) : null}
+            description="Timestamp of the most recent PubMed sync check for this article. The sync process checks for retractions and author changes."
           />
-          <NullableCardKVRow
+          <DescriptionRow
             label="Retracted"
             value={raw.retracted === true ? <Badge color="red">Yes</Badge> : <Badge color="gray">No</Badge>}
+            description="Whether PubMed has flagged this article as retracted. Retracted articles are marked prominently in the UI and excluded from feeds."
           />
-          <NullableCardKVRow
+          <DescriptionRow
             label="Authors changed"
             value={raw.authors_changed === true ? <Badge color="orange">Yes</Badge> : <Badge color="gray">No</Badge>}
+            description="Set to true if the PubMed sync detected a change in the author list since initial import. Triggers the author update pipeline."
           />
-          <NullableCardKVRow
+          <DescriptionRow
             label="New authors data"
-            value={raw.authors_changed === true && Array.isArray(raw.authors_raw_new) ? (
-              <span style={{ color: "#9ca3af", fontSize: "13px" }}>
-                {(raw.authors_raw_new as unknown[]).length} authors pending review
-              </span>
-            ) : null}
+            value={raw.authors_changed === true && Array.isArray(raw.authors_raw_new)
+              ? <span style={{ color: "#9ca3af", fontSize: "13px" }}>{(raw.authors_raw_new as unknown[]).length} authors pending review</span>
+              : null}
+            description="The new raw author data from PubMed, stored pending processing by the author update pipeline."
           />
-          <NullableCardKVRow
+          <DescriptionRow
             label="Previous authors"
-            value={raw.authors_raw_previous != null && Array.isArray(raw.authors_raw_previous) ? (
-              <span style={{ color: "#9ca3af", fontSize: "13px" }}>
-                {(raw.authors_raw_previous as unknown[]).length} authors (previous)
-              </span>
-            ) : null}
+            value={raw.authors_raw_previous != null && Array.isArray(raw.authors_raw_previous)
+              ? <span style={{ color: "#9ca3af", fontSize: "13px" }}>{(raw.authors_raw_previous as unknown[]).length} authors (previous)</span>
+              : null}
+            description="The previous raw author data, stored for comparison and audit purposes when an author change is detected."
           />
         </CardBody>
       </Card>
@@ -1002,7 +1277,7 @@ export default async function AdminArticleLogPage({
     { title: "Indlæsning af artikel",    types: ["imported"],      alwaysShow: true },
     { title: "Indlæsning af forfattere", types: ["author_linked"], alwaysShow: true },
     { title: "AI Scoring",               types: ["enriched"] },
-    { title: "Auto-Tagging",            types: ["auto_tagged"] },
+    { title: "Auto-Tagging",             types: ["auto_tagged"] },
     { title: "Validering",               types: ["lab_decision"] },
     { title: "Bibliometri",              types: ["citation_count_updated"] },
   ];
@@ -1012,14 +1287,13 @@ export default async function AdminArticleLogPage({
     events: events.filter((ev) => s.types.includes(ev.event_type)),
   })).filter((s) => s.alwaysShow || s.events.length > 0);
 
-  // Pre-pair status_changed / verified events onto their nearest lab_decision (within 60s)
   const statusChangedEvents = events.filter((ev) => ev.event_type === "status_changed");
   const verifiedEvents      = events.filter((ev) => ev.event_type === "verified");
 
   function findClosest(source: typeof events[0], candidates: typeof events) {
     const t = new Date(source.created_at).getTime();
     return candidates.reduce<typeof events[0] | null>((best, c) => {
-      const diff = Math.abs(new Date(c.created_at).getTime() - t);
+      const diff     = Math.abs(new Date(c.created_at).getTime() - t);
       const bestDiff = best ? Math.abs(new Date(best.created_at).getTime() - t) : Infinity;
       return diff < bestDiff && diff < 60_000 ? c : best;
     }, null);
@@ -1033,11 +1307,8 @@ export default async function AdminArticleLogPage({
             <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#5a6a85", marginBottom: "16px", paddingBottom: "8px", borderBottom: "1px solid #e5e7eb" }}>
               {section.title}
             </div>
-
             {section.events.length === 0 ? (
-              <div style={{ fontSize: "13px", color: "#9ca3af" }}>
-                Ikke gennemført endnu
-              </div>
+              <div style={{ fontSize: "13px", color: "#9ca3af" }}>Ikke gennemført endnu</div>
             ) : (
               <div style={{ position: "relative" }}>
                 <div style={{ position: "absolute", left: "15px", top: "8px", bottom: "8px", width: "2px", background: "#e5e7eb" }} />
@@ -1055,11 +1326,7 @@ export default async function AdminArticleLogPage({
                             <span style={{ fontSize: "11px", color: "#9ca3af" }}>{fmt(ev.created_at)}</span>
                           </div>
                           {ev.event_type === "lab_decision"
-                            ? <LabDecisionCard
-                                p={ev.payload}
-                                statusChange={findClosest(ev, statusChangedEvents)?.payload}
-                                verifiedChange={findClosest(ev, verifiedEvents)?.payload}
-                              />
+                            ? <LabDecisionCard p={ev.payload} statusChange={findClosest(ev, statusChangedEvents)?.payload} verifiedChange={findClosest(ev, verifiedEvents)?.payload} />
                             : <EventCard eventType={ev.event_type} payload={ev.payload} />
                           }
                         </div>
@@ -1082,36 +1349,34 @@ export default async function AdminArticleLogPage({
       <Card>
         <CardHeader label="Bibliometri" />
         <CardBody>
-          {(a.impact_factor != null || raw.impact_factor_fetched_at != null || a.journal_h_index != null) && (
-            <>
-              <SectionLabel>Journal metrics</SectionLabel>
-              <NullableCardKVRow label="Impact Factor" value={a.impact_factor != null ? ifBadge(a.impact_factor) : null} />
-              <NullableCardKVRow label="IF fetched at" value={raw.impact_factor_fetched_at ? fmt(raw.impact_factor_fetched_at as string) : null} />
-              <NullableCardKVRow label="Journal H-index" value={a.journal_h_index != null ? String(a.journal_h_index) : null} />
-            </>
-          )}
+          <SectionLabel>Journal metrics</SectionLabel>
+          <DescriptionRow label="Impact Factor"    value={a.impact_factor != null ? ifBadge(a.impact_factor) : null}                      description="Journal Impact Factor — the average number of citations received per article published in the journal over the past two years. Source: OpenAlex." />
+          <DescriptionRow label="IF fetched at"    value={raw.impact_factor_fetched_at ? fmt(raw.impact_factor_fetched_at as string) : null} description="Timestamp of when the impact factor was last fetched from the data source." />
+          <DescriptionRow label="Journal H-index"  value={a.journal_h_index != null ? String(a.journal_h_index) : null}                   description="The journal's h-index — the largest number h such that h articles have each been cited at least h times. Source: OpenAlex." />
 
-          {(a.citation_count != null || raw.citations_fetched_at != null || raw.fwci != null) && (
-            <>
-              <SectionLabel>Citationer</SectionLabel>
-              <NullableCardKVRow label="Citation count" value={
-                <a href={citationsUrl} target="_blank" rel="noopener noreferrer"
-                  style={{ color: "#1a6eb5", textDecoration: "none" }}>
-                  {a.citation_count ?? "—"}{a.citation_count != null ? " ↗" : ""}
-                </a>
-              } />
-              <NullableCardKVRow label="Citations fetched" value={raw.citations_fetched_at ? fmt(raw.citations_fetched_at as string) : null} />
-              <NullableCardKVRow label="FWCI" value={raw.fwci != null ? (raw.fwci as number).toFixed(3) : null} />
-            </>
-          )}
+          <SectionLabel>Citationer</SectionLabel>
+          <DescriptionRow
+            label="Citation count"
+            value={
+              <a href={citationsUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
+                {a.citation_count ?? "—"}{a.citation_count != null ? " ↗" : ""}
+              </a>
+            }
+            description="Number of times this specific article has been cited, according to Europe PMC. Updated periodically."
+          />
+          <DescriptionRow label="Citations fetched" value={raw.citations_fetched_at ? fmt(raw.citations_fetched_at as string) : null} description="Timestamp of when the citation count was last fetched from Europe PMC." />
+          <DescriptionRow label="FWCI"              value={raw.fwci != null ? (raw.fwci as number).toFixed(3) : null}                description="Field-Weighted Citation Impact — compares this article's citations to the world average for articles of the same type, age, and field. Score >1 means above average. Source: OpenAlex." />
 
           <SectionLabel>OpenAlex</SectionLabel>
-          <NullableCardKVRow label="OpenAlex Work" value={raw.openalex_work_id ? (
-            <a href={`https://openalex.org/works/${raw.openalex_work_id as string}`} target="_blank" rel="noopener noreferrer"
-              style={{ color: "#1a6eb5", textDecoration: "none" }}>
-              {String(raw.openalex_work_id)} ↗
-            </a>
-          ) : null} />
+          <DescriptionRow
+            label="OpenAlex Work"
+            value={raw.openalex_work_id ? (
+              <a href={`https://openalex.org/works/${raw.openalex_work_id as string}`} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
+                {String(raw.openalex_work_id)} ↗
+              </a>
+            ) : null}
+            description="OpenAlex's unique identifier for this article. Used to fetch bibliometric data including FWCI, impact factor, and citation counts."
+          />
         </CardBody>
       </Card>
     </div>
@@ -1119,35 +1384,22 @@ export default async function AdminArticleLogPage({
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", minHeight: "100vh" }}>
-      <div style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px 0" }}>
+      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "40px 24px 0" }}>
 
         {/* Breadcrumb */}
         <div style={{ marginBottom: "8px", fontSize: "13px", color: "#5a6a85" }}>
           <Link href="/admin/articles" style={{ color: "#5a6a85", textDecoration: "none" }}>← Artikler</Link>
         </div>
 
-        {/* Article header — title only */}
+        {/* Article header */}
         <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "24px", marginBottom: "24px" }}>
           <h1 style={{ fontSize: "16px", fontWeight: 700, lineHeight: 1.4, margin: 0 }}>
             {a.title}
           </h1>
           {raw.retracted === true && (
-            <div style={{
-              marginTop: "12px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              background: "#fef2f2",
-              border: "1px solid #fecaca",
-              borderRadius: "6px",
-              padding: "6px 12px",
-            }}>
-              <span style={{ fontSize: "13px", fontWeight: 700, color: "#b91c1c" }}>
-                ⚠ RETRACTED
-              </span>
-              <span style={{ fontSize: "12px", color: "#ef4444" }}>
-                This article has been retracted from PubMed
-              </span>
+            <div style={{ marginTop: "12px", display: "inline-flex", alignItems: "center", gap: "6px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "6px", padding: "6px 12px" }}>
+              <span style={{ fontSize: "13px", fontWeight: 700, color: "#b91c1c" }}>⚠ RETRACTED</span>
+              <span style={{ fontSize: "12px", color: "#ef4444" }}>This article has been retracted from PubMed</span>
             </div>
           )}
         </div>
@@ -1155,7 +1407,7 @@ export default async function AdminArticleLogPage({
       </div>
 
       {/* Tabs */}
-      <div style={{ maxWidth: "860px", margin: "0 auto", padding: "0 24px" }}>
+      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 24px" }}>
         <AdminArticleTabs
           pubmed={pubmedTab}
           aiScoring={aiScoringTab}
