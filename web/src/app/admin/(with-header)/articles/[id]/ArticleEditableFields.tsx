@@ -1,207 +1,217 @@
 "use client";
 
 import { useState } from "react";
-import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-
-const EXTRA_TAGS: { slug: string; label: string }[] = [
-  { slug: "neuroscience",       label: "Neuroscience" },
-  { slug: "basic_neuro_research", label: "Basic Neuro Research" },
-  { slug: "anesthesiology",     label: "Anesthesiology" },
-  { slug: "ent",                label: "ENT" },
-];
-
-const ALL_TAGS = [
-  { slug: ACTIVE_SPECIALTY, label: ACTIVE_SPECIALTY.charAt(0).toUpperCase() + ACTIVE_SPECIALTY.slice(1) },
-  ...EXTRA_TAGS,
-];
-
-const TAG_LABEL: Record<string, string> = Object.fromEntries(ALL_TAGS.map((t) => [t.slug, t.label]));
-function tagLabel(slug: string) { return TAG_LABEL[slug] ?? slug; }
 
 interface Props {
   articleId:             string;
-  initialTags:           string[];
-  initialSpecialtyMatch: boolean | null;
-  initialSpecialty:      string;
-  initialSubspecialties: string[];
-  subspecialties:        string[];
+  // Specialty
+  allSpecialties:        { slug: string; label: string }[];
+  articleSpecialties:    { specialty: string; specialty_match: boolean | null }[];
+  // Subspecialty
+  allSubspecialties:     { name: string }[];
+  articleSubspecialties: string[];
+  // Article type
+  allArticleTypes:       { name: string }[];
+  articleType:           string | null;
 }
+
+const SECTION_HEADER: React.CSSProperties = {
+  fontSize: "11px",
+  fontWeight: 600,
+  color: "#5a6a85",
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+  marginBottom: "8px",
+  display: "flex",
+  alignItems: "center",
+  gap: "6px",
+};
+
+const SAVING_LABEL: React.CSSProperties = {
+  fontSize: "11px",
+  color: "#9ca3af",
+  fontWeight: 400,
+  textTransform: "none",
+  letterSpacing: 0,
+};
+
+const ERROR_BOX: React.CSSProperties = {
+  fontSize: "12px",
+  color: "#b91c1c",
+  padding: "6px 10px",
+  background: "#fef2f2",
+  borderRadius: "6px",
+  border: "1px solid #fecaca",
+  marginTop: "6px",
+};
+
+const CHECKBOX_ROW: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  padding: "4px 0",
+  fontSize: "13px",
+  color: "#1a1a1a",
+  cursor: "pointer",
+};
 
 export default function ArticleEditableFields({
   articleId,
-  initialTags,
-  initialSpecialtyMatch,
-  initialSpecialty,
-  initialSubspecialties,
-  subspecialties: allSubspecialties,
+  allSpecialties,
+  articleSpecialties,
+  allSubspecialties,
+  articleSubspecialties,
+  allArticleTypes,
+  articleType,
 }: Props) {
-  const [tags,           setTags]           = useState<string[]>(initialTags);
-  const [subspecialties, setSubspecialties] = useState<string[]>(initialSubspecialties);
-  const [specialtyMatch, setSpecialtyMatch] = useState<boolean | null>(initialSpecialtyMatch);
-  const [input,          setInput]          = useState("");
-  const [subInput,       setSubInput]       = useState("");
-  const [saving,         setSaving]         = useState<string | null>(null);
-  const [error,          setError]          = useState<string | null>(null);
+  // ── Specialties state ──────────────────────────────────────────────────────
+  const initialSpecialtyMap = Object.fromEntries(
+    articleSpecialties.map((s) => [s.specialty, s.specialty_match])
+  );
+  const [specialtyMap, setSpecialtyMap] = useState<Record<string, boolean | null>>(initialSpecialtyMap);
+  const [savingSpecialty, setSavingSpecialty] = useState(false);
+  const [specialtyError,  setSpecialtyError]  = useState<string | null>(null);
 
-  async function save(patch: { specialty_tags?: string[]; specialty_match?: string; specialty?: string; subspecialty_ai?: string[] }, key: string) {
-    setSaving(key);
-    setError(null);
+  // ── Subspecialties state ───────────────────────────────────────────────────
+  const [subspecialties,    setSubspecialties]    = useState<string[]>(articleSubspecialties);
+  const [savingSubspecialty, setSavingSubspecialty] = useState(false);
+  const [subspecialtyError,  setSubspecialtyError]  = useState<string | null>(null);
+
+  // ── Article type state ─────────────────────────────────────────────────────
+  const [type,        setType]        = useState<string>(articleType ?? "");
+  const [savingType,  setSavingType]  = useState(false);
+  const [typeError,   setTypeError]   = useState<string | null>(null);
+
+  // ── Generic PUT helper ─────────────────────────────────────────────────────
+  async function put(patch: Record<string, unknown>): Promise<string | null> {
+    const res  = await fetch(`/api/admin/articles/${articleId}`, {
+      method:  "PUT",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(patch),
+    });
+    const data = await res.json() as { ok: boolean; error?: string };
+    return data.ok ? null : (data.error ?? "Save failed");
+  }
+
+  // ── Specialty toggle ───────────────────────────────────────────────────────
+  async function toggleSpecialty(slug: string, checked: boolean) {
+    const newVal = checked ? true : false;
+    setSpecialtyMap((prev) => ({ ...prev, [slug]: newVal }));
+    setSavingSpecialty(true);
+    setSpecialtyError(null);
     try {
-      const res = await fetch(`/api/admin/articles/${articleId}`, {
-        method:  "PUT",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify(patch),
-      });
-      const data = await res.json() as { ok: boolean; error?: string };
-      if (!data.ok) setError(data.error ?? "Fejl ved gem");
-    } catch {
-      setError("Netværksfejl");
-    } finally {
-      setSaving(null);
-    }
+      const err = await put({ specialty_match: newVal ? "true" : "false", specialty: slug });
+      if (err) { setSpecialtyError(err); setSpecialtyMap((prev) => ({ ...prev, [slug]: specialtyMap[slug] ?? null })); }
+    } catch { setSpecialtyError("Network error"); }
+    finally  { setSavingSpecialty(false); }
   }
 
-  function addTag(raw: string) {
-    const slug = raw.trim().toLowerCase().replace(/\s+/g, "_");
-    if (!slug || tags.includes(slug)) { setInput(""); return; }
-    const newTags = [...tags, slug];
-    setTags(newTags);
-    setInput("");
-    void save({ specialty_tags: newTags }, "tags");
-  }
-
-  function removeTag(tag: string) {
-    const newTags = tags.filter((t) => t !== tag);
-    setTags(newTags);
-    void save({ specialty_tags: newTags }, "tags");
-  }
-
-  function addSubspecialty(raw: string) {
-    const val = raw.trim();
-    if (!val || subspecialties.includes(val)) { setSubInput(""); return; }
-    const next = [...subspecialties, val];
+  // ── Subspecialty toggle ────────────────────────────────────────────────────
+  async function toggleSubspecialty(name: string, checked: boolean) {
+    const next = checked
+      ? [...subspecialties, name]
+      : subspecialties.filter((s) => s !== name);
     setSubspecialties(next);
-    setSubInput("");
-    void save({ subspecialty_ai: next }, "subspecialty");
+    setSavingSubspecialty(true);
+    setSubspecialtyError(null);
+    try {
+      const err = await put({ subspecialty: next });
+      if (err) { setSubspecialtyError(err); setSubspecialties(subspecialties); }
+    } catch { setSubspecialtyError("Network error"); }
+    finally  { setSavingSubspecialty(false); }
   }
 
-  function removeSubspecialty(val: string) {
-    const next = subspecialties.filter((s) => s !== val);
-    setSubspecialties(next);
-    void save({ subspecialty_ai: next }, "subspecialty");
+  // ── Article type change ────────────────────────────────────────────────────
+  async function changeType(value: string) {
+    setType(value);
+    setSavingType(true);
+    setTypeError(null);
+    try {
+      const err = await put({ article_type: value || null });
+      if (err) { setTypeError(err); setType(articleType ?? ""); }
+    } catch { setTypeError("Network error"); }
+    finally  { setSavingType(false); }
   }
-
-  function handleSpecialtyMatchChange(val: string) {
-    const parsed = val === "true" ? true : val === "false" ? false : null;
-    setSpecialtyMatch(parsed);
-    void save({ specialty_match: val, specialty: initialSpecialty }, "specialty_match");
-  }
-
-  const matchBg     = specialtyMatch === true ? "#f0fdf4" : specialtyMatch === false ? "#fef2f2" : "#fffbeb";
-  const matchColor  = specialtyMatch === true ? "#15803d" : specialtyMatch === false ? "#b91c1c" : "#92400e";
-  const matchBorder = specialtyMatch === true ? "#bbf7d0" : specialtyMatch === false ? "#fecaca" : "#fde68a";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
-      {/* Specialty tags */}
+      {/* Specialties */}
       <div>
-        <div style={{ fontSize: "11px", fontWeight: 600, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>
-          Specialty tags{saving === "tags" && <span style={{ color: "#9ca3af", fontWeight: 400, marginLeft: "6px" }}>gemmer…</span>}
+        <div style={SECTION_HEADER}>
+          Specialties
+          {savingSpecialty && <span style={SAVING_LABEL}>Saving…</span>}
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
-          {tags.map((tag) => (
-            <span key={tag} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: 600, borderRadius: "999px", padding: "3px 6px 3px 10px", border: "1px solid #bfdbfe", background: "#eff6ff", color: "#1d4ed8" }}>
-              {tagLabel(tag)}
-              <button
-                onClick={() => removeTag(tag)}
-                title="Fjern tag"
-                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "16px", height: "16px", borderRadius: "50%", background: "rgba(29,78,216,0.12)", border: "none", cursor: "pointer", color: "#1d4ed8", fontSize: "11px", lineHeight: 1, padding: 0, flexShrink: 0 }}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-          {tags.length === 0 && (
-            <span style={{ fontSize: "12px", color: "#9ca3af" }}>Ingen tags</span>
-          )}
-          <input
-            list="tag-suggestions"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(input); } }}
-            onBlur={() => { if (input.trim()) addTag(input); }}
-            placeholder="+ tilføj tag"
-            style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "999px", border: "1px dashed #bfdbfe", background: "#f8fbff", color: "#1d4ed8", outline: "none", minWidth: "110px" }}
-          />
-          <datalist id="tag-suggestions">
-            {ALL_TAGS.filter((t) => !tags.includes(t.slug)).map((t) => (
-              <option key={t.slug} value={t.slug}>{t.label}</option>
-            ))}
-          </datalist>
-        </div>
+        {allSpecialties.map(({ slug, label }) => {
+          const checked = specialtyMap[slug] === true;
+          return (
+            <label key={slug} style={CHECKBOX_ROW}>
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={(e) => { void toggleSpecialty(slug, e.target.checked); }}
+                style={{ width: "15px", height: "15px", cursor: "pointer", accentColor: "#1d4ed8" }}
+              />
+              {label}
+            </label>
+          );
+        })}
+        {specialtyError && <div style={ERROR_BOX}>{specialtyError}</div>}
       </div>
 
-      {/* Subspecialer */}
+      {/* Subspecialties */}
       <div>
-        <div style={{ fontSize: "11px", fontWeight: 600, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>
-          Subspecialer{saving === "subspecialty" && <span style={{ color: "#9ca3af", fontWeight: 400, marginLeft: "6px" }}>gemmer…</span>}
+        <div style={SECTION_HEADER}>
+          Subspecialties
+          {savingSubspecialty && <span style={SAVING_LABEL}>Saving…</span>}
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
-          {subspecialties.map((val) => (
-            <span key={val} style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: 600, borderRadius: "999px", padding: "3px 6px 3px 10px", border: "1px solid #bfdbfe", background: "#eff6ff", color: "#1d4ed8" }}>
-              {val}
-              <button
-                onClick={() => removeSubspecialty(val)}
-                title="Fjern subspeciale"
-                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "16px", height: "16px", borderRadius: "50%", background: "rgba(29,78,216,0.12)", border: "none", cursor: "pointer", color: "#1d4ed8", fontSize: "11px", lineHeight: 1, padding: 0, flexShrink: 0 }}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-          {subspecialties.length === 0 && (
-            <span style={{ fontSize: "12px", color: "#9ca3af" }}>Ingen subspecialer</span>
-          )}
-          <input
-            list="subspecialty-suggestions"
-            value={subInput}
-            onChange={(e) => setSubInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubspecialty(subInput); } }}
-            onBlur={() => { if (subInput.trim()) addSubspecialty(subInput); }}
-            placeholder="+ tilføj subspeciale"
-            style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "999px", border: "1px dashed #bfdbfe", background: "#f8fbff", color: "#1d4ed8", outline: "none", minWidth: "140px" }}
-          />
-          <datalist id="subspecialty-suggestions">
-            {allSubspecialties.filter((o) => !subspecialties.includes(o)).map((o) => (
-              <option key={o} value={o}>{o}</option>
-            ))}
-          </datalist>
-        </div>
+        {allSubspecialties.map(({ name }) => {
+          const checked = subspecialties.includes(name);
+          return (
+            <label key={name} style={CHECKBOX_ROW}>
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={(e) => { void toggleSubspecialty(name, e.target.checked); }}
+                style={{ width: "15px", height: "15px", cursor: "pointer", accentColor: "#1d4ed8" }}
+              />
+              {name}
+            </label>
+          );
+        })}
+        {subspecialtyError && <div style={ERROR_BOX}>{subspecialtyError}</div>}
       </div>
 
-      {/* Specialty match */}
-      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        <span style={{ fontSize: "11px", fontWeight: 600, color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          Specialty match
-        </span>
+      {/* Article type */}
+      <div>
+        <div style={SECTION_HEADER}>
+          Article type
+          {savingType && <span style={SAVING_LABEL}>Saving…</span>}
+        </div>
         <select
-          value={specialtyMatch === true ? "true" : specialtyMatch === false ? "false" : "null"}
-          onChange={(e) => handleSpecialtyMatchChange(e.target.value)}
-          style={{ fontSize: "12px", fontWeight: 600, padding: "4px 8px", borderRadius: "6px", border: `1px solid ${matchBorder}`, background: matchBg, color: matchColor, cursor: "pointer", outline: "none" }}
+          value={type}
+          onChange={(e) => { void changeType(e.target.value); }}
+          style={{
+            fontSize: "13px",
+            padding: "6px 10px",
+            borderRadius: "6px",
+            border: "1px solid #d1d5db",
+            background: "#fff",
+            color: type ? "#1a1a1a" : "#9ca3af",
+            fontFamily: "inherit",
+            cursor: "pointer",
+            outline: "none",
+            minWidth: "220px",
+          }}
         >
-          <option value="null">Pending</option>
-          <option value="true">Included</option>
-          <option value="false">Excluded</option>
+          <option value="">— not classified —</option>
+          {allArticleTypes.map(({ name }) => (
+            <option key={name} value={name}>{name}</option>
+          ))}
         </select>
-        {saving === "specialty_match" && <span style={{ fontSize: "11px", color: "#9ca3af" }}>gemmer…</span>}
+        {typeError && <div style={ERROR_BOX}>{typeError}</div>}
       </div>
 
-      {error && (
-        <div style={{ fontSize: "12px", color: "#b91c1c", padding: "6px 10px", background: "#fef2f2", borderRadius: "6px", border: "1px solid #fecaca" }}>
-          {error}
-        </div>
-      )}
     </div>
   );
 }

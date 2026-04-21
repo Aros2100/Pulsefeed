@@ -3,18 +3,20 @@
 import { useState } from "react";
 
 interface Props {
-  pubmed:      React.ReactNode;
-  aiScoring:   React.ReactNode;
-  geo:         React.ReactNode;
-  import_:     React.ReactNode;
-  historik:    React.ReactNode;
-  bibliometri: React.ReactNode;
-  note:        React.ReactNode;
+  pubmed:         React.ReactNode;
+  classification: React.ReactNode;
+  condensation:   React.ReactNode;
+  scoring:        React.ReactNode;
+  location:       React.ReactNode;
+  import_:        React.ReactNode;
+  log:            React.ReactNode;
+  bibliometrics:  React.ReactNode;
+  note:           React.ReactNode;
 }
 
-type Tab = "pubmed" | "aiScoring" | "geo" | "import_" | "historik" | "bibliometri" | "note";
+type Tab = "pubmed" | "classification" | "condensation" | "scoring" | "location" | "import_" | "log" | "bibliometrics" | "note";
 
-export default function AdminArticleTabs({ pubmed, aiScoring, geo, import_, historik, bibliometri, note }: Props) {
+export default function AdminArticleTabs({ pubmed, classification, condensation, scoring, location, import_, log, bibliometrics, note }: Props) {
   const [tab, setTab] = useState<Tab>("pubmed");
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
@@ -37,22 +39,26 @@ export default function AdminArticleTabs({ pubmed, aiScoring, geo, import_, hist
     <div>
       {/* Tab bar */}
       <div style={{ display: "flex", borderBottom: "1px solid #dde3ed", marginBottom: "20px" }}>
-        <button style={tabStyle(tab === "pubmed")}      onClick={() => setTab("pubmed")}>PubMed</button>
-        <button style={tabStyle(tab === "aiScoring")}   onClick={() => setTab("aiScoring")}>AI-scoring</button>
-        <button style={tabStyle(tab === "geo")}         onClick={() => setTab("geo")}>Geo</button>
-        <button style={tabStyle(tab === "import_")}     onClick={() => setTab("import_")}>Import</button>
-        <button style={tabStyle(tab === "historik")}    onClick={() => setTab("historik")}>Historik</button>
-        <button style={tabStyle(tab === "bibliometri")} onClick={() => setTab("bibliometri")}>Bibliometri</button>
-        <button style={tabStyle(tab === "note")}        onClick={() => setTab("note")}>Note</button>
+        <button style={tabStyle(tab === "pubmed")}         onClick={() => setTab("pubmed")}>PubMed</button>
+        <button style={tabStyle(tab === "classification")} onClick={() => setTab("classification")}>Classification</button>
+        <button style={tabStyle(tab === "condensation")}   onClick={() => setTab("condensation")}>Condensation</button>
+        <button style={tabStyle(tab === "scoring")}        onClick={() => setTab("scoring")}>Scoring</button>
+        <button style={tabStyle(tab === "location")}       onClick={() => setTab("location")}>Location</button>
+        <button style={tabStyle(tab === "import_")}        onClick={() => setTab("import_")}>Import</button>
+        <button style={tabStyle(tab === "log")}            onClick={() => setTab("log")}>Log</button>
+        <button style={tabStyle(tab === "bibliometrics")}  onClick={() => setTab("bibliometrics")}>Bibliometrics</button>
+        <button style={tabStyle(tab === "note")}           onClick={() => setTab("note")}>Note</button>
       </div>
 
-      {tab === "pubmed"      && pubmed}
-      {tab === "aiScoring"   && aiScoring}
-      {tab === "geo"         && geo}
-      {tab === "import_"     && import_}
-      {tab === "historik"    && historik}
-      {tab === "bibliometri" && bibliometri}
-      {tab === "note"        && note}
+      {tab === "pubmed"         && pubmed}
+      {tab === "classification" && classification}
+      {tab === "condensation"   && condensation}
+      {tab === "scoring"        && scoring}
+      {tab === "location"       && location}
+      {tab === "import_"        && import_}
+      {tab === "log"            && log}
+      {tab === "bibliometrics"  && bibliometrics}
+      {tab === "note"           && note}
     </div>
   );
 }

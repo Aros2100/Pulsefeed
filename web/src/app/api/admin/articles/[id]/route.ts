@@ -9,9 +9,16 @@ const schema = z.object({
   specialty_match: z.enum(["true", "false", "null"]).optional(),
   specialty:       z.string().optional(),
   subspecialty_ai: z.array(z.string()).optional(),
-}).refine((d) => d.specialty_tags !== undefined || d.specialty_match !== undefined || d.subspecialty_ai !== undefined, {
-  message: "At least one field must be provided",
-});
+  subspecialty:    z.array(z.string()).optional(),
+  article_type:    z.string().nullable().optional(),
+}).refine((d) =>
+  d.specialty_tags !== undefined ||
+  d.specialty_match !== undefined ||
+  d.subspecialty_ai !== undefined ||
+  d.subspecialty !== undefined ||
+  d.article_type !== undefined,
+  { message: "At least one field must be provided" }
+);
 
 export async function PUT(
   request: NextRequest,
@@ -31,7 +38,7 @@ export async function PUT(
     return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
   }
 
-  const { specialty_tags, specialty_match, specialty, subspecialty_ai } = result.data;
+  const { specialty_tags, specialty_match, specialty, subspecialty_ai, subspecialty, article_type } = result.data;
   const admin = createAdminClient();
 
   // Fetch current article values for logging and for RPC args
@@ -85,6 +92,30 @@ export async function PUT(
       specialty,
       to:         specialty_match,
       changed_by: auth.userId,
+    });
+  }
+
+  // Update subspecialty (authoritative)
+  if (subspecialty !== undefined) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await admin.from("articles").update({ subspecialty: subspecialty as any }).eq("id", articleId);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    void logArticleEvent(articleId, "lab_decision", {
+      module:          "subspecialty",
+      editor_verdict:  subspecialty,
+      changed_by:      auth.userId,
+    });
+  }
+
+  // Update article_type
+  if (article_type !== undefined) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await admin.from("articles").update({ article_type } as any).eq("id", articleId);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    void logArticleEvent(articleId, "lab_decision", {
+      module:       "article_type",
+      article_type,
+      changed_by:   auth.userId,
     });
   }
 

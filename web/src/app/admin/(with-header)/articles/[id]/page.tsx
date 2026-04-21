@@ -9,6 +9,7 @@ import AdminArticleTabs from "./AdminArticleTabs";
 import ArticleEditableFields from "./ArticleEditableFields";
 import ArticleNoteTab from "./ArticleNoteTab";
 import { getSubspecialties } from "@/lib/lab/classification-options";
+import { getArticleTypes } from "@/lib/lab/article-type-options";
 import GeoCard from "./GeoCard";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -72,11 +73,11 @@ function cast<T>(v: unknown): T[] { return Array.isArray(v) ? (v as T[]) : []; }
 
 const COLORS: Record<string, { dot: string; border: string; bg: string; label: string }> = {
   imported:               { dot: "#3b82f6", border: "#bfdbfe", bg: "#eff6ff", label: "Article imported" },
-  enriched:               { dot: "#8b5cf6", border: "#ddd6fe", bg: "#f5f3ff", label: "AI Berigelse" },
+  enriched:               { dot: "#8b5cf6", border: "#ddd6fe", bg: "#f5f3ff", label: "AI Enrichment" },
   lab_decision:           { dot: "#10b981", border: "#a7f3d0", bg: "#f0fdf4", label: "Lab" },
   feedback:               { dot: "#f59e0b", border: "#fde68a", bg: "#fffbeb", label: "Feedback" },
-  status_changed:         { dot: "#f97316", border: "#fed7aa", bg: "#fff7ed", label: "Status ændret" },
-  verified:               { dot: "#10b981", border: "#a7f3d0", bg: "#f0fdf4", label: "Verificeret" },
+  status_changed:         { dot: "#f97316", border: "#fed7aa", bg: "#fff7ed", label: "Status changed" },
+  verified:               { dot: "#10b981", border: "#a7f3d0", bg: "#f0fdf4", label: "Verified" },
   author_linked:          { dot: "#3b82f6", border: "#bfdbfe", bg: "#eff6ff", label: "Authors linked to article" },
   quality_check:          { dot: "#6b7280", border: "#d1d5db", bg: "#f9fafb", label: "Quality Check" },
   auto_tagged:            { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff", label: "Auto-Tagged" },
@@ -149,14 +150,37 @@ function DescriptionRow({ label, value, description }: {
   description: string;
 }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "60% 40%", padding: "8px 0", borderBottom: "1px solid #f5f5f5", gap: "16px", alignItems: "start" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "8px", alignItems: "start" }}>
-        <span style={{ color: "#888", fontSize: "13px", paddingTop: "1px" }}>{label}</span>
-        <span style={{ color: value !== null && value !== undefined && value !== "—" ? "#1a1a1a" : "#bbb", fontSize: "14px" }}>
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      padding: "7px 0",
+      borderBottom: "1px solid #f5f5f5",
+      gap: "16px",
+      alignItems: "start",
+      minHeight: 0,
+    }}>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "160px 1fr",
+        gap: "8px",
+        alignItems: "start",
+      }}>
+        <span style={{ color: "#888", fontSize: "13px" }}>{label}</span>
+        <span style={{
+          color: value !== null && value !== undefined && value !== "—" ? "#1a1a1a" : "#bbb",
+          fontSize: "14px",
+          lineHeight: 1.5,
+        }}>
           {value ?? "—"}
         </span>
       </div>
-      <span style={{ color: "#9ca3af", fontSize: "12px", lineHeight: 1.5, paddingTop: "1px", borderLeft: "1px solid #f0f0f0", paddingLeft: "16px" }}>
+      <span style={{
+        color: "#9ca3af",
+        fontSize: "12px",
+        lineHeight: 1.5,
+        borderLeft: "1px solid #f0f0f0",
+        paddingLeft: "16px",
+      }}>
         {description}
       </span>
     </div>
@@ -432,13 +456,14 @@ export default async function AdminArticleLogPage({
   const { id } = await params;
   const admin = createAdminClient();
 
-  const [articleResult, eventsResult, authorLinksResult, specialtyResult, subspecialtiesList] = await Promise.all([
+  const [articleResult, eventsResult, authorLinksResult, specialtyResult, subspecialtiesList, articleTypesList] = await Promise.all([
     admin.from("articles").select("*").eq("id", id).maybeSingle(),
     admin.from("article_events").select("*").eq("article_id", id).order("sequence", { ascending: true }),
     admin.from("article_authors").select("author_id, position, authors(author_score, department, hospital, city, state, country, verified_by)").eq("article_id", id),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (admin as any).from("article_specialties").select("specialty, specialty_match, scored_by, scored_at, source, specialty_confidence, specialty_reason").eq("article_id", id).eq("specialty", ACTIVE_SPECIALTY).maybeSingle(),
     getSubspecialties(ACTIVE_SPECIALTY),
+    getArticleTypes(ACTIVE_SPECIALTY),
   ]);
 
   const article = articleResult.data;
@@ -474,6 +499,18 @@ export default async function AdminArticleLogPage({
 
   const events = (eventsResult.data ?? []) as { id: string; event_type: string; payload: P; created_at: string }[];
 
+  const specialtyLabEvent = [...events]
+    .filter((ev) => ev.event_type === "lab_decision" && (ev.payload as P).module === "specialty_tag")
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] ?? null;
+
+  const subspecialtyLabEvent = [...events]
+    .filter((ev) => ev.event_type === "lab_decision" && (ev.payload as P).module === "subspecialty")
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] ?? null;
+
+  const articleTypeLabEvent = [...events]
+    .filter((ev) => ev.event_type === "lab_decision" && (ev.payload as P).module === "article_type")
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] ?? null;
+
   const pubmedUrl    = `https://pubmed.ncbi.nlm.nih.gov/${a.pubmed_id}/`;
   const pmcId        = raw.pmc_id as string | null;
   const citationsUrl = `https://europepmc.org/search?query=cites:MED:${a.pubmed_id}`;
@@ -490,8 +527,9 @@ export default async function AdminArticleLogPage({
 
   const authors   = cast<AuthorRaw>(a.authors);
   const meshTerms = cast<MeshTerm>(a.mesh_terms);
-  const grants    = cast<Grant>(a.grants);
-  const abstract  = a.abstract ? decodeHtml(a.abstract) : null;
+  const grants     = cast<Grant>(a.grants);
+  const substances = cast<{ registryNumber?: string | null; name?: string | null }>(raw.substances);
+  const abstract   = a.abstract ? decodeHtml(a.abstract) : null;
 
   const abstractSections = abstract
     ? abstract.split(/\n/).reduce<{ label: string; text: string }[]>((acc, line) => {
@@ -512,6 +550,9 @@ export default async function AdminArticleLogPage({
   const firstAuthorCitation = authors.length > 0
     ? `${authors[0].lastName ?? ""}${authors.length > 1 ? " et al." : ""}`
     : "";
+  const citationSummary = authors.length > 0
+    ? `${authors[0].lastName ?? ""}${authors.length > 1 ? " et al." : ""}, ${a.journal_abbr ?? a.journal_title ?? ""}`
+    : null;
   const citationText = [
     firstAuthorCitation,
     a.title ? ` ${a.title}.` : "",
@@ -530,7 +571,7 @@ export default async function AdminArticleLogPage({
 
       {/* Identifikation */}
       <Card>
-        <CardHeader label="Identifikation" />
+        <CardHeader label="Identification" />
         <CardBody>
           <DescriptionRow
             label="PMID"
@@ -599,7 +640,7 @@ export default async function AdminArticleLogPage({
 
       {/* Datoer */}
       <Card>
-        <CardHeader label="Datoer" />
+        <CardHeader label="Dates" />
         <CardBody>
           <DescriptionRow
             label="Published"
@@ -631,42 +672,13 @@ export default async function AdminArticleLogPage({
 
       {/* Artikel */}
       <Card>
-        <CardHeader label="Artikel" />
+        <CardHeader label="Article" />
         <CardBody>
           <DescriptionRow
             label="Title"
             value={a.title}
             description="Full title of the article as recorded in PubMed."
           />
-          {/* Abstract — text block, not grid cell */}
-          <div style={{ display: "grid", gridTemplateColumns: "60% 40%", padding: "8px 0", borderBottom: "1px solid #f5f5f5", gap: "16px", alignItems: "start" }}>
-            <div>
-              <span style={{ color: "#888", fontSize: "13px", display: "block", marginBottom: "8px" }}>Abstract</span>
-              {abstract ? (
-                abstractSections && abstractSections.some((s) => s.label) ? (
-                  <div>
-                    {abstractSections.map((s, i) => (
-                      <div key={i} style={{ marginBottom: i < abstractSections.length - 1 ? "14px" : 0 }}>
-                        {s.label && (
-                          <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#5a6a85", display: "block", marginBottom: "4px" }}>
-                            {s.label}
-                          </span>
-                        )}
-                        <span style={{ fontSize: "14px", lineHeight: 1.7, color: "#2a2a2a" }}>{s.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p style={{ fontSize: "14px", lineHeight: 1.7, color: "#2a2a2a", margin: 0, whiteSpace: "pre-line" }}>{abstract}</p>
-                )
-              ) : (
-                <span style={{ color: "#bbb", fontSize: "14px" }}>—</span>
-              )}
-            </div>
-            <span style={{ color: "#9ca3af", fontSize: "12px", lineHeight: 1.5, paddingTop: "1px", borderLeft: "1px solid #f0f0f0", paddingLeft: "16px" }}>
-              Author-provided summary of the article. Structured abstracts are preserved with their section labels.
-            </span>
-          </div>
           <DescriptionRow
             label="Language"
             value={a.language ? (LANGUAGE_NAMES[a.language] ?? a.language.toUpperCase()) : null}
@@ -687,6 +699,36 @@ export default async function AdminArticleLogPage({
             value={raw.coi_statement as string | null}
             description="Conflict of interest statement as provided by the authors or publisher."
           />
+        </CardBody>
+      </Card>
+
+      {/* Abstract */}
+      <Card>
+        <CardHeader label="Abstract" />
+        <CardBody>
+          <DescriptionRow
+            label="Abstract"
+            value={null}
+            description="Author-provided summary of the article. Structured abstracts are preserved with their section labels."
+          />
+          {abstract ? (
+            abstractSections && abstractSections.some((s) => s.label) ? (
+              <div style={{ marginTop: "8px" }}>
+                {abstractSections.map((s, i) => (
+                  <div key={i} style={{ marginBottom: i < abstractSections.length - 1 ? "14px" : 0 }}>
+                    {s.label && (
+                      <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#5a6a85", display: "block", marginBottom: "4px" }}>
+                        {s.label}
+                      </span>
+                    )}
+                    <span style={{ fontSize: "14px", lineHeight: 1.7, color: "#2a2a2a" }}>{s.text}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ fontSize: "14px", lineHeight: 1.7, color: "#2a2a2a", margin: "8px 0 0", whiteSpace: "pre-line" }}>{abstract}</p>
+            )
+          ) : null}
         </CardBody>
       </Card>
 
@@ -724,11 +766,13 @@ export default async function AdminArticleLogPage({
 
       {/* Forfattere */}
       <Card>
-        <CardHeader label="Forfattere" />
+        <CardHeader label="Authors" />
         <CardBody>
           <DescriptionRow
-            label="Authors"
-            value={null}
+            label="First author"
+            value={authors.length > 0
+              ? `${authors[0].foreName ?? ""} ${authors[0].lastName ?? ""}${authors.length > 1 ? ` et al. (${authors.length} authors)` : ""}`.trim()
+              : null}
             description="Author list as recorded in PubMed, with affiliations and ORCID identifiers where available. Links to author profiles within PulseFeeds where matched."
           />
           {authors.length > 0 ? (
@@ -753,7 +797,7 @@ export default async function AdminArticleLogPage({
         <CardBody>
           <DescriptionRow
             label="Grants"
-            value={null}
+            value={grants.length > 0 ? `${grants.length} grant${grants.length > 1 ? "s" : ""}` : null}
             description="Funding sources reported by the authors, including grant IDs and funding agencies. Sourced directly from PubMed's grant data."
           />
           {grants.length > 0 ? (
@@ -777,24 +821,21 @@ export default async function AdminArticleLogPage({
         <CardBody>
           <DescriptionRow
             label="Substances"
-            value={null}
+            value={substances.length > 0 ? `${substances.length} substance${substances.length > 1 ? "s" : ""}` : null}
             description="Chemical substances and drugs mentioned in the article, from PubMed's MeSH chemical list. Includes registry numbers where available."
           />
-          {(() => {
-            const subs = (raw.substances as Array<{ registryNumber?: string; name?: string }> | null) ?? [];
-            return subs.length > 0 ? (
-              <div style={{ marginTop: "8px" }}>
-                {subs.map((s, i) => (
-                  <div key={i} style={{ fontSize: "14px", padding: "6px 0", borderBottom: i < subs.length - 1 ? "1px solid #f5f5f5" : undefined, color: "#1a1a1a" }}>
-                    {s.name}
-                    {s.registryNumber && <span style={{ color: "#888" }}> — {s.registryNumber}</span>}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ fontSize: "13px", color: "#9ca3af", marginTop: "8px" }}>No substance data</div>
-            );
-          })()}
+          {substances.length > 0 ? (
+            <div style={{ marginTop: "8px" }}>
+              {substances.map((s, i) => (
+                <div key={i} style={{ fontSize: "14px", padding: "6px 0", borderBottom: i < substances.length - 1 ? "1px solid #f5f5f5" : undefined, color: "#1a1a1a" }}>
+                  {s.name}
+                  {s.registryNumber && <span style={{ color: "#888" }}> — {s.registryNumber}</span>}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: "13px", color: "#9ca3af", marginTop: "8px" }}>No substance data</div>
+          )}
         </CardBody>
       </Card>
 
@@ -804,7 +845,7 @@ export default async function AdminArticleLogPage({
         <CardBody>
           <DescriptionRow
             label="Vancouver"
-            value={null}
+            value={citationSummary}
             description="Auto-generated Vancouver-style citation based on PubMed data. Click to copy."
           />
           <div style={{ marginTop: "8px" }}>
@@ -819,9 +860,9 @@ export default async function AdminArticleLogPage({
     </div>
   );
 
-  // ── AI-scoring tab ──────────────────────────────────────────────────────────
+  // ── Classification tab ──────────────────────────────────────────────────────
 
-  const aiScoringTab = (
+  const classificationTab = (
     <div style={{ padding: "4px 0 80px" }}>
 
       {/* Specialty */}
@@ -829,70 +870,52 @@ export default async function AdminArticleLogPage({
         <CardHeader label="Specialty" />
         <CardBody>
           <DescriptionRow
-            label="Specialty match"
+            label="Specialty"
+            value={specialtyRow?.specialty ? specialtyLabel(specialtyRow.specialty) : null}
+            description="The medical specialty this article has been evaluated for."
+          />
+          <DescriptionRow
+            label="Status"
             value={
-              specialtyRow?.specialty_match === true ? <Badge color="green">Approved</Badge>
-              : specialtyRow?.specialty_match === false ? <Badge color="red">Rejected</Badge>
+              specialtyRow?.specialty_match === true ? <Badge color="green">Included</Badge>
+              : specialtyRow?.specialty_match === false ? <Badge color="red">Excluded</Badge>
               : <Badge color="gray">Pending</Badge>
             }
-            description="Whether this article has been approved as relevant to the active specialty. Approved = included in feeds. Rejected = excluded. Pending = not yet scored."
+            description="Whether this article is included in the specialty feed. Included = appears in feeds and newsletters. Excluded = filtered out. Pending = not yet scored."
           />
           <DescriptionRow
-            label="Source"
-            value={specialtyRow?.source ?? null}
-            description="What triggered the specialty scoring — e.g. ai_score (AI model), mesh_auto_tag (automatic MeSH match), journal (journal whitelist), human (editor decision)."
-          />
-          <DescriptionRow
-            label="Model"
-            value={specialtyRow?.scored_by ?? null}
-            description="The prompt version used to score specialty relevance, e.g. v10. Tracks which model version produced the current result."
-          />
-          <DescriptionRow
-            label="Confidence"
-            value={specialtyRow?.specialty_confidence != null ? `${specialtyRow.specialty_confidence}%` : null}
-            description="The AI model's confidence in its specialty decision, expressed as a percentage. Higher values indicate more certain classifications."
-          />
-          <DescriptionRow
-            label="Scored at"
+            label="Decision date"
             value={specialtyRow?.scored_at ? fmt(specialtyRow.scored_at) : null}
-            description="Timestamp of when the specialty scoring was last run for this article."
+            description="The date the specialty decision was made for this article."
           />
           <DescriptionRow
-            label="Reason"
-            value={specialtyRow?.specialty_reason ?? null}
-            description="The AI model's explanation for its specialty decision. Only present for Lab-validated scores."
+            label="Decision method"
+            value={(() => {
+              const s = specialtyRow?.source ?? null;
+              if (!s) return null;
+              const labels: Record<string, string> = {
+                ai_score:  "AI model",
+                c1_filter: "Circle 1 — journal whitelist",
+                c2_filter: "Circle 2 — affiliation filter",
+                c4_filter: "Circle 4 — MeSH filter",
+                manual:    "Manual — editor decision",
+              };
+              return labels[s] ?? s;
+            })()}
+            description="How the specialty decision was made — by AI model, journal whitelist, MeSH auto-tag, or human editor."
           />
-          {(() => {
-            const legacyFields = [raw.ai_decision, raw.specialty_confidence, raw.specialty_scored_at, raw.specialty_reasoning, raw.model_version, raw.specialty_tags];
-            const hasLegacy = legacyFields.some((f) => f != null && f !== "" && !(Array.isArray(f) && (f as unknown[]).length === 0));
-            if (!hasLegacy) return null;
-            return (
-              <>
-                <SectionLabel>Legacy felter (articles-tabel)</SectionLabel>
-                <DescriptionRow label="ai_decision"          value={raw.ai_decision as string | null}       description="Legacy field — the AI's raw decision before the article_specialties table was introduced. Will be removed in a future cleanup migration." />
-                <DescriptionRow label="specialty_confidence" value={raw.specialty_confidence != null ? `${raw.specialty_confidence}%` : null} description="Legacy confidence score stored directly on the articles table. Superseded by article_specialties.specialty_confidence." />
-                <DescriptionRow label="specialty_scored_at"  value={raw.specialty_scored_at ? fmt(raw.specialty_scored_at as string) : null} description="Legacy timestamp stored on the articles table. Superseded by article_specialties.scored_at." />
-                <DescriptionRow label="specialty_reasoning"  value={raw.specialty_reasoning as string | null} description="Legacy reasoning text stored on the articles table. Superseded by article_specialties.specialty_reason." />
-                <DescriptionRow label="model_version"        value={raw.model_version as string | null}      description="Legacy model version field on the articles table. Superseded by article_specialties.scored_by." />
-                <DescriptionRow label="specialty_tags"       value={(() => { const tags = parseSubArray(raw.specialty_tags); return tags.length > 0 ? tags.join(", ") : null; })()} description="Legacy array of specialty slugs stored directly on the articles table. Superseded by the article_specialties junction table." />
-              </>
-            );
-          })()}
-        </CardBody>
-      </Card>
-
-      {/* Article Type */}
-      <Card>
-        <CardHeader label="Article Type" />
-        <CardBody>
-          <DescriptionRow label="article_type (auth.)"       value={raw.article_type as string | null}          description="The authoritative article type for this article. Set by Lab validation or deterministic scoring. This field drives all downstream logic." />
-          <DescriptionRow label="article_type_ai"            value={raw.article_type_ai as string | null}       description="The article type suggested by the AI scoring model before Lab validation. May differ from the authoritative article_type if an editor corrected it." />
-          <DescriptionRow label="Confidence"                 value={raw.article_type_confidence != null ? `${raw.article_type_confidence}%` : null} description="The AI model's confidence in its article type classification, expressed as a percentage." />
-          <DescriptionRow label="Method"                     value={raw.article_type_method as string | null}   description="How the article type was determined — e.g. ai (AI model), deterministic (rule-based), lab (editor-validated)." />
-          <DescriptionRow label="Validated"                  value={raw.article_type_validated != null ? <Badge color={raw.article_type_validated ? "green" : "red"}>{raw.article_type_validated ? "Yes" : "No"}</Badge> : null} description="Whether an editor has reviewed and confirmed the article type in the Lab. Validated articles are used as training examples." />
-          <DescriptionRow label="Scored at"                  value={raw.article_type_scored_at ? fmt(raw.article_type_scored_at as string) : null} description="Timestamp of when the article type scoring was last run." />
-          <DescriptionRow label="Model version"              value={raw.article_type_model_version as string | null} description="The prompt version used for article type scoring." />
-          <DescriptionRow label="Rationale"                  value={raw.article_type_rationale as string | null} description="The AI model's explanation for its article type decision." />
+          <DescriptionRow
+            label="Scored by model"
+            value={specialtyRow?.scored_by ?? null}
+            description="The AI model version used to evaluate this article for the specialty, e.g. v10."
+          />
+          <DescriptionRow
+            label="Validated by Lab"
+            value={specialtyLabEvent
+              ? <Badge color="green">Yes</Badge>
+              : <Badge color="gray">No</Badge>}
+            description="Whether a Lab editor has reviewed and validated the specialty decision for this article. See Log tab for details."
+          />
         </CardBody>
       </Card>
 
@@ -901,54 +924,91 @@ export default async function AdminArticleLogPage({
         <CardHeader label="Subspecialty" />
         <CardBody>
           {(() => {
-            const subAuth     = parseSubArray(raw.subspecialty);
-            const subAi       = parseSubArray(a.subspecialty_ai);
-            const studyDesign = parseSubArray(raw.study_design_ai);
+            const subAuth = parseSubArray(raw.subspecialty);
             return (
               <>
-                <DescriptionRow label="subspecialty (auth.)" value={subAuth.length > 0 ? subAuth.join(", ") : null}                         description="The authoritative subspecialty classification — an array of subspecialty names. This field is used in feeds and newsletters." />
-                <DescriptionRow label="subspecialty_ai"       value={subAi.length > 0 ? subAi.join(", ") : null}                             description="The subspecialty classification suggested by the AI model. May differ from the authoritative subspecialty if corrected by an editor." />
-                <DescriptionRow label="Scored at"             value={raw.subspecialty_scored_at ? fmt(raw.subspecialty_scored_at as string) : null} description="Timestamp of when subspecialty scoring was last run for this article." />
-                <DescriptionRow label="Model version"         value={a.subspecialty_model_version ? `v${a.subspecialty_model_version}` : null} description="The prompt version used for subspecialty scoring." />
-                <DescriptionRow label="Reason"                value={raw.subspecialty_reason as string | null}                               description="The AI model's explanation for its subspecialty classification. Only present for Lab-scored articles." />
-                <DescriptionRow label="Study design (AI)"     value={studyDesign.length > 0 ? studyDesign.join(", ") : null}                 description="An array of study design tags assigned by the AI, e.g. RCT, cohort, case series. Experimental field — not yet used in production feeds." />
+                <DescriptionRow label="Subspecialty"    value={subAuth.length > 0 ? subAuth.join(", ") : null}                                      description="The authoritative subspecialty classification used in feeds and newsletters." />
+                <DescriptionRow label="Decision date"   value={raw.subspecialty_scored_at ? fmt(raw.subspecialty_scored_at as string) : null}        description="The date the subspecialty classification was last made for this article." />
+                <DescriptionRow label="Scored by model" value={a.subspecialty_model_version ?? null}                                                 description="The AI model version used to classify the subspecialty." />
               </>
             );
           })()}
-        </CardBody>
-      </Card>
-
-      {/* Kondensering */}
-      <Card>
-        <CardHeader label="Kondensering" />
-        <CardBody>
-          <DescriptionRow label="Kondenseret"    value={raw.condensed_at ? fmt(raw.condensed_at as string) : null}             description="Timestamp of when the condensation was last generated for this article." />
-          <DescriptionRow label="Model version"  value={a.condensed_model_version ? `v${a.condensed_model_version}` : null}   description="The prompt version used to generate the condensation." />
-          <DescriptionRow label="Enriched at"    value={a.enriched_at ? fmt(a.enriched_at) : null}                            description="Timestamp of when the full AI enrichment pipeline (summary, PICO, news value etc.) was last run." />
-          <DescriptionRow label="Short headline" value={a.short_headline ?? null}                                              description="A short, punchy headline generated by AI for use in newsletter and feed cards. Max ~10 words." />
-          <DescriptionRow label="Short resume"   value={a.short_resume ?? null}                                               description="A plain-language summary of the article generated by AI. Written for a clinical audience. Used in feed cards and newsletters." />
-          <DescriptionRow label="Long resume"    value={(raw.long_resume as string | null) ?? null}                           description="An extended AI-generated summary with more detail than the short resume. Not currently used in production UI." />
           <DescriptionRow
-            label="Bottom line"
-            value={a.bottom_line ? (
-              <div style={{ background: "#f9fafb", borderLeft: "3px solid #7c3aed", padding: "10px 12px", fontSize: "14px", fontStyle: "italic", color: "#2a2a2a", lineHeight: 1.5 }}>
-                {a.bottom_line}
-              </div>
-            ) : null}
-            description="A single-sentence clinical takeaway generated by AI — the most important implication for practice."
+            label="Validated by Lab"
+            value={subspecialtyLabEvent
+              ? <Badge color="green">Yes</Badge>
+              : <Badge color="gray">No</Badge>}
+            description="Whether a Lab editor has reviewed and validated the subspecialty classification. See Log tab for details."
           />
         </CardBody>
       </Card>
 
-      {/* PICO */}
+      {/* Article Type */}
       <Card>
-        <CardHeader label="PICO" />
+        <CardHeader label="Article Type" />
         <CardBody>
-          <DescriptionRow label="Population"   value={a.pico_population ?? null}   description="Population: the patient group or study subjects studied in this article." />
-          <DescriptionRow label="Intervention" value={a.pico_intervention ?? null} description="Intervention: the treatment, procedure, or exposure being evaluated." />
-          <DescriptionRow label="Comparison"   value={a.pico_comparison ?? null}   description="Comparison: the control or comparator group, if any." />
-          <DescriptionRow label="Outcome"      value={a.pico_outcome ?? null}      description="Outcome: the primary endpoint or result being measured." />
-          <DescriptionRow label="Sample size"  value={a.sample_size != null ? `N = ${a.sample_size.toLocaleString("da-DK")}` : null} description="Total number of participants or cases included in the study, as extracted by AI." />
+          <DescriptionRow label="Article type"     value={raw.article_type as string | null}          description="The authoritative article type for this article. Set by Lab validation or deterministic scoring. This field drives all downstream logic." />
+          <DescriptionRow label="Decision date"    value={raw.article_type_scored_at ? fmt(raw.article_type_scored_at as string) : null}           description="The date the article type was last determined for this article." />
+          <DescriptionRow
+            label="Decision method"
+            value={(() => {
+              const m = raw.article_type_method as string | null;
+              if (!m) return null;
+              const labels: Record<string, string> = {
+                ai:            "AI model",
+                deterministic: "Deterministic — rule-based",
+              };
+              return labels[m] ?? m;
+            })()}
+            description="How the article type was determined — by AI model or deterministic rule-based scoring."
+          />
+          <DescriptionRow label="Scored by model"  value={raw.article_type_model_version as string | null}                                         description="The AI model version used to determine the article type." />
+          <DescriptionRow
+            label="Validated by Lab"
+            value={articleTypeLabEvent
+              ? <Badge color="green">Yes</Badge>
+              : <Badge color="gray">No</Badge>}
+            description="Whether a Lab editor has reviewed and validated the article type. See Log tab for details."
+          />
+        </CardBody>
+      </Card>
+
+      {/* Redigering */}
+      <Card>
+        <CardHeader label="Editing" />
+        <CardBody>
+          <ArticleEditableFields
+            articleId={id}
+            allSpecialties={[{ slug: ACTIVE_SPECIALTY, label: specialtyLabel(ACTIVE_SPECIALTY) }]}
+            articleSpecialties={specialtyRow ? [{ specialty: specialtyRow.specialty, specialty_match: specialtyRow.specialty_match }] : []}
+            allSubspecialties={subspecialtiesList.map((name) => ({ name }))}
+            articleSubspecialties={parseSubArray(raw.subspecialty)}
+            allArticleTypes={articleTypesList.map(({ name }) => ({ name }))}
+            articleType={raw.article_type as string | null}
+          />
+        </CardBody>
+      </Card>
+    </div>
+  );
+
+  // ── Condensation tab ─────────────────────────────────────────────────────────
+
+  const condensationTab = (
+    <div style={{ padding: "4px 0 80px" }}>
+
+      {/* Kondensering */}
+      <Card>
+        <CardHeader label="Condensation" />
+        <CardBody>
+          <DescriptionRow label="Condensed at"    value={raw.condensed_at ? fmt(raw.condensed_at as string) : null}  description="When the condensation was last generated for this article." />
+          <DescriptionRow label="Scored by model" value={a.condensed_model_version ?? null}                           description="The prompt version used to generate the condensation." />
+          <DescriptionRow label="Short headline"  value={a.short_headline ?? null}                                    description="A short, punchy headline generated by AI for use in newsletter and feed cards. Max ~10 words." />
+          <DescriptionRow label="Short resume"    value={a.short_resume ?? null}                                      description="A plain-language summary of the article generated by AI. Written for a clinical audience. Used in feed cards and newsletters." />
+          <DescriptionRow
+            label="Bottom line"
+            value={a.bottom_line ?? null}
+            description="A single-sentence clinical takeaway generated by AI — the most important implication for practice."
+          />
         </CardBody>
       </Card>
 
@@ -960,12 +1020,20 @@ export default async function AdminArticleLogPage({
           <DescriptionRow label="Action"      value={raw.sari_action as string | null}      description="Action: what was done, tested, or investigated." />
           <DescriptionRow label="Result"      value={raw.sari_result as string | null}      description="Result: what was found." />
           <DescriptionRow label="Implication" value={raw.sari_implication as string | null} description="Implication: what the finding means for clinical practice or future research." />
+          <DescriptionRow label="Sample size"  value={a.sample_size != null ? `N = ${a.sample_size.toLocaleString("da-DK")}` : null} description="Total number of participants or cases included in the study, as extracted by AI." />
         </CardBody>
       </Card>
+    </div>
+  );
+
+  // ── Scoring tab ──────────────────────────────────────────────────────────────
+
+  const scoringTab = (
+    <div style={{ padding: "4px 0 80px" }}>
 
       {/* Vurdering */}
       <Card>
-        <CardHeader label="Vurdering" />
+        <CardHeader label="Scoring" />
         <CardBody>
           <DescriptionRow
             label="Evidence score"
@@ -1022,9 +1090,9 @@ export default async function AdminArticleLogPage({
                   value={a.full_text_available != null ? (
                     a.full_text_available
                       ? pmcFullTextUrl
-                        ? <a href={pmcFullTextUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#15803d", fontWeight: 600, textDecoration: "none" }}>Tilgængelig ↗</a>
-                        : <Badge color="green">Tilgængelig</Badge>
-                      : <Badge color="gray">Kun abstract</Badge>
+                        ? <a href={pmcFullTextUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#15803d", fontWeight: 600, textDecoration: "none" }}>Available ↗</a>
+                        : <Badge color="green">Available</Badge>
+                      : <Badge color="gray">Abstract only</Badge>
                   ) : null}
                   description="Whether the full text of the article is freely available via PubMed Central (PMC)."
                 />
@@ -1047,34 +1115,19 @@ export default async function AdminArticleLogPage({
           })()}
         </CardBody>
       </Card>
-
-      {/* Redigering */}
-      <Card>
-        <CardHeader label="Redigering" />
-        <CardBody>
-          <ArticleEditableFields
-            articleId={id}
-            initialTags={[]}
-            initialSpecialtyMatch={specialtyRow?.specialty_match ?? null}
-            initialSpecialty={specialtyRow?.specialty ?? ACTIVE_SPECIALTY}
-            initialSubspecialties={(Array.isArray(a.subspecialty_ai) ? a.subspecialty_ai : []) as string[]}
-            subspecialties={subspecialtiesList}
-          />
-        </CardBody>
-      </Card>
     </div>
   );
 
-  // ── Geo tab ─────────────────────────────────────────────────────────────────
+  // ── Location tab ─────────────────────────────────────────────────────────────
 
   const _firstAuthor = (raw.authors as Array<{ affiliations?: string[]; affiliation?: string | null }>)?.[0];
   const firstAuthorRawAffiliation = _firstAuthor?.affiliations?.[0] ?? _firstAuthor?.affiliation ?? null;
 
-  const geoTab = (
+  const locationTab = (
     <div style={{ padding: "4px 0 80px" }}>
       {/* Rå affiliationstekst */}
       <Card>
-        <CardHeader label="Rå affiliationstekst" />
+        <CardHeader label="Raw Affiliation Text" />
         <CardBody>
           <DescriptionRow
             label="First author affiliation"
@@ -1103,7 +1156,7 @@ export default async function AdminArticleLogPage({
 
       {/* Geo metadata */}
       <Card>
-        <CardHeader label="Geo metadata" />
+        <CardHeader label="Geo Metadata" />
         <CardBody>
           <DescriptionRow
             label="Geo source"
@@ -1123,7 +1176,7 @@ export default async function AdminArticleLogPage({
             label="AI attempted"
             value={raw.ai_location_attempted != null ? (
               <Badge color={raw.ai_location_attempted ? "purple" : "gray"}>
-                AI {raw.ai_location_attempted ? "ja" : "nej"}
+                AI {raw.ai_location_attempted ? "yes" : "no"}
               </Badge>
             ) : null}
             description="Whether the AI fallback was invoked to assist geo parsing when the rule-based parser was insufficient."
@@ -1224,7 +1277,7 @@ export default async function AdminArticleLogPage({
 
       {/* Indeksering */}
       <Card>
-        <CardHeader label="Indeksering (beregnet ved import)" />
+        <CardHeader label="Indexing (computed at import)" />
         <CardBody>
           <DescriptionRow label="Indexed date" value={fmtDate(raw.indexed_date as string | null)}                              description="The full indexing date, derived from pubmed_indexed_at. Used as the canonical date for all filtering and feed logic in PulseFeeds." />
           <DescriptionRow label="Year"         value={raw.indexed_year  != null ? String(raw.indexed_year)  : null}            description="Year component of the indexing date. Pre-computed for efficient filtering." />
@@ -1274,12 +1327,12 @@ export default async function AdminArticleLogPage({
   // ── Historik tab ────────────────────────────────────────────────────────────
 
   const SECTIONS: { title: string; types: string[]; alwaysShow?: boolean }[] = [
-    { title: "Indlæsning af artikel",    types: ["imported"],      alwaysShow: true },
-    { title: "Indlæsning af forfattere", types: ["author_linked"], alwaysShow: true },
-    { title: "AI Scoring",               types: ["enriched"] },
-    { title: "Auto-Tagging",             types: ["auto_tagged"] },
-    { title: "Validering",               types: ["lab_decision"] },
-    { title: "Bibliometri",              types: ["citation_count_updated"] },
+    { title: "Article import",  types: ["imported"],               alwaysShow: true },
+    { title: "Author import",   types: ["author_linked"],          alwaysShow: true },
+    { title: "AI Scoring",      types: ["enriched"] },
+    { title: "Auto-Tagging",    types: ["auto_tagged"] },
+    { title: "Lab validation",  types: ["lab_decision"] },
+    { title: "Bibliometrics",   types: ["citation_count_updated"] },
   ];
 
   const grouped = SECTIONS.map((s) => ({
@@ -1299,7 +1352,7 @@ export default async function AdminArticleLogPage({
     }, null);
   }
 
-  const historikTab = (
+  const logTab = (
     <div style={{ padding: "4px 0 80px" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
         {grouped.map((section) => (
@@ -1308,7 +1361,7 @@ export default async function AdminArticleLogPage({
               {section.title}
             </div>
             {section.events.length === 0 ? (
-              <div style={{ fontSize: "13px", color: "#9ca3af" }}>Ikke gennemført endnu</div>
+              <div style={{ fontSize: "13px", color: "#9ca3af" }}>Not completed yet</div>
             ) : (
               <div style={{ position: "relative" }}>
                 <div style={{ position: "absolute", left: "15px", top: "8px", bottom: "8px", width: "2px", background: "#e5e7eb" }} />
@@ -1344,17 +1397,17 @@ export default async function AdminArticleLogPage({
 
   // ── Bibliometri tab ─────────────────────────────────────────────────────────
 
-  const bibliometriTab = (
+  const bibliometricsTab = (
     <div style={{ padding: "4px 0 80px" }}>
       <Card>
-        <CardHeader label="Bibliometri" />
+        <CardHeader label="Bibliometrics" />
         <CardBody>
           <SectionLabel>Journal metrics</SectionLabel>
           <DescriptionRow label="Impact Factor"    value={a.impact_factor != null ? ifBadge(a.impact_factor) : null}                      description="Journal Impact Factor — the average number of citations received per article published in the journal over the past two years. Source: OpenAlex." />
           <DescriptionRow label="IF fetched at"    value={raw.impact_factor_fetched_at ? fmt(raw.impact_factor_fetched_at as string) : null} description="Timestamp of when the impact factor was last fetched from the data source." />
           <DescriptionRow label="Journal H-index"  value={a.journal_h_index != null ? String(a.journal_h_index) : null}                   description="The journal's h-index — the largest number h such that h articles have each been cited at least h times. Source: OpenAlex." />
 
-          <SectionLabel>Citationer</SectionLabel>
+          <SectionLabel>Citations</SectionLabel>
           <DescriptionRow
             label="Citation count"
             value={
@@ -1384,11 +1437,11 @@ export default async function AdminArticleLogPage({
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", minHeight: "100vh" }}>
-      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "40px 24px 0" }}>
+      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "40px 48px 0" }}>
 
         {/* Breadcrumb */}
         <div style={{ marginBottom: "8px", fontSize: "13px", color: "#5a6a85" }}>
-          <Link href="/admin/articles" style={{ color: "#5a6a85", textDecoration: "none" }}>← Artikler</Link>
+          <Link href="/admin/articles" style={{ color: "#5a6a85", textDecoration: "none" }}>← Articles</Link>
         </div>
 
         {/* Article header */}
@@ -1407,14 +1460,16 @@ export default async function AdminArticleLogPage({
       </div>
 
       {/* Tabs */}
-      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 24px" }}>
+      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 48px" }}>
         <AdminArticleTabs
           pubmed={pubmedTab}
-          aiScoring={aiScoringTab}
-          geo={geoTab}
+          classification={classificationTab}
+          condensation={condensationTab}
+          scoring={scoringTab}
+          location={locationTab}
           import_={importTab}
-          historik={historikTab}
-          bibliometri={bibliometriTab}
+          log={logTab}
+          bibliometrics={bibliometricsTab}
           note={<ArticleNoteTab articleId={id} initialNote={(raw.admin_note as string | null) ?? ""} />}
         />
       </div>
