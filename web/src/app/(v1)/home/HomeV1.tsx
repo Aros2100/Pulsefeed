@@ -265,7 +265,8 @@ export default async function HomeV1() {
     );
   }
 
-  // Fetch global articles for the current edition (sequential — needs edition.id)
+  // Fetch global articles — two separate queries to avoid PostgREST nested relation issues
+  let globalArticles: GlobalArticleRow[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: editionArticleRows } = await (supabase as any)
     .from("newsletter_edition_articles")
@@ -273,9 +274,8 @@ export default async function HomeV1() {
     .eq("edition_id", edition.id)
     .eq("is_global", true);
 
-  let globalArticles: GlobalArticleRow[] = [];
   if (editionArticleRows && editionArticleRows.length > 0) {
-    const articleIds = editionArticleRows.map((r: { article_id: string }) => r.article_id);
+    const articleIds = (editionArticleRows as { article_id: string }[]).map((r) => r.article_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: articleRows } = await (supabase as any)
       .from("articles")
@@ -284,7 +284,7 @@ export default async function HomeV1() {
 
     if (articleRows) {
       const articleMap = Object.fromEntries(
-        (articleRows as GlobalArticleRow["articles"][]).map((a) => [a!.id, a])
+        (articleRows as NonNullable<GlobalArticleRow["articles"]>[]).map((a) => [a.id, a])
       );
       globalArticles = (editionArticleRows as { sort_order: number; subspecialty: string | null; article_id: string }[])
         .map((r) => ({
