@@ -29,7 +29,7 @@ export default function UserHeader({ activePage, mode, onModeChange, onProfileCl
   }
 
   return (
-    <header style={{ height: 80 }} className="w-full bg-pf-header border-b border-pf-header-border flex items-center px-6">
+    <header style={{ height: 80 }} className="w-full bg-pf-header flex items-center px-6">
       <div className="w-full grid grid-cols-[1fr_auto_1fr] items-center">
 
         {/* Left — Logo */}
