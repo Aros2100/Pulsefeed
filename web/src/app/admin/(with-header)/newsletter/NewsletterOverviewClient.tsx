@@ -86,11 +86,12 @@ function getStepState(edition: Edition): StepState {
   };
 }
 
-const STEPS: { key: Step; label: string }[] = [
+const STEPS: { key: Step | "send"; label: string }[] = [
   { key: "selection",   label: "Selection" },
   { key: "review",      label: "Review" },
   { key: "intro-texts", label: "Intro texts" },
   { key: "preview",     label: "Preview" },
+  { key: "send",        label: "Send" },
 ];
 
 function StatusBadge({ status }: { status: Edition["status"] }) {
@@ -118,19 +119,21 @@ function StatusBadge({ status }: { status: Edition["status"] }) {
 
 function ProgressTracker({ edition }: { edition: Edition }) {
   const { selectionDone, reviewDone, introTextsDone, allDone, nextStep } = getStepState(edition);
+  const sendDone = edition.status === "sent";
 
-  const stepDone: Record<Step, boolean> = {
-    selection:   selectionDone,
-    review:      reviewDone,
+  const stepDone: Record<Step | "send", boolean> = {
+    selection:     selectionDone,
+    review:        reviewDone,
     "intro-texts": introTextsDone,
-    preview:     allDone,
+    preview:       allDone,
+    send:          sendDone,
   };
 
   return (
     <div style={{ display: "flex", gap: 4 }}>
       {STEPS.map((step) => {
-        const done = stepDone[step.key];
-        const active = !allDone && step.key === nextStep;
+        const done = stepDone[step.key as Step | "send"];
+        const active = !sendDone && step.key === nextStep;
 
         const barColor = done ? "#1a1a1a" : active ? "#E83B2A" : "#e5e7eb";
         const labelColor = done ? "#1a1a1a" : active ? "#E83B2A" : "#9ca3af";

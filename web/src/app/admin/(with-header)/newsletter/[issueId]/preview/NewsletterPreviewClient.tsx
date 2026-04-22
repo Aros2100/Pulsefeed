@@ -114,14 +114,14 @@ export default function NewsletterPreviewClient({ edition, subspecialties, editi
   async function approve() {
     setApproving(true);
     try {
-      const res = await fetch("/api/admin/newsletter/edition", {
+      const res = await fetch("/api/admin/newsletter/status", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: edition.id, content: { ...content, status: "approved" } }),
+        body: JSON.stringify({ id: edition.id, status: "approved" }),
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "Failed");
-      router.push("/admin/newsletter");
+      router.push(`/admin/newsletter/${edition.id}/send`);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Approve failed");
       setApproving(false);
