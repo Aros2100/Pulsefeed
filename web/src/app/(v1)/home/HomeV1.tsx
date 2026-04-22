@@ -138,22 +138,25 @@ function NewsletterSection({
       </div>
 
       {/* Previous editions */}
-      {prevEditions.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${prevEditions.length}, 1fr)`, gap: "8px" }}>
-          {prevEditions.map((e) => (
-            <a key={e.id} href="#" style={{
-              background: "#fff", borderRadius: "10px", border: "1px solid #e5e9f0",
-              padding: "13px 18px", display: "flex", alignItems: "center",
-              justifyContent: "space-between", textDecoration: "none",
-            }}>
-              <span style={{ fontSize: "12px", fontWeight: 600, color: "#888" }}>
-                Week {e.week_number}, {e.year}
-              </span>
-              <span style={{ fontSize: "13px", color: "#E83B2A", fontWeight: 700 }}>→</span>
-            </a>
-          ))}
-        </div>
-      )}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+        {prevEditions.length > 0 ? prevEditions.map((e) => (
+          <a key={e.id} href="#" style={{
+            background: "#fff", borderRadius: "10px", border: "1px solid #e5e9f0",
+            padding: "13px 18px", display: "flex", alignItems: "center",
+            justifyContent: "space-between", textDecoration: "none",
+          }}>
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "#888" }}>
+              Week {e.week_number}, {e.year}
+            </span>
+            <span style={{ fontSize: "13px", color: "#E83B2A", fontWeight: 700 }}>→</span>
+          </a>
+        )) : [1, 2, 3].map((i) => (
+          <div key={i} style={{
+            background: "#fff", borderRadius: "10px", border: "1px solid #e5e9f0",
+            padding: "13px 18px", height: "46px",
+          }} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -384,7 +387,7 @@ export default async function HomeV1() {
     .eq("status", "approved")
     .order("year", { ascending: false })
     .order("week_number", { ascending: false })
-    .range(1, 3);
+    .range(1, 4);
 
   const prevEditions = (prevEditionsRaw ?? []) as { id: string; week_number: number; year: number }[];
 
@@ -472,9 +475,6 @@ export default async function HomeV1() {
 
       {/* Newsletter-artikler — smal container */}
       <div style={{ maxWidth: "620px", margin: "0 auto", padding: "0 24px 80px" }}>
-        {!hasContent && (
-          <div style={{ fontSize: "14px", color: "#888", marginTop: "28px" }}>No articles in this edition.</div>
-        )}
 
         {/* General section first */}
         {(content.general?.length ?? 0) > 0 && (
