@@ -465,39 +465,38 @@ export default async function HomeV1() {
         </div>
       </div>
 
-      {/* Newsletter content — narrow reading width */}
+      {/* Newsletter-sektion — bred container */}
+      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "24px 24px 0" }}>
+        <NewsletterSection edition={{ ...edition, content: edition.content as { global_intro?: string } }} prevEditions={prevEditions} />
+      </div>
+
+      {/* Newsletter-artikler — smal container */}
       <div style={{ maxWidth: "620px", margin: "0 auto", padding: "0 24px 80px" }}>
-        <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "24px 28px", marginTop: "24px" }}>
+        {!hasContent && (
+          <div style={{ fontSize: "14px", color: "#888", marginTop: "28px" }}>No articles in this edition.</div>
+        )}
 
-          <NewsletterSection edition={{ ...edition, content: edition.content as { global_intro?: string } }} prevEditions={prevEditions} />
+        {/* General section first */}
+        {(content.general?.length ?? 0) > 0 && (
+          <div style={{ marginBottom: "32px", marginTop: "28px" }}>
+            <SectionHeading>General</SectionHeading>
+            {content.general.map((a) => (
+              <ArticleCard key={a.id} article={a} />
+            ))}
+          </div>
+        )}
 
-          {!hasContent && (
-            <div style={{ fontSize: "14px", color: "#888" }}>No articles in this edition.</div>
-          )}
-
-          {/* General section first */}
-          {(content.general?.length ?? 0) > 0 && (
-            <div style={{ marginBottom: "32px" }}>
-              <SectionHeading>General</SectionHeading>
-              {content.general.map((a) => (
+        {/* Subspecialty sections matching user's selection */}
+        {visibleSubspecialties
+          .filter((s) => s.articles.length > 0)
+          .map((s, i) => (
+            <div key={s.name} style={{ marginBottom: "32px", marginTop: i === 0 && (content.general?.length ?? 0) === 0 ? "28px" : 0 }}>
+              <SectionHeading>{s.name}</SectionHeading>
+              {s.articles.map((a) => (
                 <ArticleCard key={a.id} article={a} />
               ))}
             </div>
-          )}
-
-          {/* Subspecialty sections matching user's selection */}
-          {visibleSubspecialties
-            .filter((s) => s.articles.length > 0)
-            .map((s, i) => (
-              <div key={s.name} style={{ marginBottom: "32px", marginTop: i === 0 && (content.general?.length ?? 0) === 0 ? 0 : 0 }}>
-                <SectionHeading>{s.name}</SectionHeading>
-                {s.articles.map((a) => (
-                  <ArticleCard key={a.id} article={a} />
-                ))}
-              </div>
-            ))}
-
-        </div>
+          ))}
       </div>
     </>
   );
