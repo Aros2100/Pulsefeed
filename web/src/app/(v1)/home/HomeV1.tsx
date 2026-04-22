@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import type { NewsletterArticle, NewsletterContent } from "@/lib/newsletter/send";
-import KPIOverviewV1 from "@/components/KPIOverviewV1";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 
@@ -254,12 +253,9 @@ export default async function HomeV1() {
       <>
         {previewBanner}
         <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 40px" }}>
-          <div style={{ maxWidth: "620px", marginBottom: "24px" }}>
-            <div style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a" }}>
-              Welcome, {firstName}
-            </div>
+          <div style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a" }}>
+            Welcome, {firstName}
           </div>
-          <KPIOverviewV1 userSubspecialties={userSubspecialties} shortNameMap={shortNameMap} />
         </div>
       </>
     );
@@ -319,9 +315,9 @@ export default async function HomeV1() {
     <>
       {previewBanner}
 
-      {/* Header + KPI widget — wider container */}
-      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 0" }}>
-        <div style={{ maxWidth: "620px", marginBottom: "24px" }}>
+      {/* Header + widget — two-column layout */}
+      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 0", display: "flex", alignItems: "flex-start", gap: "32px" }}>
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
           <div style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a" }}>
             Welcome back, {firstName}
           </div>
@@ -329,10 +325,7 @@ export default async function HomeV1() {
             Week {edition.week_number}, {edition.year}
           </div>
         </div>
-
-        <KPIOverviewV1 userSubspecialties={userSubspecialties} shortNameMap={shortNameMap} />
-
-        <div style={{ marginTop: "24px" }}>
+        <div style={{ flex: "0 0 420px" }}>
           <TopArticlesWidget articles={globalArticles} />
         </div>
       </div>
