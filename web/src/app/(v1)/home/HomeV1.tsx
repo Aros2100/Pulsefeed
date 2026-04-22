@@ -221,7 +221,7 @@ export default async function HomeV1() {
   const startOfWeekIso = monday.toISOString().slice(0, 10);
   const todayIso = now.toISOString().slice(0, 10);
 
-  const [{ data: profile }, { data: editionRaw }, { data: subsRows }, { count: weeklyCount }] = await Promise.all([
+  const [{ data: profile }, { data: editionRaw }, { data: subsRows }, { data: weeklyCount }] = await Promise.all([
     supabase
       .from("users")
       .select("name, subspecialties")
@@ -242,12 +242,11 @@ export default async function HomeV1() {
       .select("name, short_name")
       .eq("specialty", ACTIVE_SPECIALTY)
       .eq("active", true),
-    supabase
-      .from("articles")
-      .select("id", { count: "exact", head: true })
-      .eq("specialty_match" as never, true)
-      .gte("pubmed_indexed_at", startOfWeekIso)
-      .lte("pubmed_indexed_at", todayIso),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any).rpc("count_articles_this_week", {
+      week_start: startOfWeekIso,
+      week_end: todayIso,
+    }),
   ]);
   const edition = editionRaw as { id: string; week_number: number; year: number; content: NewsletterContent } | null;
 
@@ -355,20 +354,20 @@ export default async function HomeV1() {
           </div>
 
           {/* Subspecialty-sektion */}
-          {userSubspecialties.length > 0 && (
+          {userSubspecialties.filter(s => s.toLowerCase() !== "neurosurgery").length > 0 && (
             <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "24px 28px", marginTop: "16px" }}>
               <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888", marginBottom: "12px" }}>
                 Your subspecialties
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
-                {userSubspecialties.slice(0, 3).map((s) => (
+                {userSubspecialties.filter(s => s.toLowerCase() !== "neurosurgery").slice(0, 3).map((s) => (
                   <span key={s} style={{ fontSize: "12px", fontWeight: 600, color: "#1a1a1a", background: "#f3f4f6", borderRadius: "6px", padding: "4px 10px" }}>
                     {shortNameMap[s] ?? s}
                   </span>
                 ))}
-                {userSubspecialties.length > 3 && (
+                {userSubspecialties.filter(s => s.toLowerCase() !== "neurosurgery").length > 3 && (
                   <span style={{ fontSize: "12px", color: "#888", padding: "4px 0" }}>
-                    and {userSubspecialties.length - 3} more
+                    and {userSubspecialties.filter(s => s.toLowerCase() !== "neurosurgery").length - 3} more
                   </span>
                 )}
               </div>
