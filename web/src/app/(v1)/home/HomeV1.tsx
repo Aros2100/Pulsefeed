@@ -330,14 +330,19 @@ export default async function HomeV1() {
 
       {/* Header + widget — two-column layout */}
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 0", display: "flex", alignItems: "flex-start", gap: "32px" }}>
-        <div style={{ flex: "1 1 0", minWidth: 0, background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "24px 28px" }}>
-          <div style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a" }}>
-            Welcome back, {firstName}
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+          {/* Header — ingen baggrund */}
+          <div style={{ marginBottom: "20px" }}>
+            <div style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a" }}>
+              Welcome back, {firstName}
+            </div>
+            <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>
+              Week {edition.week_number}, {edition.year}
+            </div>
           </div>
-          <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>
-            Week {edition.week_number}, {edition.year}
-          </div>
-          <div style={{ marginTop: "28px" }}>
+
+          {/* KPI-boks */}
+          <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "24px 28px" }}>
             <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888", marginBottom: "6px" }}>
               New this week
             </div>
