@@ -110,7 +110,6 @@ function NewsletterSection({
         padding: "20px 24px", marginBottom: "8px",
         display: "flex", alignItems: "center", gap: "0",
       }}>
-        {/* Left: 2/3 */}
         <div style={{ flex: "2 1 0", minWidth: 0, paddingRight: "24px" }}>
           <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#E83B2A", marginBottom: "6px" }}>
             Week {edition.week_number}, {edition.year}
@@ -119,11 +118,7 @@ function NewsletterSection({
             {edition.content.global_intro ?? ""}
           </div>
         </div>
-
-        {/* Divider */}
         <div style={{ width: "1px", alignSelf: "stretch", background: "#e5e9f0", flexShrink: 0 }} />
-
-        {/* Right: 1/3 — button centered */}
         <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <a href="#" style={{
             fontSize: "12px", fontWeight: 600, color: "#E83B2A",
