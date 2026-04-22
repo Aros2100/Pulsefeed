@@ -92,6 +92,103 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
   );
 }
 
+type GlobalArticleRow = {
+  sort_order: number;
+  subspecialty: string | null;
+  articles: {
+    id: string;
+    title: string;
+    pubmed_id: string | null;
+    pubmed_indexed_at: string | null;
+    article_type: string | null;
+    journal_abbr: string | null;
+  } | null;
+};
+
+function TopArticlesWidget({ articles }: { articles: GlobalArticleRow[] }) {
+  const sorted = [...articles]
+    .filter(r => r.articles)
+    .sort((a, b) => {
+      const da = a.articles?.pubmed_indexed_at ?? "";
+      const db = b.articles?.pubmed_indexed_at ?? "";
+      return db.localeCompare(da);
+    });
+
+  if (sorted.length === 0) return null;
+
+  return (
+    <div style={{
+      width: "50%",
+      minWidth: "280px",
+      background: "#fff",
+      borderRadius: "12px",
+      border: "1px solid #e5e9f0",
+      padding: "20px",
+      boxSizing: "border-box",
+    }}>
+      <div style={{
+        fontSize: "11px",
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        color: "#E83B2A",
+        borderBottom: "2px solid #E83B2A",
+        paddingBottom: "8px",
+        marginBottom: "14px",
+      }}>
+        This month&apos;s highlights
+      </div>
+      <div style={{
+        maxHeight: "420px",
+        overflowY: "auto",
+        paddingRight: "4px",
+      }}>
+        {sorted.map((row, i) => {
+          const a = row.articles!;
+          const url = a.pubmed_id ? `https://pubmed.ncbi.nlm.nih.gov/${a.pubmed_id}/` : null;
+          return (
+            <div key={a.id} style={{
+              paddingBottom: "12px",
+              marginBottom: "12px",
+              borderBottom: i < sorted.length - 1 ? "1px solid #f0f2f5" : "none",
+            }}>
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "5px" }}>
+                {row.subspecialty && (
+                  <span style={{
+                    fontSize: "10px", fontWeight: 600, color: "#6b7280",
+                    background: "#f3f4f6", borderRadius: "4px", padding: "2px 6px",
+                  }}>
+                    {row.subspecialty}
+                  </span>
+                )}
+                {a.article_type && (
+                  <span style={{
+                    fontSize: "10px", fontWeight: 600, color: "#E83B2A",
+                    background: "#fef2f2", borderRadius: "4px", padding: "2px 6px",
+                  }}>
+                    {a.article_type}
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a", lineHeight: 1.45, marginBottom: "5px" }}>
+                {url ? (
+                  <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "#1a1a1a", textDecoration: "none" }}>
+                    {a.title}
+                  </a>
+                ) : a.title}
+              </div>
+              <div style={{ fontSize: "11px", color: "#aaa" }}>
+                {[a.journal_abbr, a.pubmed_indexed_at ? new Date(a.pubmed_indexed_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : null]
+                  .filter(Boolean).join(" · ")}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default async function HomeV1() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -127,7 +224,7 @@ export default async function HomeV1() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any)
       .from("newsletter_editions")
-      .select("week_number, year, content")
+      .select("id, week_number, year, content")
       .not("published_at", "is", null)
       .order("year", { ascending: false })
       .order("week_number", { ascending: false })
@@ -140,7 +237,7 @@ export default async function HomeV1() {
       .eq("specialty", ACTIVE_SPECIALTY)
       .eq("active", true),
   ]);
-  const edition = editionRaw as { week_number: number; year: number; content: NewsletterContent } | null;
+  const edition = editionRaw as { id: string; week_number: number; year: number; content: NewsletterContent } | null;
 
   const firstName = profile?.name?.split(" ")[0] ?? "there";
   const userSubspecialties: string[] = Array.isArray(profile?.subspecialties)
@@ -166,6 +263,35 @@ export default async function HomeV1() {
         </div>
       </>
     );
+  }
+
+  // Fetch global articles for the current edition (sequential — needs edition.id)
+  let globalArticles: GlobalArticleRow[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: globalRows } = await (supabase as any)
+    .from("newsletter_edition_articles")
+    .select(`
+      sort_order,
+      subspecialty,
+      articles (
+        id,
+        title,
+        pubmed_id,
+        pubmed_indexed_at,
+        article_type,
+        journal_abbr
+      )
+    `)
+    .eq("edition_id", edition.id)
+    .eq("is_global", true)
+    .order("sort_order", { ascending: true });
+
+  if (globalRows) {
+    globalArticles = (globalRows as GlobalArticleRow[]).sort((a, b) => {
+      const da = a.articles?.pubmed_indexed_at ?? "";
+      const db = b.articles?.pubmed_indexed_at ?? "";
+      return db.localeCompare(da);
+    });
   }
 
   // Case B — edition exists
@@ -198,6 +324,10 @@ export default async function HomeV1() {
         </div>
 
         <KPIOverviewV1 userSubspecialties={userSubspecialties} shortNameMap={shortNameMap} />
+
+        <div style={{ marginTop: "24px" }}>
+          <TopArticlesWidget articles={globalArticles} />
+        </div>
       </div>
 
       {/* Newsletter content — narrow reading width */}
