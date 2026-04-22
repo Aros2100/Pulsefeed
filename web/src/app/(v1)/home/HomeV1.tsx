@@ -91,6 +91,73 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
   );
 }
 
+function NewsletterSection({
+  edition,
+  prevEditions,
+}: {
+  edition: { week_number: number; year: number; content: { global_intro?: string } };
+  prevEditions: { id: string; week_number: number; year: number }[];
+}) {
+  return (
+    <div style={{ marginTop: "24px" }}>
+      <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888", marginBottom: "12px" }}>
+        Newsletter
+      </div>
+
+      {/* Hero */}
+      <div style={{
+        background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0",
+        padding: "20px 24px", marginBottom: "8px",
+        display: "flex", alignItems: "center", gap: "0",
+      }}>
+        {/* Left: 2/3 */}
+        <div style={{ flex: "2 1 0", minWidth: 0, paddingRight: "24px" }}>
+          <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#E83B2A", marginBottom: "6px" }}>
+            Week {edition.week_number}, {edition.year}
+          </div>
+          <div style={{ fontSize: "13px", color: "#444", lineHeight: 1.65,
+            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+          }}>
+            {edition.content.global_intro ?? ""}
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div style={{ width: "1px", alignSelf: "stretch", background: "#e5e9f0", flexShrink: 0 }} />
+
+        {/* Right: 1/3 — button centered */}
+        <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <a href="#" style={{
+            fontSize: "12px", fontWeight: 600, color: "#E83B2A",
+            border: "1.5px solid #E83B2A", borderRadius: "6px",
+            padding: "6px 16px", textDecoration: "none", whiteSpace: "nowrap",
+          }}>
+            Open →
+          </a>
+        </div>
+      </div>
+
+      {/* Previous editions */}
+      {prevEditions.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${prevEditions.length}, 1fr)`, gap: "8px" }}>
+          {prevEditions.map((e) => (
+            <a key={e.id} href="#" style={{
+              background: "#fff", borderRadius: "10px", border: "1px solid #e5e9f0",
+              padding: "13px 18px", display: "flex", alignItems: "center",
+              justifyContent: "space-between", textDecoration: "none",
+            }}>
+              <span style={{ fontSize: "12px", fontWeight: 600, color: "#888" }}>
+                Week {e.week_number}, {e.year}
+              </span>
+              <span style={{ fontSize: "13px", color: "#E83B2A", fontWeight: 700 }}>→</span>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 type GlobalArticleRow = {
   sort_order: number;
   subspecialty: string | null;
@@ -309,6 +376,18 @@ export default async function HomeV1() {
     }
   }
 
+  // Hent 3 tidligere approved editions
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: prevEditionsRaw } = await (supabase as any)
+    .from("newsletter_editions")
+    .select("id, week_number, year")
+    .eq("status", "approved")
+    .order("year", { ascending: false })
+    .order("week_number", { ascending: false })
+    .range(1, 3);
+
+  const prevEditions = (prevEditionsRaw ?? []) as { id: string; week_number: number; year: number }[];
+
   // Case B — edition exists
   const content = edition.content as NewsletterContent;
 
@@ -389,6 +468,8 @@ export default async function HomeV1() {
       {/* Newsletter content — narrow reading width */}
       <div style={{ maxWidth: "620px", margin: "0 auto", padding: "0 24px 80px" }}>
         <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "24px 28px", marginTop: "24px" }}>
+
+          <NewsletterSection edition={{ ...edition, content: edition.content as { global_intro?: string } }} prevEditions={prevEditions} />
 
           {!hasContent && (
             <div style={{ fontSize: "14px", color: "#888" }}>No articles in this edition.</div>
