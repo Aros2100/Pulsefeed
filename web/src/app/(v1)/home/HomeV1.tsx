@@ -225,7 +225,7 @@ export default async function HomeV1() {
     (supabase as any)
       .from("newsletter_editions")
       .select("id, week_number, year, content")
-      .not("published_at", "is", null)
+      .eq("status", "approved")
       .order("year", { ascending: false })
       .order("week_number", { ascending: false })
       .limit(1)
