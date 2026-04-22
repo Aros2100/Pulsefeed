@@ -353,6 +353,34 @@ export default async function HomeV1() {
               neurosurgery articles on PubMed
             </div>
           </div>
+
+          {/* Subspecialty-sektion */}
+          {userSubspecialties.length > 0 && (
+            <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "24px 28px", marginTop: "16px" }}>
+              <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888", marginBottom: "12px" }}>
+                Your subspecialties
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
+                {userSubspecialties.slice(0, 3).map((s) => (
+                  <span key={s} style={{ fontSize: "12px", fontWeight: 600, color: "#1a1a1a", background: "#f3f4f6", borderRadius: "6px", padding: "4px 10px" }}>
+                    {shortNameMap[s] ?? s}
+                  </span>
+                ))}
+                {userSubspecialties.length > 3 && (
+                  <span style={{ fontSize: "12px", color: "#888", padding: "4px 0" }}>
+                    and {userSubspecialties.length - 3} more
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: "12px", color: "#888" }}>
+                You can always{" "}
+                <a href="/profile" style={{ color: "#E83B2A", fontWeight: 600, textDecoration: "none" }}>
+                  change your preferences
+                </a>
+                .
+              </div>
+            </div>
+          )}
         </div>
         <div style={{ flex: "0 0 420px" }}>
           <TopArticlesWidget articles={globalArticles} />
