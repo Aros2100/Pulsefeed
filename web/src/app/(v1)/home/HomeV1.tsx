@@ -115,9 +115,7 @@ function NewsletterSection({
           <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#E83B2A", marginBottom: "6px" }}>
             Week {edition.week_number}, {edition.year}
           </div>
-          <div style={{ fontSize: "13px", color: "#444", lineHeight: 1.65,
-            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
-          }}>
+          <div style={{ fontSize: "13px", color: "#444", lineHeight: 1.65 }}>
             {edition.content.global_intro ?? ""}
           </div>
         </div>
