@@ -23,7 +23,7 @@ function weekSaturday(week: number, year: number): string {
   monday.setUTCDate(jan4.getUTCDate() - (jan4Day - 1) + (week - 1) * 7);
   const saturday = new Date(monday);
   saturday.setUTCDate(monday.getUTCDate() + 5);
-  return saturday.toLocaleDateString("da-DK", {
+  return saturday.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -45,10 +45,10 @@ function getProgress(edition: Edition): { activeStep: Step | null; allDone: bool
 }
 
 const STEPS: { key: Step; label: string }[] = [
-  { key: "selection", label: "Selection" },
-  { key: "review", label: "Review" },
+  { key: "selection",  label: "Selection" },
+  { key: "review",     label: "Review" },
   { key: "intro-texts", label: "Intro texts" },
-  { key: "preview", label: "Preview" },
+  { key: "preview",    label: "Preview" },
 ];
 
 const STEP_ORDER: Step[] = ["selection", "review", "intro-texts", "preview"];
@@ -81,57 +81,25 @@ function ProgressTracker({ edition }: { edition: Edition }) {
   const activeIdx = activeStep ? STEP_ORDER.indexOf(activeStep) : STEP_ORDER.length;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+    <div style={{ display: "flex", gap: 4 }}>
       {STEPS.map((step, i) => {
         const done = allDone || i < activeIdx;
         const active = !allDone && step.key === activeStep;
-        const pending = !done && !active;
 
-        let circleStyle: React.CSSProperties = {
-          width: 22,
-          height: 22,
-          borderRadius: "50%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: "11px",
-          fontWeight: 700,
-          flexShrink: 0,
-          border: "2px solid",
-        };
-        if (done) {
-          circleStyle = { ...circleStyle, background: "#15803d", borderColor: "#15803d", color: "#fff" };
-        } else if (active) {
-          circleStyle = { ...circleStyle, background: "#1a1a1a", borderColor: "#1a1a1a", color: "#fff" };
-        } else {
-          circleStyle = { ...circleStyle, background: "#fff", borderColor: "#d1d5db", color: "#9ca3af" };
-        }
+        const barColor = done ? "#1a1a1a" : active ? "#E83B2A" : "#e5e7eb";
+        const labelColor = done ? "#1a1a1a" : active ? "#E83B2A" : "#9ca3af";
 
         return (
-          <div key={step.key} style={{ display: "flex", alignItems: "center" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-              <div style={circleStyle}>
-                {done ? "✓" : i + 1}
-              </div>
-              <span style={{
-                fontSize: "11px",
-                fontWeight: active ? 700 : 500,
-                color: done ? "#15803d" : active ? "#1a1a1a" : "#9ca3af",
-                whiteSpace: "nowrap",
-              }}>
-                {step.label}
-              </span>
-            </div>
-            {i < STEPS.length - 1 && (
-              <div style={{
-                width: 48,
-                height: 2,
-                background: done ? "#15803d" : "#e5e7eb",
-                marginBottom: 18,
-                marginLeft: 4,
-                marginRight: 4,
-              }} />
-            )}
+          <div key={step.key} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ height: 3, borderRadius: 2, background: barColor }} />
+            <span style={{
+              fontSize: "11px",
+              fontWeight: active || done ? 600 : 400,
+              color: labelColor,
+              whiteSpace: "nowrap",
+            }}>
+              {step.label}
+            </span>
           </div>
         );
       })}
@@ -144,6 +112,9 @@ function CurrentEditionCard({ edition }: { edition: Edition }) {
   const continueHref = activeStep
     ? `/admin/newsletter/${edition.id}/${activeStep}`
     : `/admin/newsletter/${edition.id}/preview`;
+  const continueLabel = activeStep
+    ? STEPS.find((s) => s.key === activeStep)!.label + " →"
+    : "Preview →";
 
   return (
     <div style={{
@@ -159,7 +130,7 @@ function CurrentEditionCard({ edition }: { edition: Edition }) {
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
           <div>
             <div style={{ fontSize: "20px", fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>
-              Uge {edition.week_number}, {edition.year}
+              Week {edition.week_number} · {edition.year}
             </div>
             <div style={{ fontSize: "13px", color: "#6b7280" }}>
               {weekSaturday(edition.week_number, edition.year)}
@@ -184,7 +155,7 @@ function CurrentEditionCard({ edition }: { edition: Edition }) {
         justifyContent: "space-between",
       }}>
         <span style={{ fontSize: "13px", color: "#6b7280" }}>
-          {edition.article_count} artikel{edition.article_count !== 1 ? "er" : ""} valgt
+          {edition.article_count} article{edition.article_count !== 1 ? "s" : ""} selected
         </span>
         <div style={{ display: "flex", gap: 8 }}>
           <Link
@@ -218,7 +189,7 @@ function CurrentEditionCard({ edition }: { edition: Edition }) {
                 display: "inline-block",
               }}
             >
-              Fortsæt →
+              {continueLabel}
             </Link>
           )}
         </div>
@@ -241,7 +212,7 @@ export default function NewsletterOverviewClient({ editions }: Props) {
         <CurrentEditionCard edition={current} />
       ) : (
         <p style={{ fontSize: "14px", color: "#9ca3af", fontStyle: "italic" }}>
-          Ingen aktuelle udgaver.
+          No editions found.
         </p>
       )}
 
@@ -270,14 +241,14 @@ export default function NewsletterOverviewClient({ editions }: Props) {
               >
                 <div>
                   <div style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a" }}>
-                    Uge {ed.week_number}, {ed.year}
+                    Week {ed.week_number} · {ed.year}
                   </div>
                   <div style={{ fontSize: "12px", color: "#9ca3af", marginTop: 1 }}>
                     {weekSaturday(ed.week_number, ed.year)}
                   </div>
                 </div>
                 <span style={{ fontSize: "13px", color: "#6b7280", whiteSpace: "nowrap" }}>
-                  {ed.article_count} artikel{ed.article_count !== 1 ? "er" : ""}
+                  {ed.article_count} article{ed.article_count !== 1 ? "s" : ""}
                 </span>
                 <StatusBadge status={ed.status} />
                 <Link
