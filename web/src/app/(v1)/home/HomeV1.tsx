@@ -266,32 +266,39 @@ export default async function HomeV1() {
   }
 
   // Fetch global articles for the current edition (sequential — needs edition.id)
-  let globalArticles: GlobalArticleRow[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: globalRows } = await (supabase as any)
+  const { data: editionArticleRows } = await (supabase as any)
     .from("newsletter_edition_articles")
-    .select(`
-      sort_order,
-      subspecialty,
-      articles (
-        id,
-        title,
-        pubmed_id,
-        pubmed_indexed_at,
-        article_type,
-        journal_abbr
-      )
-    `)
+    .select("sort_order, subspecialty, article_id")
     .eq("edition_id", edition.id)
-    .eq("is_global", true)
-    .order("sort_order", { ascending: true });
+    .eq("is_global", true);
 
-  if (globalRows) {
-    globalArticles = (globalRows as GlobalArticleRow[]).sort((a, b) => {
-      const da = a.articles?.pubmed_indexed_at ?? "";
-      const db = b.articles?.pubmed_indexed_at ?? "";
-      return db.localeCompare(da);
-    });
+  let globalArticles: GlobalArticleRow[] = [];
+  if (editionArticleRows && editionArticleRows.length > 0) {
+    const articleIds = editionArticleRows.map((r: { article_id: string }) => r.article_id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: articleRows } = await (supabase as any)
+      .from("articles")
+      .select("id, title, pubmed_id, pubmed_indexed_at, article_type, journal_abbr")
+      .in("id", articleIds);
+
+    if (articleRows) {
+      const articleMap = Object.fromEntries(
+        (articleRows as GlobalArticleRow["articles"][]).map((a) => [a!.id, a])
+      );
+      globalArticles = (editionArticleRows as { sort_order: number; subspecialty: string | null; article_id: string }[])
+        .map((r) => ({
+          sort_order: r.sort_order,
+          subspecialty: r.subspecialty,
+          articles: articleMap[r.article_id] ?? null,
+        }))
+        .filter((r) => r.articles !== null)
+        .sort((a, b) => {
+          const da = a.articles?.pubmed_indexed_at ?? "";
+          const db = b.articles?.pubmed_indexed_at ?? "";
+          return db.localeCompare(da);
+        });
+    }
   }
 
   // Case B — edition exists
