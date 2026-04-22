@@ -9,6 +9,10 @@ interface Edition {
   status: "draft" | "approved" | "sent";
   content: Record<string, unknown> | null;
   article_count: number;
+  articlesBySubspecialty: Record<string, number>;
+  globalCount: number;
+  subspecialtiesWithArticles: string[];
+  activeSubspecialtyCount: number;
 }
 
 interface Props {
@@ -33,25 +37,61 @@ function weekSaturday(week: number, year: number): string {
 
 type Step = "selection" | "review" | "intro-texts" | "preview";
 
-function getProgress(edition: Edition): { activeStep: Step | null; allDone: boolean } {
+interface StepState {
+  selectionDone: boolean;
+  reviewDone: boolean;
+  introTextsDone: boolean;
+  allDone: boolean;
+  nextStep: Step;
+}
+
+function getStepState(edition: Edition): StepState {
+  const content = edition.content ?? {};
+
+  // Selection done: every active subspecialty has ≥ 5 articles
+  const selectionDone =
+    edition.activeSubspecialtyCount > 0 &&
+    Object.keys(edition.articlesBySubspecialty).length >= edition.activeSubspecialtyCount &&
+    Object.values(edition.articlesBySubspecialty).every((n) => n >= 5);
+
+  // Review done: globalCount === 3
+  const reviewDone = edition.globalCount === 3;
+
+  // Intro texts done: global_intro filled AND all subspecialties with articles have a comment
+  const globalIntro = typeof content.global_intro === "string" && content.global_intro.trim() !== "";
+  const subspecialtyComments = (content.subspecialty_comments ?? {}) as Record<string, string>;
+  const introDone =
+    globalIntro &&
+    edition.subspecialtiesWithArticles.length > 0 &&
+    edition.subspecialtiesWithArticles.every(
+      (s) => typeof subspecialtyComments[s] === "string" && subspecialtyComments[s].trim() !== ""
+    );
+
   if (edition.status === "approved" || edition.status === "sent") {
-    return { activeStep: null, allDone: true };
+    return { selectionDone: true, reviewDone: true, introTextsDone: true, allDone: true, nextStep: "preview" };
   }
-  const hasArticles = edition.article_count > 0;
-  const hasGlobalIntro = !!(edition.content as Record<string, unknown> | null)?.global_intro;
-  if (!hasArticles) return { activeStep: "selection", allDone: false };
-  if (!hasGlobalIntro) return { activeStep: "intro-texts", allDone: false };
-  return { activeStep: "preview", allDone: false };
+
+  let nextStep: Step = "selection";
+  if (selectionDone && reviewDone && introDone) nextStep = "preview";
+  else if (selectionDone && reviewDone) nextStep = "intro-texts";
+  else if (selectionDone) nextStep = "review";
+  else nextStep = "selection";
+
+  return {
+    selectionDone,
+    reviewDone,
+    introTextsDone: introDone,
+    allDone: false,
+    nextStep,
+  };
 }
 
 const STEPS: { key: Step; label: string }[] = [
-  { key: "selection",  label: "Selection" },
-  { key: "review",     label: "Review" },
+  { key: "selection",   label: "Selection" },
+  { key: "review",      label: "Review" },
   { key: "intro-texts", label: "Intro texts" },
-  { key: "preview",    label: "Preview" },
+  { key: "preview",     label: "Preview" },
 ];
-
-const STEP_ORDER: Step[] = ["selection", "review", "intro-texts", "preview"];
 
 function StatusBadge({ status }: { status: Edition["status"] }) {
   const map: Record<Edition["status"], { label: string; bg: string; color: string; border: string }> = {
@@ -77,14 +117,20 @@ function StatusBadge({ status }: { status: Edition["status"] }) {
 }
 
 function ProgressTracker({ edition }: { edition: Edition }) {
-  const { activeStep, allDone } = getProgress(edition);
-  const activeIdx = activeStep ? STEP_ORDER.indexOf(activeStep) : STEP_ORDER.length;
+  const { selectionDone, reviewDone, introTextsDone, allDone, nextStep } = getStepState(edition);
+
+  const stepDone: Record<Step, boolean> = {
+    selection:   selectionDone,
+    review:      reviewDone,
+    "intro-texts": introTextsDone,
+    preview:     allDone,
+  };
 
   return (
     <div style={{ display: "flex", gap: 4 }}>
-      {STEPS.map((step, i) => {
-        const done = allDone || i < activeIdx;
-        const active = !allDone && step.key === activeStep;
+      {STEPS.map((step) => {
+        const done = stepDone[step.key];
+        const active = !allDone && step.key === nextStep;
 
         const barColor = done ? "#1a1a1a" : active ? "#E83B2A" : "#e5e7eb";
         const labelColor = done ? "#1a1a1a" : active ? "#E83B2A" : "#9ca3af";
@@ -108,13 +154,9 @@ function ProgressTracker({ edition }: { edition: Edition }) {
 }
 
 function CurrentEditionCard({ edition }: { edition: Edition }) {
-  const { activeStep, allDone } = getProgress(edition);
-  const continueHref = activeStep
-    ? `/admin/newsletter/${edition.id}/${activeStep}`
-    : `/admin/newsletter/${edition.id}/preview`;
-  const continueLabel = activeStep
-    ? STEPS.find((s) => s.key === activeStep)!.label + " →"
-    : "Preview →";
+  const { allDone, nextStep } = getStepState(edition);
+  const continueHref = `/admin/newsletter/${edition.id}/${nextStep}`;
+  const continueLabel = STEPS.find((s) => s.key === nextStep)!.label + " →";
 
   return (
     <div style={{
