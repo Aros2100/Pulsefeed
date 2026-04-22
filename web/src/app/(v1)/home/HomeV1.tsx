@@ -214,7 +214,14 @@ export default async function HomeV1() {
     </div>
   ) : null;
 
-  const [{ data: profile }, { data: editionRaw }, { data: subsRows }] = await Promise.all([
+  const now = new Date();
+  const daysFromMonday = now.getDay() === 0 ? 6 : now.getDay() - 1;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - daysFromMonday);
+  const startOfWeekIso = monday.toISOString().slice(0, 10);
+  const todayIso = now.toISOString().slice(0, 10);
+
+  const [{ data: profile }, { data: editionRaw }, { data: subsRows }, { count: weeklyCount }] = await Promise.all([
     supabase
       .from("users")
       .select("name, subspecialties")
@@ -235,6 +242,12 @@ export default async function HomeV1() {
       .select("name, short_name")
       .eq("specialty", ACTIVE_SPECIALTY)
       .eq("active", true),
+    supabase
+      .from("articles")
+      .select("id", { count: "exact", head: true })
+      .eq("specialty_match" as never, true)
+      .gte("pubmed_indexed_at", startOfWeekIso)
+      .lte("pubmed_indexed_at", todayIso),
   ]);
   const edition = editionRaw as { id: string; week_number: number; year: number; content: NewsletterContent } | null;
 
@@ -323,6 +336,17 @@ export default async function HomeV1() {
           </div>
           <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>
             Week {edition.week_number}, {edition.year}
+          </div>
+          <div style={{ marginTop: "28px" }}>
+            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888", marginBottom: "6px" }}>
+              New this week
+            </div>
+            <div style={{ fontSize: "42px", fontWeight: 800, color: "#1a1a1a", lineHeight: 1 }}>
+              {weeklyCount ?? 0}
+            </div>
+            <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>
+              neurosurgery articles on PubMed
+            </div>
           </div>
         </div>
         <div style={{ flex: "0 0 420px" }}>
