@@ -121,7 +121,7 @@ export default function NewsletterPreviewClient({ edition, subspecialties, editi
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "Failed");
-      router.push(`/admin/newsletter/${edition.id}`);
+      router.push("/admin/newsletter");
     } catch (e) {
       alert(e instanceof Error ? e.message : "Approve failed");
       setApproving(false);
