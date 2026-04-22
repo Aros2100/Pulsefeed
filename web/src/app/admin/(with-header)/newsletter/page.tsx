@@ -2,61 +2,46 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
+import NewsletterOverviewClient from "./NewsletterOverviewClient";
 
-function getISOWeek(d: Date): number {
-  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const day = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-}
-
-export default async function NewsletterIndexPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ week?: string; year?: string }>;
-}) {
+export default async function NewsletterIndexPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
   if (user.app_metadata?.role !== "admin") redirect("/");
 
-  const now = new Date();
-  const { week: weekParam, year: yearParam } = await searchParams;
-  const targetWeek = weekParam ? parseInt(weekParam) : getISOWeek(now);
-  const targetYear = yearParam ? parseInt(yearParam) : now.getFullYear();
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
-  // Look for existing edition for this week
-  const { data: existing } = await admin
+  const { data: editions } = await admin
     .from("newsletter_editions")
-    .select("id")
+    .select("id, week_number, year, status, content")
     .eq("specialty", ACTIVE_SPECIALTY)
-    .eq("week_number", targetWeek)
-    .eq("year", targetYear)
-    .single();
+    .order("year", { ascending: false })
+    .order("week_number", { ascending: false });
 
-  if (existing?.id) {
-    redirect(`/admin/newsletter/${existing.id}`);
+  const editionList = editions ?? [];
+
+  // Fetch article counts for all editions in one query
+  let countMap: Record<string, number> = {};
+  if (editionList.length > 0) {
+    const ids = editionList.map((e: { id: string }) => e.id);
+    const { data: counts } = await admin
+      .from("newsletter_edition_articles")
+      .select("edition_id")
+      .in("edition_id", ids);
+
+    if (counts) {
+      for (const row of counts as { edition_id: string }[]) {
+        countMap[row.edition_id] = (countMap[row.edition_id] ?? 0) + 1;
+      }
+    }
   }
 
-  // None found — create one and redirect
-  const { data: created, error } = await admin
-    .from("newsletter_editions")
-    .insert({
-      week_number: targetWeek,
-      year: targetYear,
-      specialty: ACTIVE_SPECIALTY,
-      status: "draft",
-      content: {},
-      created_by: user.id,
-    })
-    .select("id")
-    .single();
+  const enriched = editionList.map((e: { id: string; week_number: number; year: number; status: string; content: Record<string, unknown> | null }) => ({
+    ...e,
+    article_count: countMap[e.id] ?? 0,
+  }));
 
-  if (error || !created?.id) throw new Error(error?.message ?? "Failed to create edition");
-
-  redirect(`/admin/newsletter/${created.id}`);
+  return <NewsletterOverviewClient editions={enriched} />;
 }
