@@ -60,7 +60,7 @@ export default async function ArticlesPage({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let articlesQuery = (supabase as any)
     .from("articles")
-    .select("id, title, journal_abbr, published_date, indexed_date, authors, publication_types, news_value, clinical_relevance, enriched_at, imported_at", { count: "exact" })
+    .select("id, title, journal_abbr, published_date, indexed_date, authors, publication_types, enriched_at, imported_at", { count: "exact" })
     .eq("status", "approved")
     .order("indexed_date", { ascending: false })
     .range(from, to);

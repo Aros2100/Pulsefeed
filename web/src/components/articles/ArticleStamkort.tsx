@@ -30,12 +30,9 @@ export interface ArticleData {
   impact_factor:    number | null;
   journal_h_index:  number | null;
   citation_count:   number | null;
-  evidence_score:   number | null;
   enriched_at: string | null;
   ai_decision: string | null;
   short_resume: string | null;
-  news_value: number | null;
-  clinical_relevance: string | null;
   // Classification (AI-scored)
   subspecialty_ai: string | null;
   subspecialty_reason: string | null;

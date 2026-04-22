@@ -67,12 +67,11 @@ interface ArticleRow {
   circle: number | null;
   specialty_tags: string[];
   abstract: string | null;
-  evidence_score: number | null;
   article_type: string | null;
   subspecialty: string[] | null;
 }
 
-type SortField = "title" | "journal_abbr" | "pubmed_indexed_at" | "imported_at" | "circle" | "evidence_score";
+type SortField = "title" | "journal_abbr" | "pubmed_indexed_at" | "imported_at" | "circle";
 
 interface Filters {
   search: string;
@@ -158,7 +157,7 @@ function SelectFilter({ value, onChange, options, placeholder, disabled }: {
   );
 }
 
-const SORT_FIELDS = ["title", "journal_abbr", "pubmed_indexed_at", "imported_at", "circle", "evidence_score"] as const;
+const SORT_FIELDS = ["title", "journal_abbr", "pubmed_indexed_at", "imported_at", "circle"] as const;
 
 function filtersFromParams(sp: URLSearchParams): Filters {
   const sortBy = sp.get("sort_by") ?? "imported_at";

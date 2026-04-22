@@ -10,8 +10,6 @@ interface Article {
   published_date: string | null;
   authors: unknown;
   publication_types: string[] | null;
-  news_value: number | null;
-  clinical_relevance: string | null;
   enriched_at: string | null;
   imported_at: string;
   specialty_tags: string[] | null;
@@ -22,12 +20,6 @@ interface Props {
   specialtyTags: string[];
   initialQuery: string;
   initialSpecialties: string[];
-}
-
-function stars(value: number | null): string {
-  if (!value) return "";
-  const v = Math.round(Math.max(1, Math.min(5, value)));
-  return "★".repeat(v) + "☆".repeat(5 - v);
 }
 
 function formatDate(dateStr: string | null): string {
@@ -46,14 +38,6 @@ function firstAuthor(authors: unknown): string {
   const a = authors[0] as { foreName?: string; lastName?: string };
   const name = [a.foreName, a.lastName].filter(Boolean).join(" ");
   return authors.length > 1 ? `${name} et al.` : name;
-}
-
-function relevanceInfo(cr: string | null): { label: string; bg: string; color: string } | null {
-  if (!cr) return null;
-  const lower = cr.toLowerCase();
-  if (lower.includes("practice")) return { label: "Practice changing", bg: "#fff3e0", color: "#e65100" };
-  if (lower.includes("clinical")) return { label: "Clinically relevant", bg: "#e8f4e8", color: "#2d7a2d" };
-  return { label: "Research only", bg: "#f0f0f0", color: "#666" };
 }
 
 function specialtyLabel(slug: string): string {
@@ -248,7 +232,6 @@ export default function SearchClient({ articles, specialtyTags, initialQuery, in
             </div>
           ) : (
             filtered.map((article, i) => {
-              const rel = relevanceInfo(article.clinical_relevance);
               const isHovered = hoveredId === article.id;
               const author = firstAuthor(article.authors);
               const date = formatDate(article.published_date);
@@ -308,20 +291,6 @@ export default function SearchClient({ articles, specialtyTags, initialQuery, in
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px", minWidth: "90px", paddingTop: "2px" }}>
-                    {article.news_value && (
-                      <div style={{ fontSize: "13px", color: "#f4a100", letterSpacing: "1px" }}>
-                        {stars(article.news_value)}
-                      </div>
-                    )}
-                    {rel && (
-                      <div style={{
-                        fontSize: "11px", padding: "2px 8px", borderRadius: "10px",
-                        fontWeight: 600, whiteSpace: "nowrap",
-                        background: rel.bg, color: rel.color,
-                      }}>
-                        {rel.label}
-                      </div>
-                    )}
                   </div>
                 </div>
               );

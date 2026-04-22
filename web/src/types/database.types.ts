@@ -20,7 +20,6 @@ export type Database = {
           article_number: string | null
           authors: Json
           circle: number | null
-          clinical_relevance: string | null
           coi_statement: string | null
           date_completed: string | null
           doi: string | null
@@ -37,7 +36,6 @@ export type Database = {
           language: string | null
           long_resume: string | null
           mesh_terms: Json
-          news_value: number | null
           pico: Json | null
           pmc_id: string | null
           publication_types: string[] | null
@@ -65,7 +63,6 @@ export type Database = {
           article_number?: string | null
           authors?: Json
           circle?: number | null
-          clinical_relevance?: string | null
           coi_statement?: string | null
           date_completed?: string | null
           doi?: string | null
@@ -82,7 +79,6 @@ export type Database = {
           language?: string | null
           long_resume?: string | null
           mesh_terms?: Json
-          news_value?: number | null
           pico?: Json | null
           pmc_id?: string | null
           publication_types?: string[] | null
@@ -110,7 +106,6 @@ export type Database = {
           article_number?: string | null
           authors?: Json
           circle?: number | null
-          clinical_relevance?: string | null
           coi_statement?: string | null
           date_completed?: string | null
           doi?: string | null
@@ -127,7 +122,6 @@ export type Database = {
           language?: string | null
           long_resume?: string | null
           mesh_terms?: Json
-          news_value?: number | null
           pico?: Json | null
           pmc_id?: string | null
           publication_types?: string[] | null
@@ -289,12 +283,10 @@ export type Database = {
           article_id: string | null
           article_rank: number | null
           article_type: string | null
-          clinical_relevance: string | null
           decided_at: string | null
           decision: string | null
           id: string
           impact_factor: number | null
-          news_value: number | null
           week_number: number
           year: number
         }
@@ -302,12 +294,10 @@ export type Database = {
           article_id?: string | null
           article_rank?: number | null
           article_type?: string | null
-          clinical_relevance?: string | null
           decided_at?: string | null
           decision?: string | null
           id?: string
           impact_factor?: number | null
-          news_value?: number | null
           week_number: number
           year: number
         }
@@ -315,12 +305,10 @@ export type Database = {
           article_id?: string | null
           article_rank?: number | null
           article_type?: string | null
-          clinical_relevance?: string | null
           decided_at?: string | null
           decision?: string | null
           id?: string
           impact_factor?: number | null
-          news_value?: number | null
           week_number?: number
           year?: number
         }

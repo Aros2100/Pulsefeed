@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from("articles")
-    .select("id, title, journal_abbr, published_date, authors, publication_types, news_value, clinical_relevance, enriched_at, imported_at", { count: "exact" })
+    .select("id, title, journal_abbr, published_date, authors, publication_types, enriched_at, imported_at", { count: "exact" })
     .in("id", approvedArticleIds.length > 0 ? approvedArticleIds : ["00000000-0000-0000-0000-000000000000"])
     .order("imported_at", { ascending: false })
     .range(from, to);

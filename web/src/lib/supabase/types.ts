@@ -240,14 +240,12 @@ export type Database = {
           subspecialty_model_version: string | null
           subspecialty_reason: string | null
           subspecialty_scored_at: string | null
-          clinical_relevance: string | null
           coi_statement: string | null
           condensed_at: string | null
           condensed_model_version: string | null
           date_completed: string | null
           doi: string | null
           enriched_at: string | null
-          evidence_score: number | null
           full_text_available: boolean | null
           fwci: number | null
           geo_city: string | null
@@ -281,7 +279,6 @@ export type Database = {
           mesh_terms: Json
           mesh_terms_text: string | null
           model_version: string | null
-          news_value: number | null
           openalex_work_id: string | null
           patient_population: string | null
           pico: Json | null
@@ -339,14 +336,12 @@ export type Database = {
           subspecialty_model_version?: string | null
           subspecialty_reason?: string | null
           subspecialty_scored_at?: string | null
-          clinical_relevance?: string | null
           coi_statement?: string | null
           condensed_at?: string | null
           condensed_model_version?: string | null
           date_completed?: string | null
           doi?: string | null
           enriched_at?: string | null
-          evidence_score?: number | null
           full_text_available?: boolean | null
           fwci?: number | null
           geo_city?: string | null
@@ -380,7 +375,6 @@ export type Database = {
           mesh_terms?: Json
           mesh_terms_text?: string | null
           model_version?: string | null
-          news_value?: number | null
           openalex_work_id?: string | null
           patient_population?: string | null
           pico?: Json | null
@@ -438,14 +432,12 @@ export type Database = {
           subspecialty_model_version?: string | null
           subspecialty_reason?: string | null
           subspecialty_scored_at?: string | null
-          clinical_relevance?: string | null
           coi_statement?: string | null
           condensed_at?: string | null
           condensed_model_version?: string | null
           date_completed?: string | null
           doi?: string | null
           enriched_at?: string | null
-          evidence_score?: number | null
           full_text_available?: boolean | null
           fwci?: number | null
           geo_city?: string | null
@@ -479,7 +471,6 @@ export type Database = {
           mesh_terms?: Json
           mesh_terms_text?: string | null
           model_version?: string | null
-          news_value?: number | null
           openalex_work_id?: string | null
           patient_population?: string | null
           pico?: Json | null
@@ -1303,12 +1294,10 @@ export type Database = {
           article_id: string | null
           article_rank: number | null
           article_type: string | null
-          clinical_relevance: string | null
           decided_at: string | null
           decision: string | null
           id: string
           impact_factor: number | null
-          news_value: number | null
           week_number: number
           year: number
         }
@@ -1316,12 +1305,10 @@ export type Database = {
           article_id?: string | null
           article_rank?: number | null
           article_type?: string | null
-          clinical_relevance?: string | null
           decided_at?: string | null
           decision?: string | null
           id?: string
           impact_factor?: number | null
-          news_value?: number | null
           week_number: number
           year: number
         }
@@ -1329,12 +1316,10 @@ export type Database = {
           article_id?: string | null
           article_rank?: number | null
           article_type?: string | null
-          clinical_relevance?: string | null
           decided_at?: string | null
           decision?: string | null
           id?: string
           impact_factor?: number | null
-          news_value?: number | null
           week_number?: number
           year?: number
         }

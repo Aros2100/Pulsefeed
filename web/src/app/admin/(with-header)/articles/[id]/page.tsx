@@ -293,8 +293,6 @@ function FeedbackCard({ p }: { p: P }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       <KV label="Uge / År"          value={p.week != null ? `Uge ${p.week}, ${p.year}` : null} />
       {p.decision ? <KV label="Beslutning" value={<Badge color={p.decision === "selected" ? "green" : "gray"}>{String(p.decision)}</Badge>} /> : null}
-      {p.news_value != null         && <KV label="Nyhedsværdi"    value={`${p.news_value} / 5`} />}
-      {p.clinical_relevance != null && <KV label="Klinisk relevans" value={String(p.clinical_relevance)} />}
     </div>
   );
 }
@@ -402,28 +400,6 @@ function EventCard({ eventType, payload }: { eventType: string; payload: P }) {
 
 // ── Berigelse helpers ─────────────────────────────────────────────────────────
 
-function EvidenceScore({ value }: { value: number }) {
-  const pct   = Math.min(100, Math.max(0, value));
-  const color = pct >= 70 ? "#15803d" : pct >= 40 ? "#d97706" : "#E83B2A";
-  const bg    = pct >= 70 ? "#f0fdf4" : pct >= 40 ? "#fffbeb" : "#fef2f2";
-  const label = pct >= 70 ? "Strong" : pct >= 40 ? "Moderate" : "Limited";
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: "16px", background: bg, borderRadius: "8px", padding: "12px 16px", border: `1px solid ${color}22` }}>
-      <div style={{ textAlign: "center", minWidth: "56px" }}>
-        <div style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1, color }}>{pct}</div>
-        <div style={{ fontSize: "10px", color: "#888", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: "2px" }}>/ 100</div>
-      </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" }}>
-          <span style={{ fontSize: "12px", fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label} evidence</span>
-        </div>
-        <div style={{ height: "6px", borderRadius: "3px", background: "#e5e7eb", overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: "3px" }} />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function ifBadge(value: number): React.ReactNode {
   const isGold   = value >= 5;
@@ -438,12 +414,6 @@ function ifBadge(value: number): React.ReactNode {
       <span>{value.toFixed(3)}</span>
     </span>
   );
-}
-
-function stars(value: number | null): React.ReactNode {
-  if (!value) return null;
-  const v = Math.round(Math.max(1, Math.min(5, value)));
-  return <><span>{"★".repeat(v)}</span><span style={{ color: "#ddd" }}>{"★".repeat(5 - v)}</span></>;
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -988,6 +958,68 @@ export default async function AdminArticleLogPage({
           />
         </CardBody>
       </Card>
+
+      {/* Article metadata */}
+      {(() => {
+        const POPULATION_COLORS: Record<string, { bg: string; color: string; border: string }> = {
+          adult:         { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
+          pediatric:     { bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
+          neonatal:      { bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" },
+          mixed:         { bg: "#faf5ff", color: "#7c3aed", border: "#ddd6fe" },
+          not_specified: { bg: "#f9fafb", color: "#374151", border: "#d1d5db" },
+        };
+        const popStyle   = a.patient_population
+          ? POPULATION_COLORS[a.patient_population.toLowerCase()] ?? { bg: "#f1f5f9", color: "#475569", border: "#e2e8f0" }
+          : null;
+        const trialUrl       = a.trial_registration ? `https://clinicaltrials.gov/study/${a.trial_registration}` : null;
+        const pmcFullTextUrl = a.pmc_id ? `https://www.ncbi.nlm.nih.gov/pmc/articles/${a.pmc_id}/` : null;
+        return (
+          <Card>
+            <CardHeader label="Article metadata" />
+            <CardBody>
+              <DescriptionRow
+                label="Patient population"
+                value={a.patient_population && popStyle ? (
+                  <span style={{ fontSize: "12px", fontWeight: 600, borderRadius: "4px", padding: "2px 8px", background: popStyle.bg, color: popStyle.color, border: `1px solid ${popStyle.border}` }}>
+                    {a.patient_population}
+                  </span>
+                ) : null}
+                description="The primary patient age group studied — Adult, Pediatric, Neonatal, Mixed, or Not specified."
+              />
+              <DescriptionRow
+                label="Time to read"
+                value={a.time_to_read != null ? `${a.time_to_read} min` : null}
+                description="Estimated reading time in minutes."
+              />
+              <DescriptionRow
+                label="Full text"
+                value={a.full_text_available != null ? (
+                  a.full_text_available
+                    ? pmcFullTextUrl
+                      ? <a href={pmcFullTextUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#15803d", fontWeight: 600, textDecoration: "none" }}>Available ↗</a>
+                      : <Badge color="green">Available</Badge>
+                    : <Badge color="gray">Abstract only</Badge>
+                ) : null}
+                description="Whether the full text is freely available via PubMed Central (PMC)."
+              />
+              <DescriptionRow
+                label="Trial registration"
+                value={a.trial_registration && trialUrl ? (
+                  <a href={trialUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
+                    {a.trial_registration} ↗
+                  </a>
+                ) : null}
+                description="Clinical trial registration number. Links to ClinicalTrials.gov."
+              />
+              <DescriptionRow
+                label="Auto-tagged at"
+                value={raw.auto_tagged_at ? fmt(raw.auto_tagged_at as string) : null}
+                description="When this article was last automatically tagged via MeSH-based specialty matching."
+              />
+            </CardBody>
+          </Card>
+        );
+      })()}
     </div>
   );
 
@@ -1026,98 +1058,6 @@ export default async function AdminArticleLogPage({
     </div>
   );
 
-  // ── Scoring tab ──────────────────────────────────────────────────────────────
-
-  const scoringTab = (
-    <div style={{ padding: "4px 0 80px" }}>
-
-      {/* Vurdering */}
-      <Card>
-        <CardHeader label="Scoring" />
-        <CardBody>
-          <DescriptionRow
-            label="Evidence score"
-            value={a.evidence_score != null ? <EvidenceScore value={a.evidence_score} /> : null}
-            description="A composite score (0–100) reflecting the strength of evidence, based on article type, sample size, and study design. Strong ≥70, Moderate ≥40, Limited <40."
-          />
-          <DescriptionRow
-            label="News value"
-            value={a.news_value != null ? (
-              <span style={{ fontSize: "18px", letterSpacing: "2px", color: "#f4a100", lineHeight: 1 }}>{stars(a.news_value)}</span>
-            ) : null}
-            description="Editorial news value score (1–5 stars) assigned by AI. Reflects how timely, surprising, or practice-changing the article is."
-          />
-          <DescriptionRow
-            label="Clinical relevance"
-            value={a.clinical_relevance ? (
-              <span style={{ display: "inline-block", fontSize: "12px", background: a.clinical_relevance.toLowerCase().includes("practice") ? "#fff3e0" : "#e8f4e8", color: a.clinical_relevance.toLowerCase().includes("practice") ? "#e65100" : "#2d7a2d", padding: "4px 12px", borderRadius: "20px", fontWeight: 600 }}>
-                {a.clinical_relevance}
-              </span>
-            ) : null}
-            description="AI-assigned label describing how directly the article is relevant to clinical practice, e.g. 'Practice-changing' or 'Background knowledge'."
-          />
-          {(() => {
-            const POPULATION_COLORS: Record<string, { bg: string; color: string; border: string }> = {
-              adult:         { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
-              pediatric:     { bg: "#f0fdf4", color: "#15803d", border: "#bbf7d0" },
-              neonatal:      { bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" },
-              mixed:         { bg: "#faf5ff", color: "#7c3aed", border: "#ddd6fe" },
-              not_specified: { bg: "#f9fafb", color: "#374151", border: "#d1d5db" },
-            };
-            const popStyle = a.patient_population
-              ? POPULATION_COLORS[a.patient_population.toLowerCase()] ?? { bg: "#f1f5f9", color: "#475569", border: "#e2e8f0" }
-              : null;
-            const trialUrl     = a.trial_registration ? `https://clinicaltrials.gov/study/${a.trial_registration}` : null;
-            const pmcFullTextUrl = a.pmc_id ? `https://www.ncbi.nlm.nih.gov/pmc/articles/${a.pmc_id}/` : null;
-            return (
-              <>
-                <DescriptionRow
-                  label="Patient population"
-                  value={a.patient_population && popStyle ? (
-                    <span style={{ fontSize: "12px", fontWeight: 600, borderRadius: "4px", padding: "2px 8px", background: popStyle.bg, color: popStyle.color, border: `1px solid ${popStyle.border}` }}>
-                      {a.patient_population}
-                    </span>
-                  ) : null}
-                  description="The primary patient age group studied — Adult, Pediatric, Neonatal, Mixed, or Not specified. Assigned by AI."
-                />
-                <DescriptionRow
-                  label="Time to read"
-                  value={a.time_to_read != null ? `${a.time_to_read} min` : null}
-                  description="Estimated reading time in minutes, calculated from abstract and full-text length."
-                />
-                <DescriptionRow
-                  label="Full text"
-                  value={a.full_text_available != null ? (
-                    a.full_text_available
-                      ? pmcFullTextUrl
-                        ? <a href={pmcFullTextUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#15803d", fontWeight: 600, textDecoration: "none" }}>Available ↗</a>
-                        : <Badge color="green">Available</Badge>
-                      : <Badge color="gray">Abstract only</Badge>
-                  ) : null}
-                  description="Whether the full text of the article is freely available via PubMed Central (PMC)."
-                />
-                <DescriptionRow
-                  label="Trial registration"
-                  value={a.trial_registration && trialUrl ? (
-                    <a href={trialUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1a6eb5", textDecoration: "none" }}>
-                      {a.trial_registration} ↗
-                    </a>
-                  ) : null}
-                  description="Clinical trial registration number, e.g. NCT number. Links to ClinicalTrials.gov."
-                />
-                <DescriptionRow
-                  label="Auto tagged at"
-                  value={raw.auto_tagged_at ? fmt(raw.auto_tagged_at as string) : null}
-                  description="Timestamp of when the article was auto-tagged via MeSH-based specialty matching."
-                />
-              </>
-            );
-          })()}
-        </CardBody>
-      </Card>
-    </div>
-  );
-
   // ── Location tab ─────────────────────────────────────────────────────────────
 
   const _firstAuthor = (raw.authors as Array<{ affiliations?: string[]; affiliation?: string | null }>)?.[0];
@@ -1132,7 +1072,9 @@ export default async function AdminArticleLogPage({
           <DescriptionRow
             label="First author affiliation"
             value={firstAuthorRawAffiliation ? (
-              <span style={{ fontFamily: "monospace", fontSize: "12px", wordBreak: "break-word", lineHeight: 1.5 }}>{firstAuthorRawAffiliation}</span>
+              <span style={{ fontFamily: "monospace", fontSize: "12px", wordBreak: "break-word", lineHeight: 1.5 }}>
+                {decodeHtml(firstAuthorRawAffiliation)}
+              </span>
             ) : null}
             description="Raw affiliation text for the first author as received from PubMed. This is the input used by the geo parser."
           />
@@ -1395,19 +1337,13 @@ export default async function AdminArticleLogPage({
     </div>
   );
 
-  // ── Bibliometri tab ─────────────────────────────────────────────────────────
+  // ── Scoring tab ──────────────────────────────────────────────────────────────
 
-  const bibliometricsTab = (
+  const scoringTab = (
     <div style={{ padding: "4px 0 80px" }}>
       <Card>
-        <CardHeader label="Bibliometrics" />
+        <CardHeader label="Scoring" />
         <CardBody>
-          <SectionLabel>Journal metrics</SectionLabel>
-          <DescriptionRow label="Impact Factor"    value={a.impact_factor != null ? ifBadge(a.impact_factor) : null}                      description="Journal Impact Factor — the average number of citations received per article published in the journal over the past two years. Source: OpenAlex." />
-          <DescriptionRow label="IF fetched at"    value={raw.impact_factor_fetched_at ? fmt(raw.impact_factor_fetched_at as string) : null} description="Timestamp of when the impact factor was last fetched from the data source." />
-          <DescriptionRow label="Journal H-index"  value={a.journal_h_index != null ? String(a.journal_h_index) : null}                   description="The journal's h-index — the largest number h such that h articles have each been cited at least h times. Source: OpenAlex." />
-
-          <SectionLabel>Citations</SectionLabel>
           <DescriptionRow
             label="Citation count"
             value={
@@ -1415,10 +1351,38 @@ export default async function AdminArticleLogPage({
                 {a.citation_count ?? "—"}{a.citation_count != null ? " ↗" : ""}
               </a>
             }
-            description="Number of times this specific article has been cited, according to Europe PMC. Updated periodically."
+            description="Number of times this article has been cited, according to Europe PMC."
           />
+          <DescriptionRow
+            label="Impact factor"
+            value={a.impact_factor != null ? ifBadge(a.impact_factor) : null}
+            description="Journal Impact Factor. Source: OpenAlex."
+          />
+          <DescriptionRow
+            label="Journal H-index"
+            value={a.journal_h_index != null ? String(a.journal_h_index) : null}
+            description="The journal's h-index. Source: OpenAlex."
+          />
+          <DescriptionRow
+            label="FWCI"
+            value={raw.fwci != null ? (raw.fwci as number).toFixed(3) : null}
+            description="Field-Weighted Citation Impact — compares citations to world average for same type, age, and field. Score >1 means above average. Source: OpenAlex."
+          />
+        </CardBody>
+      </Card>
+    </div>
+  );
+
+  // ── Bibliometri tab ─────────────────────────────────────────────────────────
+
+  const bibliometricsTab = (
+    <div style={{ padding: "4px 0 80px" }}>
+      <Card>
+        <CardHeader label="Bibliometrics" />
+        <CardBody>
+          <SectionLabel>Timestamps</SectionLabel>
+          <DescriptionRow label="IF fetched at"    value={raw.impact_factor_fetched_at ? fmt(raw.impact_factor_fetched_at as string) : null} description="Timestamp of when the impact factor was last fetched from the data source." />
           <DescriptionRow label="Citations fetched" value={raw.citations_fetched_at ? fmt(raw.citations_fetched_at as string) : null} description="Timestamp of when the citation count was last fetched from Europe PMC." />
-          <DescriptionRow label="FWCI"              value={raw.fwci != null ? (raw.fwci as number).toFixed(3) : null}                description="Field-Weighted Citation Impact — compares this article's citations to the world average for articles of the same type, age, and field. Score >1 means above average. Source: OpenAlex." />
 
           <SectionLabel>OpenAlex</SectionLabel>
           <DescriptionRow

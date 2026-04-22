@@ -18,8 +18,6 @@ export interface NLArticle {
   pubmed_indexed_at: string | null;
   imported_at: string | null;
   authors: unknown;
-  news_value: number | null;
-  clinical_relevance: string | null;
   short_resume: string | null;
   abstract: string | null;
   pubmed_id: string;
@@ -54,12 +52,6 @@ interface Props {
 const GENERAL = "No subspecialty";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function stars(v: number | null): string {
-  if (!v) return "";
-  const n = Math.max(1, Math.min(5, Math.round(v)));
-  return "★".repeat(n) + "☆".repeat(5 - n);
-}
 
 function fmtDate(s: string | null): string {
   if (!s) return "";
@@ -458,9 +450,6 @@ export default function NewsletterSelectionClient({ edition, subspecialties, art
                       {pubType}
                     </span>
                   )}
-                  {article.news_value ? (
-                    <span style={{ fontSize: "11px", color: "#f4a100" }}>{stars(article.news_value)}</span>
-                  ) : null}
                 </div>
               </div>
             );
@@ -501,20 +490,6 @@ export default function NewsletterSelectionClient({ edition, subspecialties, art
                   }}>
                     {activeArticle.short_resume}
                     <div style={{ display: "flex", gap: "24px", marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #c8e6c0", flexWrap: "wrap" }}>
-                      {activeArticle.news_value ? (
-                        <div>
-                          <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "3px" }}>News Value</div>
-                          <div style={{ fontSize: "16px", color: "#f4a100" }}>{stars(activeArticle.news_value)}</div>
-                        </div>
-                      ) : null}
-                      {activeArticle.clinical_relevance && (
-                        <div>
-                          <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "3px" }}>Clinical Relevance</div>
-                          <span style={{ display: "inline-block", fontSize: "12px", background: "#f0f0f0", color: "#555", padding: "2px 8px", borderRadius: "10px", fontWeight: 600 }}>
-                            {activeArticle.clinical_relevance}
-                          </span>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>

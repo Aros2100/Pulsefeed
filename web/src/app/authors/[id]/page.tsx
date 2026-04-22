@@ -73,8 +73,6 @@ interface ArticleRow {
     title: string;
     journal_abbr: string | null;
     published_date: string | null;
-    news_value: number | null;
-    evidence_score: number | null;
   };
 }
 
@@ -109,7 +107,7 @@ export default async function AuthorDetailPage({
       .maybeSingle(),
     supabase
       .from("article_authors")
-      .select("position, articles(id, title, journal_abbr, published_date, news_value, evidence_score)")
+      .select("position, articles(id, title, journal_abbr, published_date)")
       .eq("author_id", id)
       .order("position", { ascending: true })
       .limit(100),
@@ -235,7 +233,6 @@ export default async function AuthorDetailPage({
                       {article.title}
                     </div>
                   </div>
-                  {article.evidence_score != null && <ScoreBadge score={article.evidence_score} />}
                 </Link>
               );
             })

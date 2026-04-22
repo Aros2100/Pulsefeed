@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const ALLOWED_SORT = ["title", "journal_abbr", "pubmed_indexed_at", "imported_at", "circle", "evidence_score"] as const;
+const ALLOWED_SORT = ["title", "journal_abbr", "pubmed_indexed_at", "imported_at", "circle"] as const;
 type SortField = typeof ALLOWED_SORT[number];
 
 export async function GET(request: NextRequest) {
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     query = supabase
       .from("articles")
       .select(
-        `id, title, journal_abbr, pubmed_indexed_at, imported_at, authors, circle, specialty_tags, abstract, evidence_score, article_type, subspecialty,
+        `id, title, journal_abbr, pubmed_indexed_at, imported_at, authors, circle, specialty_tags, abstract, article_type, subspecialty,
          article_specialties!inner(specialty, specialty_match)`,
         { count: "exact" }
       )
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     query = supabase
       .from("articles")
       .select(
-        "id, title, journal_abbr, pubmed_indexed_at, imported_at, authors, circle, specialty_tags, abstract, evidence_score, article_type, subspecialty",
+        "id, title, journal_abbr, pubmed_indexed_at, imported_at, authors, circle, specialty_tags, abstract, article_type, subspecialty",
         { count: "exact" }
       )
       .order(sort_by, { ascending })

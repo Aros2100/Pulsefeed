@@ -35,7 +35,7 @@ export default async function NewsletterSelectPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query = (supabase as any)
     .from("articles")
-    .select("id, title, journal_abbr, published_date, authors, article_type, news_value, clinical_relevance, enriched_at, short_resume, abstract, pico, pubmed_id, volume, issue, imported_at")
+    .select("id, title, journal_abbr, published_date, authors, article_type, enriched_at, short_resume, abstract, pico, pubmed_id, volume, issue, imported_at")
     .eq("status", "approved")
     .gte("imported_at", twoWeeksAgo)
     .order("imported_at", { ascending: false })

@@ -100,10 +100,10 @@ export async function PUT(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await admin.from("articles").update({ subspecialty: subspecialty as any }).eq("id", articleId);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    void logArticleEvent(articleId, "lab_decision", {
-      module:          "subspecialty",
-      editor_verdict:  subspecialty,
-      changed_by:      auth.userId,
+    void logArticleEvent(articleId, "status_changed", {
+      type:       "subspecialty",
+      to:         subspecialty,
+      changed_by: auth.userId,
     });
   }
 
@@ -112,10 +112,10 @@ export async function PUT(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await admin.from("articles").update({ article_type } as any).eq("id", articleId);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    void logArticleEvent(articleId, "lab_decision", {
-      module:       "article_type",
-      article_type,
-      changed_by:   auth.userId,
+    void logArticleEvent(articleId, "status_changed", {
+      type:       "article_type",
+      to:         article_type,
+      changed_by: auth.userId,
     });
   }
 

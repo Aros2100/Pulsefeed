@@ -63,15 +63,6 @@ function AuthorScoreBadge({ score }: { score: number }) {
   );
 }
 
-function EvidenceScoreBadge({ score }: { score: number }) {
-  const bg    = score >= 35 ? "#f0fdf4" : score >= 15 ? "#fffbeb" : "#fef2f2";
-  const color = score >= 35 ? "#15803d" : score >= 15 ? "#d97706" : "#b91c1c";
-  return (
-    <span style={{ fontSize: "11px", fontWeight: 700, borderRadius: "5px", padding: "1px 7px", background: bg, color, flexShrink: 0 }}>
-      {score}
-    </span>
-  );
-}
 
 interface AuthorRow {
   id: string;
@@ -109,8 +100,6 @@ interface ArticleItem {
   title: string;
   journal_abbr: string | null;
   published_date: string | null;
-  news_value: number | null;
-  evidence_score: number | null;
 }
 
 type Tab = "profil" | "openalex" | "log";
@@ -339,7 +328,7 @@ export default function AdminAuthorDetailPage() {
 
       const { data: articleRows } = await supabase
         .from("article_authors")
-        .select("position, articles(id, title, journal_abbr, published_date, news_value, evidence_score)")
+        .select("position, articles(id, title, journal_abbr, published_date)")
         .eq("author_id", id)
         .order("position", { ascending: true })
         .limit(100);
@@ -663,9 +652,6 @@ export default function AdminAuthorDetailPage() {
                       {article.title}
                     </div>
                   </div>
-                  {article.evidence_score != null && (
-                    <EvidenceScoreBadge score={article.evidence_score} />
-                  )}
                 </Link>
               );
             })

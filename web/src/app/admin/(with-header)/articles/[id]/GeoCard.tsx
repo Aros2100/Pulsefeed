@@ -273,7 +273,7 @@ export default function GeoCard(props: GeoCardProps) {
       {/* Sektion 1: Artiklens lokation */}
       <Card>
         <CardHeader
-          label="Geo-lokation"
+          label="Geo Location"
           right={
             <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
               {savedMsg && (

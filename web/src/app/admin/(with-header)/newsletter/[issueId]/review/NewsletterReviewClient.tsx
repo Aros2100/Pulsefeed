@@ -24,7 +24,6 @@ interface ArticleDetail {
   journal_abbr: string | null;
   pubmed_indexed_at: string | null;
   article_type: string | null;
-  news_value: number | null;
   pubmed_id: string;
 }
 
@@ -35,7 +34,6 @@ interface SectionItem {
   journal_abbr: string | null;
   pubmed_indexed_at: string | null;
   article_type: string | null;
-  news_value: number | null;
   is_global: boolean;
 }
 
@@ -72,7 +70,6 @@ function initSections(
       journal_abbr: detail.journal_abbr,
       pubmed_indexed_at: detail.pubmed_indexed_at,
       article_type: detail.article_type,
-      news_value: detail.news_value,
       is_global: ea.is_global,
     });
   }

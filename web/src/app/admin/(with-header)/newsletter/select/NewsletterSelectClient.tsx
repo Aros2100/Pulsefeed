@@ -13,8 +13,6 @@ export interface NLArticle {
   published_date: string | null;
   authors: unknown;
   article_type: string | null;
-  news_value: number | null;
-  clinical_relevance: string | null;
   enriched_at: string | null;
   short_resume: string | null;
   abstract: string | null;
@@ -31,14 +29,7 @@ interface Props {
   weekNumber: number;
 }
 
-type RelevanceFilter = "all" | "practice" | "clinical" | "research";
-type SortBy = "news_value" | "newest";
-
-function stars(value: number | null): string {
-  if (!value) return "";
-  const v = Math.round(Math.max(1, Math.min(5, value)));
-  return "★".repeat(v) + "☆".repeat(5 - v);
-}
+type SortBy = "newest";
 
 function formatShortDate(dateStr: string | null): string {
   if (!dateStr) return "";
@@ -61,35 +52,16 @@ function firstAuthor(authors: unknown): string {
   return authors.length > 1 ? `${name} et al.` : name;
 }
 
-function relevanceInfo(cr: string | null) {
-  if (!cr) return null;
-  const lower = cr.toLowerCase();
-  if (lower.includes("practice")) return { label: "Practice changing", bg: "#fff3e0", color: "#e65100", key: "practice" };
-  if (lower.includes("clinical")) return { label: "Clinically relevant", bg: "#e8f4e8", color: "#2d7a2d", key: "clinical" };
-  return { label: "Research only", bg: "#f0f0f0", color: "#666", key: "research" };
-}
-
 function filterAndSort(
   articles: NLArticle[],
-  filter: RelevanceFilter,
   sort: SortBy,
   articleTypeFilter: string,
 ): NLArticle[] {
   let result = [...articles];
-  if (filter !== "all") {
-    result = result.filter((a) => {
-      const info = relevanceInfo(a.clinical_relevance);
-      return info?.key === filter;
-    });
-  }
   if (articleTypeFilter !== "all") {
     result = result.filter((a) => a.article_type === articleTypeFilter);
   }
-  if (sort === "news_value") {
-    result.sort((a, b) => (b.news_value ?? 0) - (a.news_value ?? 0));
-  } else {
-    result.sort((a, b) => new Date(b.imported_at).getTime() - new Date(a.imported_at).getTime());
-  }
+  result.sort((a, b) => new Date(b.imported_at).getTime() - new Date(a.imported_at).getTime());
   return result;
 }
 
@@ -111,8 +83,6 @@ async function saveFeedback(
       year: new Date().getFullYear(),
       decision,
       article_rank: articleRank,
-      news_value: article.news_value,
-      clinical_relevance: article.clinical_relevance,
       article_type: article.article_type ?? null,
       impact_factor: null,
     });
@@ -126,8 +96,6 @@ async function saveFeedback(
       payload: {
         week:               weekNumber,
         year:               new Date().getFullYear(),
-        news_value:         article.news_value,
-        clinical_relevance: article.clinical_relevance,
         decision,
       },
     });
@@ -137,7 +105,6 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
   const supabase = useMemo(() => createClient(), []);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(articles[0]?.id ?? null);
-  const [filter, setFilter] = useState<RelevanceFilter>("all");
   const [sortBy, setSortBy] = useState<SortBy>("newest");
   const [articleTypeFilter, setArticleTypeFilter] = useState<string>("all");
   const [panelWidth, setPanelWidth] = useState(420);
@@ -149,7 +116,7 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
     return Array.from(types).sort();
   }, [articles]);
 
-  const filteredArticles = filterAndSort(articles, filter, sortBy, articleTypeFilter);
+  const filteredArticles = filterAndSort(articles, sortBy, articleTypeFilter);
   const selectedArticles = articles.filter((a) => selectedIds.has(a.id));
   const remainingArticles = filteredArticles.filter((a) => !selectedIds.has(a.id));
 
@@ -235,14 +202,7 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
       }, [])
     : null;
 
-  const relevanceFilters: { key: RelevanceFilter; label: string }[] = [
-    { key: "all", label: "All" },
-    { key: "practice", label: "Practice changing" },
-    { key: "clinical", label: "Clinically relevant" },
-    { key: "research", label: "Research only" },
-  ];
   const sortFilters: { key: SortBy; label: string }[] = [
-    { key: "news_value", label: "News value ↓" },
     { key: "newest", label: "Newest" },
   ];
 
@@ -307,23 +267,6 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
             background: "#fafbfc", display: "flex", flexDirection: "column",
             gap: "8px", flexShrink: 0,
           }}>
-            <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "11px", color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, minWidth: "60px" }}>
-                Relevance
-              </span>
-              {relevanceFilters.map((f) => (
-                <button key={f.key} onClick={() => setFilter(f.key)} style={{
-                  fontSize: "12px",
-                  background: filter === f.key ? "#1a1a1a" : "#fff",
-                  border: `1px solid ${filter === f.key ? "#1a1a1a" : "#dde3ed"}`,
-                  borderRadius: "20px", padding: "4px 12px",
-                  color: filter === f.key ? "#fff" : "#5a6a85",
-                  cursor: "pointer", whiteSpace: "nowrap",
-                }}>
-                  {f.label}
-                </button>
-              ))}
-            </div>
             <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
               <span style={{ fontSize: "11px", color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600, minWidth: "60px" }}>
                 Sort by
@@ -380,7 +323,6 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
                   Selected · {selectedCount}
                 </div>
                 {selectedArticles.map((article) => {
-                  const rel = relevanceInfo(article.clinical_relevance);
                   return (
                     <div
                       key={article.id}
@@ -407,17 +349,9 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
                               {article.article_type}
                             </span>
                           )}
-                          {rel && (
-                            <span style={{ fontSize: "10px", padding: "2px 7px", borderRadius: "10px", fontWeight: 600, background: rel.bg, color: rel.color }}>
-                              {rel.label}
-                            </span>
-                          )}
                         </div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
-                        {article.news_value && (
-                          <div style={{ fontSize: "11px", color: "#f4a100" }}>{stars(article.news_value)}</div>
-                        )}
                         <div
                           onClick={(e) => { e.stopPropagation(); toggleSelected(article.id); }}
                           style={{
@@ -452,7 +386,6 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
                   Remaining · {remainingArticles.length} more
                 </div>
                 {remainingArticles.map((article) => {
-                  const rel = relevanceInfo(article.clinical_relevance);
                   const isActive = activeId === article.id;
                   return (
                     <div
@@ -481,17 +414,9 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
                               {article.article_type}
                             </span>
                           )}
-                          {rel && (
-                            <span style={{ fontSize: "10px", padding: "2px 7px", borderRadius: "10px", fontWeight: 600, background: rel.bg, color: rel.color }}>
-                              {rel.label}
-                            </span>
-                          )}
                         </div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
-                        {article.news_value && (
-                          <div style={{ fontSize: "11px", color: "#f4a100" }}>{stars(article.news_value)}</div>
-                        )}
                         <div
                           onClick={(e) => { e.stopPropagation(); toggleSelected(article.id); }}
                           style={{
@@ -553,23 +478,6 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
                     fontSize: "14px", lineHeight: 1.7, color: "#1a1a1a",
                   }}>
                     {activeArticle.short_resume}
-                    <div style={{ display: "flex", gap: "24px", marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #c8e6c0" }}>
-                      <div>
-                        <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>News Value</div>
-                        <div style={{ fontSize: "16px", color: "#f4a100" }}>{stars(activeArticle.news_value)}</div>
-                      </div>
-                      {activeArticle.clinical_relevance && (() => {
-                        const rel = relevanceInfo(activeArticle.clinical_relevance);
-                        return rel ? (
-                          <div>
-                            <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Clinical Relevance</div>
-                            <span style={{ display: "inline-block", fontSize: "12px", background: rel.bg, color: rel.color, padding: "3px 10px", borderRadius: "10px", fontWeight: 600 }}>
-                              {rel.label}
-                            </span>
-                          </div>
-                        ) : null;
-                      })()}
-                    </div>
                   </div>
                 </div>
               )}

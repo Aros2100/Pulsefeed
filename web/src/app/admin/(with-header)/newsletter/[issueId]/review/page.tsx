@@ -43,7 +43,7 @@ export default async function NewsletterReviewPage({ params }: { params: Promise
   if (articleIds.length > 0) {
     const { data } = await admin
       .from("articles")
-      .select("id, title, journal_abbr, pubmed_indexed_at, article_type, news_value, pubmed_id")
+      .select("id, title, journal_abbr, pubmed_indexed_at, article_type, pubmed_id")
       .in("id", articleIds);
     articleDetails = data ?? [];
   }

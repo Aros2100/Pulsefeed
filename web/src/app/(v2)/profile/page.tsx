@@ -7,7 +7,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getActiveVersion } from "@/lib/version";
 import ProfileV1 from "@/app/(v1)/profile/ProfileV1";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-import ScoreBadge from "@/components/ScoreBadge";
 import ProfileClient from "./ProfileClient";
 import { getSubspecialties } from "@/lib/lab/classification-options";
 import MergeCheck from "./MergeCheck";
@@ -75,8 +74,6 @@ export default async function ProfilePage() {
     title: string;
     journal_abbr: string | null;
     published_date: string | null;
-    news_value: number | null;
-    evidence_score: number | null;
   };
   type AuthorArticleRow = { position: number; articles: ArticleRow };
 
@@ -101,7 +98,7 @@ export default async function ProfilePage() {
         .single(),
       supabase
         .from("article_authors")
-        .select("position, articles(id, title, journal_abbr, published_date, news_value, evidence_score)")
+        .select("position, articles(id, title, journal_abbr, published_date)")
         .eq("author_id", profile.author_id)
         .limit(20),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -238,7 +235,6 @@ export default async function ProfilePage() {
                         </div>
                       </div>
                       <div style={{ marginLeft: "16px", flexShrink: 0 }}>
-                        {row.articles.evidence_score != null && <ScoreBadge score={row.articles.evidence_score} />}
                       </div>
                     </div>
                   ))}
