@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { getActivePrompt, scoreArticleTypeProd, type ActivePrompt, type ArticleTypeProdResult } from "@/lib/lab/scorer";
 import { logArticleEvent } from "@/lib/article-events";
+import { startScoringRun, finishScoringRun, failScoringRun } from "@/lib/scoring-runs";
 
 const CONCURRENCY  = 1;
 const DELAY_MS     = 1300;
@@ -99,6 +100,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
   }
 
+  const runId = await startScoringRun("article_type_prod", specialty, activePrompt.version);
+
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
@@ -144,8 +147,10 @@ export async function POST(request: NextRequest) {
         );
 
         send({ done: true, scored, failed: failedIds.length, total: toScore.length, approved: 0, rejected: 0 });
+        void finishScoringRun(runId, scored, failedIds.length, toScore.length);
       } catch (e) {
         send({ done: true, error: String(e), scored, failed: failedIds.length, total: toScore.length, approved: 0, rejected: 0 });
+        void failScoringRun(runId, String(e));
       } finally {
         controller.close();
       }

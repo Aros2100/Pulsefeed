@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { getActivePrompt, scoreArticle, type ActivePrompt } from "@/lib/lab/scorer";
 import { logArticleEvent } from "@/lib/article-events";
+import { startScoringRun, finishScoringRun, failScoringRun } from "@/lib/scoring-runs";
 
 const CONCURRENCY  = 1;    // sequential to avoid bursting the 50 req/min limit
 const DELAY_MS     = 1300; // 1300ms between requests ≈ 46 req/min, safely under 50
@@ -91,7 +92,10 @@ export async function POST(request: NextRequest) {
 
   const toScore = (unscoredData ?? []) as Article[];
 
+  const runId = await startScoringRun("specialty", specialty, activePrompt.version);
+
   if (toScore.length === 0) {
+    void finishScoringRun(runId, 0, 0, 0);
     const emptyStream = new ReadableStream({
       start(controller) {
         const encoder = new TextEncoder();
@@ -159,8 +163,10 @@ export async function POST(request: NextRequest) {
         );
 
         send({ done: true, scored, approved, rejected, failed: failedIds.length, total: toScore.length });
+        void finishScoringRun(runId, scored, failedIds.length, toScore.length);
       } catch (e) {
         send({ done: true, error: String(e), scored, approved, rejected, failed: failedIds.length, total: toScore.length });
+        void failScoringRun(runId, String(e));
       } finally {
         controller.close();
       }

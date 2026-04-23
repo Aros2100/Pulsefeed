@@ -32,6 +32,37 @@ const headerLabel: React.CSSProperties = {
 
 type ModelVersion = { specialty: string; module: string; version: string };
 
+type ScoringRun = {
+  id: string;
+  module: string;
+  specialty: string;
+  version: string;
+  started_at: string;
+  finished_at: string | null;
+  scored: number;
+  failed: number;
+  total: number;
+  status: string;
+  error: string | null;
+  triggered_by: string;
+};
+
+function fmtDa(iso: string): string {
+  return new Date(iso).toLocaleString("da-DK", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function fmtDuration(startedAt: string, finishedAt: string | null): string {
+  if (!finishedAt) return "—";
+  const secs = Math.round((new Date(finishedAt).getTime() - new Date(startedAt).getTime()) / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  const rem  = secs % 60;
+  return rem > 0 ? `${mins}m ${rem}s` : `${mins}m`;
+}
+
 const MODULE_CONFIG: Record<string, {
   label: string;
   apiRoute: string;
@@ -74,6 +105,10 @@ export default async function ScoringPage() {
   const rows: ModelVersion[] = allModules ?? [];
 
   // Fetch pending counts in parallel
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: runsRaw } = await (admin as any).rpc("get_scoring_runs", { p_limit: 20 });
+  const scoringRuns: ScoringRun[] = runsRaw ?? [];
+
   const pendingCounts = await Promise.all(
     rows.map(async ({ module: mod }) => {
       if (mod === "specialty") {
@@ -164,6 +199,54 @@ export default async function ScoringPage() {
             </div>
           );
         })}
+
+        {/* Scoring log */}
+        <div style={sectionCard}>
+          <div style={sectionHeader}>
+            <span style={headerLabel}>Scoring log</span>
+            <span style={{ fontSize: "12px", color: "#888" }}>Seneste 20 kørsler</span>
+          </div>
+          {scoringRuns.length === 0 ? (
+            <div style={{ padding: "24px 20px", fontSize: "13px", color: "#888" }}>Ingen kørsler endnu.</div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                <thead>
+                  <tr style={{ background: "#f8fafc", borderBottom: "1px solid #dde3ed" }}>
+                    {["Modul", "Specialty", "Version", "Startet", "Varighed", "Scored / Failed", "Status", "Af"].map((h) => (
+                      <th key={h} style={{ padding: "8px 14px", textAlign: "left", fontWeight: 700, fontSize: "11px", letterSpacing: "0.05em", textTransform: "uppercase", color: "#5a6a85", whiteSpace: "nowrap" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {scoringRuns.map((run, i) => {
+                    const statusColor = run.status === "done" ? "#15803d" : run.status === "error" ? "#b91c1c" : "#d97706";
+                    const statusBg    = run.status === "done" ? "#dcfce7"  : run.status === "error" ? "#fee2e2"  : "#fef9c3";
+                    return (
+                      <tr key={run.id} style={{ borderBottom: "1px solid #f1f3f7", background: i % 2 === 0 ? "#fff" : "#fafbfc" }}>
+                        <td style={{ padding: "9px 14px", fontWeight: 600, color: "#1a1a1a", whiteSpace: "nowrap" }}>{run.module}</td>
+                        <td style={{ padding: "9px 14px", color: "#444", textTransform: "capitalize" }}>{run.specialty}</td>
+                        <td style={{ padding: "9px 14px", color: "#888", fontFamily: "monospace" }}>{run.version}</td>
+                        <td style={{ padding: "9px 14px", color: "#5a6a85", whiteSpace: "nowrap" }}>{fmtDa(run.started_at)}</td>
+                        <td style={{ padding: "9px 14px", color: "#888", whiteSpace: "nowrap" }}>{fmtDuration(run.started_at, run.finished_at)}</td>
+                        <td style={{ padding: "9px 14px", color: run.failed > 0 ? "#b91c1c" : "#444" }}>
+                          {run.scored} / {run.failed > 0 ? <span style={{ color: "#b91c1c", fontWeight: 700 }}>{run.failed}</span> : run.failed}
+                        </td>
+                        <td style={{ padding: "9px 14px" }}>
+                          <span style={{ fontSize: "11px", fontWeight: 700, color: statusColor, background: statusBg, borderRadius: "20px", padding: "2px 10px" }}>
+                            {run.status}
+                          </span>
+                          {run.error && <div style={{ fontSize: "11px", color: "#b91c1c", marginTop: "2px", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={run.error}>{run.error}</div>}
+                        </td>
+                        <td style={{ padding: "9px 14px", color: "#aaa" }}>{run.triggered_by}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
       </div>
     </div>
