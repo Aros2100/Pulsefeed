@@ -20,11 +20,12 @@ export async function GET(request: NextRequest) {
   const article_type  = params.get("article_type");
   const pub_date_from = params.get("pub_date_from");
   const pub_date_to   = params.get("pub_date_to");
-  const geo_continent = params.get("geo_continent");
-  const geo_region    = params.get("geo_region");
-  const geo_country   = params.get("geo_country");
-  const geo_state     = params.get("geo_state");
-  const geo_city      = params.get("geo_city");
+  const geo_continent    = params.get("geo_continent");
+  const geo_region       = params.get("geo_region");
+  const geo_country      = params.get("geo_country");
+  const geo_state        = params.get("geo_state");
+  const geo_city         = params.get("geo_city");
+  const no_subspecialty  = params.get("no_subspecialty") === "true";
 
   const from = (page - 1) * limit;
   const to   = from + limit - 1;
@@ -72,7 +73,8 @@ export async function GET(request: NextRequest) {
     }
     query = query.in("id", ids);
   }
-  if (subspecialty)  query = query.contains("subspecialty", [subspecialty]);
+  if (subspecialty)     query = query.contains("subspecialty", [subspecialty]);
+  if (no_subspecialty)  query = query.or("subspecialty.is.null,subspecialty.eq.{}");
   if (article_type)  query = query.eq("article_type", article_type);
   if (pub_date_from) query = query.gte("pubmed_indexed_at", pub_date_from);
   if (pub_date_to)   query = query.lte("pubmed_indexed_at", pub_date_to);

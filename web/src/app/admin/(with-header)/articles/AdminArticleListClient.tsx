@@ -84,12 +84,13 @@ interface Filters {
   geo_country: string;
   geo_state: string;
   geo_city: string;
-  no_region:   boolean;
-  no_country:  boolean;
-  no_state:    boolean;
-  no_city:     boolean;
-  not_parsed:   boolean;
-  suspect_city: boolean;
+  no_region:      boolean;
+  no_country:     boolean;
+  no_state:       boolean;
+  no_city:        boolean;
+  not_parsed:     boolean;
+  suspect_city:   boolean;
+  no_subspecialty: boolean;
   sort_by: SortField;
   sort_dir: "asc" | "desc";
   page: number;
@@ -173,12 +174,13 @@ function filtersFromParams(sp: URLSearchParams): Filters {
     geo_country:     sp.get("geo_country")     ?? "",
     geo_state:       sp.get("geo_state")       ?? "",
     geo_city:        sp.get("geo_city")        ?? "",
-    no_region:       sp.get("no_region")       === "true",
-    no_country:      sp.get("no_country")      === "true",
-    no_state:        sp.get("no_state")        === "true",
-    no_city:         sp.get("no_city")         === "true",
-    not_parsed:      sp.get("not_parsed")      === "true",
-    suspect_city:    sp.get("suspect_city")    === "true",
+    no_region:        sp.get("no_region")        === "true",
+    no_country:       sp.get("no_country")       === "true",
+    no_state:         sp.get("no_state")         === "true",
+    no_city:          sp.get("no_city")          === "true",
+    not_parsed:       sp.get("not_parsed")       === "true",
+    suspect_city:     sp.get("suspect_city")     === "true",
+    no_subspecialty:  sp.get("no_subspecialty")  === "true",
     sort_by:         (SORT_FIELDS as readonly string[]).includes(sortBy) ? sortBy as SortField : "imported_at",
     sort_dir:        sortDir === "asc" ? "asc" : "desc",
     page:            Math.max(1, parseInt(sp.get("page") ?? "1", 10)),
@@ -198,12 +200,13 @@ function filtersToParams(f: Filters): URLSearchParams {
   if (f.geo_country)     p.set("geo_country",     f.geo_country);
   if (f.geo_state)       p.set("geo_state",       f.geo_state);
   if (f.geo_city)        p.set("geo_city",        f.geo_city);
-  if (f.no_region)       p.set("no_region",       "true");
-  if (f.no_country)      p.set("no_country",      "true");
-  if (f.no_state)        p.set("no_state",        "true");
-  if (f.no_city)         p.set("no_city",         "true");
-  if (f.not_parsed)      p.set("not_parsed",      "true");
-  if (f.suspect_city)    p.set("suspect_city",    "true");
+  if (f.no_region)        p.set("no_region",        "true");
+  if (f.no_country)       p.set("no_country",       "true");
+  if (f.no_state)         p.set("no_state",         "true");
+  if (f.no_city)          p.set("no_city",          "true");
+  if (f.not_parsed)       p.set("not_parsed",       "true");
+  if (f.suspect_city)     p.set("suspect_city",     "true");
+  if (f.no_subspecialty)  p.set("no_subspecialty",  "true");
   if (f.sort_by !== "imported_at") p.set("sort_by", f.sort_by);
   if (f.sort_dir !== "desc")       p.set("sort_dir", f.sort_dir);
   if (f.page > 1)                  p.set("page", String(f.page));
@@ -214,7 +217,7 @@ function filtersToParams(f: Filters): URLSearchParams {
 const EMPTY_FILTERS: Filters = {
   search: "", mesh_term: "", specialty: ACTIVE_SPECIALTY, subspecialty: "", article_type: "",
   geo_continent: "", geo_region: "", geo_country: "", geo_state: "", geo_city: "",
-  no_region: false, no_country: false, no_state: false, no_city: false, not_parsed: false, suspect_city: false,
+  no_region: false, no_country: false, no_state: false, no_city: false, not_parsed: false, suspect_city: false, no_subspecialty: false,
   sort_by: "imported_at", sort_dir: "desc", page: 1,
   period: null,
 };
@@ -337,7 +340,9 @@ export default function AdminArticleListClient({
       if (key === "geo_region")    { next.geo_country = ""; next.geo_state = ""; next.geo_city = ""; }
       if (key === "geo_country")   { next.geo_state = ""; next.geo_city = ""; }
       if (key === "geo_state")     { next.geo_city = ""; }
-      if (key === "specialty" && value !== ACTIVE_SPECIALTY) { next.subspecialty = ""; }
+      if (key === "specialty" && value !== ACTIVE_SPECIALTY) { next.subspecialty = ""; next.no_subspecialty = false; }
+      if (key === "subspecialty" && value) { next.no_subspecialty = false; }
+      if (key === "no_subspecialty" && value) { next.subspecialty = ""; }
       return next;
     });
   }
@@ -372,7 +377,7 @@ export default function AdminArticleListClient({
   }
 
   const hasActiveFilters = !!(
-    filters.subspecialty || filters.article_type || filters.search ||
+    filters.subspecialty || filters.no_subspecialty || filters.article_type || filters.search ||
     filters.mesh_term || filters.geo_continent || filters.geo_region || filters.geo_country || filters.geo_state ||
     filters.geo_city
   );
@@ -425,6 +430,19 @@ export default function AdminArticleListClient({
               options={subspecialties.map((t) => ({ value: t, label: t }))}
               disabled={filters.specialty !== ACTIVE_SPECIALTY}
             />
+            {filters.specialty === ACTIVE_SPECIALTY && !filters.subspecialty && (
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", marginTop: "2px" }}>
+                <input
+                  type="checkbox"
+                  checked={filters.no_subspecialty}
+                  onChange={(e) => setFilter("no_subspecialty", e.target.checked)}
+                  style={{ accentColor: "var(--pf-red)", cursor: "pointer" }}
+                />
+                <span style={{ fontSize: "11px", color: filters.no_subspecialty ? "var(--pf-red)" : "var(--color-text-secondary)", fontWeight: filters.no_subspecialty ? 700 : 400 }}>
+                  No subspecialty
+                </span>
+              </label>
+            )}
           </div>
         </div>
 
