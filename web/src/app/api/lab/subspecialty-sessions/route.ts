@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
   for (const v of verdicts) {
     const { error: updateError } = await admin
       .from("articles")
-      .update({ subspecialty: v.decision })
+      .update({ subspecialty: [v.decision] })
       .eq("id", v.article_id);
     if (updateError) {
       console.error(`[subspecialty-sessions] articles update error for ${v.article_id}:`, updateError);
