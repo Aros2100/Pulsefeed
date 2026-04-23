@@ -17,7 +17,7 @@ const schema = z.object({
   ),
 });
 
-type Article = { id: string; title: string; abstract: string | null };
+type Article = { id: string; title: string; abstract: string | null; short_headline: string | null; short_resume: string | null; bottom_line: string | null };
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
@@ -80,7 +80,14 @@ export async function POST(request: NextRequest) {
             limiter(async () => {
               try {
                 await new Promise((r) => setTimeout(r, DELAY_MS));
-                const sari = await scoreSari(article, activePrompt);
+                const sari = await scoreSari({
+                  id: article.id,
+                  title: article.title,
+                  abstract: article.abstract,
+                  short_headline: article.short_headline,
+                  short_resume: article.short_resume,
+                  bottom_line: article.bottom_line,
+                }, activePrompt);
                 const updatePayload = {
                   sari_subject:            sari.sari_subject,
                   sari_action:             sari.sari_action,

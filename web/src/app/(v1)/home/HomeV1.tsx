@@ -5,6 +5,14 @@ import type { NewsletterArticle, NewsletterContent } from "@/lib/newsletter/send
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 
+function getWeekNum(iso: string): number {
+  const d = new Date(iso);
+  const jan4 = new Date(d.getFullYear(), 0, 4);
+  const startOfWeek1 = new Date(jan4);
+  startOfWeek1.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+  return Math.round((d.getTime() - startOfWeek1.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+}
+
 function formatDate(d: string | null): string {
   if (!d) return "";
   try {
@@ -96,23 +104,16 @@ function ActivityWidget({
   weekStarts,
   userSubs,
   subWeekCounts,
-  currentWeekNumber,
-  currentYear,
+  shortNameMap,
 }: {
   weeklyCount: number;
   weekStarts: string[];
   userSubs: string[];
   subWeekCounts: { subspecialty: string; week_start: string; article_count: number }[];
-  currentWeekNumber: number;
-  currentYear: number;
+  shortNameMap: Record<string, string>;
 }) {
-  const getWeekNum = (iso: string) => {
-    const d = new Date(iso);
-    const jan4 = new Date(d.getFullYear(), 0, 4);
-    const startOfWeek1 = new Date(jan4);
-    startOfWeek1.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
-    return Math.round((d.getTime() - startOfWeek1.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
-  };
+  const currentWeek = getWeekNum(weekStarts[weekStarts.length - 1]);
+  const currentYear = weekStarts[weekStarts.length - 1].slice(0, 4);
 
   const lookup: Record<string, Record<string, number>> = {};
   for (const row of subWeekCounts) {
@@ -129,7 +130,7 @@ function ActivityWidget({
           <div style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "4px" }}>
             New articles in <span style={{ color: "#E83B2A" }}>neurosurgery</span><br />this week
           </div>
-          <div style={{ fontSize: "11px", color: "#bbb" }}>Week {currentWeekNumber}, {currentYear}</div>
+          <div style={{ fontSize: "11px", color: "#bbb" }}>Week {currentWeek}, {currentYear}</div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div style={{ fontSize: "52px", fontWeight: 800, color: "#1a1a1a", lineHeight: 1 }}>{weeklyCount}</div>
@@ -159,7 +160,7 @@ function ActivityWidget({
             return (
               <div key={sub} style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px" }}>
                 <div style={{ flex: "1 1 0", fontSize: "12px", fontWeight: 600, color: "#444", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {sub}
+                  {shortNameMap[sub] ?? sub}
                 </div>
                 <div style={{ display: "flex", gap: "6px", alignItems: "flex-end", flexShrink: 0 }}>
                   {counts.map((count, i) => {
@@ -273,8 +274,6 @@ function TopArticlesWidget({ articles }: { articles: GlobalArticleRow[] }) {
 
   return (
     <div style={{
-      width: "50%",
-      minWidth: "280px",
       background: "#fff",
       borderRadius: "12px",
       border: "1px solid #e5e9f0",
@@ -289,9 +288,11 @@ function TopArticlesWidget({ articles }: { articles: GlobalArticleRow[] }) {
         color: "#E83B2A",
         borderBottom: "2px solid #E83B2A",
         paddingBottom: "8px",
-        marginBottom: "14px",
       }}>
-        This month&apos;s highlights
+        Don&apos;t miss
+      </div>
+      <div style={{ fontSize: "11px", color: "#888", fontWeight: 400, marginTop: "3px", marginBottom: "14px" }}>
+        Editor&apos;s picks · last 30 days
       </div>
       <div style={{
         maxHeight: "420px",
@@ -376,6 +377,8 @@ export default async function HomeV1() {
   monday.setDate(now.getDate() - daysFromMonday);
   const startOfWeekIso = monday.toISOString().slice(0, 10);
   const todayIso = now.toISOString().slice(0, 10);
+  const currentWeekNumber = getWeekNum(startOfWeekIso);
+  const currentYear = new Date().getFullYear();
 
   // 4 historiske uger (mandag-datoer)
   const weekStarts: string[] = [];
@@ -438,17 +441,31 @@ export default async function HomeV1() {
     );
   }
 
-  // Fetch global articles — two separate queries to avoid PostgREST nested relation issues
-  let globalArticles: GlobalArticleRow[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: editionArticleRows } = await (supabase as any)
-    .from("newsletter_edition_articles")
-    .select("sort_order, subspecialty, article_id")
-    .eq("edition_id", edition.id)
-    .eq("is_global", true);
+  // Fetch global articles — last 30 days across all approved editions
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const thirtyDaysAgoIso = thirtyDaysAgo.toISOString().slice(0, 10);
 
-  if (editionArticleRows && editionArticleRows.length > 0) {
-    const articleIds = (editionArticleRows as { article_id: string }[]).map((r) => r.article_id);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: globalRows } = await (supabase as any)
+    .from("newsletter_edition_articles")
+    .select("sort_order, subspecialty, article_id, edition_id")
+    .eq("is_global", true)
+    .in("edition_id",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (await (supabase as any)
+        .from("newsletter_editions")
+        .select("id")
+        .eq("status", "approved")
+        .gte("created_at", thirtyDaysAgoIso)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .then((r: any) => (r.data ?? []).map((e: any) => e.id))
+      )
+    );
+
+  let globalArticles: GlobalArticleRow[] = [];
+  if (globalRows && globalRows.length > 0) {
+    const articleIds = (globalRows as { article_id: string }[]).map(r => r.article_id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: articleRows } = await (supabase as any)
       .from("articles")
@@ -457,15 +474,15 @@ export default async function HomeV1() {
 
     if (articleRows) {
       const articleMap = Object.fromEntries(
-        (articleRows as NonNullable<GlobalArticleRow["articles"]>[]).map((a) => [a.id, a])
+        (articleRows as NonNullable<GlobalArticleRow["articles"]>[]).map(a => [a.id, a])
       );
-      globalArticles = (editionArticleRows as { sort_order: number; subspecialty: string | null; article_id: string }[])
-        .map((r) => ({
+      globalArticles = (globalRows as { sort_order: number; subspecialty: string | null; article_id: string }[])
+        .map(r => ({
           sort_order: r.sort_order,
           subspecialty: r.subspecialty,
           articles: articleMap[r.article_id] ?? null,
         }))
-        .filter((r) => r.articles !== null)
+        .filter(r => r.articles !== null)
         .sort((a, b) => {
           const da = a.articles?.pubmed_indexed_at ?? "";
           const db = b.articles?.pubmed_indexed_at ?? "";
@@ -499,6 +516,8 @@ export default async function HomeV1() {
 
   // Case B — edition exists
   const content = edition.content as NewsletterContent;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   // Filter subspecialty sections to only those the user has selected
   const visibleSubspecialties = userSubspecialties.length > 0
@@ -521,10 +540,10 @@ export default async function HomeV1() {
           {/* Header — ingen baggrund */}
           <div style={{ marginBottom: "20px" }}>
             <div style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a" }}>
-              Welcome back, {firstName}
+              {greeting}, {firstName}
             </div>
             <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>
-              Week {edition.week_number}, {edition.year}
+              Week {currentWeekNumber}, {currentYear}
             </div>
           </div>
 
@@ -533,11 +552,10 @@ export default async function HomeV1() {
             weekStarts={weekStarts}
             userSubs={userSubs}
             subWeekCounts={subWeekCounts}
-            currentWeekNumber={edition.week_number}
-            currentYear={edition.year}
+            shortNameMap={shortNameMap}
           />
         </div>
-        <div style={{ flex: "0 0 420px" }}>
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
           <TopArticlesWidget articles={globalArticles} />
         </div>
       </div>
