@@ -23,14 +23,7 @@ function accColor(v: number | null): string {
   return "#dc2626";
 }
 
-// ─── Tabs ────────────────────────────────────────────────────────────────────
-
-const TABS = [
-  { key: "text", label: "Tekst", module: "condensation_text" },
-  { key: "sari", label: "SARI",  module: "condensation_sari" },
-] as const;
-
-type TabKey = (typeof TABS)[number]["key"];
+const ACTIVE_MODULE = "condensation_sari";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -51,16 +44,8 @@ interface VersionStats {
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
-interface Props {
-  searchParams: Promise<{ tab?: string }>;
-}
-
-export default async function CondensationDashboardPage({ searchParams }: Props) {
-  const { tab: tabParam } = await searchParams;
-  const activeTab: TabKey = TABS.some((t) => t.key === tabParam)
-    ? (tabParam as TabKey)
-    : "text";
-  const activeModule = TABS.find((t) => t.key === activeTab)!.module;
+export default async function CondensationDashboardPage() {
+  const activeModule = ACTIVE_MODULE;
 
   const specialty = ACTIVE_SPECIALTY;
 
@@ -97,58 +82,6 @@ export default async function CondensationDashboardPage({ searchParams }: Props)
     decisions.push(...(data as Decision[]));
     if (data.length < 1000) break;
     from += 1000;
-  }
-
-  // Fetch both modules' decisions for the summary card
-  type SummaryDecision = { model_version: string | null; ai_decision: string; decision: string };
-  const allModuleDecisions: Record<string, SummaryDecision[]> = {};
-  for (const tab of TABS) {
-    const ds: SummaryDecision[] = [];
-    for (let from = 0; ; ) {
-      const { data } = await admin
-        .from("lab_decisions")
-        .select("model_version, ai_decision, decision")
-        .eq("specialty", specialty)
-        .eq("module", tab.module)
-        .not("ai_decision", "is", null)
-        .range(from, from + 999);
-      if (!data || data.length === 0) break;
-      ds.push(...(data as SummaryDecision[]));
-      if (data.length < 1000) break;
-      from += 1000;
-    }
-    allModuleDecisions[tab.key] = ds;
-  }
-
-  // Build summary rows: per version, per dimension
-  type SummaryRow = {
-    version: string;
-    active: boolean;
-    text: number | null;
-    sari: number | null;
-    average: number | null;
-  };
-
-  const summaryRows: SummaryRow[] = rawVersions.map((v) => {
-    const ver = v.version as string;
-    const dimAccuracies: Record<string, number | null> = {};
-    for (const tab of TABS) {
-      const ds = allModuleDecisions[tab.key].filter((d) => d.model_version === ver);
-      // For condensation: "approved" = agreement (ai_decision is always "approved")
-      dimAccuracies[tab.key] = pct(ds.filter((d) => d.decision === "approved").length, ds.length);
-    }
-    return {
-      version: ver,
-      active: v.active as boolean,
-      text: dimAccuracies["text"],
-      sari: dimAccuracies["sari"],
-      average: null,
-    };
-  });
-
-  for (const r of summaryRows) {
-    const vals = [r.text, r.sari].filter((v): v is number => v != null);
-    r.average = vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
   }
 
   // Group decisions by model_version
@@ -284,74 +217,9 @@ export default async function CondensationDashboardPage({ searchParams }: Props)
           </p>
         </div>
 
-        {/* Summary table */}
-        {summaryRows.length > 0 && (
-          <div style={card}>
-            <div style={cardHeader}>Versions-oversigt — alle moduler</div>
-            <div>
-              <div style={{
-                display: "grid", gridTemplateColumns: "120px 1fr 1fr 1fr",
-                padding: "10px 24px", borderBottom: "1px solid #e8ecf1",
-                fontSize: "11px", color: "#888", fontWeight: 600,
-                textTransform: "uppercase", letterSpacing: "0.05em",
-              }}>
-                <div>Version</div>
-                <div>Tekst</div>
-                <div>SARI</div>
-                <div>Samlet</div>
-              </div>
-              {summaryRows.map((r) => (
-                <div key={r.version} style={{
-                  display: "grid", gridTemplateColumns: "120px 1fr 1fr 1fr",
-                  padding: "12px 24px", borderBottom: "1px solid #f0f2f5",
-                  fontSize: "13px", alignItems: "center",
-                }}>
-                  <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
-                    {r.version}
-                    {r.active && (
-                      <span style={{ fontSize: "10px", fontWeight: 700, background: "#16a34a", color: "#fff", borderRadius: "3px", padding: "1px 6px" }}>
-                        Aktiv
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ color: accColor(r.text) }}>{r.text != null ? `${r.text}%` : "—"}</div>
-                  <div style={{ color: accColor(r.sari) }}>{r.sari != null ? `${r.sari}%` : "—"}</div>
-                  <div style={{ fontWeight: 700, color: accColor(r.average) }}>{r.average != null ? `${r.average}%` : "—"}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div style={{ display: "flex", gap: "4px", marginBottom: "24px" }}>
-          {TABS.map((t) => {
-            const isActive = t.key === activeTab;
-            return (
-              <Link
-                key={t.key}
-                href={`/admin/lab/condensation/dashboard?tab=${t.key}`}
-                style={{
-                  fontSize: "13px",
-                  fontWeight: isActive ? 700 : 500,
-                  color: isActive ? "#059669" : "#5a6a85",
-                  background: isActive ? "#ecfdf5" : "#fff",
-                  border: `1px solid ${isActive ? "#a7f3d0" : "#e5e7eb"}`,
-                  borderRadius: "6px",
-                  padding: "7px 16px",
-                  textDecoration: "none",
-                  transition: "all 0.15s",
-                }}
-              >
-                {t.label}
-              </Link>
-            );
-          })}
-        </div>
-
         {/* Bar chart */}
         <div style={card}>
-          <div style={cardHeader}>Godkendelsesrate pr. version — {TABS.find((t) => t.key === activeTab)!.label}</div>
+          <div style={cardHeader}>Godkendelsesrate pr. version — SARI</div>
           <div style={{ padding: "24px 24px 20px" }}>
             {chartVersions.length === 0 ? (
               <div style={{ height: barHeight, display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa", fontSize: "13px" }}>
@@ -469,7 +337,7 @@ export default async function CondensationDashboardPage({ searchParams }: Props)
 
         {/* Version comparison table */}
         <div style={card}>
-          <div style={cardHeader}>Versions-sammenligning — {TABS.find((t) => t.key === activeTab)!.label}</div>
+          <div style={cardHeader}>Versions-sammenligning — SARI</div>
           {tableRows.length === 0 ? (
             <div style={{ padding: "24px", fontSize: "13px", color: "#aaa" }}>Ingen versioner endnu.</div>
           ) : (

@@ -7,7 +7,7 @@ const CONFIG: SimulatorConfig = {
   accent: "#059669",
   optimizeHref: "/admin/lab/condensation-text/optimize",
   resultType: "binary",
-  scoreEndpoint: "/api/lab/simulate-condensation",
+  scoreEndpoint: "/api/lab/simulate-condensation-text",
   rescoreIncludesSpecialty: true,
   showSpecialtyInSubtitle: false,
   regressionCommentPlaceholder: "Fx: Korrekt tone — neutral og præcis",

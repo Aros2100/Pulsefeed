@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
                 });
                 scored++;
               } catch (e) {
-                console.error(`[score-condensation] failed article ${article.id}:`, e);
+                console.error(`[score-condensation-sari] failed article ${article.id}:`, e);
                 failedIds.push(article.id);
               }
               send({ scored, total: toScore.length });

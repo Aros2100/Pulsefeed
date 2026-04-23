@@ -11,27 +11,8 @@ function fmtDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function parseSariComment(comment: string | null): Record<string, string> | null {
-  if (!comment) return null;
-  try {
-    const parsed = JSON.parse(comment);
-    if (parsed && typeof parsed === "object" && parsed.fields && typeof parsed.fields === "object") {
-      return parsed.fields as Record<string, string>;
-    }
-  } catch {
-    // not JSON
-  }
-  return null;
-}
 
-// ─── Tabs ────────────────────────────────────────────────────────────────────
-
-const TABS = [
-  { key: "text", label: "Tekst", module: "condensation_text" },
-  { key: "sari", label: "SARI",  module: "condensation_sari" },
-] as const;
-
-type TabKey = (typeof TABS)[number]["key"];
+const ACTIVE_MODULE = "condensation_sari";
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
@@ -55,12 +36,9 @@ interface RejectionRow {
 }
 
 interface ArticleDetail {
-  title:          string;
-  journal_abbr:   string | null;
-  abstract:       string | null;
-  short_headline: string | null;
-  short_resume:   string | null;
-  bottom_line:    string | null;
+  title:            string;
+  journal_abbr:     string | null;
+  abstract:         string | null;
   sari_subject:     string | null;
   sari_action:      string | null;
   sari_result:      string | null;
@@ -70,7 +48,7 @@ interface ArticleDetail {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function ArticleRow({ row, article, tab }: { row: RejectionRow; article: ArticleDetail | undefined; tab: TabKey }) {
+function ArticleRow({ row, article }: { row: RejectionRow; article: ArticleDetail | undefined }) {
   const title    = article?.title ?? row.article_id ?? "Unknown";
   const journal  = article?.journal_abbr ?? "—";
   const abstract = article?.abstract;
@@ -114,52 +92,15 @@ function ArticleRow({ row, article, tab }: { row: RejectionRow; article: Article
               ))}
             </div>
           )}
-          {row.comment && (() => {
-            const sariFields = parseSariComment(row.comment);
-            if (sariFields) {
-              const entries = Object.entries(sariFields).filter(([, v]) => v);
-              return entries.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                  {entries.map(([key, value]) => (
-                    <div key={key} style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-                      <span style={{
-                        fontSize: "10px", fontWeight: 700, borderRadius: "4px", padding: "1px 5px",
-                        background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca",
-                        fontFamily: "monospace", flexShrink: 0,
-                      }}>
-                        {key}
-                      </span>
-                      <span style={{ fontSize: "12px", color: "#444", lineHeight: 1.5 }}>{value}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : null;
-            }
-            return (
-              <div style={{ fontSize: "12px", color: "#555", fontStyle: "italic", lineHeight: 1.5 }}>
-                {row.comment}
-              </div>
-            );
-          })()}
-        </div>
-      )}
-
-      {/* Show rejected condensation content */}
-      {article && tab === "text" && (article.short_headline || article.short_resume || article.bottom_line) && (
-        <div style={{ marginTop: "10px", padding: "10px 12px", background: "#fef2f2", borderRadius: "6px", borderLeft: "3px solid #fecaca" }}>
-          {article.short_headline && (
-            <div style={{ fontSize: "13px", fontWeight: 700, color: "#1a1a1a", marginBottom: "4px" }}>{article.short_headline}</div>
-          )}
-          {article.short_resume && (
-            <div style={{ fontSize: "12px", color: "#444", lineHeight: 1.5, marginBottom: article.bottom_line ? "6px" : 0 }}>{article.short_resume}</div>
-          )}
-          {article.bottom_line && (
-            <div style={{ fontSize: "12px", color: "#666", fontStyle: "italic", lineHeight: 1.4 }}>{article.bottom_line}</div>
+          {row.comment && (
+            <div style={{ fontSize: "12px", color: "#555", fontStyle: "italic", lineHeight: 1.5 }}>
+              {row.comment}
+            </div>
           )}
         </div>
       )}
 
-      {article && tab === "sari" && (article.sari_subject || article.sari_action || article.sari_result || article.sari_implication) && (
+      {article && (article.sari_subject || article.sari_action || article.sari_result || article.sari_implication) && (
         <div style={{ marginTop: "10px", padding: "10px 12px", background: "#fef2f2", borderRadius: "6px", borderLeft: "3px solid #fecaca", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
           {[
             { label: "S", value: article.sari_subject },
@@ -198,15 +139,12 @@ function ArticleRow({ row, article, tab }: { row: RejectionRow; article: Article
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 interface Props {
-  searchParams: Promise<{ tab?: string; version?: string }>;
+  searchParams: Promise<{ version?: string }>;
 }
 
 export default async function CondensationEvaluationPage({ searchParams }: Props) {
-  const { tab: tabParam, version: versionParam } = await searchParams;
-  const activeTab: TabKey = TABS.some((t) => t.key === tabParam)
-    ? (tabParam as TabKey)
-    : "text";
-  const activeModule = TABS.find((t) => t.key === activeTab)!.module;
+  const { version: versionParam } = await searchParams;
+  const activeModule = ACTIVE_MODULE;
 
   const specialty = ACTIVE_SPECIALTY;
   const specialtyLabel = ACTIVE_SPECIALTY.charAt(0).toUpperCase() + ACTIVE_SPECIALTY.slice(1);
@@ -247,7 +185,7 @@ export default async function CondensationEvaluationPage({ searchParams }: Props
   const [articlesForMap, allAccRes] = await Promise.all([
     articleIds.length > 0
       ? admin.from("articles")
-          .select("id, title, journal_abbr, abstract, short_headline, short_resume, bottom_line, sari_subject, sari_action, sari_result, sari_implication, sample_size")
+          .select("id, title, journal_abbr, abstract, sari_subject, sari_action, sari_result, sari_implication, sample_size")
           .in("id", articleIds)
       : Promise.resolve({ data: null }),
     admin.from("lab_decisions")
@@ -294,8 +232,6 @@ export default async function CondensationEvaluationPage({ searchParams }: Props
   const totalRejected = rejections.length;
   const approvalRate  = total > 0 ? Math.round(((total - totalRejected) / total) * 100) : null;
 
-  // Data sufficiency
-  const hasSufficientData = true;
   const dataBanner = { bg: "#f0fdf4", border: "#bbf7d0", dot: "#15803d", text: "#14532d", msg: `${totalRejected} afvisninger` };
 
   return (
@@ -335,32 +271,6 @@ export default async function CondensationEvaluationPage({ searchParams }: Props
           </p>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display: "flex", gap: "4px", marginBottom: "20px" }}>
-          {TABS.map((t) => {
-            const isActive = t.key === activeTab;
-            return (
-              <Link
-                key={t.key}
-                href={`/admin/lab/condensation/evaluation?tab=${t.key}${selectedVersion ? `&version=${selectedVersion}` : ""}`}
-                style={{
-                  fontSize: "13px",
-                  fontWeight: isActive ? 700 : 500,
-                  color: isActive ? "#059669" : "#5a6a85",
-                  background: isActive ? "#ecfdf5" : "#fff",
-                  border: `1px solid ${isActive ? "#a7f3d0" : "#e5e7eb"}`,
-                  borderRadius: "6px",
-                  padding: "7px 16px",
-                  textDecoration: "none",
-                  transition: "all 0.15s",
-                }}
-              >
-                {t.label}
-              </Link>
-            );
-          })}
-        </div>
-
         {/* Data sufficiency banner */}
         <div style={{ background: dataBanner.bg, border: `1px solid ${dataBanner.border}`, borderRadius: "8px", padding: "10px 16px", marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -380,7 +290,7 @@ export default async function CondensationEvaluationPage({ searchParams }: Props
           <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
-                Summary — {TABS.find((t) => t.key === activeTab)!.label}
+                Summary — SARI
               </span>
               {selectedVersion && (
                 <span style={{ fontSize: "11px", color: "#888" }}>
@@ -409,7 +319,7 @@ export default async function CondensationEvaluationPage({ searchParams }: Props
 
         {/* Rejections list */}
         <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700, marginBottom: "12px" }}>
-          Afvisninger — {TABS.find((t) => t.key === activeTab)!.label}
+          Afvisninger — SARI
         </div>
         <div style={card}>
           <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -430,7 +340,6 @@ export default async function CondensationEvaluationPage({ searchParams }: Props
                 key={`${row.article_id}-${row.decided_at}`}
                 row={row}
                 article={row.article_id ? articleMap[row.article_id] : undefined}
-                tab={activeTab}
               />
             ))
           )}

@@ -9,16 +9,6 @@ function fmtDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function parseSariComment(comment: string | null): Record<string, string> | null {
-  if (!comment) return null;
-  try {
-    const parsed = JSON.parse(comment);
-    if (parsed && typeof parsed === "object" && parsed.fields && typeof parsed.fields === "object") {
-      return parsed.fields as Record<string, string>;
-    }
-  } catch { /* not JSON */ }
-  return null;
-}
 
 const card: React.CSSProperties = {
   background: "#fff", borderRadius: "10px",
@@ -83,23 +73,9 @@ function ArticleRow({ row, article }: { row: RejectionRow; article: ArticleDetai
               ))}
             </div>
           )}
-          {row.comment && (() => {
-            const sariFields = parseSariComment(row.comment);
-            if (sariFields) {
-              const entries = Object.entries(sariFields).filter(([, v]) => v);
-              return entries.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                  {entries.map(([key, value]) => (
-                    <div key={key} style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-                      <span style={{ fontSize: "10px", fontWeight: 700, borderRadius: "4px", padding: "1px 5px", background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", fontFamily: "monospace", flexShrink: 0 }}>{key}</span>
-                      <span style={{ fontSize: "12px", color: "#444", lineHeight: 1.5 }}>{value}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : null;
-            }
-            return <div style={{ fontSize: "12px", color: "#555", fontStyle: "italic", lineHeight: 1.5 }}>{row.comment}</div>;
-          })()}
+          {row.comment && (
+            <div style={{ fontSize: "12px", color: "#555", fontStyle: "italic", lineHeight: 1.5 }}>{row.comment}</div>
+          )}
         </div>
       )}
 

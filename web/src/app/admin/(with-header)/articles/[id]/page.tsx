@@ -81,7 +81,10 @@ const COLORS: Record<string, { dot: string; border: string; bg: string; label: s
   author_linked:          { dot: "#3b82f6", border: "#bfdbfe", bg: "#eff6ff", label: "Authors linked to article" },
   quality_check:          { dot: "#6b7280", border: "#d1d5db", bg: "#f9fafb", label: "Quality Check" },
   auto_tagged:            { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff", label: "Auto-Tagged" },
-  citation_count_updated: { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff", label: "Citation count updated" },
+  citation_count_updated:    { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff", label: "Citation count updated" },
+  condensation_text_scored:  { dot: "#059669", border: "#a7f3d0", bg: "#f0fdf4", label: "TEXT CONDENSED" },
+  condensation_scored:       { dot: "#7c3aed", border: "#ddd6fe", bg: "#f5f3ff", label: "SARI SCORED" },
+  condensation_validated:    { dot: "#10b981", border: "#a7f3d0", bg: "#f0fdf4", label: "CONDENSATION VALIDATED" },
 };
 const FALLBACK_COLOR = { dot: "#6b7280", border: "#d1d5db", bg: "#f9fafb", label: "Event" };
 
@@ -380,6 +383,32 @@ function AutoTaggedCard({ p }: { p: P }) {
   );
 }
 
+function TextCondensedCard({ p }: { p: P }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      {p.version != null && <KV label="Version" value={String(p.version)} />}
+    </div>
+  );
+}
+
+function SariScoredCard({ p }: { p: P }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      {(p.sari_version ?? p.version) != null && <KV label="Version" value={String(p.sari_version ?? p.version)} />}
+    </div>
+  );
+}
+
+function CondensationValidatedCard({ p }: { p: P }) {
+  const decision = p.decision as string | null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      {p.module != null && <KV label="Module" value={<Badge color="gray">{String(p.module)}</Badge>} />}
+      {decision != null && <KV label="Decision" value={<Badge color={decision === "approved" ? "green" : "red"}>{decision}</Badge>} />}
+    </div>
+  );
+}
+
 function EventCard({ eventType, payload }: { eventType: string; payload: P }) {
   switch (eventType) {
     case "imported":              return <ImportedCard           p={payload} />;
@@ -390,9 +419,12 @@ function EventCard({ eventType, payload }: { eventType: string; payload: P }) {
     case "verified":              return <VerifiedCard           p={payload} />;
     case "author_linked":         return <AuthorLinkedCard       p={payload} />;
     case "quality_check":         return <QualityCheckCard       p={payload} />;
-    case "auto_tagged":           return <AutoTaggedCard         p={payload} />;
-    case "impact_factor_updated": return <ImpactFactorUpdatedCard p={payload} />;
-    case "citation_count_updated":return <CitationCountUpdatedCard p={payload} />;
+    case "auto_tagged":              return <AutoTaggedCard            p={payload} />;
+    case "impact_factor_updated":    return <ImpactFactorUpdatedCard   p={payload} />;
+    case "citation_count_updated":   return <CitationCountUpdatedCard  p={payload} />;
+    case "condensation_text_scored": return <TextCondensedCard         p={payload} />;
+    case "condensation_scored":      return <SariScoredCard            p={payload} />;
+    case "condensation_validated":   return <CondensationValidatedCard p={payload} />;
     default:
       return <pre style={{ fontSize: "11px", color: "#6b7280", margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{JSON.stringify(payload, null, 2)}</pre>;
   }
@@ -1268,18 +1300,20 @@ export default async function AdminArticleLogPage({
 
   // ── Historik tab ────────────────────────────────────────────────────────────
 
-  const SECTIONS: { title: string; types: string[]; alwaysShow?: boolean }[] = [
-    { title: "Article import",  types: ["imported"],               alwaysShow: true },
-    { title: "Author import",   types: ["author_linked"],          alwaysShow: true },
-    { title: "AI Scoring",      types: ["enriched"] },
-    { title: "Auto-Tagging",    types: ["auto_tagged"] },
-    { title: "Lab validation",  types: ["lab_decision"] },
-    { title: "Bibliometrics",   types: ["citation_count_updated"] },
+  const SECTIONS: { title: string; types: string[]; alwaysShow?: boolean; filter?: (ev: typeof events[0]) => boolean }[] = [
+    { title: "Article import",     types: ["imported"],                                                      alwaysShow: true },
+    { title: "Author import",      types: ["author_linked"],                                                 alwaysShow: true },
+    { title: "AI Scoring",         types: ["enriched"] },
+    { title: "Auto-Tagging",       types: ["auto_tagged"] },
+    { title: "Lab validation",     types: ["lab_decision"] },
+    { title: "Bibliometrics",      types: ["citation_count_updated"] },
+    { title: "Text Condensation",  types: ["condensation_text_scored", "condensation_validated"], filter: (ev) => ev.event_type === "condensation_text_scored" || (ev.event_type === "condensation_validated" && (ev.payload as P).module === "condensation_text") },
+    { title: "SARI Condensation",  types: ["condensation_scored",      "condensation_validated"], filter: (ev) => ev.event_type === "condensation_scored"      || (ev.event_type === "condensation_validated" && (ev.payload as P).module === "condensation_sari") },
   ];
 
   const grouped = SECTIONS.map((s) => ({
     ...s,
-    events: events.filter((ev) => s.types.includes(ev.event_type)),
+    events: s.filter ? events.filter(s.filter) : events.filter((ev) => s.types.includes(ev.event_type)),
   })).filter((s) => s.alwaysShow || s.events.length > 0);
 
   const statusChangedEvents = events.filter((ev) => ev.event_type === "status_changed");

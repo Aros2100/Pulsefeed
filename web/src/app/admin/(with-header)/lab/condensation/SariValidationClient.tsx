@@ -140,7 +140,7 @@ export default function SariValidationClient({ specialty, label }: Props) {
 
       // 2. Ingen klar — score ny batch
       try {
-        const scoreRes = await fetch("/api/lab/score-condensation", {
+        const scoreRes = await fetch("/api/lab/score-condensation-sari", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ specialty }),

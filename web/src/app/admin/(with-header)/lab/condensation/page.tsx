@@ -14,11 +14,6 @@ function fmtDate(iso: string | null): string {
   });
 }
 
-const CND_MODULES = [
-  { module: "condensation_text", label: "Tekst" },
-  { module: "condensation_sari", label: "SARI" },
-] as const;
-
 export default async function CondensationOverviewPage() {
   const specialty = ACTIVE_SPECIALTY;
 
@@ -26,30 +21,13 @@ export default async function CondensationOverviewPage() {
 
   // --- Queries ---
   const [
-    textQueueResult,
     picoQueueResult,
-    textTotalResult, textRejectedResult,
-    picoTotalResult, picoRejectedResult,
+    sariTotalResult, sariRejectedResult,
     lastResult,
   ] = await Promise.all([
-    admin.rpc("count_condensation_not_validated", { p_specialty: specialty }),
     admin.rpc("count_pico_not_validated", { p_specialty: specialty }),
 
-    // Tekst
-    admin
-      .from("lab_decisions")
-      .select("*", { count: "exact", head: true })
-      .eq("specialty", specialty)
-      .eq("module", "condensation_text")
-      .not("ai_decision", "is", null),
-    admin
-      .from("lab_decisions")
-      .select("*", { count: "exact", head: true })
-      .eq("specialty", specialty)
-      .eq("module", "condensation_text")
-      .eq("decision", "rejected"),
-
-    // PICO
+    // SARI
     admin
       .from("lab_decisions")
       .select("*", { count: "exact", head: true })
@@ -63,30 +41,20 @@ export default async function CondensationOverviewPage() {
       .eq("module", "condensation_sari")
       .eq("decision", "rejected"),
 
-    // Last decision across condensation modules
+    // Last SARI decision
     admin
       .from("lab_decisions")
       .select("decided_at")
       .eq("specialty", specialty)
-      .in("module", CND_MODULES.map((m) => m.module))
+      .eq("module", "condensation_sari")
       .order("decided_at", { ascending: false })
       .limit(1),
   ]);
 
-  const textQueueCount = (textQueueResult.data as number | null) ?? 0;
-  const picoQueueCount = (picoQueueResult.data as number | null) ?? 0;
-  const lastDecisionAt = lastResult.data?.[0]?.decided_at ?? null;
-
-  // Per-module stats
-  const moduleStats = [
-    { label: "Tekst", total: textTotalResult.count ?? 0, rejected: textRejectedResult.count ?? 0 },
-    { label: "SARI", total: picoTotalResult.count ?? 0, rejected: picoRejectedResult.count ?? 0 },
-  ];
-
-  // Aggregate stats
-  const totalReviewed = moduleStats[0].total; // 1 text decision per article
-  const totalRejections = moduleStats.reduce((sum, m) => sum + m.rejected, 0);
-  const totalDecisions = moduleStats.reduce((sum, m) => sum + m.total, 0);
+  const picoQueueCount  = (picoQueueResult.data as number | null) ?? 0;
+  const sariTotal       = sariTotalResult.count ?? 0;
+  const sariRejected    = sariRejectedResult.count ?? 0;
+  const lastDecisionAt  = lastResult.data?.[0]?.decided_at ?? null;
 
   return (
     <div style={{
@@ -127,40 +95,7 @@ export default async function CondensationOverviewPage() {
         {/* Section cards */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
 
-          {/* Card 1: Tekst-validering */}
-          <SectionCard
-            headerLabel="Tekst-validering"
-            badges={[{ label: "Aktiv", color: "#059669" }]}
-            kpis={[
-              {
-                label: "Artikler i kø",
-                value: String(textQueueCount),
-                valueColor: textQueueCount > 0 ? "#059669" : undefined,
-              },
-              {
-                label: "Bearbejdet",
-                value: String(moduleStats[0].total),
-                sub: "artikler valideret",
-              },
-              {
-                label: "Afvist",
-                value: moduleStats[0].total > 0
-                  ? `${Math.round((moduleStats[0].rejected / moduleStats[0].total) * 100)}%`
-                  : "—",
-                valueColor: moduleStats[0].rejected > 0 ? "#dc2626" : undefined,
-                sub: `${moduleStats[0].rejected} af ${moduleStats[0].total}`,
-              },
-              {
-                label: "Sidst bearbejdet",
-                value: fmtDate(lastDecisionAt),
-                valueColor: "#5a6a85",
-              },
-            ]}
-            actionLabel="Validering afsluttet"
-            actionColor="#94a3b8"
-          />
-
-          {/* Card 2: SARI-validering */}
+          {/* Card 1: SARI-validering */}
           <SectionCard
             headerLabel="SARI-validering"
             badges={[{ label: "Aktiv", color: "#059669" }]}
@@ -172,16 +107,16 @@ export default async function CondensationOverviewPage() {
               },
               {
                 label: "Bearbejdet",
-                value: String(moduleStats[1].total),
+                value: String(sariTotal),
                 sub: "artikler valideret",
               },
               {
                 label: "Afvist",
-                value: moduleStats[1].total > 0
-                  ? `${Math.round((moduleStats[1].rejected / moduleStats[1].total) * 100)}%`
+                value: sariTotal > 0
+                  ? `${Math.round((sariRejected / sariTotal) * 100)}%`
                   : "—",
-                valueColor: moduleStats[1].rejected > 0 ? "#dc2626" : undefined,
-                sub: `${moduleStats[1].rejected} af ${moduleStats[1].total}`,
+                valueColor: sariRejected > 0 ? "#dc2626" : undefined,
+                sub: `${sariRejected} af ${sariTotal}`,
               },
               {
                 label: "Sidst bearbejdet",
@@ -198,52 +133,51 @@ export default async function CondensationOverviewPage() {
             actionColor="#059669"
           />
 
-          {/* Card 3: Performance */}
+          {/* Card 2: Performance */}
           <SectionCard
             headerLabel="Performance"
             badges={
-              totalDecisions > 0
+              sariTotal > 0
                 ? [{
-                    label: `${Math.round(((totalDecisions - totalRejections) / totalDecisions) * 100)}% godkendt`,
+                    label: `${Math.round(((sariTotal - sariRejected) / sariTotal) * 100)}% godkendt`,
                     color: "#15803d",
                   }]
                 : []
             }
-            kpis={moduleStats.map((m) => {
-              const approvalRate = m.total > 0
-                ? Math.round(((m.total - m.rejected) / m.total) * 100)
-                : null;
-              return {
-                label: m.label,
-                value: approvalRate !== null ? `${approvalRate}%` : "—",
-                valueColor: approvalRate !== null ? "#15803d" : undefined,
-                sub: `${m.total - m.rejected} af ${m.total}`,
-              };
-            }).concat([
+            kpis={[
+              {
+                label: "SARI",
+                value: sariTotal > 0 ? `${Math.round(((sariTotal - sariRejected) / sariTotal) * 100)}%` : "—",
+                valueColor: sariTotal > 0 ? "#15803d" : undefined,
+                sub: `${sariTotal - sariRejected} af ${sariTotal}`,
+              },
               {
                 label: "Beslutninger",
-                value: String(totalDecisions),
+                value: String(sariTotal),
                 valueColor: undefined,
-                sub: `${totalReviewed} artikler`,
+                sub: "artikler",
               },
-            ])}
+            ]}
             actionLabel="Se detaljer →"
             actionHref="/admin/lab/condensation/dashboard"
           />
 
-          {/* Card 4: Prompt */}
+          {/* Card 3: Prompt */}
           <SectionCard
             headerLabel="Prompt"
-            badges={totalRejections > 0 ? [{ label: `${totalRejections} afvisninger`, color: "#d97706" }] : []}
-            kpis={moduleStats.map((m) => ({
-              label: m.label,
-              value: String(m.rejected),
-              sub: `af ${m.total} beslutninger`,
-            })).concat([{
-              label: "Threshold",
-              value: "0",
-              sub: "altid tilstrækkelig data",
-            }])}
+            badges={sariRejected > 0 ? [{ label: `${sariRejected} afvisninger`, color: "#d97706" }] : []}
+            kpis={[
+              {
+                label: "SARI",
+                value: String(sariRejected),
+                sub: `af ${sariTotal} beslutninger`,
+              },
+              {
+                label: "Threshold",
+                value: "0",
+                sub: "altid tilstrækkelig data",
+              },
+            ]}
             actionLabel="Evaluér prompt →"
             actionHref="/admin/lab/condensation/evaluation"
             actionColor="#d97706"

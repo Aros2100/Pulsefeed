@@ -89,7 +89,7 @@ interface Props {
   backHref?: string;
 }
 
-export default function TextValidationClient({ specialty, label, scoringEndpoint = "/api/lab/score-condensation", backHref = "/admin/lab/condensation" }: Props) {
+export default function TextValidationClient({ specialty, label, scoringEndpoint = "/api/lab/score-condensation-sari", backHref = "/admin/lab/condensation" }: Props) {
   const router = useRouter();
 
   const [articles, setArticles]               = useState<CondensationArticle[]>([]);
@@ -115,51 +115,48 @@ export default function TextValidationClient({ specialty, label, scoringEndpoint
   useEffect(() => {
     const abort = new AbortController();
 
-    async function loadArticles() {
+    async function load() {
       setLoading(true);
 
-      let d: { ok: boolean; articles?: CondensationArticle[] };
+      // 1. Check for already-scored, not-yet-validated articles
       try {
-        d = await fetch(`/api/admin/training/condensation-articles?specialty=${specialty}`, { signal: abort.signal })
-          .then((r) => r.json()) as { ok: boolean; articles?: CondensationArticle[] };
+        const checkRes = await fetch(`/api/admin/training/condensation-text-articles?specialty=${specialty}`, { signal: abort.signal });
+        const checkData = await checkRes.json() as { ok: boolean; articles?: CondensationArticle[] };
+        const existing = checkData.articles ?? [];
+
+        if (existing.length > 0) {
+          populateArticles(existing);
+          setLoading(false);
+          return;
+        }
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
-        setLoading(false);
-        return;
+        console.error("[TextValidationClient] check failed:", e);
       }
 
-      if (!d.ok) { setLoading(false); return; }
+      // 2. None ready — score a new batch
+      setLoading(false);
+      setScoring(true);
+      setScoringProgress(null);
 
-      const list = d.articles ?? [];
+      try {
+        const response = await fetch(scoringEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ specialty }),
+          signal: abort.signal,
+        });
 
-      if (list.length >= 100) {
-        setLoading(false);
-        populateArticles(list);
-      } else {
-        setScoring(true);
-        setScoringProgress(null);
-        setLoading(false);
-
-        try {
-          const response = await fetch(scoringEndpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ specialty }),
-            signal: abort.signal,
-          });
-
-          const reader = response.body!.getReader();
-          const decoder = new TextDecoder();
-
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        if (reader) {
           outer: while (true) {
             const { done, value } = await reader.read();
             if (done) break;
             for (const line of decoder.decode(value).split("\n")) {
               if (!line.startsWith("data: ")) continue;
               try {
-                const data = JSON.parse(line.slice(6)) as {
-                  scored?: number; total?: number; done?: boolean;
-                };
+                const data = JSON.parse(line.slice(6)) as { scored?: number; total?: number; done?: boolean };
                 if (data.done) break outer;
                 if (data.scored !== undefined && data.total !== undefined) {
                   setScoringProgress({ scored: data.scored, total: data.total });
@@ -167,23 +164,24 @@ export default function TextValidationClient({ specialty, label, scoringEndpoint
               } catch { /* ignore malformed events */ }
             }
           }
-        } catch (e) {
-          if ((e as Error).name === "AbortError") return;
         }
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+        console.error("[TextValidationClient] scoring failed:", e);
+      }
 
-        if (abort.signal.aborted) return;
-        setScoring(false);
-        setScoringProgress(null);
+      if (abort.signal.aborted) return;
+      setScoring(false);
+      setScoringProgress(null);
 
-        let d2: { ok: boolean; articles?: CondensationArticle[] };
-        try {
-          d2 = await fetch(`/api/admin/training/condensation-articles?specialty=${specialty}`, { signal: abort.signal })
-            .then((r) => r.json()) as { ok: boolean; articles?: CondensationArticle[] };
-        } catch (e) {
-          if ((e as Error).name === "AbortError") return;
-          return;
-        }
-        populateArticles(d2.articles ?? []);
+      // 3. Reload after scoring
+      try {
+        const res = await fetch(`/api/admin/training/condensation-text-articles?specialty=${specialty}`, { signal: abort.signal });
+        const d = await res.json() as { ok: boolean; articles?: CondensationArticle[] };
+        populateArticles(d.articles ?? []);
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+        console.error("[TextValidationClient] reload failed:", e);
       }
     }
 
@@ -193,9 +191,9 @@ export default function TextValidationClient({ specialty, label, scoringEndpoint
       setSelectedId(list[0]?.id ?? null);
     }
 
-    void loadArticles();
+    void load();
     return () => abort.abort();
-  }, [specialty]);
+  }, [specialty, scoringEndpoint]);
 
   // ── Browser leave warning ────────────────────────────────────────────────
 
