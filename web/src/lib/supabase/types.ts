@@ -1,1 +1,3572 @@
-{"types":"export type Json =\n  | string\n  | number\n  | boolean\n  | null\n  | { [key: string]: Json | undefined }\n  | Json[]\n\nexport type Database = {\n  // Allows to automatically instantiate createClient with right options\n  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)\n  __InternalSupabase: {\n    PostgrestVersion: \"14.1\"\n  }\n  public: {\n    Tables: {\n      api_usage: {\n        Row: {\n          article_id: string | null\n          called_at: string | null\n          completion_tokens: number\n          cost_usd: number | null\n          id: string\n          model_key: string\n          prompt_tokens: number\n          task: string | null\n          total_tokens: number\n        }\n        Insert: {\n          article_id?: string | null\n          called_at?: string | null\n          completion_tokens: number\n          cost_usd?: number | null\n          id?: string\n          model_key: string\n          prompt_tokens: number\n          task?: string | null\n          total_tokens: number\n        }\n        Update: {\n          article_id?: string | null\n          called_at?: string | null\n          completion_tokens?: number\n          cost_usd?: number | null\n          id?: string\n          model_key?: string\n          prompt_tokens?: number\n          task?: string | null\n          total_tokens?: number\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"api_usage_article_id_fkey\"\n            columns: [\"article_id\"]\n            isOneToOne: false\n            referencedRelation: \"articles\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      article_authors: {\n        Row: {\n          article_id: string\n          author_id: string\n          is_corresponding: boolean | null\n          orcid_on_paper: string | null\n          position: number | null\n        }\n        Insert: {\n          article_id: string\n          author_id: string\n          is_corresponding?: boolean | null\n          orcid_on_paper?: string | null\n          position?: number | null\n        }\n        Update: {\n          article_id?: string\n          author_id?: string\n          is_corresponding?: boolean | null\n          orcid_on_paper?: string | null\n          position?: number | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"article_authors_article_id_fkey\"\n            columns: [\"article_id\"]\n            isOneToOne: false\n            referencedRelation: \"articles\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"article_authors_author_id_fkey\"\n            columns: [\"author_id\"]\n            isOneToOne: false\n            referencedRelation: \"authors\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      article_events: {\n        Row: {\n          article_id: string\n          created_at: string | null\n          event_type: string\n          id: string\n          payload: Json\n          sequence: number\n        }\n        Insert: {\n          article_id: string\n          created_at?: string | null\n          event_type: string\n          id?: string\n          payload?: Json\n          sequence?: number\n        }\n        Update: {\n          article_id?: string\n          created_at?: string | null\n          event_type?: string\n          id?: string\n          payload?: Json\n          sequence?: number\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"article_events_article_id_fkey\"\n            columns: [\"article_id\"]\n            isOneToOne: false\n            referencedRelation: \"articles\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      article_specialties: {\n        Row: {\n          article_id: string\n          scored_at: string\n          scored_by: string | null\n          source: string\n          specialty: string\n          specialty_confidence: number | null\n          specialty_match: boolean | null\n          specialty_reason: string | null\n        }\n        Insert: {\n          article_id: string\n          scored_at?: string\n          scored_by?: string | null\n          source: string\n          specialty: string\n          specialty_confidence?: number | null\n          specialty_match?: boolean | null\n          specialty_reason?: string | null\n        }\n        Update: {\n          article_id?: string\n          scored_at?: string\n          scored_by?: string | null\n          source?: string\n          specialty?: string\n          specialty_confidence?: number | null\n          specialty_match?: boolean | null\n          specialty_reason?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"article_specialties_article_id_fkey\"\n            columns: [\"article_id\"]\n            isOneToOne: false\n            referencedRelation: \"articles\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      article_type_rules: {\n        Row: {\n          article_type: string\n          created_at: string\n          id: string\n          is_active: boolean\n          priority: number\n          publication_type: string\n          updated_at: string\n        }\n        Insert: {\n          article_type: string\n          created_at?: string\n          id?: string\n          is_active?: boolean\n          priority?: number\n          publication_type: string\n          updated_at?: string\n        }\n        Update: {\n          article_type?: string\n          created_at?: string\n          id?: string\n          is_active?: boolean\n          priority?: number\n          publication_type?: string\n          updated_at?: string\n        }\n        Relationships: []\n      }\n      article_types: {\n        Row: {\n          active: boolean\n          code: number\n          created_at: string\n          id: string\n          is_study_type: boolean\n          name: string\n          sort_order: number\n          specialty: string\n        }\n        Insert: {\n          active?: boolean\n          code: number\n          created_at?: string\n          id?: string\n          is_study_type?: boolean\n          name: string\n          sort_order: number\n          specialty: string\n        }\n        Update: {\n          active?: boolean\n          code?: number\n          created_at?: string\n          id?: string\n          is_study_type?: boolean\n          name?: string\n          sort_order?: number\n          specialty?: string\n        }\n        Relationships: []\n      }\n      articles: {\n        Row: {\n          abstract: string | null\n          admin_note: string | null\n          ai_decision: string | null\n          ai_location_attempted: boolean | null\n          approval_method: string | null\n          article_cities: string[] | null\n          article_countries: string[] | null\n          article_number: string | null\n          article_type: string | null\n          article_type_ai: string | null\n          article_type_confidence: number | null\n          article_type_method: string | null\n          article_type_model_version: string | null\n          article_type_rationale: string | null\n          article_type_scored_at: string | null\n          article_type_validated: boolean | null\n          authors: Json\n          authors_changed: boolean\n          authors_raw_new: Json | null\n          authors_raw_previous: Json | null\n          authors_unresolvable: boolean | null\n          auto_tagged_at: string | null\n          bottom_line: string | null\n          circle: number | null\n          citation_count: number | null\n          citations_fetched_at: string | null\n          coi_statement: string | null\n          condensed_at: string | null\n          condensed_model_version: string | null\n          date_completed: string | null\n          doi: string | null\n          enriched_at: string | null\n          full_text_available: boolean | null\n          fwci: number | null\n          geo_city: string | null\n          geo_continent: string | null\n          geo_country: string | null\n          geo_department: string | null\n          geo_institution: string | null\n          geo_region: string | null\n          geo_source: string | null\n          geo_state: string | null\n          grants: Json\n          id: string\n          impact_factor: number | null\n          impact_factor_fetched_at: string | null\n          imported_at: string\n          indexed_date: string | null\n          indexed_month: number | null\n          indexed_week: number | null\n          indexed_year: number | null\n          issn_electronic: string | null\n          issn_print: string | null\n          issue: string | null\n          journal_abbr: string | null\n          journal_h_index: number | null\n          journal_title: string | null\n          keywords: string[] | null\n          language: string | null\n          location_confidence: string | null\n          location_parsed_at: string | null\n          long_resume: string | null\n          mesh_terms: Json\n          mesh_terms_text: string | null\n          model_version: string | null\n          openalex_work_id: string | null\n          patient_population: string | null\n          pmc_id: string | null\n          publication_types: string[] | null\n          published_date: string | null\n          published_year: number | null\n          pubmed_date: string | null\n          pubmed_id: string\n          pubmed_indexed_at: string | null\n          pubmed_modified_at: string | null\n          pubmed_synced_at: string | null\n          retracted: boolean\n          sample_size: number | null\n          sari_action: string | null\n          sari_implication: string | null\n          sari_result: string | null\n          sari_subject: string | null\n          short_headline: string | null\n          short_resume: string | null\n          source_id: string | null\n          specialty_confidence: number | null\n          specialty_reasoning: string | null\n          specialty_scored_at: string | null\n          specialty_tags: string[]\n          status: string | null\n          study_design_ai: string[] | null\n          subspecialty: string[] | null\n          subspecialty_ai: string[] | null\n          subspecialty_model_version: string | null\n          subspecialty_reason: string | null\n          subspecialty_scored_at: string | null\n          substances: Json\n          time_to_read: number | null\n          title: string\n          trial_registration: string | null\n          verified: boolean | null\n          volume: string | null\n        }\n        Insert: {\n          abstract?: string | null\n          admin_note?: string | null\n          ai_decision?: string | null\n          ai_location_attempted?: boolean | null\n          approval_method?: string | null\n          article_cities?: string[] | null\n          article_countries?: string[] | null\n          article_number?: string | null\n          article_type?: string | null\n          article_type_ai?: string | null\n          article_type_confidence?: number | null\n          article_type_method?: string | null\n          article_type_model_version?: string | null\n          article_type_rationale?: string | null\n          article_type_scored_at?: string | null\n          article_type_validated?: boolean | null\n          authors?: Json\n          authors_changed?: boolean\n          authors_raw_new?: Json | null\n          authors_raw_previous?: Json | null\n          authors_unresolvable?: boolean | null\n          auto_tagged_at?: string | null\n          bottom_line?: string | null\n          circle?: number | null\n          citation_count?: number | null\n          citations_fetched_at?: string | null\n          coi_statement?: string | null\n          condensed_at?: string | null\n          condensed_model_version?: string | null\n          date_completed?: string | null\n          doi?: string | null\n          enriched_at?: string | null\n          full_text_available?: boolean | null\n          fwci?: number | null\n          geo_city?: string | null\n          geo_continent?: string | null\n          geo_country?: string | null\n          geo_department?: string | null\n          geo_institution?: string | null\n          geo_region?: string | null\n          geo_source?: string | null\n          geo_state?: string | null\n          grants?: Json\n          id?: string\n          impact_factor?: number | null\n          impact_factor_fetched_at?: string | null\n          imported_at?: string\n          indexed_date?: string | null\n          indexed_month?: number | null\n          indexed_week?: number | null\n          indexed_year?: number | null\n          issn_electronic?: string | null\n          issn_print?: string | null\n          issue?: string | null\n          journal_abbr?: string | null\n          journal_h_index?: number | null\n          journal_title?: string | null\n          keywords?: string[] | null\n          language?: string | null\n          location_confidence?: string | null\n          location_parsed_at?: string | null\n          long_resume?: string | null\n          mesh_terms?: Json\n          mesh_terms_text?: string | null\n          model_version?: string | null\n          openalex_work_id?: string | null\n          patient_population?: string | null\n          pmc_id?: string | null\n          publication_types?: string[] | null\n          published_date?: string | null\n          published_year?: number | null\n          pubmed_date?: string | null\n          pubmed_id: string\n          pubmed_indexed_at?: string | null\n          pubmed_modified_at?: string | null\n          pubmed_synced_at?: string | null\n          retracted?: boolean\n          sample_size?: number | null\n          sari_action?: string | null\n          sari_implication?: string | null\n          sari_result?: string | null\n          sari_subject?: string | null\n          short_headline?: string | null\n          short_resume?: string | null\n          source_id?: string | null\n          specialty_confidence?: number | null\n          specialty_reasoning?: string | null\n          specialty_scored_at?: string | null\n          specialty_tags?: string[]\n          status?: string | null\n          study_design_ai?: string[] | null\n          subspecialty?: string[] | null\n          subspecialty_ai?: string[] | null\n          subspecialty_model_version?: string | null\n          subspecialty_reason?: string | null\n          subspecialty_scored_at?: string | null\n          substances?: Json\n          time_to_read?: number | null\n          title: string\n          trial_registration?: string | null\n          verified?: boolean | null\n          volume?: string | null\n        }\n        Update: {\n          abstract?: string | null\n          admin_note?: string | null\n          ai_decision?: string | null\n          ai_location_attempted?: boolean | null\n          approval_method?: string | null\n          article_cities?: string[] | null\n          article_countries?: string[] | null\n          article_number?: string | null\n          article_type?: string | null\n          article_type_ai?: string | null\n          article_type_confidence?: number | null\n          article_type_method?: string | null\n          article_type_model_version?: string | null\n          article_type_rationale?: string | null\n          article_type_scored_at?: string | null\n          article_type_validated?: boolean | null\n          authors?: Json\n          authors_changed?: boolean\n          authors_raw_new?: Json | null\n          authors_raw_previous?: Json | null\n          authors_unresolvable?: boolean | null\n          auto_tagged_at?: string | null\n          bottom_line?: string | null\n          circle?: number | null\n          citation_count?: number | null\n          citations_fetched_at?: string | null\n          coi_statement?: string | null\n          condensed_at?: string | null\n          condensed_model_version?: string | null\n          date_completed?: string | null\n          doi?: string | null\n          enriched_at?: string | null\n          full_text_available?: boolean | null\n          fwci?: number | null\n          geo_city?: string | null\n          geo_continent?: string | null\n          geo_country?: string | null\n          geo_department?: string | null\n          geo_institution?: string | null\n          geo_region?: string | null\n          geo_source?: string | null\n          geo_state?: string | null\n          grants?: Json\n          id?: string\n          impact_factor?: number | null\n          impact_factor_fetched_at?: string | null\n          imported_at?: string\n          indexed_date?: string | null\n          indexed_month?: number | null\n          indexed_week?: number | null\n          indexed_year?: number | null\n          issn_electronic?: string | null\n          issn_print?: string | null\n          issue?: string | null\n          journal_abbr?: string | null\n          journal_h_index?: number | null\n          journal_title?: string | null\n          keywords?: string[] | null\n          language?: string | null\n          location_confidence?: string | null\n          location_parsed_at?: string | null\n          long_resume?: string | null\n          mesh_terms?: Json\n          mesh_terms_text?: string | null\n          model_version?: string | null\n          openalex_work_id?: string | null\n          patient_population?: string | null\n          pmc_id?: string | null\n          publication_types?: string[] | null\n          published_date?: string | null\n          published_year?: number | null\n          pubmed_date?: string | null\n          pubmed_id?: string\n          pubmed_indexed_at?: string | null\n          pubmed_modified_at?: string | null\n          pubmed_synced_at?: string | null\n          retracted?: boolean\n          sample_size?: number | null\n          sari_action?: string | null\n          sari_implication?: string | null\n          sari_result?: string | null\n          sari_subject?: string | null\n          short_headline?: string | null\n          short_resume?: string | null\n          source_id?: string | null\n          specialty_confidence?: number | null\n          specialty_reasoning?: string | null\n          specialty_scored_at?: string | null\n          specialty_tags?: string[]\n          status?: string | null\n          study_design_ai?: string[] | null\n          subspecialty?: string[] | null\n          subspecialty_ai?: string[] | null\n          subspecialty_model_version?: string | null\n          subspecialty_reason?: string | null\n          subspecialty_scored_at?: string | null\n          substances?: Json\n          time_to_read?: number | null\n          title?: string\n          trial_registration?: string | null\n          verified?: boolean | null\n          volume?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"articles_source_id_fkey\"\n            columns: [\"source_id\"]\n            isOneToOne: false\n            referencedRelation: \"circle_2_sources\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      author_dismissals: {\n        Row: {\n          author_id: string\n          created_at: string\n          user_id: string\n        }\n        Insert: {\n          author_id: string\n          created_at?: string\n          user_id: string\n        }\n        Update: {\n          author_id?: string\n          created_at?: string\n          user_id?: string\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"author_dismissals_author_id_fkey\"\n            columns: [\"author_id\"]\n            isOneToOne: false\n            referencedRelation: \"authors\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      author_events: {\n        Row: {\n          author_id: string | null\n          created_at: string\n          event_type: string\n          id: string\n          payload: Json\n          sequence: number\n        }\n        Insert: {\n          author_id?: string | null\n          created_at?: string\n          event_type: string\n          id?: string\n          payload?: Json\n          sequence?: number\n        }\n        Update: {\n          author_id?: string | null\n          created_at?: string\n          event_type?: string\n          id?: string\n          payload?: Json\n          sequence?: number\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"author_events_author_id_fkey\"\n            columns: [\"author_id\"]\n            isOneToOne: false\n            referencedRelation: \"authors\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      author_follows: {\n        Row: {\n          author_id: string | null\n          created_at: string | null\n          id: string\n          user_id: string | null\n        }\n        Insert: {\n          author_id?: string | null\n          created_at?: string | null\n          id?: string\n          user_id?: string | null\n        }\n        Update: {\n          author_id?: string | null\n          created_at?: string | null\n          id?: string\n          user_id?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"author_follows_author_id_fkey\"\n            columns: [\"author_id\"]\n            isOneToOne: false\n            referencedRelation: \"authors\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"author_follows_user_id_fkey\"\n            columns: [\"user_id\"]\n            isOneToOne: false\n            referencedRelation: \"users\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      author_linking_logs: {\n        Row: {\n          articles_processed: number | null\n          authors_linked: number | null\n          authors_processed: number\n          completed_at: string | null\n          duplicates: number\n          errors: Json | null\n          id: string\n          import_log_id: string | null\n          new_authors: number\n          rejected: number\n          started_at: string | null\n          status: string | null\n        }\n        Insert: {\n          articles_processed?: number | null\n          authors_linked?: number | null\n          authors_processed?: number\n          completed_at?: string | null\n          duplicates?: number\n          errors?: Json | null\n          id?: string\n          import_log_id?: string | null\n          new_authors?: number\n          rejected?: number\n          started_at?: string | null\n          status?: string | null\n        }\n        Update: {\n          articles_processed?: number | null\n          authors_linked?: number | null\n          authors_processed?: number\n          completed_at?: string | null\n          duplicates?: number\n          errors?: Json | null\n          id?: string\n          import_log_id?: string | null\n          new_authors?: number\n          rejected?: number\n          started_at?: string | null\n          status?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"author_linking_logs_import_log_id_fkey\"\n            columns: [\"import_log_id\"]\n            isOneToOne: false\n            referencedRelation: \"import_logs\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      author_merge_log: {\n        Row: {\n          created_at: string\n          deleted_author_ids: string[]\n          id: string\n          merged_by_user_id: string\n          primary_author_id: string\n          resolved_fields: Json\n        }\n        Insert: {\n          created_at?: string\n          deleted_author_ids: string[]\n          id?: string\n          merged_by_user_id: string\n          primary_author_id: string\n          resolved_fields?: Json\n        }\n        Update: {\n          created_at?: string\n          deleted_author_ids?: string[]\n          id?: string\n          merged_by_user_id?: string\n          primary_author_id?: string\n          resolved_fields?: Json\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"author_merge_log_merged_by_user_id_fkey\"\n            columns: [\"merged_by_user_id\"]\n            isOneToOne: false\n            referencedRelation: \"users\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      author_update_logs: {\n        Row: {\n          completed_at: string | null\n          dry_run: boolean\n          errors: Json | null\n          id: string\n          processed: number\n          scenario_a: number\n          scenario_b: number\n          scenario_c: number\n          started_at: string\n          status: string\n          triggered_by: string\n          unmatched: number\n        }\n        Insert: {\n          completed_at?: string | null\n          dry_run?: boolean\n          errors?: Json | null\n          id?: string\n          processed?: number\n          scenario_a?: number\n          scenario_b?: number\n          scenario_c?: number\n          started_at?: string\n          status?: string\n          triggered_by?: string\n          unmatched?: number\n        }\n        Update: {\n          completed_at?: string | null\n          dry_run?: boolean\n          errors?: Json | null\n          id?: string\n          processed?: number\n          scenario_a?: number\n          scenario_b?: number\n          scenario_c?: number\n          started_at?: string\n          status?: string\n          triggered_by?: string\n          unmatched?: number\n        }\n        Relationships: []\n      }\n      authors: {\n        Row: {\n          affiliations: string[] | null\n          ai_geo_parsed: boolean | null\n          article_count: number | null\n          author_score: number | null\n          city: string | null\n          continent: string | null\n          country: string | null\n          created_at: string | null\n          deleted_at: string | null\n          department: string | null\n          display_name: string\n          display_name_normalized: string | null\n          email: string | null\n          first_article_date: string | null\n          geo_locked_by: string | null\n          geo_source: string | null\n          hospital: string | null\n          id: string\n          institution_type: string | null\n          last_article_date: string | null\n          match_confidence: number | null\n          openalex_author_id: string | null\n          openalex_enriched_at: string | null\n          openalex_id: string | null\n          orcid: string | null\n          orcid_enriched_at: string | null\n          region: string | null\n          ror_enriched_at: string | null\n          ror_id: string | null\n          state: string | null\n          updated_at: string | null\n          verified_by: string | null\n        }\n        Insert: {\n          affiliations?: string[] | null\n          ai_geo_parsed?: boolean | null\n          article_count?: number | null\n          author_score?: number | null\n          city?: string | null\n          continent?: string | null\n          country?: string | null\n          created_at?: string | null\n          deleted_at?: string | null\n          department?: string | null\n          display_name: string\n          display_name_normalized?: string | null\n          email?: string | null\n          first_article_date?: string | null\n          geo_locked_by?: string | null\n          geo_source?: string | null\n          hospital?: string | null\n          id?: string\n          institution_type?: string | null\n          last_article_date?: string | null\n          match_confidence?: number | null\n          openalex_author_id?: string | null\n          openalex_enriched_at?: string | null\n          openalex_id?: string | null\n          orcid?: string | null\n          orcid_enriched_at?: string | null\n          region?: string | null\n          ror_enriched_at?: string | null\n          ror_id?: string | null\n          state?: string | null\n          updated_at?: string | null\n          verified_by?: string | null\n        }\n        Update: {\n          affiliations?: string[] | null\n          ai_geo_parsed?: boolean | null\n          article_count?: number | null\n          author_score?: number | null\n          city?: string | null\n          continent?: string | null\n          country?: string | null\n          created_at?: string | null\n          deleted_at?: string | null\n          department?: string | null\n          display_name?: string\n          display_name_normalized?: string | null\n          email?: string | null\n          first_article_date?: string | null\n          geo_locked_by?: string | null\n          geo_source?: string | null\n          hospital?: string | null\n          id?: string\n          institution_type?: string | null\n          last_article_date?: string | null\n          match_confidence?: number | null\n          openalex_author_id?: string | null\n          openalex_enriched_at?: string | null\n          openalex_id?: string | null\n          orcid?: string | null\n          orcid_enriched_at?: string | null\n          region?: string | null\n          ror_enriched_at?: string | null\n          ror_id?: string | null\n          state?: string | null\n          updated_at?: string | null\n          verified_by?: string | null\n        }\n        Relationships: []\n      }\n      auto_tag_logs: {\n        Row: {\n          approved: number\n          completed_at: string | null\n          errors: string[] | null\n          id: string\n          job: string\n          started_at: string\n          status: string\n        }\n        Insert: {\n          approved?: number\n          completed_at?: string | null\n          errors?: string[] | null\n          id?: string\n          job: string\n          started_at?: string\n          status?: string\n        }\n        Update: {\n          approved?: number\n          completed_at?: string | null\n          errors?: string[] | null\n          id?: string\n          job?: string\n          started_at?: string\n          status?: string\n        }\n        Relationships: []\n      }\n      circle_2_sources: {\n        Row: {\n          active: boolean | null\n          confidence_prior: number | null\n          created_at: string | null\n          description: string | null\n          id: string\n          last_run_at: string | null\n          max_results: number | null\n          specialty: string\n          type: string\n          value: string\n        }\n        Insert: {\n          active?: boolean | null\n          confidence_prior?: number | null\n          created_at?: string | null\n          description?: string | null\n          id?: string\n          last_run_at?: string | null\n          max_results?: number | null\n          specialty: string\n          type: string\n          value: string\n        }\n        Update: {\n          active?: boolean | null\n          confidence_prior?: number | null\n          created_at?: string | null\n          description?: string | null\n          id?: string\n          last_run_at?: string | null\n          max_results?: number | null\n          specialty?: string\n          type?: string\n          value?: string\n        }\n        Relationships: []\n      }\n      circle_3_sources: {\n        Row: {\n          active: boolean\n          created_at: string\n          description: string | null\n          id: string\n          last_run_at: string | null\n          max_results: number\n          specialty: string\n          type: string\n          value: string\n        }\n        Insert: {\n          active?: boolean\n          created_at?: string\n          description?: string | null\n          id?: string\n          last_run_at?: string | null\n          max_results?: number\n          specialty?: string\n          type?: string\n          value: string\n        }\n        Update: {\n          active?: boolean\n          created_at?: string\n          description?: string | null\n          id?: string\n          last_run_at?: string | null\n          max_results?: number\n          specialty?: string\n          type?: string\n          value?: string\n        }\n        Relationships: []\n      }\n      city_aliases: {\n        Row: {\n          alias: string\n          canonical: string\n          country: string\n          created_at: string | null\n          id: string\n        }\n        Insert: {\n          alias: string\n          canonical: string\n          country: string\n          created_at?: string | null\n          id?: string\n        }\n        Update: {\n          alias?: string\n          canonical?: string\n          country?: string\n          created_at?: string | null\n          id?: string\n        }\n        Relationships: []\n      }\n      country_aliases: {\n        Row: {\n          alias: string\n          canonical: string\n          created_at: string | null\n          id: string\n        }\n        Insert: {\n          alias: string\n          canonical: string\n          created_at?: string | null\n          id?: string\n        }\n        Update: {\n          alias?: string\n          canonical?: string\n          created_at?: string | null\n          id?: string\n        }\n        Relationships: []\n      }\n      geo_cities: {\n        Row: {\n          admin1_code: string | null\n          ascii_name: string | null\n          country: string | null\n          country_code: string\n          geonameid: number\n          latitude: number | null\n          longitude: number | null\n          name: string\n          population: number | null\n          state: string | null\n        }\n        Insert: {\n          admin1_code?: string | null\n          ascii_name?: string | null\n          country?: string | null\n          country_code: string\n          geonameid: number\n          latitude?: number | null\n          longitude?: number | null\n          name: string\n          population?: number | null\n          state?: string | null\n        }\n        Update: {\n          admin1_code?: string | null\n          ascii_name?: string | null\n          country?: string | null\n          country_code?: string\n          geonameid?: number\n          latitude?: number | null\n          longitude?: number | null\n          name?: string\n          population?: number | null\n          state?: string | null\n        }\n        Relationships: []\n      }\n      geo_city_state_cache: {\n        Row: {\n          city: string\n          country: string\n          id: string\n          looked_up_at: string | null\n          source: string | null\n          state: string | null\n        }\n        Insert: {\n          city: string\n          country: string\n          id?: string\n          looked_up_at?: string | null\n          source?: string | null\n          state?: string | null\n        }\n        Update: {\n          city?: string\n          country?: string\n          id?: string\n          looked_up_at?: string | null\n          source?: string | null\n          state?: string | null\n        }\n        Relationships: []\n      }\n      geo_institution_overrides: {\n        Row: {\n          city: string | null\n          country: string | null\n          created_at: string | null\n          id: string\n          institution: string | null\n          raw_segment: string\n        }\n        Insert: {\n          city?: string | null\n          country?: string | null\n          created_at?: string | null\n          id?: string\n          institution?: string | null\n          raw_segment: string\n        }\n        Update: {\n          city?: string | null\n          country?: string | null\n          created_at?: string | null\n          id?: string\n          institution?: string | null\n          raw_segment?: string\n        }\n        Relationships: []\n      }\n      import_logs: {\n        Row: {\n          articles_fetched: number\n          articles_imported: number\n          articles_skipped: number\n          author_slots_imported: number\n          circle: number | null\n          completed_at: string | null\n          errors: Json | null\n          filter_id: string | null\n          id: string\n          started_at: string\n          status: string\n          trigger: string | null\n        }\n        Insert: {\n          articles_fetched?: number\n          articles_imported?: number\n          articles_skipped?: number\n          author_slots_imported?: number\n          circle?: number | null\n          completed_at?: string | null\n          errors?: Json | null\n          filter_id?: string | null\n          id?: string\n          started_at?: string\n          status: string\n          trigger?: string | null\n        }\n        Update: {\n          articles_fetched?: number\n          articles_imported?: number\n          articles_skipped?: number\n          author_slots_imported?: number\n          circle?: number | null\n          completed_at?: string | null\n          errors?: Json | null\n          filter_id?: string | null\n          id?: string\n          started_at?: string\n          status?: string\n          trigger?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"import_logs_filter_id_fkey\"\n            columns: [\"filter_id\"]\n            isOneToOne: false\n            referencedRelation: \"pubmed_filters\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      import_quality_checks: {\n        Row: {\n          check_type: string | null\n          checks: Json\n          created_at: string | null\n          failed_checks: number\n          id: string\n          import_log_id: string | null\n          passed: boolean\n          total_checks: number\n        }\n        Insert: {\n          check_type?: string | null\n          checks?: Json\n          created_at?: string | null\n          failed_checks?: number\n          id?: string\n          import_log_id?: string | null\n          passed?: boolean\n          total_checks?: number\n        }\n        Update: {\n          check_type?: string | null\n          checks?: Json\n          created_at?: string | null\n          failed_checks?: number\n          id?: string\n          import_log_id?: string | null\n          passed?: boolean\n          total_checks?: number\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"import_quality_checks_import_log_id_fkey\"\n            columns: [\"import_log_id\"]\n            isOneToOne: false\n            referencedRelation: \"import_logs\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      lab_decisions: {\n        Row: {\n          ai_confidence: number | null\n          ai_decision: string | null\n          ai_reasoning: string | null\n          article_id: string | null\n          author_id: string | null\n          comment: string | null\n          decided_at: string | null\n          decision: string\n          disagreement_reason: string | null\n          id: string\n          model_version: string | null\n          module: string\n          reject_reasons: string[]\n          session_id: string | null\n          specialty: string\n        }\n        Insert: {\n          ai_confidence?: number | null\n          ai_decision?: string | null\n          ai_reasoning?: string | null\n          article_id?: string | null\n          author_id?: string | null\n          comment?: string | null\n          decided_at?: string | null\n          decision: string\n          disagreement_reason?: string | null\n          id?: string\n          model_version?: string | null\n          module: string\n          reject_reasons?: string[]\n          session_id?: string | null\n          specialty: string\n        }\n        Update: {\n          ai_confidence?: number | null\n          ai_decision?: string | null\n          ai_reasoning?: string | null\n          article_id?: string | null\n          author_id?: string | null\n          comment?: string | null\n          decided_at?: string | null\n          decision?: string\n          disagreement_reason?: string | null\n          id?: string\n          model_version?: string | null\n          module?: string\n          reject_reasons?: string[]\n          session_id?: string | null\n          specialty?: string\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"lab_decisions_article_id_fkey\"\n            columns: [\"article_id\"]\n            isOneToOne: false\n            referencedRelation: \"articles\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"lab_decisions_author_id_fkey\"\n            columns: [\"author_id\"]\n            isOneToOne: false\n            referencedRelation: \"authors\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"lab_decisions_session_id_fkey\"\n            columns: [\"session_id\"]\n            isOneToOne: false\n            referencedRelation: \"lab_sessions\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      lab_sessions: {\n        Row: {\n          articles_approved: number | null\n          articles_rejected: number | null\n          articles_reviewed: number | null\n          completed_at: string | null\n          id: string\n          module: string\n          specialty: string\n          started_at: string | null\n          user_id: string | null\n        }\n        Insert: {\n          articles_approved?: number | null\n          articles_rejected?: number | null\n          articles_reviewed?: number | null\n          completed_at?: string | null\n          id?: string\n          module: string\n          specialty: string\n          started_at?: string | null\n          user_id?: string | null\n        }\n        Update: {\n          articles_approved?: number | null\n          articles_rejected?: number | null\n          articles_reviewed?: number | null\n          completed_at?: string | null\n          id?: string\n          module?: string\n          specialty?: string\n          started_at?: string | null\n          user_id?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"lab_sessions_user_id_fkey\"\n            columns: [\"user_id\"]\n            isOneToOne: false\n            referencedRelation: \"users\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      model_optimization_runs: {\n        Row: {\n          base_version: string\n          created_at: string | null\n          fn_count: number | null\n          fn_patterns: Json | null\n          fp_count: number | null\n          fp_patterns: Json | null\n          id: string\n          improved_prompt: string | null\n          module: string\n          recommended_changes: string | null\n          refinement_iterations: Json | null\n          specialty: string\n          total_decisions: number | null\n        }\n        Insert: {\n          base_version: string\n          created_at?: string | null\n          fn_count?: number | null\n          fn_patterns?: Json | null\n          fp_count?: number | null\n          fp_patterns?: Json | null\n          id?: string\n          improved_prompt?: string | null\n          module: string\n          recommended_changes?: string | null\n          refinement_iterations?: Json | null\n          specialty: string\n          total_decisions?: number | null\n        }\n        Update: {\n          base_version?: string\n          created_at?: string | null\n          fn_count?: number | null\n          fn_patterns?: Json | null\n          fp_count?: number | null\n          fp_patterns?: Json | null\n          id?: string\n          improved_prompt?: string | null\n          module?: string\n          recommended_changes?: string | null\n          refinement_iterations?: Json | null\n          specialty?: string\n          total_decisions?: number | null\n        }\n        Relationships: []\n      }\n      model_versions: {\n        Row: {\n          activated_at: string | null\n          active: boolean\n          base_prompt_text: string | null\n          generated_by: string\n          id: string\n          module: string\n          notes: string | null\n          prompt_text: string\n          specialty: string\n          version: string\n        }\n        Insert: {\n          activated_at?: string | null\n          active?: boolean\n          base_prompt_text?: string | null\n          generated_by?: string\n          id?: string\n          module: string\n          notes?: string | null\n          prompt_text: string\n          specialty: string\n          version: string\n        }\n        Update: {\n          activated_at?: string | null\n          active?: boolean\n          base_prompt_text?: string | null\n          generated_by?: string\n          id?: string\n          module?: string\n          notes?: string | null\n          prompt_text?: string\n          specialty?: string\n          version?: string\n        }\n        Relationships: []\n      }\n      newsletter_edition_articles: {\n        Row: {\n          article_id: string\n          created_at: string\n          edition_id: string\n          featured: boolean\n          id: string\n          is_global: boolean\n          sort_order: number\n          subspecialty: string\n        }\n        Insert: {\n          article_id: string\n          created_at?: string\n          edition_id: string\n          featured?: boolean\n          id?: string\n          is_global?: boolean\n          sort_order?: number\n          subspecialty: string\n        }\n        Update: {\n          article_id?: string\n          created_at?: string\n          edition_id?: string\n          featured?: boolean\n          id?: string\n          is_global?: boolean\n          sort_order?: number\n          subspecialty?: string\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"newsletter_edition_articles_article_id_fkey\"\n            columns: [\"article_id\"]\n            isOneToOne: false\n            referencedRelation: \"articles\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"newsletter_edition_articles_edition_id_fkey\"\n            columns: [\"edition_id\"]\n            isOneToOne: false\n            referencedRelation: \"newsletter_editions\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      newsletter_editions: {\n        Row: {\n          content: Json\n          created_at: string\n          created_by: string | null\n          id: string\n          published_at: string | null\n          specialty: string\n          status: string\n          week_number: number\n          year: number\n        }\n        Insert: {\n          content: Json\n          created_at?: string\n          created_by?: string | null\n          id?: string\n          published_at?: string | null\n          specialty?: string\n          status?: string\n          week_number: number\n          year: number\n        }\n        Update: {\n          content?: Json\n          created_at?: string\n          created_by?: string | null\n          id?: string\n          published_at?: string | null\n          specialty?: string\n          status?: string\n          week_number?: number\n          year?: number\n        }\n        Relationships: []\n      }\n      newsletter_feedback: {\n        Row: {\n          article_id: string | null\n          article_rank: number | null\n          article_type: string | null\n          clinical_relevance: string | null\n          decided_at: string | null\n          decision: string | null\n          id: string\n          impact_factor: number | null\n          news_value: number | null\n          week_number: number\n          year: number\n        }\n        Insert: {\n          article_id?: string | null\n          article_rank?: number | null\n          article_type?: string | null\n          clinical_relevance?: string | null\n          decided_at?: string | null\n          decision?: string | null\n          id?: string\n          impact_factor?: number | null\n          news_value?: number | null\n          week_number: number\n          year: number\n        }\n        Update: {\n          article_id?: string | null\n          article_rank?: number | null\n          article_type?: string | null\n          clinical_relevance?: string | null\n          decided_at?: string | null\n          decision?: string | null\n          id?: string\n          impact_factor?: number | null\n          news_value?: number | null\n          week_number?: number\n          year?: number\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"newsletter_feedback_article_id_fkey\"\n            columns: [\"article_id\"]\n            isOneToOne: false\n            referencedRelation: \"articles\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      newsletter_send_clicks: {\n        Row: {\n          article_id: string\n          clicked_at: string\n          id: string\n          send_id: string\n        }\n        Insert: {\n          article_id: string\n          clicked_at?: string\n          id?: string\n          send_id: string\n        }\n        Update: {\n          article_id?: string\n          clicked_at?: string\n          id?: string\n          send_id?: string\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"newsletter_send_clicks_article_id_fkey\"\n            columns: [\"article_id\"]\n            isOneToOne: false\n            referencedRelation: \"articles\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"newsletter_send_clicks_send_id_fkey\"\n            columns: [\"send_id\"]\n            isOneToOne: false\n            referencedRelation: \"newsletter_sends\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      newsletter_sends: {\n        Row: {\n          id: string\n          open_token: string\n          opened_at: string | null\n          sent_at: string\n          user_id: string\n          week_number: number\n          year: number\n        }\n        Insert: {\n          id?: string\n          open_token?: string\n          opened_at?: string | null\n          sent_at?: string\n          user_id: string\n          week_number: number\n          year: number\n        }\n        Update: {\n          id?: string\n          open_token?: string\n          opened_at?: string | null\n          sent_at?: string\n          user_id?: string\n          week_number?: number\n          year?: number\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"newsletter_sends_user_id_fkey\"\n            columns: [\"user_id\"]\n            isOneToOne: false\n            referencedRelation: \"users\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      notifications: {\n        Row: {\n          created_at: string | null\n          id: string\n          link: string | null\n          message: string | null\n          read: boolean | null\n          title: string\n          type: string\n          user_id: string | null\n        }\n        Insert: {\n          created_at?: string | null\n          id?: string\n          link?: string | null\n          message?: string | null\n          read?: boolean | null\n          title: string\n          type: string\n          user_id?: string | null\n        }\n        Update: {\n          created_at?: string | null\n          id?: string\n          link?: string | null\n          message?: string | null\n          read?: boolean | null\n          title?: string\n          type?: string\n          user_id?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"notifications_user_id_fkey\"\n            columns: [\"user_id\"]\n            isOneToOne: false\n            referencedRelation: \"users\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      projects: {\n        Row: {\n          created_at: string | null\n          id: string\n          name: string\n          user_id: string | null\n        }\n        Insert: {\n          created_at?: string | null\n          id?: string\n          name: string\n          user_id?: string | null\n        }\n        Update: {\n          created_at?: string | null\n          id?: string\n          name?: string\n          user_id?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"projects_user_id_fkey\"\n            columns: [\"user_id\"]\n            isOneToOne: false\n            referencedRelation: \"users\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      publication_type_rules: {\n        Row: {\n          active: boolean | null\n          article_type: string | null\n          created_at: string | null\n          id: string\n          pubmed_type: string\n          study_design: string | null\n        }\n        Insert: {\n          active?: boolean | null\n          article_type?: string | null\n          created_at?: string | null\n          id?: string\n          pubmed_type: string\n          study_design?: string | null\n        }\n        Update: {\n          active?: boolean | null\n          article_type?: string | null\n          created_at?: string | null\n          id?: string\n          pubmed_type?: string\n          study_design?: string | null\n        }\n        Relationships: []\n      }\n      pubmed_filters: {\n        Row: {\n          active: boolean\n          circle: number | null\n          created_at: string\n          id: string\n          journal_list: string[] | null\n          last_run_at: string | null\n          max_results: number\n          mesh_list: string[] | null\n          name: string\n          query_string: string\n          specialty: string\n          updated_at: string\n        }\n        Insert: {\n          active?: boolean\n          circle?: number | null\n          created_at?: string\n          id?: string\n          journal_list?: string[] | null\n          last_run_at?: string | null\n          max_results?: number\n          mesh_list?: string[] | null\n          name: string\n          query_string: string\n          specialty: string\n          updated_at?: string\n        }\n        Update: {\n          active?: boolean\n          circle?: number | null\n          created_at?: string\n          id?: string\n          journal_list?: string[] | null\n          last_run_at?: string | null\n          max_results?: number\n          mesh_list?: string[] | null\n          name?: string\n          query_string?: string\n          specialty?: string\n          updated_at?: string\n        }\n        Relationships: []\n      }\n      pubmed_sync_log: {\n        Row: {\n          event: string\n          fields_changed: string[] | null\n          id: string\n          pubmed_id: string\n          pubmed_modified_at: string | null\n          synced_at: string\n        }\n        Insert: {\n          event: string\n          fields_changed?: string[] | null\n          id?: string\n          pubmed_id: string\n          pubmed_modified_at?: string | null\n          synced_at?: string\n        }\n        Update: {\n          event?: string\n          fields_changed?: string[] | null\n          id?: string\n          pubmed_id?: string\n          pubmed_modified_at?: string | null\n          synced_at?: string\n        }\n        Relationships: []\n      }\n      reading_history: {\n        Row: {\n          article_id: string | null\n          id: string\n          user_id: string | null\n          visited_at: string | null\n        }\n        Insert: {\n          article_id?: string | null\n          id?: string\n          user_id?: string | null\n          visited_at?: string | null\n        }\n        Update: {\n          article_id?: string | null\n          id?: string\n          user_id?: string | null\n          visited_at?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"reading_history_article_id_fkey\"\n            columns: [\"article_id\"]\n            isOneToOne: false\n            referencedRelation: \"articles\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"reading_history_user_id_fkey\"\n            columns: [\"user_id\"]\n            isOneToOne: false\n            referencedRelation: \"users\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      rejected_authors: {\n        Row: {\n          article_id: string | null\n          created_at: string | null\n          id: string\n          linking_log_id: string | null\n          position: number | null\n          pubmed_id: string | null\n          raw_data: Json | null\n          reason: string | null\n        }\n        Insert: {\n          article_id?: string | null\n          created_at?: string | null\n          id?: string\n          linking_log_id?: string | null\n          position?: number | null\n          pubmed_id?: string | null\n          raw_data?: Json | null\n          reason?: string | null\n        }\n        Update: {\n          article_id?: string | null\n          created_at?: string | null\n          id?: string\n          linking_log_id?: string | null\n          position?: number | null\n          pubmed_id?: string | null\n          raw_data?: Json | null\n          reason?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"rejected_authors_article_id_fkey\"\n            columns: [\"article_id\"]\n            isOneToOne: false\n            referencedRelation: \"articles\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"rejected_authors_linking_log_id_fkey\"\n            columns: [\"linking_log_id\"]\n            isOneToOne: false\n            referencedRelation: \"author_linking_logs\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      ror_institutions: {\n        Row: {\n          city: string | null\n          country: string | null\n          country_code: string | null\n          dump_version: string | null\n          fetched_at: string\n          institution_type: string | null\n          name: string\n          ror_id: string\n          state: string | null\n          status: string | null\n          updated_at: string\n        }\n        Insert: {\n          city?: string | null\n          country?: string | null\n          country_code?: string | null\n          dump_version?: string | null\n          fetched_at?: string\n          institution_type?: string | null\n          name: string\n          ror_id: string\n          state?: string | null\n          status?: string | null\n          updated_at?: string\n        }\n        Update: {\n          city?: string | null\n          country?: string | null\n          country_code?: string | null\n          dump_version?: string | null\n          fetched_at?: string\n          institution_type?: string | null\n          name?: string\n          ror_id?: string\n          state?: string | null\n          status?: string | null\n          updated_at?: string\n        }\n        Relationships: []\n      }\n      saved_articles: {\n        Row: {\n          article_id: string | null\n          id: string\n          project_id: string | null\n          saved_at: string | null\n          user_id: string | null\n        }\n        Insert: {\n          article_id?: string | null\n          id?: string\n          project_id?: string | null\n          saved_at?: string | null\n          user_id?: string | null\n        }\n        Update: {\n          article_id?: string | null\n          id?: string\n          project_id?: string | null\n          saved_at?: string | null\n          user_id?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"saved_articles_article_id_fkey\"\n            columns: [\"article_id\"]\n            isOneToOne: false\n            referencedRelation: \"articles\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"saved_articles_project_id_fkey\"\n            columns: [\"project_id\"]\n            isOneToOne: false\n            referencedRelation: \"projects\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"saved_articles_user_id_fkey\"\n            columns: [\"user_id\"]\n            isOneToOne: false\n            referencedRelation: \"users\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      scoring_runs: {\n        Row: {\n          error: string | null\n          failed: number\n          finished_at: string | null\n          id: string\n          module: string\n          scored: number\n          specialty: string\n          started_at: string\n          status: string\n          total: number\n          triggered_by: string\n          version: string\n        }\n        Insert: {\n          error?: string | null\n          failed?: number\n          finished_at?: string | null\n          id?: string\n          module: string\n          scored?: number\n          specialty: string\n          started_at?: string\n          status?: string\n          total?: number\n          triggered_by?: string\n          version: string\n        }\n        Update: {\n          error?: string | null\n          failed?: number\n          finished_at?: string | null\n          id?: string\n          module?: string\n          scored?: number\n          specialty?: string\n          started_at?: string\n          status?: string\n          total?: number\n          triggered_by?: string\n          version?: string\n        }\n        Relationships: []\n      }\n      study_design_categories: {\n        Row: {\n          active: boolean | null\n          id: string\n          name: string\n          sort_order: number | null\n        }\n        Insert: {\n          active?: boolean | null\n          id?: string\n          name: string\n          sort_order?: number | null\n        }\n        Update: {\n          active?: boolean | null\n          id?: string\n          name?: string\n          sort_order?: number | null\n        }\n        Relationships: []\n      }\n      subspecialties: {\n        Row: {\n          active: boolean\n          code: number | null\n          created_at: string\n          id: string\n          name: string\n          short_name: string | null\n          sort_order: number\n          specialty: string\n        }\n        Insert: {\n          active?: boolean\n          code?: number | null\n          created_at?: string\n          id?: string\n          name: string\n          short_name?: string | null\n          sort_order: number\n          specialty: string\n        }\n        Update: {\n          active?: boolean\n          code?: number | null\n          created_at?: string\n          id?: string\n          name?: string\n          short_name?: string | null\n          sort_order?: number\n          specialty?: string\n        }\n        Relationships: []\n      }\n      system_alerts: {\n        Row: {\n          active: boolean | null\n          created_at: string | null\n          created_by: string | null\n          expires_at: string | null\n          id: string\n          message: string\n          title: string\n          type: string | null\n        }\n        Insert: {\n          active?: boolean | null\n          created_at?: string | null\n          created_by?: string | null\n          expires_at?: string | null\n          id?: string\n          message: string\n          title: string\n          type?: string | null\n        }\n        Update: {\n          active?: boolean | null\n          created_at?: string | null\n          created_by?: string | null\n          expires_at?: string | null\n          id?: string\n          message?: string\n          title?: string\n          type?: string | null\n        }\n        Relationships: []\n      }\n      tagging_rule_combos: {\n        Row: {\n          activated_at: string | null\n          activated_by: string | null\n          approve_rate: number\n          approved: number\n          created_at: string\n          id: string\n          min_decisions: number\n          rejected: number\n          source_count: number\n          specialty: string\n          status: string\n          term_1: string\n          term_2: string\n          total_decisions: number\n          updated_at: string\n        }\n        Insert: {\n          activated_at?: string | null\n          activated_by?: string | null\n          approve_rate?: number\n          approved?: number\n          created_at?: string\n          id?: string\n          min_decisions?: number\n          rejected?: number\n          source_count?: number\n          specialty: string\n          status?: string\n          term_1: string\n          term_2: string\n          total_decisions?: number\n          updated_at?: string\n        }\n        Update: {\n          activated_at?: string | null\n          activated_by?: string | null\n          approve_rate?: number\n          approved?: number\n          created_at?: string\n          id?: string\n          min_decisions?: number\n          rejected?: number\n          source_count?: number\n          specialty?: string\n          status?: string\n          term_1?: string\n          term_2?: string\n          total_decisions?: number\n          updated_at?: string\n        }\n        Relationships: []\n      }\n      tagging_rules: {\n        Row: {\n          activated_at: string | null\n          activated_by: string | null\n          approve_rate: number\n          approved: number\n          created_at: string\n          id: string\n          min_decisions: number\n          rejected: number\n          source_count: number\n          specialty: string\n          status: string\n          term: string\n          total_decisions: number\n          updated_at: string\n        }\n        Insert: {\n          activated_at?: string | null\n          activated_by?: string | null\n          approve_rate?: number\n          approved?: number\n          created_at?: string\n          id?: string\n          min_decisions?: number\n          rejected?: number\n          source_count?: number\n          specialty: string\n          status?: string\n          term: string\n          total_decisions?: number\n          updated_at?: string\n        }\n        Update: {\n          activated_at?: string | null\n          activated_by?: string | null\n          approve_rate?: number\n          approved?: number\n          created_at?: string\n          id?: string\n          min_decisions?: number\n          rejected?: number\n          source_count?: number\n          specialty?: string\n          status?: string\n          term?: string\n          total_decisions?: number\n          updated_at?: string\n        }\n        Relationships: []\n      }\n      unsubscribe_log: {\n        Row: {\n          email: string\n          id: string\n          ip_address: string | null\n          resubscribed_at: string | null\n          unsubscribed_at: string\n          user_agent: string | null\n          user_id: string\n        }\n        Insert: {\n          email: string\n          id?: string\n          ip_address?: string | null\n          resubscribed_at?: string | null\n          unsubscribed_at?: string\n          user_agent?: string | null\n          user_id: string\n        }\n        Update: {\n          email?: string\n          id?: string\n          ip_address?: string | null\n          resubscribed_at?: string | null\n          unsubscribed_at?: string\n          user_agent?: string | null\n          user_id?: string\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"unsubscribe_log_user_id_fkey\"\n            columns: [\"user_id\"]\n            isOneToOne: false\n            referencedRelation: \"users\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      user_keywords: {\n        Row: {\n          created_at: string\n          id: string\n          keyword: string\n          user_id: string\n        }\n        Insert: {\n          created_at?: string\n          id?: string\n          keyword: string\n          user_id: string\n        }\n        Update: {\n          created_at?: string\n          id?: string\n          keyword?: string\n          user_id?: string\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"user_keywords_user_id_fkey\"\n            columns: [\"user_id\"]\n            isOneToOne: false\n            referencedRelation: \"users\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      users: {\n        Row: {\n          author_id: string | null\n          avatar_url: string | null\n          city: string | null\n          country: string | null\n          created_at: string\n          department: string | null\n          email: string\n          email_format: string\n          email_notifications: boolean | null\n          first_name: string | null\n          frequency: string\n          hospital: string | null\n          id: string\n          is_public: boolean | null\n          last_name: string | null\n          name: string\n          notes: string\n          onboarding_completed: boolean\n          paused_until: string | null\n          referral_code: string | null\n          referred_by_id: string | null\n          role: string\n          role_type: string | null\n          source: string\n          specialty_slugs: string[]\n          state: string | null\n          status: string\n          subscribed_at: string\n          subspecialties: Json\n          title: string | null\n          unsubscribe_token: string | null\n          unsubscribed_at: string | null\n          updated_at: string\n          welcome_sent_at: string | null\n        }\n        Insert: {\n          author_id?: string | null\n          avatar_url?: string | null\n          city?: string | null\n          country?: string | null\n          created_at?: string\n          department?: string | null\n          email: string\n          email_format?: string\n          email_notifications?: boolean | null\n          first_name?: string | null\n          frequency?: string\n          hospital?: string | null\n          id: string\n          is_public?: boolean | null\n          last_name?: string | null\n          name?: string\n          notes?: string\n          onboarding_completed?: boolean\n          paused_until?: string | null\n          referral_code?: string | null\n          referred_by_id?: string | null\n          role?: string\n          role_type?: string | null\n          source?: string\n          specialty_slugs?: string[]\n          state?: string | null\n          status?: string\n          subscribed_at?: string\n          subspecialties?: Json\n          title?: string | null\n          unsubscribe_token?: string | null\n          unsubscribed_at?: string | null\n          updated_at?: string\n          welcome_sent_at?: string | null\n        }\n        Update: {\n          author_id?: string | null\n          avatar_url?: string | null\n          city?: string | null\n          country?: string | null\n          created_at?: string\n          department?: string | null\n          email?: string\n          email_format?: string\n          email_notifications?: boolean | null\n          first_name?: string | null\n          frequency?: string\n          hospital?: string | null\n          id?: string\n          is_public?: boolean | null\n          last_name?: string | null\n          name?: string\n          notes?: string\n          onboarding_completed?: boolean\n          paused_until?: string | null\n          referral_code?: string | null\n          referred_by_id?: string | null\n          role?: string\n          role_type?: string | null\n          source?: string\n          specialty_slugs?: string[]\n          state?: string | null\n          status?: string\n          subscribed_at?: string\n          subspecialties?: Json\n          title?: string | null\n          unsubscribe_token?: string | null\n          unsubscribed_at?: string | null\n          updated_at?: string\n          welcome_sent_at?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"users_author_id_fkey\"\n            columns: [\"author_id\"]\n            isOneToOne: false\n            referencedRelation: \"authors\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"users_referred_by_id_fkey\"\n            columns: [\"referred_by_id\"]\n            isOneToOne: false\n            referencedRelation: \"users\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n    }\n    Views: {\n      [_ in never]: never\n    }\n    Functions: {\n      compute_author_scores: { Args: never; Returns: undefined }\n      count_affiliation_too_long: { Args: never; Returns: number }\n      count_article_suspect_city_values: { Args: never; Returns: number }\n      count_article_type_not_validated: { Args: never; Returns: number }\n      count_article_type_pending: { Args: never; Returns: number }\n      count_article_type_pending_approval: {\n        Args: { p_article_type?: string }\n        Returns: number\n      }\n      count_article_type_unscored:\n        | { Args: never; Returns: number }\n        | { Args: { p_specialty?: string }; Returns: number }\n      count_articles_by_mesh_terms: {\n        Args: {\n          p_mesh_terms: string[]\n          p_subspecialty: string\n          p_year_range?: string\n        }\n        Returns: number\n      }\n      count_articles_by_specialty:\n        | {\n            Args: {\n              p_article_types?: string[]\n              p_circle?: number\n              p_date_from?: string\n              p_date_to?: string\n              p_geo_city?: string\n              p_geo_continent?: string\n              p_geo_country?: string\n              p_geo_region?: string\n              p_geo_state?: string\n              p_search?: string\n              p_specialty: string\n              p_specialty_match: string\n              p_subspecialties?: string[]\n            }\n            Returns: number\n          }\n        | {\n            Args: {\n              p_circle?: number\n              p_geo_city?: string\n              p_geo_continent?: string\n              p_geo_country?: string\n              p_geo_region?: string\n              p_geo_state?: string\n              p_search?: string\n              p_specialty: string\n              p_specialty_match: string\n              p_subspecialty?: string\n            }\n            Returns: number\n          }\n        | {\n            Args: {\n              p_article_type?: string\n              p_circle?: number\n              p_geo_city?: string\n              p_geo_continent?: string\n              p_geo_country?: string\n              p_geo_region?: string\n              p_geo_state?: string\n              p_search?: string\n              p_specialty: string\n              p_specialty_match: string\n              p_subspecialty?: string\n            }\n            Returns: number\n          }\n      count_articles_by_specialty_multi: {\n        Args: {\n          p_article_types?: string[]\n          p_circle?: number\n          p_date_from?: string\n          p_date_to?: string\n          p_geo_city?: string\n          p_geo_continent?: string\n          p_geo_country?: string\n          p_geo_region?: string\n          p_geo_state?: string\n          p_search?: string\n          p_specialty: string\n          p_specialty_match: string\n          p_subspecialties?: string[]\n        }\n        Returns: number\n      }\n      count_articles_in_range: {\n        Args: { p_from: string; p_to: string }\n        Returns: number\n      }\n      count_articles_this_week: {\n        Args: { week_end: string; week_start: string }\n        Returns: number\n      }\n      count_articles_with_mismatch: { Args: never; Returns: number }\n      count_articles_without_authors: { Args: never; Returns: number }\n      count_city_alias_pairs: { Args: never; Returns: number }\n      count_city_alias_resolved: { Args: never; Returns: number }\n      count_condensation_not_validated: {\n        Args: { p_specialty: string }\n        Returns: number\n      }\n      count_country_alias_pairs: { Args: never; Returns: number }\n      count_distinct_geo_regions: { Args: never; Returns: number }\n      count_newsletter_articles: {\n        Args: { p_end: string; p_specialty: string; p_start: string }\n        Returns: number\n      }\n      count_sari_not_validated: {\n        Args: { p_specialty: string }\n        Returns: number\n      }\n      count_scored_not_validated: {\n        Args: { p_specialty: string }\n        Returns: number\n      }\n      count_subspecialties_by_weeks: {\n        Args: { p_subspecialties: string[]; p_week_starts: string[] }\n        Returns: {\n          article_count: number\n          subspecialty: string\n          week_start: string\n        }[]\n      }\n      count_subspecialties_this_week: {\n        Args: {\n          p_subspecialties: string[]\n          p_week_end: string\n          p_week_start: string\n        }\n        Returns: {\n          article_count: number\n          subspecialty: string\n        }[]\n      }\n      count_subspecialty_not_validated: {\n        Args: { p_specialty: string }\n        Returns: number\n      }\n      count_subspecialty_unscored: {\n        Args: { p_specialty: string }\n        Returns: number\n      }\n      count_suspect_country_values: { Args: never; Returns: number }\n      count_text_unscored: { Args: { p_specialty?: string }; Returns: number }\n      count_unlinked_articles: { Args: never; Returns: number }\n      count_unlinked_author_slots: { Args: never; Returns: number }\n      decode_html_entities: { Args: { input: string }; Returns: string }\n      fetch_unlinked_articles: {\n        Args: { p_limit?: number; p_offset: number }\n        Returns: {\n          authors: Json\n          doi: string\n          id: string\n          pubmed_id: string\n        }[]\n      }\n      filter_articles_by_mesh: {\n        Args: { p_descriptor: string }\n        Returns: string[]\n      }\n      find_author_duplicates:\n        | {\n            Args: {\n              p_country?: string\n              p_exact_lastname?: boolean\n              p_exclude_countries?: string[]\n              p_last_name_chars?: number\n              p_match_city?: boolean\n              p_match_country?: boolean\n              p_match_firstname_initial?: boolean\n              p_match_hospital?: boolean\n              p_match_state?: boolean\n              p_max_group_size?: number\n            }\n            Returns: {\n              author_ids: string[]\n              display_names: string[]\n              group_size: number\n            }[]\n          }\n        | {\n            Args: {\n              p_exclude_countries?: string[]\n              p_last_name_chars?: number\n              p_match_city?: boolean\n              p_match_country?: boolean\n              p_match_hospital?: boolean\n              p_match_state?: boolean\n              p_max_group_size?: number\n            }\n            Returns: {\n              author_ids: string[]\n              display_names: string[]\n              group_size: number\n            }[]\n          }\n      generate_referral_code: { Args: never; Returns: string }\n      get_api_article_counts: {\n        Args: { since_ts?: string }\n        Returns: {\n          articles: number\n          cost_with_aid: number\n          task: string\n        }[]\n      }\n      get_api_cost_summary: {\n        Args: { since_ts?: string }\n        Returns: {\n          articles: number\n          calls: number\n          cost_usd: number\n          day: string\n          model_key: string\n          task: string\n        }[]\n      }\n      get_article_geo_options: { Args: never; Returns: Json }\n      get_article_ids_by_specialty: {\n        Args: { p_specialty: string; p_specialty_match?: string }\n        Returns: {\n          article_id: string\n        }[]\n      }\n      get_article_ids_by_specialty_paged:\n        | {\n            Args: {\n              p_article_types?: string[]\n              p_circle?: number\n              p_date_from?: string\n              p_date_to?: string\n              p_geo_city?: string\n              p_geo_continent?: string\n              p_geo_country?: string\n              p_geo_region?: string\n              p_geo_state?: string\n              p_limit: number\n              p_offset: number\n              p_search?: string\n              p_specialty: string\n              p_specialty_match: string\n              p_subspecialties?: string[]\n            }\n            Returns: {\n              article_id: string\n            }[]\n          }\n        | {\n            Args: {\n              p_circle?: number\n              p_geo_city?: string\n              p_geo_continent?: string\n              p_geo_country?: string\n              p_geo_region?: string\n              p_geo_state?: string\n              p_limit: number\n              p_offset: number\n              p_search?: string\n              p_specialty: string\n              p_specialty_match: string\n              p_subspecialty?: string\n            }\n            Returns: {\n              article_id: string\n            }[]\n          }\n        | {\n            Args: {\n              p_article_type?: string\n              p_circle?: number\n              p_geo_city?: string\n              p_geo_continent?: string\n              p_geo_country?: string\n              p_geo_region?: string\n              p_geo_state?: string\n              p_limit: number\n              p_offset: number\n              p_search?: string\n              p_specialty: string\n              p_specialty_match: string\n              p_subspecialty?: string\n            }\n            Returns: {\n              article_id: string\n            }[]\n          }\n      get_article_ids_by_specialty_paged_multi: {\n        Args: {\n          p_article_types?: string[]\n          p_circle?: number\n          p_date_from?: string\n          p_date_to?: string\n          p_geo_city?: string\n          p_geo_continent?: string\n          p_geo_country?: string\n          p_geo_region?: string\n          p_geo_state?: string\n          p_limit: number\n          p_offset: number\n          p_search?: string\n          p_sort_by?: string\n          p_sort_dir?: string\n          p_specialty: string\n          p_specialty_match: string\n          p_subspecialties?: string[]\n        }\n        Returns: {\n          article_id: string\n        }[]\n      }\n      get_article_ids_for_mesh_terms: {\n        Args: { p_mesh_terms: string[] }\n        Returns: {\n          id: string\n        }[]\n      }\n      get_article_type_candidates: {\n        Args: { p_limit?: number; p_offset?: number; p_specialty: string }\n        Returns: {\n          id: string\n          publication_types: string[]\n        }[]\n      }\n      get_article_type_distribution: {\n        Args: { p_specialty: string }\n        Returns: {\n          article_type: string\n          n: number\n        }[]\n      }\n      get_article_type_matrix: {\n        Args: { p_from_date: string; p_subspecialties: string[] }\n        Returns: {\n          article_count: number\n          article_type: string\n          subspecialty: string\n        }[]\n      }\n      get_article_type_not_validated_articles: {\n        Args: { p_limit?: number }\n        Returns: {\n          abstract: string\n          article_type_ai: string\n          article_type_confidence: number\n          article_type_model_version: string\n          article_type_rationale: string\n          authors: Json\n          circle: number\n          id: string\n          journal_abbr: string\n          journal_title: string\n          mesh_terms: Json\n          publication_types: string[]\n          published_date: string\n          pubmed_id: string\n          title: string\n        }[]\n      }\n      get_article_type_pending_approval: {\n        Args: { p_article_type?: string; p_limit?: number; p_offset?: number }\n        Returns: {\n          article_type_ai: string\n          article_type_confidence: number\n          id: string\n          journal_abbr: string\n          publication_types: string[]\n          published_date: string\n          title: string\n        }[]\n      }\n      get_article_type_pending_counts: {\n        Args: never\n        Returns: {\n          article_type: string\n          count: number\n        }[]\n      }\n      get_article_type_rescore_candidates: {\n        Args: { p_limit?: number; p_version: string }\n        Returns: {\n          id: string\n        }[]\n      }\n      get_article_type_unscored_articles: {\n        Args: {\n          p_edat_from?: string\n          p_edat_to?: string\n          p_limit?: number\n          p_specialty: string\n        }\n        Returns: {\n          abstract: string\n          id: string\n          journal_abbr: string\n          journal_title: string\n          mesh_terms: Json\n          publication_types: string[]\n          title: string\n        }[]\n      }\n      get_author_location_stats: {\n        Args: never\n        Returns: {\n          city_coverage: number\n          country_coverage: number\n          no_city: number\n          no_country: number\n          no_region: number\n          no_state: number\n          region_coverage: number\n          source_parser: number\n          source_ror: number\n          state_coverage: number\n          total_authors: number\n        }[]\n      }\n      get_author_update_stats: {\n        Args: never\n        Returns: {\n          articles_updated: number\n          total_created_b: number\n          total_matched_a: number\n          total_removed_c: number\n          total_unmatched: number\n        }[]\n      }\n      get_author_verification_stats: {\n        Args: never\n        Returns: {\n          human: number\n          uverificeret: number\n        }[]\n      }\n      get_authors_affiliation_too_long: {\n        Args: never\n        Returns: {\n          id: string\n        }[]\n      }\n      get_authors_city_not_in_geonames: {\n        Args: { p_limit?: number }\n        Returns: {\n          affiliations: string[]\n          article_count: number\n          city: string\n          country: string\n          department: string\n          display_name: string\n          hospital: string\n          id: string\n          state: string\n        }[]\n      }\n      get_city_country_map: {\n        Args: never\n        Returns: {\n          country: string\n          name: string\n        }[]\n      }\n      get_combo_article_counts: {\n        Args: { p_specialty: string }\n        Returns: {\n          co_occurrences: number\n          pending_count: number\n          term_1: string\n          term_2: string\n        }[]\n      }\n      get_combo_pending_articles: {\n        Args: { p_specialty: string }\n        Returns: {\n          combos: Json\n          id: string\n          journal_abbr: string\n          published_date: string\n          title: string\n        }[]\n      }\n      get_condensation_not_validated_articles: {\n        Args: { p_limit: number; p_specialty: string }\n        Returns: {\n          abstract: string\n          authors: Json\n          bottom_line: string\n          condensed_model_version: string\n          id: string\n          journal_abbr: string\n          journal_title: string\n          published_date: string\n          pubmed_id: string\n          sample_size: number\n          sari_action: string\n          sari_implication: string\n          sari_result: string\n          sari_subject: string\n          short_headline: string\n          short_resume: string\n          title: string\n        }[]\n      }\n      get_condensation_unscored_articles: {\n        Args: { p_limit?: number; p_specialty: string }\n        Returns: {\n          abstract: string\n          bottom_line: string\n          id: string\n          short_headline: string\n          short_resume: string\n          title: string\n        }[]\n      }\n      get_cost_dashboard: {\n        Args: { since_ts: string }\n        Returns: {\n          artikler: number\n          forbrug: number\n          is_lab: boolean\n          kald: number\n          lab_step: string\n          task: string\n        }[]\n      }\n      get_distinct_specialties: {\n        Args: never\n        Returns: {\n          specialty: string\n        }[]\n      }\n      get_distinct_specialty_tags: {\n        Args: never\n        Returns: {\n          tag: string\n        }[]\n      }\n      get_geo_articles: {\n        Args: { p_city?: string; p_since?: string }\n        Returns: {\n          id: string\n          journal_abbr: string\n          published_date: string\n          title: string\n        }[]\n      }\n      get_geo_articles_week: {\n        Args: { p_city: string; p_since: string }\n        Returns: {\n          id: string\n          journal_abbr: string\n          published_date: string\n          title: string\n        }[]\n      }\n      get_geo_cities:\n        | {\n            Args: { p_country?: string; p_since?: string }\n            Returns: {\n              city: string\n              count: number\n            }[]\n          }\n        | {\n            Args: { p_country?: string; p_since?: string; p_state?: string }\n            Returns: {\n              city: string\n              count: number\n            }[]\n          }\n      get_geo_cities_week: {\n        Args: { p_country: string; p_since: string }\n        Returns: {\n          city: string\n          count: number\n        }[]\n      }\n      get_geo_continents: {\n        Args: { p_since?: string }\n        Returns: {\n          continent: string\n          count: number\n        }[]\n      }\n      get_geo_countries: {\n        Args: { p_region?: string; p_since?: string }\n        Returns: {\n          count: number\n          country: string\n        }[]\n      }\n      get_geo_countries_week: {\n        Args: { p_since: string }\n        Returns: {\n          count: number\n          country: string\n          region: string\n        }[]\n      }\n      get_geo_options_filtered:\n        | {\n            Args: {\n              p_continent?: string\n              p_country?: string\n              p_field: string\n              p_state?: string\n            }\n            Returns: string[]\n          }\n        | {\n            Args: {\n              p_continent?: string\n              p_country?: string\n              p_field: string\n              p_region?: string\n              p_state?: string\n            }\n            Returns: string[]\n          }\n      get_geo_regions: {\n        Args: { p_continent?: string; p_since?: string }\n        Returns: {\n          count: number\n          region: string\n        }[]\n      }\n      get_geo_regions_week: {\n        Args: { p_since: string }\n        Returns: {\n          count: number\n          region: string\n        }[]\n      }\n      get_geo_states: {\n        Args: { p_country?: string; p_since?: string }\n        Returns: {\n          count: number\n          state: string\n        }[]\n      }\n      get_kpi_geo_hierarchy: {\n        Args: {\n          p_city?: string\n          p_continent?: string\n          p_country?: string\n          p_period: string\n          p_region?: string\n          p_subspecialty?: string\n        }\n        Returns: Json\n      }\n      get_kpi_overview: {\n        Args: { p_period: string; p_subspecialty?: string }\n        Returns: Json\n      }\n      get_mesh_co_occurrences:\n        | {\n            Args: { p_min_count: number; p_specialty: string }\n            Returns: {\n              pair_count: number\n              term_1: string\n              term_2: string\n            }[]\n          }\n        | {\n            Args: { p_min_count?: number; p_specialty: string }\n            Returns: {\n              cnt: number\n              t1: string\n              t2: string\n            }[]\n          }\n      get_mesh_terms_for_subspecialty: {\n        Args: {\n          p_clinical_only?: boolean\n          p_specialty: string\n          p_subspecialty: string\n          p_year_range?: string\n        }\n        Returns: {\n          article_count: number\n          lift: number\n          term: string\n        }[]\n      }\n      get_newsletter_articles: {\n        Args: { p_end: string; p_specialty: string; p_start: string }\n        Returns: {\n          abstract: string\n          article_type: string\n          authors: Json\n          bottom_line: string\n          id: string\n          imported_at: string\n          issue: string\n          journal_abbr: string\n          pubmed_id: string\n          pubmed_indexed_at: string\n          sample_size: number\n          sari_action: string\n          sari_implication: string\n          sari_result: string\n          sari_subject: string\n          short_headline: string\n          short_resume: string\n          subspecialty: string[]\n          title: string\n          volume: string\n        }[]\n      }\n      get_sari_not_validated_articles: {\n        Args: { p_limit?: number; p_specialty: string }\n        Returns: {\n          abstract: string\n          authors: Json\n          condensed_model_version: string\n          id: string\n          journal_abbr: string\n          journal_title: string\n          published_date: string\n          pubmed_id: string\n          sample_size: number\n          sari_action: string\n          sari_implication: string\n          sari_result: string\n          sari_subject: string\n          title: string\n        }[]\n      }\n      get_scored_not_validated_articles: {\n        Args: { p_limit?: number; p_specialty: string }\n        Returns: {\n          abstract: string\n          ai_decision: string\n          authors: Json\n          circle: number\n          id: string\n          journal_abbr: string\n          journal_title: string\n          published_date: string\n          pubmed_id: string\n          specialty_confidence: number\n          title: string\n        }[]\n      }\n      get_scoring_runs: {\n        Args: { p_limit?: number }\n        Returns: {\n          error: string\n          failed: number\n          finished_at: string\n          id: string\n          module: string\n          scored: number\n          specialty: string\n          started_at: string\n          status: string\n          total: number\n          triggered_by: string\n          version: string\n        }[]\n      }\n      get_single_borderline_articles: {\n        Args: { p_specialty: string }\n        Returns: {\n          article_id: string\n          journal_abbr: string\n          matched_terms: Json\n          published_date: string\n          title: string\n        }[]\n      }\n      get_single_ready_articles: {\n        Args: { p_specialty: string }\n        Returns: {\n          article_id: string\n          journal_abbr: string\n          matched_terms: Json\n          published_date: string\n          title: string\n        }[]\n      }\n      get_specialty_article_stats: {\n        Args: { specialty_slug: string }\n        Returns: {\n          antal: number\n          circle: number\n          specialty_match: boolean\n        }[]\n      }\n      get_specialty_scoring_candidates: {\n        Args: {\n          p_edat_from?: string\n          p_edat_to?: string\n          p_limit?: number\n          p_specialty: string\n        }\n        Returns: {\n          article_id: string\n        }[]\n      }\n      get_specialty_unscored_articles: {\n        Args: {\n          p_edat_from?: string\n          p_edat_to?: string\n          p_limit?: number\n          p_specialty: string\n        }\n        Returns: {\n          abstract: string\n          id: string\n          title: string\n        }[]\n      }\n      get_subspecialty_article_counts: {\n        Args: { p_specialty: string; p_subspecialties: string[] }\n        Returns: {\n          article_count: number\n          subspecialty: string\n        }[]\n      }\n      get_subspecialty_not_validated_articles: {\n        Args: { p_limit?: number; p_specialty: string }\n        Returns: {\n          abstract: string\n          article_type_ai: string\n          authors: Json\n          circle: number\n          id: string\n          journal_abbr: string\n          journal_title: string\n          published_date: string\n          pubmed_id: string\n          study_design_ai: string\n          subspecialty_ai: string[]\n          subspecialty_model_version: string\n          subspecialty_reason: string\n          title: string\n        }[]\n      }\n      get_subspecialty_rescore_candidates: {\n        Args: { p_limit?: number; p_specialty: string }\n        Returns: {\n          id: string\n        }[]\n      }\n      get_subspecialty_unscored_articles: {\n        Args: {\n          p_edat_from?: string\n          p_edat_to?: string\n          p_limit?: number\n          p_specialty: string\n        }\n        Returns: {\n          abstract: string\n          id: string\n          title: string\n        }[]\n      }\n      get_suggested_authors: {\n        Args: {\n          p_subspecialty?: string\n          p_user_country?: string\n          p_user_id: string\n        }\n        Returns: {\n          article_count: number\n          city: string\n          country: string\n          display_name: string\n          hospital: string\n          id: string\n          last_article_date: string\n          region: string\n          top_mesh_terms: string[]\n        }[]\n      }\n      get_suspect_city_article_ids: {\n        Args: never\n        Returns: {\n          id: string\n        }[]\n      }\n      get_tagging_kpis: {\n        Args: { p_specialty: string }\n        Returns: {\n          combo_ready: number\n          no_match: number\n          no_mesh: number\n          single_ready: number\n          total_pending: number\n        }[]\n      }\n      get_text_unscored_articles:\n        | {\n            Args: { p_limit?: number; p_specialty: string }\n            Returns: {\n              abstract: string\n              id: string\n              title: string\n            }[]\n          }\n        | {\n            Args: {\n              p_edat_from?: string\n              p_edat_to?: string\n              p_limit?: number\n              p_specialty: string\n            }\n            Returns: {\n              abstract: string\n              id: string\n              title: string\n            }[]\n          }\n      get_top_subspecialties: {\n        Args: { p_limit?: number }\n        Returns: {\n          count: number\n          tag: string\n        }[]\n      }\n      merge_author_duplicates_geo: {\n        Args: never\n        Returns: {\n          duplicates_merged: number\n          group_name: string\n          primary_id: string\n        }[]\n      }\n      merge_author_duplicates_orcid: {\n        Args: never\n        Returns: {\n          duplicates_merged: number\n          group_name: string\n          primary_id: string\n        }[]\n      }\n      merge_authors: {\n        Args: { p_master_id: string; p_slave_ids: string[] }\n        Returns: undefined\n      }\n      merge_authors_user: {\n        Args: {\n          p_primary_id: string\n          p_resolved_fields?: Json\n          p_slave_ids: string[]\n          p_user_id: string\n        }\n        Returns: undefined\n      }\n      normalize_author_geo_city: { Args: never; Returns: number }\n      normalize_geo_city: { Args: never; Returns: number }\n      pubmed_sync_log_runs: {\n        Args: never\n        Returns: {\n          imported: number\n          retracted: number\n          run_time: string\n          total: number\n          updated: number\n        }[]\n      }\n      recalculate_tagging_rule_combos: {\n        Args: { p_include_c1?: boolean; p_specialty: string }\n        Returns: undefined\n      }\n      recalculate_tagging_rules:\n        | { Args: { p_specialty: string }; Returns: undefined }\n        | {\n            Args: { p_include_c1?: boolean; p_specialty: string }\n            Returns: undefined\n          }\n      replace_article_specialty_tags:\n        | {\n            Args: {\n              p_article_id: string\n              p_tags: string[]\n              p_verified?: boolean\n            }\n            Returns: undefined\n          }\n        | {\n            Args: {\n              p_article_id: string\n              p_status?: string\n              p_tags: string[]\n              p_verified?: boolean\n            }\n            Returns: undefined\n          }\n      run_exact_dupe_cleanup: {\n        Args: never\n        Returns: {\n          authors_deleted: number\n          pairs_merged: number\n        }[]\n      }\n      search_articles_by_mesh: { Args: { p_term: string }; Returns: string[] }\n      search_mesh_terms: {\n        Args: { p_limit?: number; p_query: string }\n        Returns: {\n          descriptor: string\n        }[]\n      }\n      show_limit: { Args: never; Returns: number }\n      show_trgm: { Args: { \"\": string }; Returns: string[] }\n      unaccent: { Args: { \"\": string }; Returns: string }\n      unlinked_author_slots_for_import_logs: {\n        Args: { p_ids: string[] }\n        Returns: {\n          import_log_id: string\n          slots: number\n        }[]\n      }\n    }\n    Enums: {\n      [_ in never]: never\n    }\n    CompositeTypes: {\n      [_ in never]: never\n    }\n  }\n}\n\ntype DatabaseWithoutInternals = Omit<Database, \"__InternalSupabase\">\n\ntype DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, \"public\">]\n\nexport type Tables<\n  DefaultSchemaTableNameOrOptions extends\n    | keyof (DefaultSchema[\"Tables\"] & DefaultSchema[\"Views\"])\n    | { schema: keyof DatabaseWithoutInternals },\n  TableName extends DefaultSchemaTableNameOrOptions extends {\n    schema: keyof DatabaseWithoutInternals\n  }\n    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions[\"schema\"]][\"Tables\"] &\n        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions[\"schema\"]][\"Views\"])\n    : never = never,\n> = DefaultSchemaTableNameOrOptions extends {\n  schema: keyof DatabaseWithoutInternals\n}\n  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions[\"schema\"]][\"Tables\"] &\n      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions[\"schema\"]][\"Views\"])[TableName] extends {\n      Row: infer R\n    }\n    ? R\n    : never\n  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema[\"Tables\"] &\n        DefaultSchema[\"Views\"])\n    ? (DefaultSchema[\"Tables\"] &\n        DefaultSchema[\"Views\"])[DefaultSchemaTableNameOrOptions] extends {\n        Row: infer R\n      }\n      ? R\n      : never\n    : never\n\nexport type TablesInsert<\n  DefaultSchemaTableNameOrOptions extends\n    | keyof DefaultSchema[\"Tables\"]\n    | { schema: keyof DatabaseWithoutInternals },\n  TableName extends DefaultSchemaTableNameOrOptions extends {\n    schema: keyof DatabaseWithoutInternals\n  }\n    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions[\"schema\"]][\"Tables\"]\n    : never = never,\n> = DefaultSchemaTableNameOrOptions extends {\n  schema: keyof DatabaseWithoutInternals\n}\n  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions[\"schema\"]][\"Tables\"][TableName] extends {\n      Insert: infer I\n    }\n    ? I\n    : never\n  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema[\"Tables\"]\n    ? DefaultSchema[\"Tables\"][DefaultSchemaTableNameOrOptions] extends {\n        Insert: infer I\n      }\n      ? I\n      : never\n    : never\n\nexport type TablesUpdate<\n  DefaultSchemaTableNameOrOptions extends\n    | keyof DefaultSchema[\"Tables\"]\n    | { schema: keyof DatabaseWithoutInternals },\n  TableName extends DefaultSchemaTableNameOrOptions extends {\n    schema: keyof DatabaseWithoutInternals\n  }\n    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions[\"schema\"]][\"Tables\"]\n    : never = never,\n> = DefaultSchemaTableNameOrOptions extends {\n  schema: keyof DatabaseWithoutInternals\n}\n  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions[\"schema\"]][\"Tables\"][TableName] extends {\n      Update: infer U\n    }\n    ? U\n    : never\n  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema[\"Tables\"]\n    ? DefaultSchema[\"Tables\"][DefaultSchemaTableNameOrOptions] extends {\n        Update: infer U\n      }\n      ? U\n      : never\n    : never\n\nexport type Enums<\n  DefaultSchemaEnumNameOrOptions extends\n    | keyof DefaultSchema[\"Enums\"]\n    | { schema: keyof DatabaseWithoutInternals },\n  EnumName extends DefaultSchemaEnumNameOrOptions extends {\n    schema: keyof DatabaseWithoutInternals\n  }\n    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions[\"schema\"]][\"Enums\"]\n    : never = never,\n> = DefaultSchemaEnumNameOrOptions extends {\n  schema: keyof DatabaseWithoutInternals\n}\n  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions[\"schema\"]][\"Enums\"][EnumName]\n  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema[\"Enums\"]\n    ? DefaultSchema[\"Enums\"][DefaultSchemaEnumNameOrOptions]\n    : never\n\nexport type CompositeTypes<\n  PublicCompositeTypeNameOrOptions extends\n    | keyof DefaultSchema[\"CompositeTypes\"]\n    | { schema: keyof DatabaseWithoutInternals },\n  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {\n    schema: keyof DatabaseWithoutInternals\n  }\n    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions[\"schema\"]][\"CompositeTypes\"]\n    : never = never,\n> = PublicCompositeTypeNameOrOptions extends {\n  schema: keyof DatabaseWithoutInternals\n}\n  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions[\"schema\"]][\"CompositeTypes\"][CompositeTypeName]\n  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema[\"CompositeTypes\"]\n    ? DefaultSchema[\"CompositeTypes\"][PublicCompositeTypeNameOrOptions]\n    : never\n\nexport const Constants = {\n  public: {\n    Enums: {},\n  },\n} as const\n"}
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
+  }
+  public: {
+    Tables: {
+      api_usage: {
+        Row: {
+          article_id: string | null
+          called_at: string | null
+          completion_tokens: number
+          cost_usd: number | null
+          id: string
+          model_key: string
+          prompt_tokens: number
+          task: string | null
+          total_tokens: number
+        }
+        Insert: {
+          article_id?: string | null
+          called_at?: string | null
+          completion_tokens: number
+          cost_usd?: number | null
+          id?: string
+          model_key: string
+          prompt_tokens: number
+          task?: string | null
+          total_tokens: number
+        }
+        Update: {
+          article_id?: string | null
+          called_at?: string | null
+          completion_tokens?: number
+          cost_usd?: number | null
+          id?: string
+          model_key?: string
+          prompt_tokens?: number
+          task?: string | null
+          total_tokens?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_usage_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_authors: {
+        Row: {
+          article_id: string
+          author_id: string
+          is_corresponding: boolean | null
+          orcid_on_paper: string | null
+          position: number | null
+        }
+        Insert: {
+          article_id: string
+          author_id: string
+          is_corresponding?: boolean | null
+          orcid_on_paper?: string | null
+          position?: number | null
+        }
+        Update: {
+          article_id?: string
+          author_id?: string
+          is_corresponding?: boolean | null
+          orcid_on_paper?: string | null
+          position?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_authors_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "article_authors_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "authors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_events: {
+        Row: {
+          article_id: string
+          created_at: string | null
+          event_type: string
+          id: string
+          payload: Json
+          sequence: number
+        }
+        Insert: {
+          article_id: string
+          created_at?: string | null
+          event_type: string
+          id?: string
+          payload?: Json
+          sequence?: number
+        }
+        Update: {
+          article_id?: string
+          created_at?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          sequence?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_events_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_specialties: {
+        Row: {
+          article_id: string
+          scored_at: string
+          scored_by: string | null
+          source: string
+          specialty: string
+          specialty_confidence: number | null
+          specialty_match: boolean | null
+          specialty_reason: string | null
+        }
+        Insert: {
+          article_id: string
+          scored_at?: string
+          scored_by?: string | null
+          source: string
+          specialty: string
+          specialty_confidence?: number | null
+          specialty_match?: boolean | null
+          specialty_reason?: string | null
+        }
+        Update: {
+          article_id?: string
+          scored_at?: string
+          scored_by?: string | null
+          source?: string
+          specialty?: string
+          specialty_confidence?: number | null
+          specialty_match?: boolean | null
+          specialty_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_specialties_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_type_rules: {
+        Row: {
+          article_type: string
+          created_at: string
+          id: string
+          is_active: boolean
+          priority: number
+          publication_type: string
+          updated_at: string
+        }
+        Insert: {
+          article_type: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          priority?: number
+          publication_type: string
+          updated_at?: string
+        }
+        Update: {
+          article_type?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          priority?: number
+          publication_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      article_types: {
+        Row: {
+          active: boolean
+          code: number
+          created_at: string
+          id: string
+          is_study_type: boolean
+          name: string
+          sort_order: number
+          specialty: string
+        }
+        Insert: {
+          active?: boolean
+          code: number
+          created_at?: string
+          id?: string
+          is_study_type?: boolean
+          name: string
+          sort_order: number
+          specialty: string
+        }
+        Update: {
+          active?: boolean
+          code?: number
+          created_at?: string
+          id?: string
+          is_study_type?: boolean
+          name?: string
+          sort_order?: number
+          specialty?: string
+        }
+        Relationships: []
+      }
+      articles: {
+        Row: {
+          abstract: string | null
+          admin_note: string | null
+          ai_decision: string | null
+          ai_location_attempted: boolean | null
+          approval_method: string | null
+          article_cities: string[] | null
+          article_countries: string[] | null
+          article_number: string | null
+          article_type: string | null
+          article_type_ai: string | null
+          article_type_confidence: number | null
+          article_type_method: string | null
+          article_type_model_version: string | null
+          article_type_rationale: string | null
+          article_type_scored_at: string | null
+          article_type_validated: boolean | null
+          authors: Json
+          authors_changed: boolean
+          authors_raw_new: Json | null
+          authors_raw_previous: Json | null
+          authors_unresolvable: boolean | null
+          auto_tagged_at: string | null
+          bottom_line: string | null
+          circle: number | null
+          citation_count: number | null
+          citations_fetched_at: string | null
+          coi_statement: string | null
+          condensed_at: string | null
+          condensed_model_version: string | null
+          date_completed: string | null
+          doi: string | null
+          enriched_at: string | null
+          full_text_available: boolean | null
+          fwci: number | null
+          geo_city: string | null
+          geo_continent: string | null
+          geo_country: string | null
+          geo_department: string | null
+          geo_institution: string | null
+          geo_region: string | null
+          geo_source: string | null
+          geo_state: string | null
+          grants: Json
+          id: string
+          impact_factor: number | null
+          impact_factor_fetched_at: string | null
+          imported_at: string
+          indexed_date: string | null
+          indexed_month: number | null
+          indexed_week: number | null
+          indexed_year: number | null
+          issn_electronic: string | null
+          issn_print: string | null
+          issue: string | null
+          journal_abbr: string | null
+          journal_h_index: number | null
+          journal_title: string | null
+          keywords: string[] | null
+          language: string | null
+          location_confidence: string | null
+          location_parsed_at: string | null
+          long_resume: string | null
+          mesh_terms: Json
+          mesh_terms_text: string | null
+          model_version: string | null
+          openalex_work_id: string | null
+          patient_population: string | null
+          pmc_id: string | null
+          publication_types: string[] | null
+          published_date: string | null
+          published_year: number | null
+          pubmed_date: string | null
+          pubmed_id: string
+          pubmed_indexed_at: string | null
+          pubmed_modified_at: string | null
+          pubmed_synced_at: string | null
+          retracted: boolean
+          sample_size: number | null
+          sari_action: string | null
+          sari_implication: string | null
+          sari_result: string | null
+          sari_subject: string | null
+          short_headline: string | null
+          short_resume: string | null
+          source_id: string | null
+          specialty_confidence: number | null
+          specialty_reasoning: string | null
+          specialty_scored_at: string | null
+          specialty_tags: string[]
+          status: string | null
+          study_design_ai: string[] | null
+          subspecialty: string[] | null
+          subspecialty_ai: string[] | null
+          subspecialty_model_version: string | null
+          subspecialty_reason: string | null
+          subspecialty_scored_at: string | null
+          substances: Json
+          time_to_read: number | null
+          title: string
+          trial_registration: string | null
+          verified: boolean | null
+          volume: string | null
+        }
+        Insert: {
+          abstract?: string | null
+          admin_note?: string | null
+          ai_decision?: string | null
+          ai_location_attempted?: boolean | null
+          approval_method?: string | null
+          article_cities?: string[] | null
+          article_countries?: string[] | null
+          article_number?: string | null
+          article_type?: string | null
+          article_type_ai?: string | null
+          article_type_confidence?: number | null
+          article_type_method?: string | null
+          article_type_model_version?: string | null
+          article_type_rationale?: string | null
+          article_type_scored_at?: string | null
+          article_type_validated?: boolean | null
+          authors?: Json
+          authors_changed?: boolean
+          authors_raw_new?: Json | null
+          authors_raw_previous?: Json | null
+          authors_unresolvable?: boolean | null
+          auto_tagged_at?: string | null
+          bottom_line?: string | null
+          circle?: number | null
+          citation_count?: number | null
+          citations_fetched_at?: string | null
+          coi_statement?: string | null
+          condensed_at?: string | null
+          condensed_model_version?: string | null
+          date_completed?: string | null
+          doi?: string | null
+          enriched_at?: string | null
+          full_text_available?: boolean | null
+          fwci?: number | null
+          geo_city?: string | null
+          geo_continent?: string | null
+          geo_country?: string | null
+          geo_department?: string | null
+          geo_institution?: string | null
+          geo_region?: string | null
+          geo_source?: string | null
+          geo_state?: string | null
+          grants?: Json
+          id?: string
+          impact_factor?: number | null
+          impact_factor_fetched_at?: string | null
+          imported_at?: string
+          indexed_date?: string | null
+          indexed_month?: number | null
+          indexed_week?: number | null
+          indexed_year?: number | null
+          issn_electronic?: string | null
+          issn_print?: string | null
+          issue?: string | null
+          journal_abbr?: string | null
+          journal_h_index?: number | null
+          journal_title?: string | null
+          keywords?: string[] | null
+          language?: string | null
+          location_confidence?: string | null
+          location_parsed_at?: string | null
+          long_resume?: string | null
+          mesh_terms?: Json
+          mesh_terms_text?: string | null
+          model_version?: string | null
+          openalex_work_id?: string | null
+          patient_population?: string | null
+          pmc_id?: string | null
+          publication_types?: string[] | null
+          published_date?: string | null
+          published_year?: number | null
+          pubmed_date?: string | null
+          pubmed_id: string
+          pubmed_indexed_at?: string | null
+          pubmed_modified_at?: string | null
+          pubmed_synced_at?: string | null
+          retracted?: boolean
+          sample_size?: number | null
+          sari_action?: string | null
+          sari_implication?: string | null
+          sari_result?: string | null
+          sari_subject?: string | null
+          short_headline?: string | null
+          short_resume?: string | null
+          source_id?: string | null
+          specialty_confidence?: number | null
+          specialty_reasoning?: string | null
+          specialty_scored_at?: string | null
+          specialty_tags?: string[]
+          status?: string | null
+          study_design_ai?: string[] | null
+          subspecialty?: string[] | null
+          subspecialty_ai?: string[] | null
+          subspecialty_model_version?: string | null
+          subspecialty_reason?: string | null
+          subspecialty_scored_at?: string | null
+          substances?: Json
+          time_to_read?: number | null
+          title: string
+          trial_registration?: string | null
+          verified?: boolean | null
+          volume?: string | null
+        }
+        Update: {
+          abstract?: string | null
+          admin_note?: string | null
+          ai_decision?: string | null
+          ai_location_attempted?: boolean | null
+          approval_method?: string | null
+          article_cities?: string[] | null
+          article_countries?: string[] | null
+          article_number?: string | null
+          article_type?: string | null
+          article_type_ai?: string | null
+          article_type_confidence?: number | null
+          article_type_method?: string | null
+          article_type_model_version?: string | null
+          article_type_rationale?: string | null
+          article_type_scored_at?: string | null
+          article_type_validated?: boolean | null
+          authors?: Json
+          authors_changed?: boolean
+          authors_raw_new?: Json | null
+          authors_raw_previous?: Json | null
+          authors_unresolvable?: boolean | null
+          auto_tagged_at?: string | null
+          bottom_line?: string | null
+          circle?: number | null
+          citation_count?: number | null
+          citations_fetched_at?: string | null
+          coi_statement?: string | null
+          condensed_at?: string | null
+          condensed_model_version?: string | null
+          date_completed?: string | null
+          doi?: string | null
+          enriched_at?: string | null
+          full_text_available?: boolean | null
+          fwci?: number | null
+          geo_city?: string | null
+          geo_continent?: string | null
+          geo_country?: string | null
+          geo_department?: string | null
+          geo_institution?: string | null
+          geo_region?: string | null
+          geo_source?: string | null
+          geo_state?: string | null
+          grants?: Json
+          id?: string
+          impact_factor?: number | null
+          impact_factor_fetched_at?: string | null
+          imported_at?: string
+          indexed_date?: string | null
+          indexed_month?: number | null
+          indexed_week?: number | null
+          indexed_year?: number | null
+          issn_electronic?: string | null
+          issn_print?: string | null
+          issue?: string | null
+          journal_abbr?: string | null
+          journal_h_index?: number | null
+          journal_title?: string | null
+          keywords?: string[] | null
+          language?: string | null
+          location_confidence?: string | null
+          location_parsed_at?: string | null
+          long_resume?: string | null
+          mesh_terms?: Json
+          mesh_terms_text?: string | null
+          model_version?: string | null
+          openalex_work_id?: string | null
+          patient_population?: string | null
+          pmc_id?: string | null
+          publication_types?: string[] | null
+          published_date?: string | null
+          published_year?: number | null
+          pubmed_date?: string | null
+          pubmed_id?: string
+          pubmed_indexed_at?: string | null
+          pubmed_modified_at?: string | null
+          pubmed_synced_at?: string | null
+          retracted?: boolean
+          sample_size?: number | null
+          sari_action?: string | null
+          sari_implication?: string | null
+          sari_result?: string | null
+          sari_subject?: string | null
+          short_headline?: string | null
+          short_resume?: string | null
+          source_id?: string | null
+          specialty_confidence?: number | null
+          specialty_reasoning?: string | null
+          specialty_scored_at?: string | null
+          specialty_tags?: string[]
+          status?: string | null
+          study_design_ai?: string[] | null
+          subspecialty?: string[] | null
+          subspecialty_ai?: string[] | null
+          subspecialty_model_version?: string | null
+          subspecialty_reason?: string | null
+          subspecialty_scored_at?: string | null
+          substances?: Json
+          time_to_read?: number | null
+          title?: string
+          trial_registration?: string | null
+          verified?: boolean | null
+          volume?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "articles_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "circle_2_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      author_dismissals: {
+        Row: {
+          author_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          author_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          author_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "author_dismissals_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "authors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      author_events: {
+        Row: {
+          author_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json
+          sequence: number
+        }
+        Insert: {
+          author_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          payload?: Json
+          sequence?: number
+        }
+        Update: {
+          author_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+          sequence?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "author_events_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "authors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      author_follows: {
+        Row: {
+          author_id: string | null
+          created_at: string | null
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          author_id?: string | null
+          created_at?: string | null
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          author_id?: string | null
+          created_at?: string | null
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "author_follows_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "authors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "author_follows_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      author_linking_logs: {
+        Row: {
+          articles_processed: number | null
+          authors_linked: number | null
+          authors_processed: number
+          completed_at: string | null
+          duplicates: number
+          errors: Json | null
+          id: string
+          import_log_id: string | null
+          new_authors: number
+          rejected: number
+          started_at: string | null
+          status: string | null
+        }
+        Insert: {
+          articles_processed?: number | null
+          authors_linked?: number | null
+          authors_processed?: number
+          completed_at?: string | null
+          duplicates?: number
+          errors?: Json | null
+          id?: string
+          import_log_id?: string | null
+          new_authors?: number
+          rejected?: number
+          started_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          articles_processed?: number | null
+          authors_linked?: number | null
+          authors_processed?: number
+          completed_at?: string | null
+          duplicates?: number
+          errors?: Json | null
+          id?: string
+          import_log_id?: string | null
+          new_authors?: number
+          rejected?: number
+          started_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "author_linking_logs_import_log_id_fkey"
+            columns: ["import_log_id"]
+            isOneToOne: false
+            referencedRelation: "import_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      author_merge_log: {
+        Row: {
+          created_at: string
+          deleted_author_ids: string[]
+          id: string
+          merged_by_user_id: string
+          primary_author_id: string
+          resolved_fields: Json
+        }
+        Insert: {
+          created_at?: string
+          deleted_author_ids: string[]
+          id?: string
+          merged_by_user_id: string
+          primary_author_id: string
+          resolved_fields?: Json
+        }
+        Update: {
+          created_at?: string
+          deleted_author_ids?: string[]
+          id?: string
+          merged_by_user_id?: string
+          primary_author_id?: string
+          resolved_fields?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "author_merge_log_merged_by_user_id_fkey"
+            columns: ["merged_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      author_update_logs: {
+        Row: {
+          completed_at: string | null
+          dry_run: boolean
+          errors: Json | null
+          id: string
+          processed: number
+          scenario_a: number
+          scenario_b: number
+          scenario_c: number
+          started_at: string
+          status: string
+          triggered_by: string
+          unmatched: number
+        }
+        Insert: {
+          completed_at?: string | null
+          dry_run?: boolean
+          errors?: Json | null
+          id?: string
+          processed?: number
+          scenario_a?: number
+          scenario_b?: number
+          scenario_c?: number
+          started_at?: string
+          status?: string
+          triggered_by?: string
+          unmatched?: number
+        }
+        Update: {
+          completed_at?: string | null
+          dry_run?: boolean
+          errors?: Json | null
+          id?: string
+          processed?: number
+          scenario_a?: number
+          scenario_b?: number
+          scenario_c?: number
+          started_at?: string
+          status?: string
+          triggered_by?: string
+          unmatched?: number
+        }
+        Relationships: []
+      }
+      authors: {
+        Row: {
+          affiliations: string[] | null
+          ai_geo_parsed: boolean | null
+          article_count: number | null
+          author_score: number | null
+          city: string | null
+          continent: string | null
+          country: string | null
+          created_at: string | null
+          deleted_at: string | null
+          department: string | null
+          display_name: string
+          display_name_normalized: string | null
+          email: string | null
+          first_article_date: string | null
+          geo_locked_by: string | null
+          geo_source: string | null
+          hospital: string | null
+          id: string
+          institution_type: string | null
+          last_article_date: string | null
+          match_confidence: number | null
+          openalex_author_id: string | null
+          openalex_enriched_at: string | null
+          openalex_id: string | null
+          orcid: string | null
+          orcid_enriched_at: string | null
+          region: string | null
+          ror_enriched_at: string | null
+          ror_id: string | null
+          state: string | null
+          updated_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          affiliations?: string[] | null
+          ai_geo_parsed?: boolean | null
+          article_count?: number | null
+          author_score?: number | null
+          city?: string | null
+          continent?: string | null
+          country?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          department?: string | null
+          display_name: string
+          display_name_normalized?: string | null
+          email?: string | null
+          first_article_date?: string | null
+          geo_locked_by?: string | null
+          geo_source?: string | null
+          hospital?: string | null
+          id?: string
+          institution_type?: string | null
+          last_article_date?: string | null
+          match_confidence?: number | null
+          openalex_author_id?: string | null
+          openalex_enriched_at?: string | null
+          openalex_id?: string | null
+          orcid?: string | null
+          orcid_enriched_at?: string | null
+          region?: string | null
+          ror_enriched_at?: string | null
+          ror_id?: string | null
+          state?: string | null
+          updated_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          affiliations?: string[] | null
+          ai_geo_parsed?: boolean | null
+          article_count?: number | null
+          author_score?: number | null
+          city?: string | null
+          continent?: string | null
+          country?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          department?: string | null
+          display_name?: string
+          display_name_normalized?: string | null
+          email?: string | null
+          first_article_date?: string | null
+          geo_locked_by?: string | null
+          geo_source?: string | null
+          hospital?: string | null
+          id?: string
+          institution_type?: string | null
+          last_article_date?: string | null
+          match_confidence?: number | null
+          openalex_author_id?: string | null
+          openalex_enriched_at?: string | null
+          openalex_id?: string | null
+          orcid?: string | null
+          orcid_enriched_at?: string | null
+          region?: string | null
+          ror_enriched_at?: string | null
+          ror_id?: string | null
+          state?: string | null
+          updated_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: []
+      }
+      auto_tag_logs: {
+        Row: {
+          approved: number
+          completed_at: string | null
+          errors: string[] | null
+          id: string
+          job: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          approved?: number
+          completed_at?: string | null
+          errors?: string[] | null
+          id?: string
+          job: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          approved?: number
+          completed_at?: string | null
+          errors?: string[] | null
+          id?: string
+          job?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      circle_2_sources: {
+        Row: {
+          active: boolean | null
+          confidence_prior: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          last_run_at: string | null
+          max_results: number | null
+          specialty: string
+          type: string
+          value: string
+        }
+        Insert: {
+          active?: boolean | null
+          confidence_prior?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          last_run_at?: string | null
+          max_results?: number | null
+          specialty: string
+          type: string
+          value: string
+        }
+        Update: {
+          active?: boolean | null
+          confidence_prior?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          last_run_at?: string | null
+          max_results?: number | null
+          specialty?: string
+          type?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      circle_3_sources: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          id: string
+          last_run_at: string | null
+          max_results: number
+          specialty: string
+          type: string
+          value: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          last_run_at?: string | null
+          max_results?: number
+          specialty?: string
+          type?: string
+          value: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          last_run_at?: string | null
+          max_results?: number
+          specialty?: string
+          type?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      city_aliases: {
+        Row: {
+          alias: string
+          canonical: string
+          country: string
+          created_at: string | null
+          id: string
+        }
+        Insert: {
+          alias: string
+          canonical: string
+          country: string
+          created_at?: string | null
+          id?: string
+        }
+        Update: {
+          alias?: string
+          canonical?: string
+          country?: string
+          created_at?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      country_aliases: {
+        Row: {
+          alias: string
+          canonical: string
+          created_at: string | null
+          id: string
+        }
+        Insert: {
+          alias: string
+          canonical: string
+          created_at?: string | null
+          id?: string
+        }
+        Update: {
+          alias?: string
+          canonical?: string
+          created_at?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      geo_cities: {
+        Row: {
+          admin1_code: string | null
+          ascii_name: string | null
+          country: string | null
+          country_code: string
+          geonameid: number
+          latitude: number | null
+          longitude: number | null
+          name: string
+          population: number | null
+          state: string | null
+        }
+        Insert: {
+          admin1_code?: string | null
+          ascii_name?: string | null
+          country?: string | null
+          country_code: string
+          geonameid: number
+          latitude?: number | null
+          longitude?: number | null
+          name: string
+          population?: number | null
+          state?: string | null
+        }
+        Update: {
+          admin1_code?: string | null
+          ascii_name?: string | null
+          country?: string | null
+          country_code?: string
+          geonameid?: number
+          latitude?: number | null
+          longitude?: number | null
+          name?: string
+          population?: number | null
+          state?: string | null
+        }
+        Relationships: []
+      }
+      geo_city_state_cache: {
+        Row: {
+          city: string
+          country: string
+          id: string
+          looked_up_at: string | null
+          source: string | null
+          state: string | null
+        }
+        Insert: {
+          city: string
+          country: string
+          id?: string
+          looked_up_at?: string | null
+          source?: string | null
+          state?: string | null
+        }
+        Update: {
+          city?: string
+          country?: string
+          id?: string
+          looked_up_at?: string | null
+          source?: string | null
+          state?: string | null
+        }
+        Relationships: []
+      }
+      geo_institution_overrides: {
+        Row: {
+          city: string | null
+          country: string | null
+          created_at: string | null
+          id: string
+          institution: string | null
+          raw_segment: string
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          id?: string
+          institution?: string | null
+          raw_segment: string
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          id?: string
+          institution?: string | null
+          raw_segment?: string
+        }
+        Relationships: []
+      }
+      import_logs: {
+        Row: {
+          articles_fetched: number
+          articles_imported: number
+          articles_skipped: number
+          author_slots_imported: number
+          circle: number | null
+          completed_at: string | null
+          errors: Json | null
+          filter_id: string | null
+          id: string
+          started_at: string
+          status: string
+          trigger: string | null
+        }
+        Insert: {
+          articles_fetched?: number
+          articles_imported?: number
+          articles_skipped?: number
+          author_slots_imported?: number
+          circle?: number | null
+          completed_at?: string | null
+          errors?: Json | null
+          filter_id?: string | null
+          id?: string
+          started_at?: string
+          status: string
+          trigger?: string | null
+        }
+        Update: {
+          articles_fetched?: number
+          articles_imported?: number
+          articles_skipped?: number
+          author_slots_imported?: number
+          circle?: number | null
+          completed_at?: string | null
+          errors?: Json | null
+          filter_id?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          trigger?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_logs_filter_id_fkey"
+            columns: ["filter_id"]
+            isOneToOne: false
+            referencedRelation: "pubmed_filters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_quality_checks: {
+        Row: {
+          check_type: string | null
+          checks: Json
+          created_at: string | null
+          failed_checks: number
+          id: string
+          import_log_id: string | null
+          passed: boolean
+          total_checks: number
+        }
+        Insert: {
+          check_type?: string | null
+          checks?: Json
+          created_at?: string | null
+          failed_checks?: number
+          id?: string
+          import_log_id?: string | null
+          passed?: boolean
+          total_checks?: number
+        }
+        Update: {
+          check_type?: string | null
+          checks?: Json
+          created_at?: string | null
+          failed_checks?: number
+          id?: string
+          import_log_id?: string | null
+          passed?: boolean
+          total_checks?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_quality_checks_import_log_id_fkey"
+            columns: ["import_log_id"]
+            isOneToOne: false
+            referencedRelation: "import_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lab_decisions: {
+        Row: {
+          ai_confidence: number | null
+          ai_decision: string | null
+          ai_reasoning: string | null
+          article_id: string | null
+          author_id: string | null
+          comment: string | null
+          decided_at: string | null
+          decision: string
+          disagreement_reason: string | null
+          id: string
+          model_version: string | null
+          module: string
+          reject_reasons: string[]
+          session_id: string | null
+          specialty: string
+        }
+        Insert: {
+          ai_confidence?: number | null
+          ai_decision?: string | null
+          ai_reasoning?: string | null
+          article_id?: string | null
+          author_id?: string | null
+          comment?: string | null
+          decided_at?: string | null
+          decision: string
+          disagreement_reason?: string | null
+          id?: string
+          model_version?: string | null
+          module: string
+          reject_reasons?: string[]
+          session_id?: string | null
+          specialty: string
+        }
+        Update: {
+          ai_confidence?: number | null
+          ai_decision?: string | null
+          ai_reasoning?: string | null
+          article_id?: string | null
+          author_id?: string | null
+          comment?: string | null
+          decided_at?: string | null
+          decision?: string
+          disagreement_reason?: string | null
+          id?: string
+          model_version?: string | null
+          module?: string
+          reject_reasons?: string[]
+          session_id?: string | null
+          specialty?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_decisions_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_decisions_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "authors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_decisions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "lab_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lab_sessions: {
+        Row: {
+          articles_approved: number | null
+          articles_rejected: number | null
+          articles_reviewed: number | null
+          completed_at: string | null
+          id: string
+          module: string
+          specialty: string
+          started_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          articles_approved?: number | null
+          articles_rejected?: number | null
+          articles_reviewed?: number | null
+          completed_at?: string | null
+          id?: string
+          module: string
+          specialty: string
+          started_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          articles_approved?: number | null
+          articles_rejected?: number | null
+          articles_reviewed?: number | null
+          completed_at?: string | null
+          id?: string
+          module?: string
+          specialty?: string
+          started_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      model_optimization_runs: {
+        Row: {
+          base_version: string
+          created_at: string | null
+          fn_count: number | null
+          fn_patterns: Json | null
+          fp_count: number | null
+          fp_patterns: Json | null
+          id: string
+          improved_prompt: string | null
+          module: string
+          recommended_changes: string | null
+          refinement_iterations: Json | null
+          specialty: string
+          total_decisions: number | null
+        }
+        Insert: {
+          base_version: string
+          created_at?: string | null
+          fn_count?: number | null
+          fn_patterns?: Json | null
+          fp_count?: number | null
+          fp_patterns?: Json | null
+          id?: string
+          improved_prompt?: string | null
+          module: string
+          recommended_changes?: string | null
+          refinement_iterations?: Json | null
+          specialty: string
+          total_decisions?: number | null
+        }
+        Update: {
+          base_version?: string
+          created_at?: string | null
+          fn_count?: number | null
+          fn_patterns?: Json | null
+          fp_count?: number | null
+          fp_patterns?: Json | null
+          id?: string
+          improved_prompt?: string | null
+          module?: string
+          recommended_changes?: string | null
+          refinement_iterations?: Json | null
+          specialty?: string
+          total_decisions?: number | null
+        }
+        Relationships: []
+      }
+      model_versions: {
+        Row: {
+          activated_at: string | null
+          active: boolean
+          base_prompt_text: string | null
+          generated_by: string
+          id: string
+          module: string
+          notes: string | null
+          prompt_text: string
+          specialty: string
+          version: string
+        }
+        Insert: {
+          activated_at?: string | null
+          active?: boolean
+          base_prompt_text?: string | null
+          generated_by?: string
+          id?: string
+          module: string
+          notes?: string | null
+          prompt_text: string
+          specialty: string
+          version: string
+        }
+        Update: {
+          activated_at?: string | null
+          active?: boolean
+          base_prompt_text?: string | null
+          generated_by?: string
+          id?: string
+          module?: string
+          notes?: string | null
+          prompt_text?: string
+          specialty?: string
+          version?: string
+        }
+        Relationships: []
+      }
+      newsletter_edition_articles: {
+        Row: {
+          article_id: string
+          created_at: string
+          edition_id: string
+          featured: boolean
+          id: string
+          is_global: boolean
+          sort_order: number
+          subspecialty: string
+        }
+        Insert: {
+          article_id: string
+          created_at?: string
+          edition_id: string
+          featured?: boolean
+          id?: string
+          is_global?: boolean
+          sort_order?: number
+          subspecialty: string
+        }
+        Update: {
+          article_id?: string
+          created_at?: string
+          edition_id?: string
+          featured?: boolean
+          id?: string
+          is_global?: boolean
+          sort_order?: number
+          subspecialty?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "newsletter_edition_articles_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "newsletter_edition_articles_edition_id_fkey"
+            columns: ["edition_id"]
+            isOneToOne: false
+            referencedRelation: "newsletter_editions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      newsletter_editions: {
+        Row: {
+          content: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          published_at: string | null
+          specialty: string
+          status: string
+          week_number: number
+          year: number
+        }
+        Insert: {
+          content: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          published_at?: string | null
+          specialty?: string
+          status?: string
+          week_number: number
+          year: number
+        }
+        Update: {
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          published_at?: string | null
+          specialty?: string
+          status?: string
+          week_number?: number
+          year?: number
+        }
+        Relationships: []
+      }
+      newsletter_feedback: {
+        Row: {
+          article_id: string | null
+          article_rank: number | null
+          article_type: string | null
+          clinical_relevance: string | null
+          decided_at: string | null
+          decision: string | null
+          id: string
+          impact_factor: number | null
+          news_value: number | null
+          week_number: number
+          year: number
+        }
+        Insert: {
+          article_id?: string | null
+          article_rank?: number | null
+          article_type?: string | null
+          clinical_relevance?: string | null
+          decided_at?: string | null
+          decision?: string | null
+          id?: string
+          impact_factor?: number | null
+          news_value?: number | null
+          week_number: number
+          year: number
+        }
+        Update: {
+          article_id?: string | null
+          article_rank?: number | null
+          article_type?: string | null
+          clinical_relevance?: string | null
+          decided_at?: string | null
+          decision?: string | null
+          id?: string
+          impact_factor?: number | null
+          news_value?: number | null
+          week_number?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "newsletter_feedback_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      newsletter_send_clicks: {
+        Row: {
+          article_id: string
+          clicked_at: string
+          id: string
+          send_id: string
+        }
+        Insert: {
+          article_id: string
+          clicked_at?: string
+          id?: string
+          send_id: string
+        }
+        Update: {
+          article_id?: string
+          clicked_at?: string
+          id?: string
+          send_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "newsletter_send_clicks_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "newsletter_send_clicks_send_id_fkey"
+            columns: ["send_id"]
+            isOneToOne: false
+            referencedRelation: "newsletter_sends"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      newsletter_sends: {
+        Row: {
+          id: string
+          open_token: string
+          opened_at: string | null
+          sent_at: string
+          user_id: string
+          week_number: number
+          year: number
+        }
+        Insert: {
+          id?: string
+          open_token?: string
+          opened_at?: string | null
+          sent_at?: string
+          user_id: string
+          week_number: number
+          year: number
+        }
+        Update: {
+          id?: string
+          open_token?: string
+          opened_at?: string | null
+          sent_at?: string
+          user_id?: string
+          week_number?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "newsletter_sends_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          link: string | null
+          message: string | null
+          read: boolean | null
+          title: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          link?: string | null
+          message?: string | null
+          read?: boolean | null
+          title: string
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          link?: string | null
+          message?: string | null
+          read?: boolean | null
+          title?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      publication_type_rules: {
+        Row: {
+          active: boolean | null
+          article_type: string | null
+          created_at: string | null
+          id: string
+          pubmed_type: string
+          study_design: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          article_type?: string | null
+          created_at?: string | null
+          id?: string
+          pubmed_type: string
+          study_design?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          article_type?: string | null
+          created_at?: string | null
+          id?: string
+          pubmed_type?: string
+          study_design?: string | null
+        }
+        Relationships: []
+      }
+      pubmed_filters: {
+        Row: {
+          active: boolean
+          circle: number | null
+          created_at: string
+          id: string
+          journal_list: string[] | null
+          last_run_at: string | null
+          max_results: number
+          mesh_list: string[] | null
+          name: string
+          query_string: string
+          specialty: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          circle?: number | null
+          created_at?: string
+          id?: string
+          journal_list?: string[] | null
+          last_run_at?: string | null
+          max_results?: number
+          mesh_list?: string[] | null
+          name: string
+          query_string: string
+          specialty: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          circle?: number | null
+          created_at?: string
+          id?: string
+          journal_list?: string[] | null
+          last_run_at?: string | null
+          max_results?: number
+          mesh_list?: string[] | null
+          name?: string
+          query_string?: string
+          specialty?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pubmed_sync_log: {
+        Row: {
+          event: string
+          fields_changed: string[] | null
+          id: string
+          pubmed_id: string
+          pubmed_modified_at: string | null
+          synced_at: string
+        }
+        Insert: {
+          event: string
+          fields_changed?: string[] | null
+          id?: string
+          pubmed_id: string
+          pubmed_modified_at?: string | null
+          synced_at?: string
+        }
+        Update: {
+          event?: string
+          fields_changed?: string[] | null
+          id?: string
+          pubmed_id?: string
+          pubmed_modified_at?: string | null
+          synced_at?: string
+        }
+        Relationships: []
+      }
+      reading_history: {
+        Row: {
+          article_id: string | null
+          id: string
+          user_id: string | null
+          visited_at: string | null
+        }
+        Insert: {
+          article_id?: string | null
+          id?: string
+          user_id?: string | null
+          visited_at?: string | null
+        }
+        Update: {
+          article_id?: string | null
+          id?: string
+          user_id?: string | null
+          visited_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reading_history_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reading_history_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rejected_authors: {
+        Row: {
+          article_id: string | null
+          created_at: string | null
+          id: string
+          linking_log_id: string | null
+          position: number | null
+          pubmed_id: string | null
+          raw_data: Json | null
+          reason: string | null
+        }
+        Insert: {
+          article_id?: string | null
+          created_at?: string | null
+          id?: string
+          linking_log_id?: string | null
+          position?: number | null
+          pubmed_id?: string | null
+          raw_data?: Json | null
+          reason?: string | null
+        }
+        Update: {
+          article_id?: string | null
+          created_at?: string | null
+          id?: string
+          linking_log_id?: string | null
+          position?: number | null
+          pubmed_id?: string | null
+          raw_data?: Json | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rejected_authors_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rejected_authors_linking_log_id_fkey"
+            columns: ["linking_log_id"]
+            isOneToOne: false
+            referencedRelation: "author_linking_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ror_institutions: {
+        Row: {
+          city: string | null
+          country: string | null
+          country_code: string | null
+          dump_version: string | null
+          fetched_at: string
+          institution_type: string | null
+          name: string
+          ror_id: string
+          state: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          country_code?: string | null
+          dump_version?: string | null
+          fetched_at?: string
+          institution_type?: string | null
+          name: string
+          ror_id: string
+          state?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          country_code?: string | null
+          dump_version?: string | null
+          fetched_at?: string
+          institution_type?: string | null
+          name?: string
+          ror_id?: string
+          state?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      saved_articles: {
+        Row: {
+          article_id: string | null
+          id: string
+          project_id: string | null
+          saved_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          article_id?: string | null
+          id?: string
+          project_id?: string | null
+          saved_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          article_id?: string | null
+          id?: string
+          project_id?: string | null
+          saved_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_articles_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_articles_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_articles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scoring_runs: {
+        Row: {
+          error: string | null
+          failed: number
+          finished_at: string | null
+          id: string
+          module: string
+          scored: number
+          specialty: string
+          started_at: string
+          status: string
+          total: number
+          triggered_by: string
+          version: string
+        }
+        Insert: {
+          error?: string | null
+          failed?: number
+          finished_at?: string | null
+          id?: string
+          module: string
+          scored?: number
+          specialty: string
+          started_at?: string
+          status?: string
+          total?: number
+          triggered_by?: string
+          version: string
+        }
+        Update: {
+          error?: string | null
+          failed?: number
+          finished_at?: string | null
+          id?: string
+          module?: string
+          scored?: number
+          specialty?: string
+          started_at?: string
+          status?: string
+          total?: number
+          triggered_by?: string
+          version?: string
+        }
+        Relationships: []
+      }
+      study_design_categories: {
+        Row: {
+          active: boolean | null
+          id: string
+          name: string
+          sort_order: number | null
+        }
+        Insert: {
+          active?: boolean | null
+          id?: string
+          name: string
+          sort_order?: number | null
+        }
+        Update: {
+          active?: boolean | null
+          id?: string
+          name?: string
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
+      subspecialties: {
+        Row: {
+          active: boolean
+          code: number | null
+          created_at: string
+          id: string
+          name: string
+          short_name: string | null
+          sort_order: number
+          specialty: string
+        }
+        Insert: {
+          active?: boolean
+          code?: number | null
+          created_at?: string
+          id?: string
+          name: string
+          short_name?: string | null
+          sort_order: number
+          specialty: string
+        }
+        Update: {
+          active?: boolean
+          code?: number | null
+          created_at?: string
+          id?: string
+          name?: string
+          short_name?: string | null
+          sort_order?: number
+          specialty?: string
+        }
+        Relationships: []
+      }
+      system_alerts: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          message: string
+          title: string
+          type: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          message: string
+          title: string
+          type?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          message?: string
+          title?: string
+          type?: string | null
+        }
+        Relationships: []
+      }
+      tagging_rule_combos: {
+        Row: {
+          activated_at: string | null
+          activated_by: string | null
+          approve_rate: number
+          approved: number
+          created_at: string
+          id: string
+          min_decisions: number
+          rejected: number
+          source_count: number
+          specialty: string
+          status: string
+          term_1: string
+          term_2: string
+          total_decisions: number
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string | null
+          activated_by?: string | null
+          approve_rate?: number
+          approved?: number
+          created_at?: string
+          id?: string
+          min_decisions?: number
+          rejected?: number
+          source_count?: number
+          specialty: string
+          status?: string
+          term_1: string
+          term_2: string
+          total_decisions?: number
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string | null
+          activated_by?: string | null
+          approve_rate?: number
+          approved?: number
+          created_at?: string
+          id?: string
+          min_decisions?: number
+          rejected?: number
+          source_count?: number
+          specialty?: string
+          status?: string
+          term_1?: string
+          term_2?: string
+          total_decisions?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tagging_rules: {
+        Row: {
+          activated_at: string | null
+          activated_by: string | null
+          approve_rate: number
+          approved: number
+          created_at: string
+          id: string
+          min_decisions: number
+          rejected: number
+          source_count: number
+          specialty: string
+          status: string
+          term: string
+          total_decisions: number
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string | null
+          activated_by?: string | null
+          approve_rate?: number
+          approved?: number
+          created_at?: string
+          id?: string
+          min_decisions?: number
+          rejected?: number
+          source_count?: number
+          specialty: string
+          status?: string
+          term: string
+          total_decisions?: number
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string | null
+          activated_by?: string | null
+          approve_rate?: number
+          approved?: number
+          created_at?: string
+          id?: string
+          min_decisions?: number
+          rejected?: number
+          source_count?: number
+          specialty?: string
+          status?: string
+          term?: string
+          total_decisions?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      unsubscribe_log: {
+        Row: {
+          email: string
+          id: string
+          ip_address: string | null
+          resubscribed_at: string | null
+          unsubscribed_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          email: string
+          id?: string
+          ip_address?: string | null
+          resubscribed_at?: string | null
+          unsubscribed_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          email?: string
+          id?: string
+          ip_address?: string | null
+          resubscribed_at?: string | null
+          unsubscribed_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unsubscribe_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_keywords: {
+        Row: {
+          created_at: string
+          id: string
+          keyword: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          keyword: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          keyword?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_keywords_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          author_id: string | null
+          avatar_url: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          department: string | null
+          email: string
+          email_format: string
+          email_notifications: boolean | null
+          first_name: string | null
+          frequency: string
+          hospital: string | null
+          id: string
+          is_public: boolean | null
+          last_name: string | null
+          name: string
+          notes: string
+          onboarding_completed: boolean
+          paused_until: string | null
+          referral_code: string | null
+          referred_by_id: string | null
+          role: string
+          role_type: string | null
+          source: string
+          specialty_slugs: string[]
+          state: string | null
+          status: string
+          subscribed_at: string
+          subspecialties: Json
+          title: string | null
+          unsubscribe_token: string | null
+          unsubscribed_at: string | null
+          updated_at: string
+          welcome_sent_at: string | null
+        }
+        Insert: {
+          author_id?: string | null
+          avatar_url?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          department?: string | null
+          email: string
+          email_format?: string
+          email_notifications?: boolean | null
+          first_name?: string | null
+          frequency?: string
+          hospital?: string | null
+          id: string
+          is_public?: boolean | null
+          last_name?: string | null
+          name?: string
+          notes?: string
+          onboarding_completed?: boolean
+          paused_until?: string | null
+          referral_code?: string | null
+          referred_by_id?: string | null
+          role?: string
+          role_type?: string | null
+          source?: string
+          specialty_slugs?: string[]
+          state?: string | null
+          status?: string
+          subscribed_at?: string
+          subspecialties?: Json
+          title?: string | null
+          unsubscribe_token?: string | null
+          unsubscribed_at?: string | null
+          updated_at?: string
+          welcome_sent_at?: string | null
+        }
+        Update: {
+          author_id?: string | null
+          avatar_url?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          department?: string | null
+          email?: string
+          email_format?: string
+          email_notifications?: boolean | null
+          first_name?: string | null
+          frequency?: string
+          hospital?: string | null
+          id?: string
+          is_public?: boolean | null
+          last_name?: string | null
+          name?: string
+          notes?: string
+          onboarding_completed?: boolean
+          paused_until?: string | null
+          referral_code?: string | null
+          referred_by_id?: string | null
+          role?: string
+          role_type?: string | null
+          source?: string
+          specialty_slugs?: string[]
+          state?: string | null
+          status?: string
+          subscribed_at?: string
+          subspecialties?: Json
+          title?: string | null
+          unsubscribe_token?: string | null
+          unsubscribed_at?: string | null
+          updated_at?: string
+          welcome_sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "users_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "authors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "users_referred_by_id_fkey"
+            columns: ["referred_by_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      compute_author_scores: { Args: never; Returns: undefined }
+      count_affiliation_too_long: { Args: never; Returns: number }
+      count_article_suspect_city_values: { Args: never; Returns: number }
+      count_article_type_not_validated: { Args: never; Returns: number }
+      count_article_type_pending: { Args: never; Returns: number }
+      count_article_type_pending_approval: {
+        Args: { p_article_type?: string }
+        Returns: number
+      }
+      count_article_type_unscored:
+        | { Args: never; Returns: number }
+        | { Args: { p_specialty?: string }; Returns: number }
+      count_articles_by_mesh_terms: {
+        Args: {
+          p_mesh_terms: string[]
+          p_subspecialty: string
+          p_year_range?: string
+        }
+        Returns: number
+      }
+      count_articles_by_specialty:
+        | {
+            Args: {
+              p_article_types?: string[]
+              p_circle?: number
+              p_date_from?: string
+              p_date_to?: string
+              p_geo_city?: string
+              p_geo_continent?: string
+              p_geo_country?: string
+              p_geo_region?: string
+              p_geo_state?: string
+              p_search?: string
+              p_specialty: string
+              p_specialty_match: string
+              p_subspecialties?: string[]
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              p_circle?: number
+              p_geo_city?: string
+              p_geo_continent?: string
+              p_geo_country?: string
+              p_geo_region?: string
+              p_geo_state?: string
+              p_search?: string
+              p_specialty: string
+              p_specialty_match: string
+              p_subspecialty?: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              p_article_type?: string
+              p_circle?: number
+              p_geo_city?: string
+              p_geo_continent?: string
+              p_geo_country?: string
+              p_geo_region?: string
+              p_geo_state?: string
+              p_search?: string
+              p_specialty: string
+              p_specialty_match: string
+              p_subspecialty?: string
+            }
+            Returns: number
+          }
+      count_articles_by_specialty_multi: {
+        Args: {
+          p_article_types?: string[]
+          p_circle?: number
+          p_date_from?: string
+          p_date_to?: string
+          p_geo_city?: string
+          p_geo_continent?: string
+          p_geo_country?: string
+          p_geo_region?: string
+          p_geo_state?: string
+          p_search?: string
+          p_specialty: string
+          p_specialty_match: string
+          p_subspecialties?: string[]
+        }
+        Returns: number
+      }
+      count_articles_in_range: {
+        Args: { p_from: string; p_to: string }
+        Returns: number
+      }
+      count_articles_this_week: {
+        Args: { week_end: string; week_start: string }
+        Returns: number
+      }
+      count_articles_with_mismatch: { Args: never; Returns: number }
+      count_articles_without_authors: { Args: never; Returns: number }
+      count_city_alias_pairs: { Args: never; Returns: number }
+      count_city_alias_resolved: { Args: never; Returns: number }
+      count_condensation_not_validated: {
+        Args: { p_specialty: string }
+        Returns: number
+      }
+      count_country_alias_pairs: { Args: never; Returns: number }
+      count_distinct_geo_regions: { Args: never; Returns: number }
+      count_newsletter_articles: {
+        Args: { p_end: string; p_specialty: string; p_start: string }
+        Returns: number
+      }
+      count_sari_not_validated: {
+        Args: { p_specialty: string }
+        Returns: number
+      }
+      count_scored_not_validated: {
+        Args: { p_specialty: string }
+        Returns: number
+      }
+      count_subspecialties_by_weeks: {
+        Args: { p_subspecialties: string[]; p_week_starts: string[] }
+        Returns: {
+          article_count: number
+          subspecialty: string
+          week_start: string
+        }[]
+      }
+      count_subspecialties_this_week: {
+        Args: {
+          p_subspecialties: string[]
+          p_week_end: string
+          p_week_start: string
+        }
+        Returns: {
+          article_count: number
+          subspecialty: string
+        }[]
+      }
+      count_subspecialty_not_validated: {
+        Args: { p_specialty: string }
+        Returns: number
+      }
+      count_subspecialty_unscored: {
+        Args: { p_specialty: string }
+        Returns: number
+      }
+      count_suspect_country_values: { Args: never; Returns: number }
+      count_text_unscored: { Args: { p_specialty?: string }; Returns: number }
+      count_unlinked_articles: { Args: never; Returns: number }
+      count_unlinked_author_slots: { Args: never; Returns: number }
+      decode_html_entities: { Args: { input: string }; Returns: string }
+      fetch_unlinked_articles: {
+        Args: { p_limit?: number; p_offset: number }
+        Returns: {
+          authors: Json
+          doi: string
+          id: string
+          pubmed_id: string
+        }[]
+      }
+      filter_articles_by_mesh: {
+        Args: { p_descriptor: string }
+        Returns: string[]
+      }
+      find_author_duplicates:
+        | {
+            Args: {
+              p_country?: string
+              p_exact_lastname?: boolean
+              p_exclude_countries?: string[]
+              p_last_name_chars?: number
+              p_match_city?: boolean
+              p_match_country?: boolean
+              p_match_firstname_initial?: boolean
+              p_match_hospital?: boolean
+              p_match_state?: boolean
+              p_max_group_size?: number
+            }
+            Returns: {
+              author_ids: string[]
+              display_names: string[]
+              group_size: number
+            }[]
+          }
+        | {
+            Args: {
+              p_exclude_countries?: string[]
+              p_last_name_chars?: number
+              p_match_city?: boolean
+              p_match_country?: boolean
+              p_match_hospital?: boolean
+              p_match_state?: boolean
+              p_max_group_size?: number
+            }
+            Returns: {
+              author_ids: string[]
+              display_names: string[]
+              group_size: number
+            }[]
+          }
+      generate_referral_code: { Args: never; Returns: string }
+      get_api_article_counts: {
+        Args: { since_ts?: string }
+        Returns: {
+          articles: number
+          cost_with_aid: number
+          task: string
+        }[]
+      }
+      get_api_cost_summary: {
+        Args: { since_ts?: string }
+        Returns: {
+          articles: number
+          calls: number
+          cost_usd: number
+          day: string
+          model_key: string
+          task: string
+        }[]
+      }
+      get_article_geo_options: { Args: never; Returns: Json }
+      get_article_ids_by_specialty: {
+        Args: { p_specialty: string; p_specialty_match?: string }
+        Returns: {
+          article_id: string
+        }[]
+      }
+      get_article_ids_by_specialty_paged:
+        | {
+            Args: {
+              p_article_types?: string[]
+              p_circle?: number
+              p_date_from?: string
+              p_date_to?: string
+              p_geo_city?: string
+              p_geo_continent?: string
+              p_geo_country?: string
+              p_geo_region?: string
+              p_geo_state?: string
+              p_limit: number
+              p_offset: number
+              p_search?: string
+              p_specialty: string
+              p_specialty_match: string
+              p_subspecialties?: string[]
+            }
+            Returns: {
+              article_id: string
+            }[]
+          }
+        | {
+            Args: {
+              p_circle?: number
+              p_geo_city?: string
+              p_geo_continent?: string
+              p_geo_country?: string
+              p_geo_region?: string
+              p_geo_state?: string
+              p_limit: number
+              p_offset: number
+              p_search?: string
+              p_specialty: string
+              p_specialty_match: string
+              p_subspecialty?: string
+            }
+            Returns: {
+              article_id: string
+            }[]
+          }
+        | {
+            Args: {
+              p_article_type?: string
+              p_circle?: number
+              p_geo_city?: string
+              p_geo_continent?: string
+              p_geo_country?: string
+              p_geo_region?: string
+              p_geo_state?: string
+              p_limit: number
+              p_offset: number
+              p_search?: string
+              p_specialty: string
+              p_specialty_match: string
+              p_subspecialty?: string
+            }
+            Returns: {
+              article_id: string
+            }[]
+          }
+      get_article_ids_by_specialty_paged_multi: {
+        Args: {
+          p_article_types?: string[]
+          p_circle?: number
+          p_date_from?: string
+          p_date_to?: string
+          p_geo_city?: string
+          p_geo_continent?: string
+          p_geo_country?: string
+          p_geo_region?: string
+          p_geo_state?: string
+          p_limit: number
+          p_offset: number
+          p_search?: string
+          p_sort_by?: string
+          p_sort_dir?: string
+          p_specialty: string
+          p_specialty_match: string
+          p_subspecialties?: string[]
+        }
+        Returns: {
+          article_id: string
+        }[]
+      }
+      get_article_ids_for_mesh_terms: {
+        Args: { p_mesh_terms: string[] }
+        Returns: {
+          id: string
+        }[]
+      }
+      get_article_type_candidates: {
+        Args: { p_limit?: number; p_offset?: number; p_specialty: string }
+        Returns: {
+          id: string
+          publication_types: string[]
+        }[]
+      }
+      get_article_type_distribution: {
+        Args: { p_specialty: string }
+        Returns: {
+          article_type: string
+          n: number
+        }[]
+      }
+      get_article_type_matrix: {
+        Args: { p_from_date: string; p_subspecialties: string[] }
+        Returns: {
+          article_count: number
+          article_type: string
+          subspecialty: string
+        }[]
+      }
+      get_article_type_not_validated_articles: {
+        Args: { p_limit?: number }
+        Returns: {
+          abstract: string
+          article_type_ai: string
+          article_type_confidence: number
+          article_type_model_version: string
+          article_type_rationale: string
+          authors: Json
+          circle: number
+          id: string
+          journal_abbr: string
+          journal_title: string
+          mesh_terms: Json
+          publication_types: string[]
+          published_date: string
+          pubmed_id: string
+          title: string
+        }[]
+      }
+      get_article_type_pending_approval: {
+        Args: { p_article_type?: string; p_limit?: number; p_offset?: number }
+        Returns: {
+          article_type_ai: string
+          article_type_confidence: number
+          id: string
+          journal_abbr: string
+          publication_types: string[]
+          published_date: string
+          title: string
+        }[]
+      }
+      get_article_type_pending_counts: {
+        Args: never
+        Returns: {
+          article_type: string
+          count: number
+        }[]
+      }
+      get_article_type_rescore_candidates: {
+        Args: { p_limit?: number; p_version: string }
+        Returns: {
+          id: string
+        }[]
+      }
+      get_article_type_unscored_articles: {
+        Args: {
+          p_edat_from?: string
+          p_edat_to?: string
+          p_limit?: number
+          p_specialty: string
+        }
+        Returns: {
+          abstract: string
+          id: string
+          journal_abbr: string
+          journal_title: string
+          mesh_terms: Json
+          publication_types: string[]
+          title: string
+        }[]
+      }
+      get_author_location_stats: {
+        Args: never
+        Returns: {
+          city_coverage: number
+          country_coverage: number
+          no_city: number
+          no_country: number
+          no_region: number
+          no_state: number
+          region_coverage: number
+          source_parser: number
+          source_ror: number
+          state_coverage: number
+          total_authors: number
+        }[]
+      }
+      get_author_update_stats: {
+        Args: never
+        Returns: {
+          articles_updated: number
+          total_created_b: number
+          total_matched_a: number
+          total_removed_c: number
+          total_unmatched: number
+        }[]
+      }
+      get_author_verification_stats: {
+        Args: never
+        Returns: {
+          human: number
+          uverificeret: number
+        }[]
+      }
+      get_authors_affiliation_too_long: {
+        Args: never
+        Returns: {
+          id: string
+        }[]
+      }
+      get_authors_city_not_in_geonames: {
+        Args: { p_limit?: number }
+        Returns: {
+          affiliations: string[]
+          article_count: number
+          city: string
+          country: string
+          department: string
+          display_name: string
+          hospital: string
+          id: string
+          state: string
+        }[]
+      }
+      get_city_country_map: {
+        Args: never
+        Returns: {
+          country: string
+          name: string
+        }[]
+      }
+      get_combo_article_counts: {
+        Args: { p_specialty: string }
+        Returns: {
+          co_occurrences: number
+          pending_count: number
+          term_1: string
+          term_2: string
+        }[]
+      }
+      get_combo_pending_articles: {
+        Args: { p_specialty: string }
+        Returns: {
+          combos: Json
+          id: string
+          journal_abbr: string
+          published_date: string
+          title: string
+        }[]
+      }
+      get_condensation_not_validated_articles: {
+        Args: { p_limit: number; p_specialty: string }
+        Returns: {
+          abstract: string
+          authors: Json
+          bottom_line: string
+          condensed_model_version: string
+          id: string
+          journal_abbr: string
+          journal_title: string
+          published_date: string
+          pubmed_id: string
+          sample_size: number
+          sari_action: string
+          sari_implication: string
+          sari_result: string
+          sari_subject: string
+          short_headline: string
+          short_resume: string
+          title: string
+        }[]
+      }
+      get_condensation_unscored_articles: {
+        Args: { p_limit?: number; p_specialty: string }
+        Returns: {
+          abstract: string
+          bottom_line: string
+          id: string
+          short_headline: string
+          short_resume: string
+          title: string
+        }[]
+      }
+      get_cost_dashboard: {
+        Args: { since_ts: string }
+        Returns: {
+          artikler: number
+          forbrug: number
+          is_lab: boolean
+          kald: number
+          lab_step: string
+          task: string
+        }[]
+      }
+      get_distinct_specialties: {
+        Args: never
+        Returns: {
+          specialty: string
+        }[]
+      }
+      get_distinct_specialty_tags: {
+        Args: never
+        Returns: {
+          tag: string
+        }[]
+      }
+      get_geo_articles: {
+        Args: { p_city?: string; p_since?: string }
+        Returns: {
+          id: string
+          journal_abbr: string
+          published_date: string
+          title: string
+        }[]
+      }
+      get_geo_articles_week: {
+        Args: { p_city: string; p_since: string }
+        Returns: {
+          id: string
+          journal_abbr: string
+          published_date: string
+          title: string
+        }[]
+      }
+      get_geo_cities:
+        | {
+            Args: { p_country?: string; p_since?: string }
+            Returns: {
+              city: string
+              count: number
+            }[]
+          }
+        | {
+            Args: { p_country?: string; p_since?: string; p_state?: string }
+            Returns: {
+              city: string
+              count: number
+            }[]
+          }
+      get_geo_cities_week: {
+        Args: { p_country: string; p_since: string }
+        Returns: {
+          city: string
+          count: number
+        }[]
+      }
+      get_geo_continents: {
+        Args: { p_since?: string }
+        Returns: {
+          continent: string
+          count: number
+        }[]
+      }
+      get_geo_countries: {
+        Args: { p_region?: string; p_since?: string }
+        Returns: {
+          count: number
+          country: string
+        }[]
+      }
+      get_geo_countries_week: {
+        Args: { p_since: string }
+        Returns: {
+          count: number
+          country: string
+          region: string
+        }[]
+      }
+      get_geo_options_filtered:
+        | {
+            Args: {
+              p_continent?: string
+              p_country?: string
+              p_field: string
+              p_state?: string
+            }
+            Returns: string[]
+          }
+        | {
+            Args: {
+              p_continent?: string
+              p_country?: string
+              p_field: string
+              p_region?: string
+              p_state?: string
+            }
+            Returns: string[]
+          }
+      get_geo_regions: {
+        Args: { p_continent?: string; p_since?: string }
+        Returns: {
+          count: number
+          region: string
+        }[]
+      }
+      get_geo_regions_week: {
+        Args: { p_since: string }
+        Returns: {
+          count: number
+          region: string
+        }[]
+      }
+      get_geo_states: {
+        Args: { p_country?: string; p_since?: string }
+        Returns: {
+          count: number
+          state: string
+        }[]
+      }
+      get_kpi_geo_hierarchy: {
+        Args: {
+          p_city?: string
+          p_continent?: string
+          p_country?: string
+          p_period: string
+          p_region?: string
+          p_subspecialty?: string
+        }
+        Returns: Json
+      }
+      get_kpi_overview: {
+        Args: { p_period: string; p_subspecialty?: string }
+        Returns: Json
+      }
+      get_mesh_co_occurrences:
+        | {
+            Args: { p_min_count: number; p_specialty: string }
+            Returns: {
+              pair_count: number
+              term_1: string
+              term_2: string
+            }[]
+          }
+        | {
+            Args: { p_min_count?: number; p_specialty: string }
+            Returns: {
+              cnt: number
+              t1: string
+              t2: string
+            }[]
+          }
+      get_mesh_terms_for_subspecialty: {
+        Args: {
+          p_clinical_only?: boolean
+          p_specialty: string
+          p_subspecialty: string
+          p_year_range?: string
+        }
+        Returns: {
+          article_count: number
+          lift: number
+          term: string
+        }[]
+      }
+      get_newsletter_articles: {
+        Args: { p_end: string; p_specialty: string; p_start: string }
+        Returns: {
+          abstract: string
+          article_type: string
+          authors: Json
+          bottom_line: string
+          id: string
+          imported_at: string
+          issue: string
+          journal_abbr: string
+          pubmed_id: string
+          pubmed_indexed_at: string
+          sample_size: number
+          sari_action: string
+          sari_implication: string
+          sari_result: string
+          sari_subject: string
+          short_headline: string
+          short_resume: string
+          subspecialty: string[]
+          title: string
+          volume: string
+        }[]
+      }
+      get_sari_not_validated_articles: {
+        Args: { p_limit?: number; p_specialty: string }
+        Returns: {
+          abstract: string
+          authors: Json
+          condensed_model_version: string
+          id: string
+          journal_abbr: string
+          journal_title: string
+          published_date: string
+          pubmed_id: string
+          sample_size: number
+          sari_action: string
+          sari_implication: string
+          sari_result: string
+          sari_subject: string
+          title: string
+        }[]
+      }
+      get_scored_not_validated_articles: {
+        Args: { p_limit?: number; p_specialty: string }
+        Returns: {
+          abstract: string
+          ai_decision: string
+          authors: Json
+          circle: number
+          id: string
+          journal_abbr: string
+          journal_title: string
+          published_date: string
+          pubmed_id: string
+          specialty_confidence: number
+          title: string
+        }[]
+      }
+      get_scoring_runs: {
+        Args: { p_limit?: number }
+        Returns: {
+          error: string
+          failed: number
+          finished_at: string
+          id: string
+          module: string
+          scored: number
+          specialty: string
+          started_at: string
+          status: string
+          total: number
+          triggered_by: string
+          version: string
+        }[]
+      }
+      get_single_borderline_articles: {
+        Args: { p_specialty: string }
+        Returns: {
+          article_id: string
+          journal_abbr: string
+          matched_terms: Json
+          published_date: string
+          title: string
+        }[]
+      }
+      get_single_ready_articles: {
+        Args: { p_specialty: string }
+        Returns: {
+          article_id: string
+          journal_abbr: string
+          matched_terms: Json
+          published_date: string
+          title: string
+        }[]
+      }
+      get_specialty_article_stats: {
+        Args: { specialty_slug: string }
+        Returns: {
+          antal: number
+          circle: number
+          specialty_match: boolean
+        }[]
+      }
+      get_specialty_scoring_candidates: {
+        Args: {
+          p_edat_from?: string
+          p_edat_to?: string
+          p_limit?: number
+          p_specialty: string
+        }
+        Returns: {
+          article_id: string
+        }[]
+      }
+      get_specialty_unscored_articles: {
+        Args: {
+          p_edat_from?: string
+          p_edat_to?: string
+          p_limit?: number
+          p_specialty: string
+        }
+        Returns: {
+          abstract: string
+          id: string
+          title: string
+        }[]
+      }
+      get_subspecialty_article_counts: {
+        Args: { p_specialty: string; p_subspecialties: string[] }
+        Returns: {
+          article_count: number
+          subspecialty: string
+        }[]
+      }
+      get_subspecialty_not_validated_articles: {
+        Args: { p_limit?: number; p_specialty: string }
+        Returns: {
+          abstract: string
+          article_type_ai: string
+          authors: Json
+          circle: number
+          id: string
+          journal_abbr: string
+          journal_title: string
+          published_date: string
+          pubmed_id: string
+          study_design_ai: string
+          subspecialty_ai: string[]
+          subspecialty_model_version: string
+          subspecialty_reason: string
+          title: string
+        }[]
+      }
+      get_subspecialty_rescore_candidates: {
+        Args: { p_limit?: number; p_specialty: string }
+        Returns: {
+          id: string
+        }[]
+      }
+      get_subspecialty_unscored_articles: {
+        Args: {
+          p_edat_from?: string
+          p_edat_to?: string
+          p_limit?: number
+          p_specialty: string
+        }
+        Returns: {
+          abstract: string
+          id: string
+          title: string
+        }[]
+      }
+      get_suggested_authors: {
+        Args: {
+          p_subspecialty?: string
+          p_user_country?: string
+          p_user_id: string
+        }
+        Returns: {
+          article_count: number
+          city: string
+          country: string
+          display_name: string
+          hospital: string
+          id: string
+          last_article_date: string
+          region: string
+          top_mesh_terms: string[]
+        }[]
+      }
+      get_suspect_city_article_ids: {
+        Args: never
+        Returns: {
+          id: string
+        }[]
+      }
+      get_tagging_kpis: {
+        Args: { p_specialty: string }
+        Returns: {
+          combo_ready: number
+          no_match: number
+          no_mesh: number
+          single_ready: number
+          total_pending: number
+        }[]
+      }
+      get_text_unscored_articles:
+        | {
+            Args: { p_limit?: number; p_specialty: string }
+            Returns: {
+              abstract: string
+              id: string
+              title: string
+            }[]
+          }
+        | {
+            Args: {
+              p_edat_from?: string
+              p_edat_to?: string
+              p_limit?: number
+              p_specialty: string
+            }
+            Returns: {
+              abstract: string
+              id: string
+              title: string
+            }[]
+          }
+      get_top_subspecialties: {
+        Args: { p_limit?: number }
+        Returns: {
+          count: number
+          tag: string
+        }[]
+      }
+      merge_author_duplicates_geo: {
+        Args: never
+        Returns: {
+          duplicates_merged: number
+          group_name: string
+          primary_id: string
+        }[]
+      }
+      merge_author_duplicates_orcid: {
+        Args: never
+        Returns: {
+          duplicates_merged: number
+          group_name: string
+          primary_id: string
+        }[]
+      }
+      merge_authors: {
+        Args: { p_master_id: string; p_slave_ids: string[] }
+        Returns: undefined
+      }
+      merge_authors_user: {
+        Args: {
+          p_primary_id: string
+          p_resolved_fields?: Json
+          p_slave_ids: string[]
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      normalize_author_geo_city: { Args: never; Returns: number }
+      normalize_geo_city: { Args: never; Returns: number }
+      pubmed_sync_log_runs: {
+        Args: never
+        Returns: {
+          imported: number
+          retracted: number
+          run_time: string
+          total: number
+          updated: number
+        }[]
+      }
+      recalculate_tagging_rule_combos: {
+        Args: { p_include_c1?: boolean; p_specialty: string }
+        Returns: undefined
+      }
+      recalculate_tagging_rules:
+        | { Args: { p_specialty: string }; Returns: undefined }
+        | {
+            Args: { p_include_c1?: boolean; p_specialty: string }
+            Returns: undefined
+          }
+      replace_article_specialty_tags:
+        | {
+            Args: {
+              p_article_id: string
+              p_tags: string[]
+              p_verified?: boolean
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_article_id: string
+              p_status?: string
+              p_tags: string[]
+              p_verified?: boolean
+            }
+            Returns: undefined
+          }
+      run_exact_dupe_cleanup: {
+        Args: never
+        Returns: {
+          authors_deleted: number
+          pairs_merged: number
+        }[]
+      }
+      search_articles_by_mesh: { Args: { p_term: string }; Returns: string[] }
+      search_mesh_terms: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          descriptor: string
+        }[]
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      unaccent: { Args: { "": string }; Returns: string }
+      unlinked_author_slots_for_import_logs: {
+        Args: { p_ids: string[] }
+        Returns: {
+          import_log_id: string
+          slots: number
+        }[]
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const
+
