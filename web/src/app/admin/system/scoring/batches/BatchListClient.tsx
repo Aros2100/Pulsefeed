@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 type BatchRow = {
@@ -42,23 +43,31 @@ function fmtDate(iso: string): string {
 
 export function BatchListClient({ initialBatches }: { initialBatches: BatchRow[] }) {
   const [batches, setBatches] = useState<BatchRow[]>(initialBatches);
+  const router = useRouter();
 
   const hasActive = batches.some((b) => ACTIVE_STATUSES.has(b.status));
 
-  const refresh = useCallback(async () => {
-    try {
-      const res = await fetch("/api/scoring/batch/list", { method: "GET" });
-      if (!res.ok) return;
-      const json = await res.json();
-      if (json.batches) setBatches(json.batches);
-    } catch { /* ignore */ }
-  }, []);
-
   useEffect(() => {
     if (!hasActive) return;
-    const interval = setInterval(refresh, 30_000);
+
+    const interval = setInterval(async () => {
+      const active = batches.filter((b) => ACTIVE_STATUSES.has(b.status));
+      for (const batch of active) {
+        try {
+          const res = await fetch(`/api/scoring/batch/${batch.id}/poll`, { method: "POST" });
+          const json = await res.json();
+          if (json.ok && json.batch) {
+            setBatches((prev) => prev.map((b) =>
+              b.id === json.batch.id ? { ...b, ...json.batch } : b
+            ));
+          }
+        } catch { /* ignore */ }
+      }
+      router.refresh();
+    }, 30_000);
+
     return () => clearInterval(interval);
-  }, [hasActive, refresh]);
+  }, [hasActive, batches, router]);
 
   if (batches.length === 0) {
     return (
