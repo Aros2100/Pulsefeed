@@ -409,12 +409,12 @@ function ArticleTypeMatrix({
       </div>
 
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
           <thead>
             <tr>
               <th style={{ textAlign: "left", padding: "0 0 10px 0", borderBottom: "1px solid #f0f2f5" }} />
               {ARTICLE_TYPE_ORDER.map((type) => (
-                <th key={type} style={{ fontSize: "10px", fontWeight: 700, color: "#aaa", textAlign: "center", padding: "0 6px 10px 6px", borderBottom: "1px solid #f0f2f5", maxWidth: "52px", verticalAlign: "bottom", lineHeight: 1.3, position: "relative" }}
+                <th key={type} style={{ width: "80px", fontSize: "10px", fontWeight: 700, color: "#aaa", textAlign: "center", padding: "0 6px 10px 6px", borderBottom: "1px solid #f0f2f5", verticalAlign: "bottom", lineHeight: 1.3, position: "relative" }}
                   title={ARTICLE_TYPE_TOOLTIP[type]}>
                   <span style={{ borderBottom: "1px dashed #ddd", paddingBottom: "1px", cursor: "default" }}>
                     {ARTICLE_TYPE_SHORT[type]}
