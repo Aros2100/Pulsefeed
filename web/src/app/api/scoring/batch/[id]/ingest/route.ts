@@ -5,6 +5,7 @@ import { finishScoringRun, failScoringRun } from "@/lib/scoring-runs";
 import { ingestSpecialtyBatchResults } from "@/lib/scoring/batch/specialty-batch";
 import { ingestSubspecialtyBatchResults } from "@/lib/scoring/batch/subspecialty-batch";
 import { ingestArticleTypeBatchResults } from "@/lib/scoring/batch/article-type-batch";
+import { ingestCondensationTextBatchResults } from "@/lib/scoring/batch/condensation-text-batch";
 
 export async function POST(
   _request: NextRequest,
@@ -87,6 +88,14 @@ export async function POST(
         typeCodeMap
       );
       stats = { scored: atStats.scored, approved: undefined, rejected: undefined, failed: atStats.failed, failedIds: atStats.failedIds };
+    } else if (row.module === "condensation_text") {
+      const condStats = await ingestCondensationTextBatchResults(
+        row.anthropic_batch_id,
+        row.custom_id_map as Record<string, string>,
+        row.specialty,
+        row.prompt_version
+      );
+      stats = { scored: condStats.scored, approved: undefined, rejected: undefined, failed: condStats.failed, failedIds: condStats.failedIds };
     } else {
       stats = await ingestSpecialtyBatchResults(
         row.anthropic_batch_id,

@@ -88,6 +88,22 @@ export default async function BatchesPage() {
 
   const atPromptVersion: string = atPromptRow?.version ?? "unknown";
 
+  // Pending condensation_text count
+  const { data: condPendingRaw } = await admin.rpc("count_text_unscored", { p_specialty: specialty });
+  const condPending: number = (condPendingRaw as number | null) ?? 0;
+
+  // Active prompt version for condensation_text
+  const { data: condPromptRow } = await admin
+    .from("model_versions")
+    .select("version")
+    .eq("specialty", specialty)
+    .eq("module", "condensation_text")
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
+
+  const condPromptVersion: string = condPromptRow?.version ?? "unknown";
+
   // Recent 20 batches
   const { data: batchRows } = await admin
     .from("scoring_batches")
@@ -181,6 +197,28 @@ export default async function BatchesPage() {
             </span>
           </div>
           <SubmitBatchForm pendingCount={atPending} apiRoute="/api/scoring/batch/article-type/submit" />
+        </div>
+
+        {/* Condensation text batch card */}
+        <div style={sectionCard}>
+          <div style={sectionHeader}>
+            <div>
+              <span style={headerLabel}>Condensation text batch</span>
+              <span style={{ marginLeft: "8px", fontSize: "13px", fontWeight: 600, color: "#1a1a1a", textTransform: "capitalize" }}>
+                {specialty}
+              </span>
+              <span style={{ marginLeft: "8px", fontSize: "12px", color: "#888" }}>{condPromptVersion}</span>
+            </div>
+            <span style={{
+              fontSize: "12px", fontWeight: 700,
+              color: condPending > 0 ? "#d97706" : "#15803d",
+              background: condPending > 0 ? "#fef9c3" : "#dcfce7",
+              borderRadius: "20px", padding: "2px 10px",
+            }}>
+              {condPending.toLocaleString("en-US")} pending
+            </span>
+          </div>
+          <SubmitBatchForm pendingCount={condPending} apiRoute="/api/scoring/batch/condensation-text/submit" />
         </div>
 
         {/* Recent batches card */}

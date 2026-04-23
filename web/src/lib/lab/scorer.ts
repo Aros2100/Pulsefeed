@@ -571,6 +571,58 @@ export async function scoreSari(
   }
 }
 
+export interface CondensationTextResult {
+  short_headline: string;
+  short_resume:   string;
+  bottom_line:    string;
+  version:        string;
+}
+
+// Deterministic request builder for condensation_text batch scoring. No side effects.
+export function buildCondensationTextRequest(
+  article: { title: string; abstract: string | null },
+  specialty: string,
+  activePrompt: ActivePrompt
+): {
+  model: string;
+  max_tokens: number;
+  messages: { role: "user"; content: string }[];
+} {
+  const content = activePrompt.prompt
+    .replace(/\{\{specialty\}\}|\{specialty\}/g, specialty)
+    .replace(/\{\{title\}\}|\{title\}/g,         article.title)
+    .replace(/\{\{abstract\}\}|\{abstract\}/g,   article.abstract ?? "No abstract available");
+
+  return {
+    model:      SCORING_MODEL,
+    max_tokens: 2048,
+    messages:   [{ role: "user", content }],
+  };
+}
+
+// Pure parser. Returns only the 3 text fields written by the condensation_text flow.
+export function parseCondensationTextResponse(
+  rawText: string,
+  version: string
+): CondensationTextResult {
+  try {
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : rawText) as {
+      short_headline?: string;
+      short_resume?: string;
+      bottom_line?: string;
+    };
+    return {
+      short_headline: typeof parsed.short_headline === "string" ? parsed.short_headline : "",
+      short_resume:   typeof parsed.short_resume   === "string" ? parsed.short_resume   : "",
+      bottom_line:    typeof parsed.bottom_line    === "string" ? parsed.bottom_line    : "",
+      version,
+    };
+  } catch {
+    return { short_headline: "", short_resume: "", bottom_line: "", version };
+  }
+}
+
 export async function scoreCondensation(
   article: { id?: string; title: string; abstract: string | null },
   specialty: string,
