@@ -413,6 +413,64 @@ export interface ArticleTypeProdResult {
   version: string;
 }
 
+// Deterministic request builder for article_type_prod scoring. No side effects.
+export function buildArticleTypeProdRequest(
+  article: {
+    title: string;
+    abstract: string | null;
+    journal_abbr?: string | null;
+    journal_title?: string | null;
+    mesh_terms?: unknown;
+    publication_types?: unknown;
+  },
+  activePrompt: ActivePrompt
+): {
+  model: string;
+  max_tokens: number;
+  thinking: { type: "disabled" };
+  system: string;
+  messages: { role: "user"; content: string }[];
+} {
+  const journal = article.journal_abbr ?? article.journal_title ?? "Unknown";
+  const meshTerms = Array.isArray(article.mesh_terms)
+    ? (article.mesh_terms as string[]).join(", ")
+    : "None";
+  const pubTypes = Array.isArray(article.publication_types)
+    ? (article.publication_types as string[]).join(", ")
+    : "None";
+
+  const content = activePrompt.prompt
+    .replace(/\{\{title\}\}|\{title\}/g,                           article.title)
+    .replace(/\{\{journal\}\}|\{journal\}/g,                       journal)
+    .replace(/\{\{abstract\}\}|\{abstract\}/g,                     article.abstract ?? "No abstract available")
+    .replace(/\{\{mesh_terms\}\}|\{mesh_terms\}/g,                 meshTerms)
+    .replace(/\{\{publication_types\}\}|\{publication_types\}/g,   pubTypes);
+
+  return {
+    model:    SCORING_MODEL,
+    max_tokens: 20,
+    thinking: { type: "disabled" },
+    system:   "You respond only with valid JSON. No explanation, no reasoning, no other text.",
+    messages: [{ role: "user", content }],
+  };
+}
+
+// Pure parser. codeMap maps numeric code → article type name.
+export function parseArticleTypeProdResponse(
+  rawText: string,
+  version: string,
+  codeMap: Map<number, string>
+): ArticleTypeProdResult {
+  try {
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : rawText) as { article_type?: number };
+    const article_type = codeMap.get(Number(parsed.article_type)) ?? "Unclassified";
+    return { article_type, version };
+  } catch {
+    return { article_type: "Unclassified", version };
+  }
+}
+
 export async function scoreArticleTypeProd(
   article: {
     id?: string;
@@ -437,39 +495,10 @@ export async function scoreArticleTypeProd(
     (typeRows ?? []).map((r: { code: number; name: string }) => [r.code, r.name])
   );
 
-  const journal = article.journal_abbr ?? article.journal_title ?? "Unknown";
-  const meshTerms = Array.isArray(article.mesh_terms)
-    ? (article.mesh_terms as string[]).join(", ")
-    : "None";
-  const pubTypes = Array.isArray(article.publication_types)
-    ? (article.publication_types as string[]).join(", ")
-    : "None";
-
-  const content = activePrompt.prompt
-    .replace(/\{\{title\}\}|\{title\}/g,                           article.title)
-    .replace(/\{\{journal\}\}|\{journal\}/g,                       journal)
-    .replace(/\{\{abstract\}\}|\{abstract\}/g,                     article.abstract ?? "No abstract available")
-    .replace(/\{\{mesh_terms\}\}|\{mesh_terms\}/g,                 meshTerms)
-    .replace(/\{\{publication_types\}\}|\{publication_types\}/g,   pubTypes);
-
-  const message = await trackedCall(`article_type_prod_${activePrompt.version}`, {
-    model: SCORING_MODEL,
-    max_tokens: 20,
-    thinking: { type: "disabled" },
-    system: "You respond only with valid JSON. No explanation, no reasoning, no other text.",
-    messages: [{ role: "user", content }],
-  }, article.id, "article_type");
-
+  const params = buildArticleTypeProdRequest(article, activePrompt);
+  const message = await trackedCall(`article_type_prod_${activePrompt.version}`, params, article.id, "article_type");
   const raw = (message.content[0] as { type: string; text: string }).text.trim();
-
-  try {
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as { article_type?: number };
-    const article_type = codeMap.get(Number(parsed.article_type)) ?? "Unclassified";
-    return { article_type, version: activePrompt.version };
-  } catch {
-    return { article_type: "Unclassified", version: activePrompt.version };
-  }
+  return parseArticleTypeProdResponse(raw, activePrompt.version, codeMap);
 }
 
 export interface SariResult {

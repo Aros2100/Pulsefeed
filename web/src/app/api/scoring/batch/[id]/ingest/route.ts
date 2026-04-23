@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { finishScoringRun, failScoringRun } from "@/lib/scoring-runs";
 import { ingestSpecialtyBatchResults } from "@/lib/scoring/batch/specialty-batch";
 import { ingestSubspecialtyBatchResults } from "@/lib/scoring/batch/subspecialty-batch";
+import { ingestArticleTypeBatchResults } from "@/lib/scoring/batch/article-type-batch";
 
 export async function POST(
   _request: NextRequest,
@@ -69,6 +70,23 @@ export async function POST(
       );
       // Normalise to common shape for DB write below
       stats = { scored: subStats.scored, approved: undefined, rejected: undefined, failed: subStats.failed, failedIds: subStats.failedIds };
+    } else if (row.module === "article_type_prod") {
+      // Fetch typeCodeMap from DB using the stored specialty
+      const { data: typeRows } = await admin
+        .from("article_types")
+        .select("code, name")
+        .eq("specialty", row.specialty)
+        .eq("active", true);
+      const typeCodeMap = new Map<number, string>(
+        ((typeRows ?? []) as { code: number; name: string }[]).map((r) => [r.code, r.name])
+      );
+      const atStats = await ingestArticleTypeBatchResults(
+        row.anthropic_batch_id,
+        row.custom_id_map as Record<string, string>,
+        row.prompt_version,
+        typeCodeMap
+      );
+      stats = { scored: atStats.scored, approved: undefined, rejected: undefined, failed: atStats.failed, failedIds: atStats.failedIds };
     } else {
       stats = await ingestSpecialtyBatchResults(
         row.anthropic_batch_id,

@@ -72,6 +72,22 @@ export default async function BatchesPage() {
 
   const subPromptVersion: string = subPromptRow?.version ?? "unknown";
 
+  // Pending article type count
+  const { data: atPendingRaw } = await admin.rpc("count_article_type_unscored", { p_specialty: specialty });
+  const atPending: number = (atPendingRaw as number | null) ?? 0;
+
+  // Active prompt version for article_type_prod
+  const { data: atPromptRow } = await admin
+    .from("model_versions")
+    .select("version")
+    .eq("specialty", specialty)
+    .eq("module", "article_type_prod")
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
+
+  const atPromptVersion: string = atPromptRow?.version ?? "unknown";
+
   // Recent 20 batches
   const { data: batchRows } = await admin
     .from("scoring_batches")
@@ -143,6 +159,28 @@ export default async function BatchesPage() {
             </span>
           </div>
           <SubmitBatchForm pendingCount={subPending} apiRoute="/api/scoring/batch/subspecialty/submit" />
+        </div>
+
+        {/* Article type batch card */}
+        <div style={sectionCard}>
+          <div style={sectionHeader}>
+            <div>
+              <span style={headerLabel}>Article type batch</span>
+              <span style={{ marginLeft: "8px", fontSize: "13px", fontWeight: 600, color: "#1a1a1a", textTransform: "capitalize" }}>
+                {specialty}
+              </span>
+              <span style={{ marginLeft: "8px", fontSize: "12px", color: "#888" }}>{atPromptVersion}</span>
+            </div>
+            <span style={{
+              fontSize: "12px", fontWeight: 700,
+              color: atPending > 0 ? "#d97706" : "#15803d",
+              background: atPending > 0 ? "#fef9c3" : "#dcfce7",
+              borderRadius: "20px", padding: "2px 10px",
+            }}>
+              {atPending.toLocaleString("en-US")} pending
+            </span>
+          </div>
+          <SubmitBatchForm pendingCount={atPending} apiRoute="/api/scoring/batch/article-type/submit" />
         </div>
 
         {/* Recent batches card */}
