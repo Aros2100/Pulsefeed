@@ -56,7 +56,7 @@ export default async function CondensationDashboardPage() {
     .from("model_versions")
     .select("version, activated_at, active")
     .eq("specialty", specialty)
-    .eq("module", "condensation")
+    .eq("module", "condensation_sari")
     .order("activated_at", { ascending: false });
 
   const rawVersions = versionsRes.data ?? [];

@@ -151,12 +151,12 @@ export default async function CondensationEvaluationPage({ searchParams }: Props
 
   const admin = createAdminClient();
 
-  // Fetch model versions (module = 'condensation')
+  // Fetch model versions (module = 'condensation_sari')
   const { data: modelVersionsData } = await admin
     .from("model_versions")
     .select("id, version, prompt_text, notes, activated_at, active, generated_by")
     .eq("specialty", specialty)
-    .eq("module", "condensation")
+    .eq("module", "condensation_sari")
     .order("activated_at", { ascending: false });
 
   const modelVersions = (modelVersionsData ?? []) as Array<{ version: string; active: boolean }>;
@@ -262,7 +262,7 @@ export default async function CondensationEvaluationPage({ searchParams }: Props
             <PromptDrawer
               versions={promptVersions}
               specialty={specialty}
-              module="condensation"
+              module="condensation_sari"
               totalDisagreements={totalRejected}
             />
           </div>
