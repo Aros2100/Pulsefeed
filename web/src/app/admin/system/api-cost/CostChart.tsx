@@ -27,10 +27,16 @@ const LAB_STEPS = ["analyse", "prompt-forbedring", "simulering"];
 
 const SHADOW = "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)";
 
-function fmt$(n: number, decimals = 2): string {
+function fmt$(n: number, decimals?: number): string {
   if (n === 0) return "$0,00";
   if (n < 0.001) return "<$0,001";
-  return "$" + n.toFixed(decimals).replace(".", ",");
+  let effectiveDecimals = decimals;
+  if (effectiveDecimals === undefined) {
+    if (n < 0.01)  effectiveDecimals = 4;
+    else if (n < 1) effectiveDecimals = 3;
+    else            effectiveDecimals = 2;
+  }
+  return "$" + n.toFixed(effectiveDecimals).replace(".", ",");
 }
 
 function nFmt(v: number) { return v.toLocaleString("da-DK"); }
