@@ -352,17 +352,17 @@ const ARTICLE_TYPE_ORDER = [
 ];
 
 const ARTICLE_TYPE_SHORT: Record<string, string> = {
-  "Meta-analysis": "Meta",
+  "Meta-analysis": "Meta-analysis",
   "Review": "Review",
-  "Intervention study": "Intervention",
-  "Non-interventional study": "Non-interv.",
-  "Basic study": "Basic",
-  "Case": "Case",
+  "Intervention study": "Intervention study",
+  "Non-interventional study": "Non-interventional study",
+  "Basic study": "Basic study",
+  "Case": "Case report",
   "Guideline": "Guideline",
-  "Surgical Technique": "Surg. Tech.",
+  "Surgical Technique": "Surgical technique",
   "Tech": "Tech",
-  "Administration": "Admin.",
-  "Letters & Notices": "Letters",
+  "Administration": "Administration",
+  "Letters & Notices": "Letters & Notices",
 };
 
 const ARTICLE_TYPE_TOOLTIP: Record<string, string> = {
