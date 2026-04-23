@@ -52,34 +52,54 @@ export async function getActivePrompt(specialty: string, module: string): Promis
   return { prompt: data.prompt_text as string, version: data.version as string };
 }
 
-export async function scoreArticle(
-  article: { id?: string; title: string; abstract: string | null },
+// Deterministic request builder. No side effects.
+// Returns the exact params object sent to Anthropic for specialty scoring.
+export function buildSpecialtyRequest(
+  article: { title: string; abstract: string | null },
   specialty: string,
   activePrompt: ActivePrompt
-): Promise<ScoreResult> {
+): {
+  model: string;
+  max_tokens: number;
+  thinking: { type: "disabled" };
+  system: string;
+  messages: { role: "user"; content: string }[];
+} {
   const content = activePrompt.prompt
     .replace(/\{\{specialty\}\}|\{specialty\}/g, specialty)
     .replace(/\{\{title\}\}|\{title\}/g,         article.title)
     .replace(/\{\{abstract\}\}|\{abstract\}/g,   article.abstract ?? "No abstract available");
 
-  const message = await trackedCall(`specialty_${activePrompt.version}`, {
+  return {
     model: SCORING_MODEL,
     max_tokens: 20,
     thinking: { type: "disabled" },
     system: "You respond only with valid JSON. No explanation, no reasoning, no other text.",
     messages: [{ role: "user", content }],
-  }, article.id, "specialty");
+  };
+}
 
-  const raw = (message.content[0] as { type: string; text: string }).text.trim();
-
+// Pure parser. No I/O.
+export function parseSpecialtyResponse(rawText: string, version: string): ScoreResult {
   try {
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as { decision?: number };
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : rawText) as { decision?: number };
     const ai_decision: "approved" | "rejected" = parsed.decision === 1 ? "approved" : "rejected";
-    return { ai_decision, version: activePrompt.version };
+    return { ai_decision, version };
   } catch {
-    return { ai_decision: "rejected", version: activePrompt.version };
+    return { ai_decision: "rejected", version };
   }
+}
+
+export async function scoreArticle(
+  article: { id?: string; title: string; abstract: string | null },
+  specialty: string,
+  activePrompt: ActivePrompt
+): Promise<ScoreResult> {
+  const params = buildSpecialtyRequest(article, specialty, activePrompt);
+  const message = await trackedCall(`specialty_${activePrompt.version}`, params, article.id, "specialty");
+  const raw = (message.content[0] as { type: string; text: string }).text.trim();
+  return parseSpecialtyResponse(raw, activePrompt.version);
 }
 
 export interface ScoreResultLab {
