@@ -1987,6 +1987,60 @@ export type Database = {
           },
         ]
       }
+      scoring_batches: {
+        Row: {
+          anthropic_batch_id: string
+          article_count: number
+          custom_id_map: Json
+          ended_at: string | null
+          error: string | null
+          id: string
+          ingested_at: string | null
+          module: string
+          prompt_version: string
+          scoring_run_id: string | null
+          specialty: string
+          stats: Json | null
+          status: string
+          submitted_at: string
+          triggered_by: string
+        }
+        Insert: {
+          anthropic_batch_id: string
+          article_count: number
+          custom_id_map: Json
+          ended_at?: string | null
+          error?: string | null
+          id?: string
+          ingested_at?: string | null
+          module: string
+          prompt_version: string
+          scoring_run_id?: string | null
+          specialty: string
+          stats?: Json | null
+          status?: string
+          submitted_at?: string
+          triggered_by: string
+        }
+        Update: {
+          anthropic_batch_id?: string
+          article_count?: number
+          custom_id_map?: Json
+          ended_at?: string | null
+          error?: string | null
+          id?: string
+          ingested_at?: string | null
+          module?: string
+          prompt_version?: string
+          scoring_run_id?: string | null
+          specialty?: string
+          stats?: Json | null
+          status?: string
+          submitted_at?: string
+          triggered_by?: string
+        }
+        Relationships: []
+      }
       scoring_runs: {
         Row: {
           error: string | null
