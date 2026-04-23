@@ -17,7 +17,8 @@ const TASKS = [
   { key: "specialty",      label: "Speciale",     color: "#3B8BD4" },
   { key: "subspecialty",   label: "Subspeciale",  color: "#1D9E75" },
   { key: "article_type",   label: "Artikel type", color: "#D85A30" },
-  { key: "condensation",   label: "Kondensering", color: "#7F77DD" },
+  { key: "condensation_text", label: "Kondensering tekst", color: "#7F77DD" },
+  { key: "condensation_sari", label: "Kondensering SARI",  color: "#B077DD" },
   { key: "geo",            label: "Geo",          color: "#888780" },
 ];
 

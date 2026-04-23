@@ -473,7 +473,7 @@ export async function scoreSari(
     .replace(/\{\{short_resume\}\}|\{short_resume\}/g,     article.short_resume ?? "")
     .replace(/\{\{bottom_line\}\}|\{bottom_line\}/g,       article.bottom_line ?? "");
 
-  const message = await trackedCall(`sari_${activePrompt.version}`, {
+  const message = await trackedCall(`condensation_sari_${activePrompt.version}`, {
     model: SCORING_MODEL,
     max_tokens: 512,
     thinking: { type: "disabled" },
