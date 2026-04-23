@@ -91,6 +91,99 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
   );
 }
 
+function ActivityWidget({
+  weeklyCount,
+  weekStarts,
+  userSubs,
+  subWeekCounts,
+  currentWeekNumber,
+  currentYear,
+}: {
+  weeklyCount: number;
+  weekStarts: string[];
+  userSubs: string[];
+  subWeekCounts: { subspecialty: string; week_start: string; article_count: number }[];
+  currentWeekNumber: number;
+  currentYear: number;
+}) {
+  const getWeekNum = (iso: string) => {
+    const d = new Date(iso);
+    const jan4 = new Date(d.getFullYear(), 0, 4);
+    const startOfWeek1 = new Date(jan4);
+    startOfWeek1.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+    return Math.round((d.getTime() - startOfWeek1.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+  };
+
+  const lookup: Record<string, Record<string, number>> = {};
+  for (const row of subWeekCounts) {
+    if (!lookup[row.subspecialty]) lookup[row.subspecialty] = {};
+    lookup[row.subspecialty][row.week_start] = row.article_count;
+  }
+
+  return (
+    <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "20px 24px" }}>
+
+      {/* Hero: text left, big number right */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", paddingBottom: "16px", borderBottom: "1px solid #f0f2f5", marginBottom: "16px" }}>
+        <div>
+          <div style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "4px" }}>
+            New articles in <span style={{ color: "#E83B2A" }}>neurosurgery</span><br />this week
+          </div>
+          <div style={{ fontSize: "11px", color: "#bbb" }}>Week {currentWeekNumber}, {currentYear}</div>
+        </div>
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
+          <div style={{ fontSize: "52px", fontWeight: 800, color: "#1a1a1a", lineHeight: 1 }}>{weeklyCount}</div>
+          <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#E83B2A", marginTop: "2px" }}>so far</div>
+        </div>
+      </div>
+
+      {/* Subspecialty rows */}
+      {userSubs.length > 0 && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+            <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#bbb" }}>
+              Your subspecialties
+            </div>
+            <div style={{ display: "flex", gap: "6px" }}>
+              {weekStarts.map((ws, i) => (
+                <div key={ws} style={{ width: "36px", textAlign: "center", fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: i === weekStarts.length - 1 ? "#E83B2A" : "#ccc" }}>
+                  W{getWeekNum(ws)}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {userSubs.map((sub) => {
+            const counts = weekStarts.map(ws => lookup[sub]?.[ws] ?? 0);
+            const max = Math.max(...counts, 1);
+            return (
+              <div key={sub} style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px" }}>
+                <div style={{ flex: "1 1 0", fontSize: "12px", fontWeight: 600, color: "#444", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {sub}
+                </div>
+                <div style={{ display: "flex", gap: "6px", alignItems: "flex-end", flexShrink: 0 }}>
+                  {counts.map((count, i) => {
+                    const isCurrent = i === counts.length - 1;
+                    const heightPct = Math.round((count / max) * 100);
+                    return (
+                      <div key={i} style={{ width: "36px", display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                        <div style={{ width: "100%", height: "24px", display: "flex", alignItems: "flex-end" }}>
+                          <div style={{ width: "100%", borderRadius: "2px 2px 0 0", minHeight: "3px", height: `${heightPct}%`, background: isCurrent ? "#E83B2A" : "#e5e9f0", opacity: isCurrent ? 0.8 : 1 }} />
+                        </div>
+                        <div style={{ fontSize: "10px", fontWeight: 700, color: isCurrent ? "#E83B2A" : "#999", textAlign: "center" }}>{count}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
+    </div>
+  );
+}
+
 function NewsletterSection({
   edition,
   prevEditions,
@@ -284,6 +377,14 @@ export default async function HomeV1() {
   const startOfWeekIso = monday.toISOString().slice(0, 10);
   const todayIso = now.toISOString().slice(0, 10);
 
+  // 4 historiske uger (mandag-datoer)
+  const weekStarts: string[] = [];
+  for (let i = 3; i >= 0; i--) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() - i * 7);
+    weekStarts.push(d.toISOString().slice(0, 10));
+  }
+
   const [{ data: profile }, { data: editionRaw }, { data: subsRows }, { data: weeklyCount }] = await Promise.all([
     supabase
       .from("users")
@@ -321,6 +422,7 @@ export default async function HomeV1() {
     ((subsRows ?? []) as { name: string; short_name: string | null }[])
       .map((r) => [r.name, r.short_name ?? r.name])
   );
+  const userSubs = userSubspecialties.filter(s => s.toLowerCase() !== "neurosurgery");
 
   // Case A — no published edition yet
   if (!edition) {
@@ -372,6 +474,17 @@ export default async function HomeV1() {
     }
   }
 
+  // Fetch subspecialty counts for activity widget
+  let subWeekCounts: { subspecialty: string; week_start: string; article_count: number }[] = [];
+  if (userSubs.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase as any).rpc("count_subspecialties_by_weeks", {
+      p_subspecialties: userSubs,
+      p_week_starts: weekStarts,
+    });
+    subWeekCounts = data ?? [];
+  }
+
   // Hent 3 tidligere approved editions
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: prevEditionsRaw } = await (supabase as any)
@@ -415,46 +528,14 @@ export default async function HomeV1() {
             </div>
           </div>
 
-          {/* KPI-boks */}
-          <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "24px 28px" }}>
-            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888", marginBottom: "6px" }}>
-              New this week
-            </div>
-            <div style={{ fontSize: "42px", fontWeight: 800, color: "#1a1a1a", lineHeight: 1 }}>
-              {weeklyCount ?? 0}
-            </div>
-            <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>
-              neurosurgery articles on PubMed
-            </div>
-          </div>
-
-          {/* Subspecialty-sektion */}
-          {userSubspecialties.filter(s => s.toLowerCase() !== "neurosurgery").length > 0 && (
-            <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "24px 28px", marginTop: "16px" }}>
-              <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888", marginBottom: "12px" }}>
-                Your subspecialties
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
-                {userSubspecialties.filter(s => s.toLowerCase() !== "neurosurgery").slice(0, 3).map((s) => (
-                  <span key={s} style={{ fontSize: "12px", fontWeight: 600, color: "#1a1a1a", background: "#f3f4f6", borderRadius: "6px", padding: "4px 10px" }}>
-                    {shortNameMap[s] ?? s}
-                  </span>
-                ))}
-                {userSubspecialties.filter(s => s.toLowerCase() !== "neurosurgery").length > 3 && (
-                  <span style={{ fontSize: "12px", color: "#888", padding: "4px 0" }}>
-                    and {userSubspecialties.filter(s => s.toLowerCase() !== "neurosurgery").length - 3} more
-                  </span>
-                )}
-              </div>
-              <div style={{ fontSize: "12px", color: "#888" }}>
-                You can always{" "}
-                <a href="/profile" style={{ color: "#E83B2A", fontWeight: 600, textDecoration: "none" }}>
-                  change your preferences
-                </a>
-                .
-              </div>
-            </div>
-          )}
+          <ActivityWidget
+            weeklyCount={weeklyCount ?? 0}
+            weekStarts={weekStarts}
+            userSubs={userSubs}
+            subWeekCounts={subWeekCounts}
+            currentWeekNumber={edition.week_number}
+            currentYear={edition.year}
+          />
         </div>
         <div style={{ flex: "0 0 420px" }}>
           <TopArticlesWidget articles={globalArticles} />

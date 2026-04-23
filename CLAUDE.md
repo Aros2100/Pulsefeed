@@ -83,11 +83,33 @@ pulsefeed/
 - **Naming**: camelCase functions, PascalCase components, snake_case DB columns, kebab-case files.
 - **Error pattern**: `{ ok: false, error: string }` with appropriate HTTP status.
 - **Fire-and-forget**: Long tasks use `after()` hook or `void runTask()`.
-- **RLS**: Every new `public` table MUST have RLS enabled + at least one policy in the same migration. Never create a table without it:
+- **RLS**: Every new `public` table MUST have RLS enabled in the same migration. Never create a table without it. Choose the policy based on access pattern:
+
   ```sql
+  -- ALWAYS required:
   ALTER TABLE public.my_table ENABLE ROW LEVEL SECURITY;
-  CREATE POLICY "authenticated can read my_table" ON public.my_table FOR SELECT TO authenticated USING (true);
+
+  -- A) Server-side only (import pipelines, cron jobs, webhooks via createAdminClient):
+  --    No policy needed — service_role bypasses RLS automatically.
+  --    DO revoke write access from anon/authenticated if it was granted:
+  REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.my_table FROM anon, authenticated;
+
+  -- B) Public reference data (UI dropdowns, lookup tables):
+  CREATE POLICY "my_table_public_select"
+    ON public.my_table FOR SELECT TO anon, authenticated USING (true);
+  REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.my_table FROM anon, authenticated;
+
+  -- C) Requires login (user-facing data, newsletters, saved items):
+  CREATE POLICY "my_table_authenticated_select"
+    ON public.my_table FOR SELECT TO authenticated USING (true);
+  REVOKE ALL ON public.my_table FROM anon;
+
+  -- D) User owns their own rows:
+  CREATE POLICY "my_table_own_rows"
+    ON public.my_table FOR SELECT TO authenticated USING (user_id = auth.uid());
   ```
+
+  After applying, verify: `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public' AND tablename = 'my_table';`
 
 ## Environment Variables
 
