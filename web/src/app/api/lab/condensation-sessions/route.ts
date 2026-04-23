@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     .from("lab_sessions")
     .insert({
       specialty,
-      module: "condensation",
+      module,
       user_id: null,
       completed_at: new Date().toISOString(),
       articles_reviewed: decisions.length,
