@@ -154,7 +154,12 @@ export default async function ScoringPage() {
           }}>
             System · Scoring
           </div>
-          <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Scoring</h1>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "16px" }}>
+            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Scoring</h1>
+            <Link href="/admin/system/scoring/batches" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+              → Batches
+            </Link>
+          </div>
         </div>
 
         {rows.length === 0 && (
