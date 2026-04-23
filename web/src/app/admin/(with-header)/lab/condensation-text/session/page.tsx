@@ -1,5 +1,5 @@
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-import TextValidationClient from "../../condensation/TextValidationClient";
+import TextValidationClient from "../TextValidationClient";
 
 export default async function CondensationTextSessionPage() {
   const specialty = ACTIVE_SPECIALTY;

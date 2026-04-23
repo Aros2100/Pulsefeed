@@ -199,7 +199,7 @@ export default async function CondensationDashboardPage() {
 
         {/* Back */}
         <div style={{ marginBottom: "8px" }}>
-          <Link href="/admin/lab/condensation" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+          <Link href="/admin/lab/condensation-sari" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
             ← Kondensering
           </Link>
         </div>

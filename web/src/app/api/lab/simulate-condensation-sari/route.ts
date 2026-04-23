@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { scoreCondensation } from "@/lib/lab/scorer";
+import { scoreSari } from "@/lib/lab/scorer";
 
 const schema = z.object({
   article_id: z.string().uuid(),
@@ -24,13 +24,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: parsed.error.issues[0].message }, { status: 400 });
   }
 
-  const { article_id, title, abstract, prompt, specialty } = parsed.data;
+  const { article_id, title, abstract, prompt } = parsed.data;
   const activePrompt = { prompt, version: "sim" };
 
   try {
-    const result = await scoreCondensation(
+    const result = await scoreSari(
       { id: article_id, title, abstract },
-      specialty,
       activePrompt
     );
 

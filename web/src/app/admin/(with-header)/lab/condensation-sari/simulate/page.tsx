@@ -3,14 +3,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import SimulatorClient, { type SimulationDisagreement, type SimulationAgreement, type SimulatorConfig } from "@/components/lab/SimulatorClient";
 
 const CONFIG: SimulatorConfig = {
-  label: "Condensation",
+  label: "Condensation SARI",
   accent: "#059669",
-  optimizeHref: "/admin/lab/condensation/optimize",
+  optimizeHref: "/admin/lab/condensation-sari/optimize",
   resultType: "binary",
   scoreEndpoint: "/api/lab/simulate-condensation-sari",
   rescoreIncludesSpecialty: true,
   showSpecialtyInSubtitle: false,
-  regressionCommentPlaceholder: "Fx: Korrekt tone — neutral og præcis",
+  regressionCommentPlaceholder: "Fx: Korrekt SARI-struktur — præcis og dækkende",
 };
 
 interface Props {
@@ -37,10 +37,10 @@ type RawDecision = {
   articles: { title: string; journal_title: string | null } | null;
 };
 
-export default async function CondensationSimulatePage({ searchParams }: Props) {
+export default async function CondensationSariSimulatePage({ searchParams }: Props) {
   const { run_id } = await searchParams;
 
-  if (!run_id) redirect("/admin/lab/condensation/optimize");
+  if (!run_id) redirect("/admin/lab/condensation-sari/optimize");
 
   const admin = createAdminClient();
 
@@ -53,14 +53,14 @@ export default async function CondensationSimulatePage({ searchParams }: Props) 
       .single() as unknown as Promise<RunResult>
   );
 
-  if (!run) redirect("/admin/lab/condensation/optimize");
+  if (!run) redirect("/admin/lab/condensation-sari/optimize");
 
   const [{ data: rawDecisions }, { data: rawAgreementData }] = await Promise.all([
     admin
       .from("lab_decisions")
       .select("decision, ai_decision, ai_confidence, disagreement_reason, article_id, articles(title, journal_title)")
       .eq("specialty", run.specialty)
-      .eq("module", "condensation_text")
+      .eq("module", "condensation_sari")
       .not("ai_decision", "is", null)
       .order("decided_at", { ascending: false }),
 
@@ -68,7 +68,7 @@ export default async function CondensationSimulatePage({ searchParams }: Props) 
       .from("lab_decisions")
       .select("decision, ai_decision, ai_confidence, article_id, articles(title, journal_title)")
       .eq("specialty", run.specialty)
-      .eq("module", "condensation_text")
+      .eq("module", "condensation_sari")
       .not("ai_decision", "is", null)
       .order("decided_at", { ascending: false })
       .limit(300),
@@ -130,7 +130,7 @@ export default async function CondensationSimulatePage({ searchParams }: Props) 
     <SimulatorClient
       runId={run.id}
       specialty={run.specialty}
-      module="condensation"
+      module="condensation_sari"
       baseVersion={run.base_version}
       initialPrompt={run.improved_prompt ?? ""}
       disagreements={disagreements}

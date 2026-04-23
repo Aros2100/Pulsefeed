@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface SariArticle {
+interface CondensationArticle {
   id: string;
   title: string;
   journal_abbr: string | null;
@@ -14,11 +14,9 @@ interface SariArticle {
   abstract: string | null;
   pubmed_id: string | null;
   authors: unknown;
-  sari_subject: string | null;
-  sari_action: string | null;
-  sari_result: string | null;
-  sari_implication: string | null;
-  sample_size: number | null;
+  short_headline: string | null;
+  short_resume: string | null;
+  bottom_line: string | null;
   condensed_model_version: string | null;
 }
 
@@ -73,46 +71,46 @@ function Spinner({ size = 12 }: { size?: number }) {
   );
 }
 
-function SariRow({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div style={{ marginBottom: "8px" }}>
-      <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#5a6a85", marginBottom: "2px" }}>
-        {label}
-      </div>
-      <div style={{ fontSize: "13px", color: value ? "#1a1a1a" : "#aaa", lineHeight: 1.5 }}>
-        {value ?? "—"}
-      </div>
-    </div>
-  );
-}
+const REJECT_REASONS = [
+  "Headline upræcis",
+  "Headline forkert fokus",
+  "Resumé mangler nøgletal",
+  "Resumé forkert fokus",
+  "Bottom line gentager titlen",
+  "Bottom line mangler kernefund",
+] as const;
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 interface Props {
   specialty: string;
   label: string;
+  scoringEndpoint?: string;
+  backHref?: string;
 }
 
-export default function SariValidationClient({ specialty, label }: Props) {
+export default function TextValidationClient({ specialty, label, scoringEndpoint = "/api/lab/score-condensation-text", backHref = "/admin/lab/condensation-text" }: Props) {
   const router = useRouter();
 
-  const [articles, setArticles]     = useState<SariArticle[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [loading, setLoading]       = useState(true);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [articles, setArticles]               = useState<CondensationArticle[]>([]);
+  const [totalCount, setTotalCount]           = useState(0);
+  const [loading, setLoading]                 = useState(true);
+  const [selectedId, setSelectedId]           = useState<string | null>(null);
 
-  const [verdicts, setVerdicts]         = useState<Record<string, { decision: "approved" | "rejected"; comment: string }>>({});
-  const [rejectChecked, setRejectChecked] = useState<Record<string, Record<string, boolean>>>({});
-  const [rejectTexts, setRejectTexts]     = useState<Record<string, Record<string, string>>>({});
-  const [pendingReject, setPendingReject] = useState<string | null>(null);
+  const [verdicts, setVerdicts]               = useState<Record<string, { decision: "approved" | "rejected"; comment: string; reasons: string[] }>>({});
+  const [comments, setComments]               = useState<Record<string, string>>({});
+  const [rejectMode, setRejectMode]           = useState(false);
+  const [rejectReasons, setRejectReasons]    = useState<Set<string>>(new Set());
+  const [scoring, setScoring]                 = useState(false);
   const [scoringProgress, setScoringProgress] = useState<{ scored: number; total: number } | null>(null);
-  const [saving, setSaving]         = useState(false);
-  const [toast, setToast]           = useState<string | null>(null);
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [saving, setSaving]                   = useState(false);
+  const [toast, setToast]                     = useState<string | null>(null);
+  const [pendingHref, setPendingHref]         = useState<string | null>(null);
 
   const hasUnsavedRef = useRef(false);
+  const rejectSectionRef = useRef<HTMLDivElement>(null);
 
-  // ── Load articles ─────────────────────────────────────────────────────────
+  // ── Load articles (with pre-scoring if needed) ────────────────────────────
 
   useEffect(() => {
     const abort = new AbortController();
@@ -120,71 +118,82 @@ export default function SariValidationClient({ specialty, label }: Props) {
     async function load() {
       setLoading(true);
 
-      // 1. Tjek om der allerede er scorede artikler klar
+      // 1. Check for already-scored, not-yet-validated articles
       try {
-        const checkRes = await fetch(`/api/admin/training/condensation-sari-articles?specialty=${specialty}`, { signal: abort.signal });
-        const checkData = await checkRes.json() as { ok: boolean; articles?: SariArticle[] };
+        const checkRes = await fetch(`/api/admin/training/condensation-text-articles?specialty=${specialty}`, { signal: abort.signal });
+        const checkData = await checkRes.json() as { ok: boolean; articles?: CondensationArticle[] };
         const existing = checkData.articles ?? [];
 
         if (existing.length > 0) {
-          setArticles(existing);
-          setTotalCount(existing.length);
-          setSelectedId(existing[0]?.id ?? null);
+          populateArticles(existing);
           setLoading(false);
           return;
         }
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
-        console.error("[SariValidationClient] check failed:", e);
+        console.error("[TextValidationClient] check failed:", e);
       }
 
-      // 2. Ingen klar — score ny batch
+      // 2. None ready — score a new batch
+      setLoading(false);
+      setScoring(true);
+      setScoringProgress(null);
+
       try {
-        const scoreRes = await fetch("/api/lab/score-condensation-sari", {
+        const response = await fetch(scoringEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ specialty }),
           signal: abort.signal,
         });
-        const reader = scoreRes.body?.getReader();
+
+        const reader = response.body?.getReader();
         const decoder = new TextDecoder();
         if (reader) {
           outer: while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            const lines = decoder.decode(value).split("\n").filter((l) => l.startsWith("data:"));
-            for (const line of lines) {
+            for (const line of decoder.decode(value).split("\n")) {
+              if (!line.startsWith("data: ")) continue;
               try {
-                const parsed = JSON.parse(line.slice(5).trim()) as { done?: boolean; scored?: number; total?: number };
-                if (parsed.total) setScoringProgress({ scored: parsed.scored ?? 0, total: parsed.total });
-                if (parsed.done) break outer;
-              } catch { /* ignore malformed lines */ }
+                const data = JSON.parse(line.slice(6)) as { scored?: number; total?: number; done?: boolean };
+                if (data.done) break outer;
+                if (data.scored !== undefined && data.total !== undefined) {
+                  setScoringProgress({ scored: data.scored, total: data.total });
+                }
+              } catch { /* ignore malformed events */ }
             }
           }
         }
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
-        console.error("[SariValidationClient] scoring failed:", e);
+        console.error("[TextValidationClient] scoring failed:", e);
       }
 
-      // 3. Load efter scoring
+      if (abort.signal.aborted) return;
+      setScoring(false);
+      setScoringProgress(null);
+
+      // 3. Reload after scoring
       try {
-        const res = await fetch(`/api/admin/training/condensation-sari-articles?specialty=${specialty}`, { signal: abort.signal });
-        const d = await res.json() as { ok: boolean; articles?: SariArticle[] };
-        if (!d.ok) { setLoading(false); return; }
-        const list = d.articles ?? [];
-        setArticles(list);
-        setTotalCount(list.length);
-        setSelectedId(list[0]?.id ?? null);
+        const res = await fetch(`/api/admin/training/condensation-text-articles?specialty=${specialty}`, { signal: abort.signal });
+        const d = await res.json() as { ok: boolean; articles?: CondensationArticle[] };
+        populateArticles(d.articles ?? []);
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
+        console.error("[TextValidationClient] reload failed:", e);
       }
-      setLoading(false);
+    }
+
+    function populateArticles(list: CondensationArticle[]) {
+      setArticles(list);
+      setTotalCount(list.length);
+      setSelectedId(list[0]?.id ?? null);
     }
 
     void load();
     return () => abort.abort();
-  }, [specialty]);
+  }, [specialty, scoringEndpoint]);
 
   // ── Browser leave warning ────────────────────────────────────────────────
 
@@ -214,10 +223,10 @@ export default function SariValidationClient({ specialty, label }: Props) {
   }, []);
 
   useEffect(() => {
-    window.history.pushState({ sariGuard: true }, "");
+    window.history.pushState({ condensationGuard: true }, "");
     function onPopState() {
       if (hasUnsavedRef.current) {
-        window.history.pushState({ sariGuard: true }, "");
+        window.history.pushState({ condensationGuard: true }, "");
         setPendingHref("__back__");
       }
     }
@@ -225,79 +234,70 @@ export default function SariValidationClient({ specialty, label }: Props) {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  // ── SARI reject fields ───────────────────────────────────────────────────
-
-  const SARI_FIELDS = [
-    { key: "S", label: "Subject" },
-    { key: "A", label: "Action" },
-    { key: "R", label: "Result" },
-    { key: "I", label: "Implication" },
-    { key: "N", label: "Sample size" },
-  ] as const;
-
-  function isFieldChecked(articleId: string, key: string): boolean {
-    return rejectChecked[articleId]?.[key] ?? false;
-  }
-
-  function getFieldText(articleId: string, key: string): string {
-    return rejectTexts[articleId]?.[key] ?? "";
-  }
-
-  function toggleField(articleId: string, key: string) {
-    setRejectChecked((prev) => ({
-      ...prev,
-      [articleId]: { ...(prev[articleId] ?? {}), [key]: !isFieldChecked(articleId, key) },
-    }));
-  }
-
-  function setFieldText(articleId: string, key: string, value: string) {
-    setRejectTexts((prev) => ({
-      ...prev,
-      [articleId]: { ...(prev[articleId] ?? {}), [key]: value },
-    }));
-  }
-
-  function canConfirmReject(articleId: string): boolean {
-    return SARI_FIELDS.some(
-      ({ key }) => isFieldChecked(articleId, key) && getFieldText(articleId, key).trim().length > 0
-    );
-  }
-
-  function buildComment(articleId: string): string {
-    const fields: Record<string, string> = {};
-    for (const { key } of SARI_FIELDS) {
-      if (isFieldChecked(articleId, key) && getFieldText(articleId, key).trim()) {
-        fields[key] = getFieldText(articleId, key).trim();
-      }
-    }
-    return JSON.stringify({ fields });
-  }
-
   // ── Verdict handling ────────────────────────────────────────────────────
 
   function approveArticle(articleId: string) {
-    setPendingReject(null);
-    setVerdicts((prev) => ({ ...prev, [articleId]: { decision: "approved", comment: "" } }));
+    setRejectMode(false);
+    setVerdicts((prev) => ({ ...prev, [articleId]: { decision: "approved", comment: "", reasons: [] } }));
   }
 
-  function startReject(articleId: string) {
-    setPendingReject(articleId);
+  function startReject() {
+    setRejectReasons(new Set());
+    setRejectMode(true);
+  }
+
+  function toggleReason(reason: string) {
+    setRejectReasons((prev) => {
+      const next = new Set(prev);
+      if (next.has(reason)) next.delete(reason);
+      else next.add(reason);
+      return next;
+    });
   }
 
   function confirmReject(articleId: string) {
-    setVerdicts((prev) => ({ ...prev, [articleId]: { decision: "rejected", comment: buildComment(articleId) } }));
-    setPendingReject(null);
+    const reasons = REJECT_REASONS.filter((r) => rejectReasons.has(r));
+    setVerdicts((prev) => ({
+      ...prev,
+      [articleId]: {
+        decision: "rejected",
+        comment:  (comments[articleId] ?? "").trim(),
+        reasons,
+      },
+    }));
+    setRejectMode(false);
+    setRejectReasons(new Set());
   }
 
   function cancelReject() {
-    setPendingReject(null);
+    setRejectMode(false);
+    setRejectReasons(new Set());
   }
 
-  // ── Clear pending reject on article change ──────────────────────────────
+  function getComment(articleId: string): string {
+    return comments[articleId] ?? "";
+  }
+
+  function setComment(articleId: string, value: string) {
+    setComments((prev) => ({ ...prev, [articleId]: value }));
+  }
+
+  // ── Clear reject mode on article change ──────────────────────────────
 
   useEffect(() => {
-    setPendingReject(null);
+    setRejectMode(false);
+    setRejectReasons(new Set());
   }, [selectedId]);
+
+  // ── Scroll reject section into view ──────────────────────────────────────
+
+  useEffect(() => {
+    if (rejectMode) {
+      requestAnimationFrame(() => {
+        rejectSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      });
+    }
+  }, [rejectMode]);
 
   // ── Auto-advance on verdict ─────────────────────────────────────────────
 
@@ -314,13 +314,14 @@ export default function SariValidationClient({ specialty, label }: Props) {
   // ── Save ───────────────────────────────────────────────────────────────
 
   async function handleSave(navigateTo?: string) {
-    const destination = navigateTo ?? "/admin/lab/condensation";
+    const destination = navigateTo ?? backHref;
     const toSave = articles
       .filter((a) => verdicts[a.id] != null)
       .map((a) => ({
-        article_id: a.id,
-        decision:   verdicts[a.id].decision,
-        comment:    verdicts[a.id].comment,
+        article_id:     a.id,
+        decision:       verdicts[a.id].decision,
+        comment:        verdicts[a.id].comment,
+        reject_reasons: verdicts[a.id].reasons,
       }));
 
     if (toSave.length === 0) return;
@@ -330,7 +331,7 @@ export default function SariValidationClient({ specialty, label }: Props) {
       const res = await fetch("/api/lab/condensation-sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ specialty, module: "condensation_sari", decisions: toSave }),
+        body: JSON.stringify({ specialty, module: "condensation_text", decisions: toSave }),
       });
       const data = await res.json() as { ok: boolean; reviewed?: number; error?: string };
 
@@ -339,7 +340,7 @@ export default function SariValidationClient({ specialty, label }: Props) {
         setPendingHref(null);
         setToast(`${data.reviewed} artikler valideret`);
         setTimeout(() => {
-          router.push(navigateTo === undefined ? "/admin/lab/condensation" : destination);
+          router.push(navigateTo === undefined ? backHref : destination);
         }, 2500);
       } else {
         setToast(`Fejl: ${data.error ?? "Ukendt fejl"}`);
@@ -373,30 +374,27 @@ export default function SariValidationClient({ specialty, label }: Props) {
 
   const isApproved = currentVerdict?.decision === "approved";
   const isRejected = currentVerdict?.decision === "rejected";
-  const isPendingReject = currentArticle ? pendingReject === currentArticle.id : false;
-
-  // SARI content
-  const sariFields = currentArticle ? [
-    currentArticle.sari_subject,
-    currentArticle.sari_action,
-    currentArticle.sari_result,
-    currentArticle.sari_implication,
-  ] : [];
-  const allSariNull = sariFields.every((f) => f == null);
 
   // ── Loading / empty states ──────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f5f7fa", color: "#888", fontSize: "14px", gap: "8px" }}>
-        {scoringProgress ? (
-          <>
-            <div>Scoring articles…</div>
-            <div style={{ fontSize: "13px", color: "#aaa" }}>{scoringProgress.scored} / {scoringProgress.total}</div>
-          </>
-        ) : (
-          <div>Loading articles…</div>
-        )}
+      <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f5f7fa", color: "#888", fontSize: "14px" }}>
+        Loading articles…
+      </div>
+    );
+  }
+
+  if (scoring) {
+    return (
+      <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f5f7fa", gap: "16px" }}>
+        <Spinner size={28} />
+        <div style={{ fontSize: "16px", fontWeight: 600, color: "#1a1a1a" }}>Kondenserer artikler med AI…</div>
+        <div style={{ fontSize: "13px", color: "#888" }}>
+          {scoringProgress
+            ? `${scoringProgress.scored} / ${scoringProgress.total} artikler kondenseret…`
+            : `Forbereder kondensering…`}
+        </div>
       </div>
     );
   }
@@ -405,8 +403,8 @@ export default function SariValidationClient({ specialty, label }: Props) {
     return (
       <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f5f7fa", gap: "12px" }}>
         <div style={{ fontSize: "18px", fontWeight: 700, color: "#1a1a1a" }}>Ingen artikler at validere</div>
-        <div style={{ fontSize: "14px", color: "#888" }}>Alle SARI-felter for {label} er allerede valideret.</div>
-        <button onClick={() => router.push("/admin/lab/condensation")} style={{ marginTop: "12px", borderRadius: "8px", padding: "10px 20px", background: "#1a1a1a", color: "#fff", border: "none", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
+        <div style={{ fontSize: "14px", color: "#888" }}>Alle tekst-felter for {label} er allerede valideret.</div>
+        <button onClick={() => router.push(backHref)} style={{ marginTop: "12px", borderRadius: "8px", padding: "10px 20px", background: "#1a1a1a", color: "#fff", border: "none", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
           ← Tilbage til Kondensering
         </button>
       </div>
@@ -420,12 +418,12 @@ export default function SariValidationClient({ specialty, label }: Props) {
 
       {/* Header bar */}
       <header style={{ height: "48px", background: "#fff", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", padding: "0 20px", flexShrink: 0, gap: "12px" }}>
-        <a href="/admin/lab/condensation" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none", flexShrink: 0 }}>
+        <a href={backHref} style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none", flexShrink: 0 }}>
           ← Kondensering
         </a>
         <span style={{ color: "#dde3ed", flexShrink: 0 }}>·</span>
         <span style={{ fontSize: "13px", color: "#1a1a1a", fontWeight: 600, flexShrink: 0 }}>
-          SARI-validering · {label}
+          Tekst-validering · {label}
         </span>
 
         <div style={{ flex: 1 }} />
@@ -520,7 +518,7 @@ export default function SariValidationClient({ specialty, label }: Props) {
             </div>
           </div>
 
-          {/* RIGHT — SARI validation */}
+          {/* RIGHT — Text validation */}
           <div style={{ width: "420px", flexShrink: 0, display: "flex", flexDirection: "column", background: "#fafbfc" }}>
             <div style={{ flex: 1, padding: "28px 24px 24px", display: "flex", flexDirection: "column", gap: "16px", overflowY: "auto" }}>
 
@@ -530,102 +528,90 @@ export default function SariValidationClient({ specialty, label }: Props) {
                 borderRadius: "8px",
                 overflow: "hidden",
               }}>
-                {/* Header */}
-                <div style={{
-                  padding: "10px 16px",
-                  borderBottom: `1px solid ${isApproved ? "#bbf7d0" : isRejected ? "#fecaca" : "#f0f0f0"}`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}>
-                  <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#5a6a85" }}>
-                    SARI & Sample
-                  </span>
-                  {isApproved && <span style={{ fontSize: "10px", fontWeight: 700, color: "#15803d" }}>Godkendt</span>}
-                  {isRejected && <span style={{ fontSize: "10px", fontWeight: 700, color: "#dc2626" }}>Afvist</span>}
-                </div>
-
                 {/* Content */}
-                <div style={{ padding: "14px 16px" }}>
-                  {allSariNull ? (
-                    <div style={{ fontSize: "13px", color: "#aaa", fontStyle: "italic" }}>
-                      Ikke relevant for denne artikeltype
+                <div style={{ padding: "16px 16px 14px" }}>
+                  {currentArticle.short_headline && (
+                    <div style={{ marginBottom: "12px" }}>
+                      <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "4px" }}>Headline</div>
+                      <div style={{ fontSize: "16px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4 }}>
+                        {currentArticle.short_headline}
+                      </div>
                     </div>
-                  ) : (
-                    <>
-                      <SariRow label="Subject"    value={currentArticle.sari_subject} />
-                      <SariRow label="Action"     value={currentArticle.sari_action} />
-                      <SariRow label="Result"     value={currentArticle.sari_result} />
-                      <SariRow label="Implication" value={currentArticle.sari_implication} />
-                    </>
                   )}
-                  <div style={{ marginTop: allSariNull ? "8px" : "4px", paddingTop: "8px", borderTop: "1px solid #f0f0f0" }}>
-                    <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#5a6a85" }}>
-                      Sample Size
-                    </span>
-                    <div style={{ fontSize: "15px", fontWeight: 600, color: currentArticle.sample_size != null ? "#1a1a1a" : "#aaa", marginTop: "2px" }}>
-                      {currentArticle.sample_size != null ? `N = ${currentArticle.sample_size.toLocaleString("da-DK")}` : "—"}
+                  {currentArticle.short_resume && (
+                    <div style={{ marginBottom: "12px" }}>
+                      <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "4px" }}>Resumé</div>
+                      <div style={{ fontSize: "14px", color: "#2a2a2a", lineHeight: 1.6 }}>
+                        {currentArticle.short_resume}
+                      </div>
                     </div>
-                  </div>
+                  )}
+                  {currentArticle.bottom_line && (
+                    <div style={{ marginBottom: "0" }}>
+                      <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85", marginBottom: "4px" }}>Bottom line</div>
+                      <div style={{
+                        background: "#f9fafb",
+                        borderLeft: "3px solid #059669",
+                        padding: "12px",
+                        fontSize: "13px",
+                        color: "#2a2a2a",
+                        lineHeight: 1.5,
+                        fontStyle: "italic",
+                      }}>
+                        {currentArticle.bottom_line}
+                      </div>
+                    </div>
+                  )}
+                  {!currentArticle.short_headline && !currentArticle.short_resume && !currentArticle.bottom_line && (
+                    <div style={{ fontSize: "13px", color: "#aaa" }}>Ingen tekst genereret</div>
+                  )}
 
-                  {/* Model version */}
-                  {currentArticle.condensed_model_version && (
-                    <div style={{ marginTop: "12px", fontSize: "11px", color: "#aaa" }}>
-                      Model: {currentArticle.condensed_model_version}
-                    </div>
-                  )}
                 </div>
 
                 {/* Actions */}
-                <div style={{ padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {isPendingReject ? (
+                <div ref={rejectSectionRef} style={{ padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {rejectMode ? (
                     <>
-                      {/* Checkboxes */}
-                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                        {SARI_FIELDS.map(({ key, label }) => {
-                          const checked = isFieldChecked(currentArticle.id, key);
-                          return (
-                            <div key={key}>
-                              <label style={{ display: "flex", alignItems: "center", gap: "7px", cursor: "pointer", fontSize: "12px", fontWeight: 600, color: "#1a1a1a" }}>
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => toggleField(currentArticle.id, key)}
-                                  style={{ width: "14px", height: "14px", cursor: "pointer", accentColor: "#dc2626" }}
-                                />
-                                <span style={{ fontFamily: "monospace", color: "#dc2626", marginRight: "2px" }}>{key}</span>
-                                {label}
-                              </label>
-                              {checked && (
-                                <input
-                                  type="text"
-                                  value={getFieldText(currentArticle.id, key)}
-                                  onChange={(e) => setFieldText(currentArticle.id, key, e.target.value)}
-                                  placeholder={`Beskriv problem med ${label}…`}
-                                  autoFocus
-                                  style={{
-                                    marginTop: "4px", marginLeft: "21px",
-                                    width: "calc(100% - 21px)", padding: "5px 8px", fontSize: "11px",
-                                    border: "1px solid #fecaca", borderRadius: "4px",
-                                    outline: "none", fontFamily: "inherit", background: "#fff",
-                                    boxSizing: "border-box",
-                                  }}
-                                />
-                              )}
-                            </div>
-                          );
-                        })}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                        {REJECT_REASONS.map((reason) => (
+                          <label
+                            key={reason}
+                            style={{
+                              display: "flex", alignItems: "center", gap: "6px",
+                              fontSize: "12px", color: "#1a1a1a", cursor: "pointer",
+                              padding: "3px 0",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={rejectReasons.has(reason)}
+                              onChange={() => toggleReason(reason)}
+                              style={{ accentColor: "#dc2626", margin: 0 }}
+                            />
+                            {reason}
+                          </label>
+                        ))}
                       </div>
-                      <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
+                      <textarea
+                        value={getComment(currentArticle.id)}
+                        onChange={(e) => setComment(currentArticle.id, e.target.value)}
+                        placeholder="Eventuelt uddybende kommentar..."
+                        style={{
+                          width: "100%", minHeight: "44px", padding: "8px 10px", fontSize: "12px",
+                          border: "1px solid #e2e8f0", borderRadius: "5px", resize: "vertical",
+                          outline: "none", fontFamily: "inherit", background: "#fff",
+                        }}
+                      />
+                      <div style={{ display: "flex", gap: "6px" }}>
                         <button
                           onClick={() => confirmReject(currentArticle.id)}
-                          disabled={!canConfirmReject(currentArticle.id)}
+                          disabled={rejectReasons.size === 0}
                           style={{
                             borderRadius: "5px", padding: "5px 14px", fontSize: "11px", fontWeight: 600,
-                            background: canConfirmReject(currentArticle.id) ? "#dc2626" : "#f3f4f6",
-                            border: `1px solid ${canConfirmReject(currentArticle.id) ? "#dc2626" : "#e5e7eb"}`,
-                            color: canConfirmReject(currentArticle.id) ? "#fff" : "#9ca3af",
-                            cursor: canConfirmReject(currentArticle.id) ? "pointer" : "not-allowed",
+                            background: rejectReasons.size > 0 ? "#dc2626" : "#e2e8f0",
+                            border: `1px solid ${rejectReasons.size > 0 ? "#dc2626" : "#e2e8f0"}`,
+                            color: rejectReasons.size > 0 ? "#fff" : "#94a3b8",
+                            cursor: rejectReasons.size > 0 ? "pointer" : "not-allowed",
                             whiteSpace: "nowrap",
                           }}
                         >
@@ -655,10 +641,10 @@ export default function SariValidationClient({ specialty, label }: Props) {
                           cursor: "pointer", whiteSpace: "nowrap",
                         }}
                       >
-                        Agree
+                        ✓ Godkend
                       </button>
                       <button
-                        onClick={() => startReject(currentArticle.id)}
+                        onClick={() => startReject()}
                         style={{
                           borderRadius: "5px", padding: "5px 14px", fontSize: "11px", fontWeight: 600,
                           background: isRejected ? "#dc2626" : "#fff",
@@ -667,7 +653,7 @@ export default function SariValidationClient({ specialty, label }: Props) {
                           cursor: "pointer", whiteSpace: "nowrap",
                         }}
                       >
-                        Disagree
+                        ✗ Afvis
                       </button>
                     </div>
                   )}

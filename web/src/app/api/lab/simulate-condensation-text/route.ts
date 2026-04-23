@@ -31,7 +31,8 @@ export async function POST(request: NextRequest) {
     const result = await scoreCondensation(
       { id: article_id, title, abstract },
       specialty,
-      activePrompt
+      activePrompt,
+      "condensation_text"
     );
 
     const hasContent = !!(result.short_headline && result.short_resume && result.bottom_line);

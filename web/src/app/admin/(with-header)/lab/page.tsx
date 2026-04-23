@@ -25,7 +25,7 @@ export default async function LabPage() {
       title: "SARI Condensation",
       description: "Validate AI-generated subject, action, result and implication",
       queue: cndQueueCount,
-      href: "/admin/lab/condensation",
+      href: "/admin/lab/condensation-sari",
       color: "#059669",
       badge: "New",
     },

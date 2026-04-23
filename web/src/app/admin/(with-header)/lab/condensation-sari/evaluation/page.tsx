@@ -240,7 +240,7 @@ export default async function CondensationEvaluationPage({ searchParams }: Props
 
         {/* Back */}
         <div style={{ marginBottom: "8px" }}>
-          <Link href="/admin/lab/condensation" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+          <Link href="/admin/lab/condensation-sari" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
             ← Kondensering
           </Link>
         </div>
@@ -278,7 +278,7 @@ export default async function CondensationEvaluationPage({ searchParams }: Props
             <span style={{ fontSize: "13px", color: dataBanner.text, fontWeight: 500 }}>{dataBanner.msg}</span>
           </div>
           <Link
-            href="/admin/lab/condensation/optimize"
+            href="/admin/lab/condensation-sari/optimize"
             style={{ flexShrink: 0, fontSize: "13px", fontWeight: 700, background: "#059669", color: "#fff", borderRadius: "7px", padding: "7px 16px", textDecoration: "none", whiteSpace: "nowrap" }}
           >
             Optimér prompt →

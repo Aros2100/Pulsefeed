@@ -1,9 +1,0 @@
-import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-import TextValidationClient from "../TextValidationClient";
-
-export default async function TextValidationPage() {
-  const specialty = ACTIVE_SPECIALTY;
-  const label = ACTIVE_SPECIALTY.charAt(0).toUpperCase() + ACTIVE_SPECIALTY.slice(1);
-
-  return <TextValidationClient specialty={specialty} label={label} />;
-}
