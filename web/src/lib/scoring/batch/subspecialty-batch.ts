@@ -9,6 +9,7 @@ import {
   type ActivePrompt,
 } from "@/lib/lab/scorer";
 import { logArticleEvent } from "@/lib/article-events";
+import { recordBatchUsage } from "@/lib/ai/tracked-client";
 import { getBatchResults, type BatchRequest } from "./client";
 
 type Article = { id: string; title: string; abstract: string | null };
@@ -114,6 +115,15 @@ export async function ingestSubspecialtyBatchResults(
         module:       "subspecialty",
         subspecialty: cls.subspecialty,
         version:      cls.version,
+      });
+
+      recordBatchUsage({
+        modelKey:         `subspecialty_${promptVersion}`,
+        model:            line.result.message!.model,
+        promptTokens:     line.result.message!.usage.input_tokens,
+        completionTokens: line.result.message!.usage.output_tokens,
+        articleId:        article_id,
+        task:             "subspecialty",
       });
 
       scored++;

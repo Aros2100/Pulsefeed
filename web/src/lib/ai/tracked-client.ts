@@ -14,6 +14,52 @@ function calcCost(model: string, inputTokens: number, outputTokens: number): num
   return (inputTokens * p.input + outputTokens * p.output) / 1_000_000;
 }
 
+// Task string conventions (must match trackedCall calls in scorer.ts):
+// - specialty scoring:      modelKey=`specialty_${version}`,           task="specialty"
+// - subspecialty scoring:   modelKey=`subspecialty_${version}`,        task="subspecialty"
+// - article_type prod:      modelKey=`article_type_prod_${version}`,   task="article_type"
+// - condensation text:      modelKey=`condensation_${version}`,        task="condensation"
+// - condensation sari:      modelKey=`condensation_sari_${version}`,   task="sari"
+
+/**
+ * Insert an api_usage row for a single Anthropic call executed via the Batch API.
+ * Uses 50% batch discount on both input and output tokens.
+ * Fire-and-forget — matches trackedCall behavior.
+ */
+export function recordBatchUsage(args: {
+  modelKey: string;
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  articleId?: string;
+  task?: string;
+}): void {
+  const p = MODEL_PRICING[args.model];
+  if (!p) {
+    console.error(`[recordBatchUsage] UNKNOWN MODEL PRICING: "${args.model}" — cost_usd will be 0`);
+  }
+  const totalTokens = args.promptTokens + args.completionTokens;
+  const fullPrice = p
+    ? (args.promptTokens * p.input + args.completionTokens * p.output) / 1_000_000
+    : 0;
+  const batchPrice = fullPrice * 0.5; // 50% batch discount
+
+  createAdminClient()
+    .from("api_usage")
+    .insert({
+      model_key:         args.modelKey,
+      prompt_tokens:     args.promptTokens,
+      completion_tokens: args.completionTokens,
+      total_tokens:      totalTokens,
+      cost_usd:          batchPrice,
+      article_id:        args.articleId ?? null,
+      task:              args.task ?? null,
+    })
+    .then(({ error }) => {
+      if (error) console.error("[api_usage] batch insert failed:", error.message);
+    });
+}
+
 export async function trackedCall(
   modelKey: string,
   params: MessageCreateParamsNonStreaming,
