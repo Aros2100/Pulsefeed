@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
   let activePrompt: ActivePrompt;
   try {
-    activePrompt = await getActivePrompt(specialty, "condensation");
+    activePrompt = await getActivePrompt(specialty, "condensation_sari");
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }

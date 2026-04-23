@@ -89,9 +89,7 @@ export async function POST(request: NextRequest) {
   // Fetch active prompt
   let activePrompt: { prompt: string; version: string };
   try {
-    // Condensation prompts are stored under module 'condensation' regardless of sub-module
-    const promptModule = isCondensation ? "condensation" : module;
-    activePrompt = await getActivePrompt(specialty, promptModule);
+    activePrompt = await getActivePrompt(specialty, module);
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }
