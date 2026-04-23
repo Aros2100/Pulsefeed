@@ -87,11 +87,12 @@ export async function POST(request: NextRequest) {
       p_edat_to:   edat_to   ?? null,
     }
   );
-  const toScore = (unscoredData ?? []) as Article[];
 
   if (fetchError) {
     return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
   }
+
+  const toScore = (unscoredData ?? []) as Article[];
 
   const stream = new ReadableStream({
     async start(controller) {
