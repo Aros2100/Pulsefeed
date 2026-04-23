@@ -25,14 +25,15 @@ export async function GET(request: NextRequest) {
   const geo_country      = params.get("geo_country");
   const geo_state        = params.get("geo_state");
   const geo_city         = params.get("geo_city");
-  const no_subspecialty  = params.get("no_subspecialty") === "true";
+  const no_subspecialty  = params.get("no_subspecialty")  === "true";
+  const specialty_excluded = params.get("specialty_excluded") === "true";
 
   const from = (page - 1) * limit;
   const to   = from + limit - 1;
 
   let query;
 
-  if (specialty) {
+  if (specialty && !specialty_excluded) {
     query = supabase
       .from("articles")
       .select(
@@ -42,6 +43,18 @@ export async function GET(request: NextRequest) {
       )
       .eq("article_specialties.specialty", specialty)
       .eq("article_specialties.specialty_match", true)
+      .order(sort_by, { ascending })
+      .range(from, to);
+  } else if (specialty && specialty_excluded) {
+    query = supabase
+      .from("articles")
+      .select(
+        `id, title, journal_abbr, pubmed_indexed_at, imported_at, authors, circle, specialty_tags, abstract, article_type, subspecialty,
+         article_specialties!inner(specialty, specialty_match)`,
+        { count: "exact" }
+      )
+      .eq("article_specialties.specialty", specialty)
+      .eq("article_specialties.specialty_match", false)
       .order(sort_by, { ascending })
       .range(from, to);
   } else {

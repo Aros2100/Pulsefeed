@@ -91,6 +91,7 @@ interface Filters {
   not_parsed:     boolean;
   suspect_city:   boolean;
   no_subspecialty: boolean;
+  specialty_excluded: boolean;
   sort_by: SortField;
   sort_dir: "asc" | "desc";
   page: number;
@@ -180,7 +181,8 @@ function filtersFromParams(sp: URLSearchParams): Filters {
     no_city:          sp.get("no_city")          === "true",
     not_parsed:       sp.get("not_parsed")       === "true",
     suspect_city:     sp.get("suspect_city")     === "true",
-    no_subspecialty:  sp.get("no_subspecialty")  === "true",
+    no_subspecialty:   sp.get("no_subspecialty")   === "true",
+    specialty_excluded: sp.get("specialty_excluded") === "true",
     sort_by:         (SORT_FIELDS as readonly string[]).includes(sortBy) ? sortBy as SortField : "imported_at",
     sort_dir:        sortDir === "asc" ? "asc" : "desc",
     page:            Math.max(1, parseInt(sp.get("page") ?? "1", 10)),
@@ -206,7 +208,8 @@ function filtersToParams(f: Filters): URLSearchParams {
   if (f.no_city)          p.set("no_city",          "true");
   if (f.not_parsed)       p.set("not_parsed",       "true");
   if (f.suspect_city)     p.set("suspect_city",     "true");
-  if (f.no_subspecialty)  p.set("no_subspecialty",  "true");
+  if (f.no_subspecialty)   p.set("no_subspecialty",   "true");
+  if (f.specialty_excluded) p.set("specialty_excluded", "true");
   if (f.sort_by !== "imported_at") p.set("sort_by", f.sort_by);
   if (f.sort_dir !== "desc")       p.set("sort_dir", f.sort_dir);
   if (f.page > 1)                  p.set("page", String(f.page));
@@ -217,7 +220,7 @@ function filtersToParams(f: Filters): URLSearchParams {
 const EMPTY_FILTERS: Filters = {
   search: "", mesh_term: "", specialty: ACTIVE_SPECIALTY, subspecialty: "", article_type: "",
   geo_continent: "", geo_region: "", geo_country: "", geo_state: "", geo_city: "",
-  no_region: false, no_country: false, no_state: false, no_city: false, not_parsed: false, suspect_city: false, no_subspecialty: false,
+  no_region: false, no_country: false, no_state: false, no_city: false, not_parsed: false, suspect_city: false, no_subspecialty: false, specialty_excluded: false,
   sort_by: "imported_at", sort_dir: "desc", page: 1,
   period: null,
 };
@@ -340,9 +343,10 @@ export default function AdminArticleListClient({
       if (key === "geo_region")    { next.geo_country = ""; next.geo_state = ""; next.geo_city = ""; }
       if (key === "geo_country")   { next.geo_state = ""; next.geo_city = ""; }
       if (key === "geo_state")     { next.geo_city = ""; }
-      if (key === "specialty" && value !== ACTIVE_SPECIALTY) { next.subspecialty = ""; next.no_subspecialty = false; }
+      if (key === "specialty") { next.subspecialty = ""; next.no_subspecialty = false; next.specialty_excluded = false; }
       if (key === "subspecialty" && value) { next.no_subspecialty = false; }
-      if (key === "no_subspecialty" && value) { next.subspecialty = ""; }
+      if (key === "no_subspecialty" && value) { next.subspecialty = ""; next.specialty_excluded = false; }
+      if (key === "specialty_excluded" && value) { next.no_subspecialty = false; }
       return next;
     });
   }
@@ -377,7 +381,7 @@ export default function AdminArticleListClient({
   }
 
   const hasActiveFilters = !!(
-    filters.subspecialty || filters.no_subspecialty || filters.article_type || filters.search ||
+    filters.subspecialty || filters.no_subspecialty || filters.specialty_excluded || filters.article_type || filters.search ||
     filters.mesh_term || filters.geo_continent || filters.geo_region || filters.geo_country || filters.geo_state ||
     filters.geo_city
   );
@@ -440,6 +444,19 @@ export default function AdminArticleListClient({
                 />
                 <span style={{ fontSize: "11px", color: filters.no_subspecialty ? "var(--pf-red)" : "var(--color-text-secondary)", fontWeight: filters.no_subspecialty ? 700 : 400 }}>
                   No subspecialty
+                </span>
+              </label>
+            )}
+            {filters.specialty && (
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", marginTop: "2px" }}>
+                <input
+                  type="checkbox"
+                  checked={filters.specialty_excluded}
+                  onChange={(e) => setFilter("specialty_excluded", e.target.checked)}
+                  style={{ accentColor: "var(--pf-red)", cursor: "pointer" }}
+                />
+                <span style={{ fontSize: "11px", color: filters.specialty_excluded ? "var(--pf-red)" : "var(--color-text-secondary)", fontWeight: filters.specialty_excluded ? 700 : 400 }}>
+                  Excluded only
                 </span>
               </label>
             )}
