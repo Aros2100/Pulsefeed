@@ -16,18 +16,25 @@ export async function POST(request: NextRequest) {
   let mindate: string | undefined;
   let maxdate: string | undefined;
   let limit = 500;
+  let includePreviousFailures = false;
+  let retryFailuresOnly = false;
   try {
-    const body = (await request.json()) as { mindate?: string; maxdate?: string; limit?: number };
+    const body = (await request.json()) as {
+      mindate?: string; maxdate?: string; limit?: number;
+      includePreviousFailures?: boolean; retryFailuresOnly?: boolean;
+    };
     mindate = body.mindate || undefined;
     maxdate = body.maxdate || undefined;
     if (body.limit && body.limit > 0) limit = body.limit;
+    includePreviousFailures = Boolean(body.includePreviousFailures);
+    retryFailuresOnly       = Boolean(body.retryFailuresOnly);
   } catch {
     // body is optional
   }
 
   after(async () => {
     try {
-      await runPubmedSync({ mindate, maxdate, esearchRetmax: limit });
+      await runPubmedSync({ mindate, maxdate, esearchRetmax: limit, includePreviousFailures, retryFailuresOnly });
     } catch (e) {
       console.error("[pubmed-sync/run] failed:", e);
     }

@@ -10,11 +10,14 @@ import { XMLParser } from "fast-xml-parser";
 
 // ── Config ─────────────────────────────────────────────────────────────────
 
-const PUBMED_BATCH  = 20;
-const RATE_MS       = 150;
-const DB_PAGE       = 1_000;
-const UPDATE_BATCH  = 100;
-const BASE          = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
+const PUBMED_BATCH      = 20;
+const RATE_MS           = 150;
+const DB_PAGE           = 1_000;
+const UPDATE_BATCH      = 100;
+const BASE              = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
+const EFETCH_TIMEOUT_MS  = 30_000;
+const EFETCH_MAX_RETRIES = 3;
+const EFETCH_BACKOFF_MS  = [1_000, 3_000, 8_000];
 
 // ── XML parser ─────────────────────────────────────────────────────────────
 
@@ -128,6 +131,8 @@ interface SyncLogEntry {
   pubmed_modified_at: string | null;
 }
 
+type AdminDb = ReturnType<typeof createAdminClient>;
+
 // ── PubMed XML → PmArticle ─────────────────────────────────────────────────
 
 function parseArticle(raw: Record<string, unknown>): PmArticle | null {
@@ -184,18 +189,102 @@ function parseArticle(raw: Record<string, unknown>): PmArticle | null {
   }
 }
 
-// ── EFetch ─────────────────────────────────────────────────────────────────
+// ── EFetch (with retry + timeout) ──────────────────────────────────────────
 
 async function efetchBatch(pmids: string[], apiKey: string): Promise<PmArticle[]> {
   const p = new URLSearchParams({ db: "pubmed", id: pmids.join(","), retmode: "xml" });
   if (apiKey) p.set("api_key", apiKey);
-  const res = await fetch(`${BASE}/efetch.fcgi?${p}`);
-  if (!res.ok) throw new Error(`efetch HTTP ${res.status}`);
-  const xml = await res.text();
-  const parsed = parser.parse(xml);
-  return toArr<Record<string, unknown>>(parsed.PubmedArticleSet?.PubmedArticle)
-    .map(parseArticle)
-    .filter((a): a is PmArticle => a !== null);
+
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= EFETCH_MAX_RETRIES; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), EFETCH_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${BASE}/efetch.fcgi?${p}`, { signal: ctrl.signal });
+      clearTimeout(timer);
+
+      if (res.status === 429 || res.status >= 500) {
+        throw new Error(`efetch HTTP ${res.status}`);
+      }
+      if (!res.ok) {
+        throw new Error(`efetch HTTP ${res.status} (non-retryable)`);
+      }
+
+      const xml = await res.text();
+      const parsed = parser.parse(xml);
+      return toArr<Record<string, unknown>>(parsed.PubmedArticleSet?.PubmedArticle)
+        .map(parseArticle)
+        .filter((a): a is PmArticle => a !== null);
+    } catch (e) {
+      clearTimeout(timer);
+      lastErr = e;
+
+      const msg = String((e as Error)?.message ?? e);
+      const isNonRetryable = msg.includes("non-retryable");
+      if (isNonRetryable || attempt === EFETCH_MAX_RETRIES) {
+        throw e;
+      }
+
+      const delay = EFETCH_BACKOFF_MS[attempt] ?? 8_000;
+      console.warn(`[pubmed-sync] efetch retry ${attempt + 1}/${EFETCH_MAX_RETRIES} efter ${delay}ms — ${msg}`);
+      await sleep(delay);
+    }
+  }
+  throw lastErr;
+}
+
+// ── Failure tracking helpers ───────────────────────────────────────────────
+
+async function recordBatchFailure(
+  db: AdminDb,
+  pmids: string[],
+  error: unknown,
+  runStartedAt: string,
+): Promise<void> {
+  const errMsg = String((error as Error)?.message ?? error).slice(0, 500);
+  const now = new Date().toISOString();
+
+  for (const pmid of pmids) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existing } = await (db as any)
+      .from("pubmed_sync_failures")
+      .select("attempts, resolved_at, first_failed_at")
+      .eq("pubmed_id", pmid)
+      .maybeSingle();
+
+    if (existing && existing.resolved_at === null) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (db as any).from("pubmed_sync_failures")
+        .update({
+          last_failed_at: now,
+          attempts: (existing.attempts ?? 0) + 1,
+          last_error: errMsg,
+          run_started_at: runStartedAt,
+        })
+        .eq("pubmed_id", pmid);
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (db as any).from("pubmed_sync_failures").upsert({
+        pubmed_id: pmid,
+        first_failed_at: existing ? existing.first_failed_at ?? now : now,
+        last_failed_at: now,
+        attempts: 1,
+        last_error: errMsg,
+        resolved_at: null,
+        run_started_at: runStartedAt,
+      }, { onConflict: "pubmed_id" });
+    }
+  }
+}
+
+async function markPmidsResolved(db: AdminDb, pmids: string[]): Promise<void> {
+  if (pmids.length === 0) return;
+  const now = new Date().toISOString();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (db as any).from("pubmed_sync_failures")
+    .update({ resolved_at: now })
+    .in("pubmed_id", pmids)
+    .is("resolved_at", null);
 }
 
 // ── ESearch ────────────────────────────────────────────────────────────────
@@ -239,64 +328,99 @@ async function esearch(
 // ── Main export ─────────────────────────────────────────────────────────────
 
 export interface SyncRunnerOpts {
-  mindate?:       string;
-  maxdate?:       string;
-  esearchRetmax?: number;
+  mindate?:                 string;
+  maxdate?:                 string;
+  esearchRetmax?:           number;
+  includePreviousFailures?: boolean;
+  retryFailuresOnly?:       boolean;
 }
 
-export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<void> {
+export interface SyncRunnerResult {
+  updated:       number;
+  retracted:     number;
+  failedBatches: number;
+  failedPmids:   number;
+}
+
+export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<SyncRunnerResult> {
   const { esearchRetmax = 10_000 } = opts;
   const db     = createAdminClient();
   const apiKey = process.env.PUBMED_API_KEY ?? "";
 
-  const today   = new Date();
-  const toDate  = opts.maxdate ? new Date(opts.maxdate) : today;
+  const runStartedAt = new Date().toISOString();
+
+  const today    = new Date();
+  const toDate   = opts.maxdate ? new Date(opts.maxdate) : today;
   const fromDate = opts.mindate ? new Date(opts.mindate) : new Date(today.getTime() - 7 * 86_400_000);
-  const mindate = fmtDate(fromDate);
-  const maxdate = fmtDate(toDate);
+  const mindate  = fmtDate(fromDate);
+  const maxdate  = fmtDate(toDate);
 
-  console.log(`[pubmed-sync] Period: ${mindate} → ${maxdate}, retmax: ${esearchRetmax}`);
+  let matches: string[];
 
-  // Step 1 — Fetch DB IDs
-  const dbIds = new Set<string>();
-  let page = 0;
-  for (;;) {
-    const { data, error } = await db
-      .from("articles")
-      .select("pubmed_id")
-      .range(page * DB_PAGE, (page + 1) * DB_PAGE - 1);
+  if (opts.retryFailuresOnly) {
+    console.log(`[pubmed-sync] Retry-only mode`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (db as any).rpc("pubmed_sync_failures_retry_candidates");
     if (error) throw error;
-    if (!data?.length) break;
-    for (const row of data) if (row.pubmed_id) dbIds.add(row.pubmed_id);
-    if (data.length < DB_PAGE) break;
-    page++;
+    matches = (data ?? []).map((r: { pubmed_id: string }) => r.pubmed_id);
+    console.log(`[pubmed-sync] ${matches.length} fejlede PMIDs at retrye`);
+  } else {
+    console.log(`[pubmed-sync] Period: ${mindate} → ${maxdate}, retmax: ${esearchRetmax}`);
+
+    // Step 1 — Fetch DB IDs
+    const dbIds = new Set<string>();
+    let page = 0;
+    for (;;) {
+      const { data, error } = await db
+        .from("articles")
+        .select("pubmed_id")
+        .range(page * DB_PAGE, (page + 1) * DB_PAGE - 1);
+      if (error) throw error;
+      if (!data?.length) break;
+      for (const row of data) if (row.pubmed_id) dbIds.add(row.pubmed_id);
+      if (data.length < DB_PAGE) break;
+      page++;
+    }
+    console.log(`[pubmed-sync] ${dbIds.size} artikler i DB`);
+
+    // Step 2 — Build filter query
+    const { data: filters, error: filterErr } = await db
+      .from("pubmed_filters")
+      .select("query_string, circle")
+      .eq("active", true)
+      .in("circle", [1, 2, 4]);
+    if (filterErr) throw filterErr;
+    if (!filters?.length) throw new Error("Ingen aktive C1/C2 filtre fundet i pubmed_filters");
+    const filterQuery = filters.map(f => `(${f.query_string})`).join(" OR ");
+
+    // Step 3 — ESearch
+    const pubmedIds = await esearch(filterQuery, mindate, maxdate, esearchRetmax, apiKey);
+    console.log(`[pubmed-sync] ${pubmedIds.length} PMIDs fra PubMed`);
+
+    // Step 4 — Cross-reference
+    const newPmids: string[] = [];
+    matches = [];
+    for (const id of pubmedIds) {
+      if (dbIds.has(id)) matches.push(id);
+      else newPmids.push(id);
+    }
+    console.log(`[pubmed-sync] Match: ${matches.length}`);
+
+    // Step 4.5 — Inkluder tidligere fejlede hvis opt-in
+    if (opts.includePreviousFailures) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (db as any).rpc("pubmed_sync_failures_retry_candidates");
+      const extra = (data ?? []).map((r: { pubmed_id: string }) => r.pubmed_id);
+      const matchSet = new Set(matches);
+      const added = extra.filter((id: string) => !matchSet.has(id));
+      matches.push(...added);
+      console.log(`[pubmed-sync] +${added.length} tidligere fejlede inkluderet`);
+    }
   }
-  console.log(`[pubmed-sync] ${dbIds.size} artikler i DB`);
-
-  // Step 2 — Build filter query
-  const { data: filters, error: filterErr } = await db
-    .from("pubmed_filters")
-    .select("query_string, circle")
-    .eq("active", true)
-    .in("circle", [1, 2, 4]);
-  if (filterErr) throw filterErr;
-  if (!filters?.length) throw new Error("Ingen aktive C1/C2 filtre fundet i pubmed_filters");
-  const filterQuery = filters.map(f => `(${f.query_string})`).join(" OR ");
-
-  // Step 3 — ESearch
-  const pubmedIds = await esearch(filterQuery, mindate, maxdate, esearchRetmax, apiKey);
-  console.log(`[pubmed-sync] ${pubmedIds.length} PMIDs fra PubMed`);
-
-  // Step 4 — Cross-reference
-  const matches:  string[] = [];
-  const newPmids: string[] = [];
-  for (const id of pubmedIds) {
-    if (dbIds.has(id)) matches.push(id);
-    else newPmids.push(id);
-  }
-  console.log(`[pubmed-sync] Match: ${matches.length}`);
 
   const logEntries: SyncLogEntry[] = [];
+  let failedBatches = 0;
+  let failedPmids   = 0;
 
   // Step 5 — Fetch matched DB records + compare + update
   if (matches.length > 0) {
@@ -316,8 +440,13 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<void> {
       let fetched: PmArticle[];
       try {
         fetched = await efetchBatch(batch, apiKey);
+        await markPmidsResolved(db, batch);
       } catch (e) {
-        console.error(`[pubmed-sync] efetch fejl ved batch ${i}:`, e);
+        const msg = String((e as Error)?.message ?? e).slice(0, 200);
+        console.error(`[pubmed-sync] efetch fejl ved batch ${i} efter retries: ${msg}`);
+        failedBatches++;
+        failedPmids += batch.length;
+        await recordBatchFailure(db, batch, e, runStartedAt);
         continue;
       }
 
@@ -383,5 +512,15 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<void> {
     }
   }
 
-  console.log(`[pubmed-sync] Færdig. Log entries: ${logEntries.length}`);
+  console.log(
+    `[pubmed-sync] Færdig. Updated: ${logEntries.length}, ` +
+    `Failed batches: ${failedBatches} (${failedPmids} PMIDs)`,
+  );
+
+  return {
+    updated:       logEntries.filter(l => l.event === "updated").length,
+    retracted:     logEntries.filter(l => l.event === "retracted").length,
+    failedBatches,
+    failedPmids,
+  };
 }

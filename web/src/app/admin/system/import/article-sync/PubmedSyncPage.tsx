@@ -12,6 +12,12 @@ interface SyncLog {
   total:     number;
 }
 
+interface FailureSummary {
+  totalUnresolved: number;
+  oldestFailure:   string | null;
+  recentFailures:  { pubmed_id: string; attempts: number; last_error: string | null; last_failed_at: string }[];
+}
+
 /* ═══ Helpers ═════════════════════════════════════════════════════════════════ */
 
 function fmt(iso: string | null) {
@@ -72,10 +78,13 @@ const inputStyle: React.CSSProperties = {
 /* ═══ Main component ══════════════════════════════════════════════════════════ */
 
 export default function PubmedSyncPage() {
-  const [running,     setRunning]     = useState(false);
-  const [error,       setError]       = useState<string | null>(null);
-  const [logs,        setLogs]        = useState<SyncLog[]>([]);
-  const [loadingLogs, setLoadingLogs] = useState(true);
+  const [running,                setRunning]                = useState(false);
+  const [retryingFailures,       setRetryingFailures]       = useState(false);
+  const [error,                  setError]                  = useState<string | null>(null);
+  const [logs,                   setLogs]                   = useState<SyncLog[]>([]);
+  const [loadingLogs,            setLoadingLogs]            = useState(true);
+  const [failures,               setFailures]               = useState<FailureSummary | null>(null);
+  const [includePreviousFailures, setIncludePreviousFailures] = useState(false);
   const [mindate, setMindate] = useState(() => {
     const d = new Date(Date.now() - 7 * 86_400_000);
     return d.toISOString().slice(0, 10);
@@ -89,41 +98,51 @@ export default function PubmedSyncPage() {
     const d = await res.json();
     if (d.ok) {
       setLogs(d.runs ?? []);
-      // If a run was in progress and new rows appeared, clear running state
       if (running && (d.runs ?? []).length > 0) setRunning(false);
     }
     setLoadingLogs(false);
   }, [running]);
 
-  useEffect(() => { void fetchLogs(); }, [fetchLogs]);
+  /* ── Fetch failures ── */
+  const fetchFailures = useCallback(async () => {
+    const res = await fetch("/api/admin/system/pubmed-sync/failures");
+    const d = await res.json();
+    if (d.ok) setFailures(d);
+  }, []);
+
+  useEffect(() => { void fetchLogs(); void fetchFailures(); }, [fetchLogs, fetchFailures]);
 
   // Poll while running
   useEffect(() => {
-    if (!running) return;
-    const iv = setInterval(() => { void fetchLogs(); }, 5000);
+    if (!running && !retryingFailures) return;
+    const iv = setInterval(() => { void fetchLogs(); void fetchFailures(); }, 5000);
     return () => clearInterval(iv);
-  }, [running, fetchLogs]);
+  }, [running, retryingFailures, fetchLogs, fetchFailures]);
 
   /* ── Trigger sync ── */
-  async function handleRun() {
-    setRunning(true);
+  async function handleRun(options: { retryFailuresOnly?: boolean } = {}) {
+    const isRetry = Boolean(options.retryFailuresOnly);
+    if (isRetry) setRetryingFailures(true); else setRunning(true);
     setError(null);
     try {
       const res = await fetch("/api/admin/system/pubmed-sync/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mindate, maxdate, limit }),
+        body: JSON.stringify({
+          mindate, maxdate, limit,
+          includePreviousFailures: isRetry ? false : includePreviousFailures,
+          retryFailuresOnly:       isRetry,
+        }),
       });
       const d = await res.json();
       if (!d.ok) {
         setError(d.error ?? "Sync fejlede");
-        setRunning(false);
+        if (isRetry) setRetryingFailures(false); else setRunning(false);
       }
-      // Refresh logs after a short delay (run is fire-and-forget on server)
-      setTimeout(() => { void fetchLogs(); }, 3000);
+      setTimeout(() => { void fetchLogs(); void fetchFailures(); }, 3000);
     } catch {
       setError("Netværksfejl");
-      setRunning(false);
+      if (isRetry) setRetryingFailures(false); else setRunning(false);
     }
   }
 
@@ -150,8 +169,8 @@ export default function PubmedSyncPage() {
             </p>
           </div>
           <button
-            onClick={handleRun}
-            disabled={running}
+            onClick={() => handleRun()}
+            disabled={running || retryingFailures}
             style={{
               padding: "9px 20px", fontSize: "13px", fontWeight: 700,
               background: running ? "#9ca3af" : "#E83B2A", color: "#fff",
@@ -212,6 +231,16 @@ export default function PubmedSyncPage() {
                 />
               </div>
             </div>
+            <div style={{ marginTop: 14 }}>
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "#1a1a1a", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={includePreviousFailures}
+                  onChange={(e) => setIncludePreviousFailures(e.target.checked)}
+                />
+                Inkluder tidligere fejlede artikler ({failures?.totalUnresolved ?? 0})
+              </label>
+            </div>
             <p style={{ fontSize: "12px", color: "#5a6a85", marginTop: "14px", marginBottom: 0, lineHeight: 1.6 }}>
               Syncer artikler modificeret på PubMed fra {fmt(mindate)} til {fmt(maxdate)}.
               Kun artikler der allerede er i databasen opdateres — nye artikler importeres via circle-import.
@@ -219,7 +248,67 @@ export default function PubmedSyncPage() {
           </div>
         </div>
 
-        {/* ═══ SECTION 2: Sync log ═══ */}
+        {/* ═══ SECTION 2: Fejlede artikler ═══ */}
+        {failures && failures.totalUnresolved > 0 && (
+          <div style={cardStyle}>
+            <div style={sectionHeader}>
+              <span style={headerLabel}>Fejlede artikler</span>
+              <button
+                onClick={() => handleRun({ retryFailuresOnly: true })}
+                disabled={retryingFailures || running}
+                style={{
+                  padding: "6px 14px", fontSize: "12px", fontWeight: 700,
+                  background: retryingFailures ? "#9ca3af" : "#1a1a1a", color: "#fff",
+                  border: "none", borderRadius: "6px",
+                  cursor: retryingFailures ? "default" : "pointer",
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                }}
+              >
+                {retryingFailures && <Spinner />}
+                {retryingFailures ? "Retrying…" : "Retry kun fejlede"}
+              </button>
+            </div>
+            <div style={{ padding: "16px 24px" }}>
+              <div style={{ display: "flex", gap: 32, marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: "#5a6a85", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.06em" }}>Uløste</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: "#dc2626" }}>{num(failures.totalUnresolved)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: "#5a6a85", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.06em" }}>Ældste fejl</div>
+                  <div style={{ fontSize: 14, color: "#1a1a1a", paddingTop: 6 }}>{fmt(failures.oldestFailure)}</div>
+                </div>
+              </div>
+              {failures.recentFailures.length > 0 && (
+                <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
+                  <thead>
+                    <tr>
+                      {["PMID", "Forsøg", "Sidste fejl", "Seneste"].map(h => (
+                        <th key={h} style={thStyle}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {failures.recentFailures.slice(0, 5).map(f => (
+                      <tr key={f.pubmed_id}>
+                        <td style={{ ...tdStyle, fontFamily: "monospace" }}>{f.pubmed_id}</td>
+                        <td style={{ ...tdStyle, fontVariantNumeric: "tabular-nums" }}>
+                          <span style={{ color: f.attempts >= 5 ? "#dc2626" : "#1a1a1a", fontWeight: f.attempts >= 5 ? 700 : 400 }}>
+                            {f.attempts}/5
+                          </span>
+                        </td>
+                        <td style={{ ...tdStyle, color: "#5a6a85", fontSize: 12 }}>{f.last_error ?? "—"}</td>
+                        <td style={{ ...tdStyle, whiteSpace: "nowrap", color: "#5a6a85" }}>{fmt(f.last_failed_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ═══ SECTION 3: Sync log ═══ */}
         <div style={cardStyle}>
           <div style={sectionHeader}>
             <span style={headerLabel}>Sync log</span>
