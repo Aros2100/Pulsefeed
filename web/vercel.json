@@ -1,14 +1,6 @@
 {
   "crons": [
     {
-      "path": "/api/internal/pubmed/run-import",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/admin/pubmed/trigger-import-daily",
-      "schedule": "0 3 * * *"
-    },
-    {
       "path": "/api/cron/nightly-check",
       "schedule": "0 6 * * *"
     }
