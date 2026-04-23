@@ -432,7 +432,7 @@ function ArticleTypeMatrix({
                 {ARTICLE_TYPE_ORDER.map((type) => {
                   const n = lookup[sub]?.[type] ?? 0;
                   return (
-                    <td key={type} style={{ textAlign: "center", padding: "8px 6px", fontSize: "12px", fontWeight: 500, color: n === 0 ? "#ddd" : "#444" }}>
+                    <td key={type} style={{ textAlign: "center", padding: "8px 6px", fontSize: "12px", fontWeight: 500, color: n === 0 ? "#ddd" : "#444", background: n === 0 ? "transparent" : "#f8f9fb", borderRadius: n === 0 ? 0 : "4px" }}>
                       {n === 0 ? "—" : n}
                     </td>
                   );
