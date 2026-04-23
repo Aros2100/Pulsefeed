@@ -457,13 +457,21 @@ export interface SariInput {
 }
 
 export async function scoreSari(
-  article: SariInput,
+  article: {
+    id?: string;
+    title: string;
+    abstract: string | null;
+    short_headline?: string | null;
+    short_resume?: string | null;
+    bottom_line?: string | null;
+  },
   activePrompt: ActivePrompt
 ): Promise<SariResult> {
   const content = activePrompt.prompt
-    .replace(/\{\{short_headline\}\}/g, article.short_headline ?? "")
-    .replace(/\{\{short_resume\}\}/g,   article.short_resume ?? "")
-    .replace(/\{\{bottom_line\}\}/g,    article.bottom_line ?? "");
+    .replace(/\{\{title\}\}|\{title\}/g,                   article.title)
+    .replace(/\{\{short_headline\}\}|\{short_headline\}/g, article.short_headline ?? "")
+    .replace(/\{\{short_resume\}\}|\{short_resume\}/g,     article.short_resume ?? "")
+    .replace(/\{\{bottom_line\}\}|\{bottom_line\}/g,       article.bottom_line ?? "");
 
   const message = await trackedCall(`sari_${activePrompt.version}`, {
     model: SCORING_MODEL,
