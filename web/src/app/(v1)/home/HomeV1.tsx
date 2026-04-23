@@ -299,6 +299,7 @@ function TopArticlesWidget({ articles }: { articles: GlobalArticleRow[] }) {
       border: "1px solid #e5e9f0",
       padding: "20px",
       boxSizing: "border-box",
+      height: "100%",
     }}>
       <div style={{
         fontSize: "11px",
@@ -371,34 +372,6 @@ const ARTICLE_TYPE_ORDER = [
   "Administration", "Letters & Notices",
 ];
 
-const ARTICLE_TYPE_SHORT: Record<string, string> = {
-  "Meta-analysis": "Meta-analysis",
-  "Review": "Review",
-  "Intervention study": "Intervention",
-  "Non-interventional study": "Non-interventional",
-  "Basic study": "Basic study",
-  "Case": "Case report",
-  "Guideline": "Guideline",
-  "Surgical Technique": "Surgical technique",
-  "Tech": "Tech",
-  "Administration": "Admin.",
-  "Letters & Notices": "Letters & Notices",
-};
-
-const ARTICLE_TYPE_TOOLTIP: Record<string, string> = {
-  "Meta-analysis": "Pooled quantitative analysis of multiple studies",
-  "Review": "Narrative reviews and literature overviews",
-  "Intervention study": "RCTs and other interventional trials",
-  "Non-interventional study": "Observational research — cohort, registry, cross-sectional",
-  "Basic study": "Laboratory, animal, or mechanistic research",
-  "Case": "Case reports and case series",
-  "Guideline": "Clinical practice guidelines and consensus statements",
-  "Surgical Technique": "Step-by-step descriptions of operative procedures",
-  "Tech": "New devices, implants, or technology evaluations",
-  "Administration": "Health economics, policy, and organizational research",
-  "Letters & Notices": "Correspondence, editorials, and brief communications",
-};
-
 function ArticleTypeMatrix({
   userSubs,
   shortNameMap,
@@ -416,52 +389,71 @@ function ArticleTypeMatrix({
     lookup[row.subspecialty][row.article_type] = row.article_count;
   }
 
+  const ARTICLE_TYPE_TOOLTIP: Record<string, string> = {
+    "Meta-analysis": "Pooled quantitative analysis of multiple studies",
+    "Review": "Narrative reviews and literature overviews",
+    "Intervention study": "RCTs and other interventional trials",
+    "Non-interventional study": "Observational research — cohort, registry, cross-sectional",
+    "Basic study": "Laboratory, animal, or mechanistic research",
+    "Case": "Case reports and case series",
+    "Guideline": "Clinical practice guidelines and consensus statements",
+    "Surgical Technique": "Step-by-step descriptions of operative procedures",
+    "Tech": "New devices, implants, or technology evaluations",
+    "Administration": "Health economics, policy, and organizational research",
+    "Letters & Notices": "Correspondence, editorials, and brief communications",
+  };
+
+  const ARTICLE_TYPE_DISPLAY: Record<string, string> = {
+    "Non-interventional study": "Non-interventional",
+    "Surgical Technique": "Surgical technique",
+    "Case": "Case report",
+  };
+
   return (
-    <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "20px 24px", marginTop: "24px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "6px" }}>
-        <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888" }}>
-          Introducing article types
-        </div>
+    <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "20px 24px", height: "100%" }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: "6px" }}>
+        <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888" }}>Introducing article types</div>
         <div style={{ fontSize: "11px", color: "#bbb" }}>Last 30 days</div>
       </div>
       <div style={{ fontSize: "12px", color: "#888", marginBottom: "16px", lineHeight: 1.5 }}>
-        We classify every article into <span style={{ fontWeight: 600, color: "#444" }}>one of 11 types</span> — here&apos;s what&apos;s been published in your subspecialties. Hover a column to learn more.
+        We classify every article into <span style={{ fontWeight: 600, color: "#444" }}>one of 11 types</span> — here&apos;s what&apos;s published in your subspecialties.
       </div>
 
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
-          <thead>
-            <tr>
-              <th style={{ width: "160px", padding: "0 16px 10px 0", borderBottom: "1px solid #f0f2f5" }} />
-              {ARTICLE_TYPE_ORDER.map((type) => (
-                <th key={type} style={{ width: "72px", fontSize: "10px", fontWeight: 700, color: "#aaa", textAlign: "center", padding: "0 4px 10px 4px", borderBottom: "1px solid #f0f2f5", verticalAlign: "bottom", lineHeight: 1.3, position: "relative" }}
-                  title={ARTICLE_TYPE_TOOLTIP[type]}>
-                  <span style={{ borderBottom: "1px dashed #ddd", paddingBottom: "1px", cursor: "default" }}>
-                    {ARTICLE_TYPE_SHORT[type]}
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {userSubs.map((sub, i) => (
-              <tr key={sub} style={{ borderBottom: i < userSubs.length - 1 ? "1px solid #f8f9fb" : "none" }}>
-                <td style={{ fontSize: "12px", fontWeight: 600, color: "#444", padding: "8px 16px 8px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {shortNameMap[sub] ?? sub}
-                </td>
-                {ARTICLE_TYPE_ORDER.map((type) => {
-                  const n = lookup[sub]?.[type] ?? 0;
-                  return (
-                    <td key={type} style={{ textAlign: "center", padding: "8px 6px", fontSize: "12px", fontWeight: 500, color: n === 0 ? "#ddd" : "#444", background: n === 0 ? "transparent" : "#fdf0ef", borderRadius: n === 0 ? 0 : "4px" }}>
-                      {n === 0 ? "—" : n}
-                    </td>
-                  );
-                })}
-              </tr>
+      <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+        <thead>
+          <tr>
+            <th style={{ textAlign: "left", paddingLeft: 0, paddingBottom: "10px", borderBottom: "2px solid #f0f2f5" }} />
+            {userSubs.map(sub => (
+              <th key={sub} style={{ fontSize: "11px", fontWeight: 700, color: "#555", textAlign: "center", padding: "0 6px 10px 6px", borderBottom: "2px solid #f0f2f5", width: "68px" }}>
+                {shortNameMap[sub] ?? sub}
+              </th>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </tr>
+        </thead>
+        <tbody>
+          {ARTICLE_TYPE_ORDER.map((type) => (
+            <tr key={type} style={{ borderBottom: "1px solid #f8f9fb" }}>
+              <td style={{ fontSize: "12px", fontWeight: 500, color: "#555", padding: "6px 6px 6px 0", textAlign: "left" }}
+                title={ARTICLE_TYPE_TOOLTIP[type]}>
+                {ARTICLE_TYPE_DISPLAY[type] ?? type}
+              </td>
+              {userSubs.map(sub => {
+                const n = lookup[sub]?.[type] ?? 0;
+                return (
+                  <td key={sub} style={{
+                    fontSize: "12px", fontWeight: 500, textAlign: "center", padding: "6px",
+                    color: n === 0 ? "#ddd" : "#444",
+                    background: n === 0 ? "transparent" : "#fdf0ef",
+                    borderRadius: "4px",
+                  }}>
+                    {n === 0 ? "—" : n}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -676,26 +668,14 @@ export default async function HomeV1() {
     <>
       {previewBanner}
 
-      {/* Header + Don't miss — two-column layout */}
-      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 0", display: "flex", alignItems: "flex-start", gap: "32px" }}>
-        <div style={{ flex: "1 1 0", minWidth: 0 }}>
-          {/* Header — ingen baggrund */}
-          <div style={{ marginBottom: "20px" }}>
-            <div style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a" }}>
-              {greeting}, {firstName}
-            </div>
-            <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>
-              Week {currentWeekNumber}, {currentYear}
-            </div>
-          </div>
-        </div>
-        <div style={{ flex: "1 1 0", minWidth: 0 }}>
-          <TopArticlesWidget articles={globalArticles} />
-        </div>
+      {/* Header — fri tekst */}
+      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 16px" }}>
+        <div style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a" }}>{greeting}, {firstName}</div>
+        <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>Week {currentWeekNumber}, {currentYear}</div>
       </div>
 
-      {/* Activity widget — fuld bredde */}
-      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "16px 24px 0" }}>
+      {/* KPI banner — fuld bredde */}
+      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "0 24px 16px" }}>
         <ActivityWidget
           weeklyCount={weeklyCount ?? 0}
           monthlyCount={monthlyCount ?? 0}
@@ -707,14 +687,23 @@ export default async function HomeV1() {
         />
       </div>
 
-      {/* Newsletter-sektion — bred container */}
-      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "24px 24px 0" }}>
+      {/* Midterste lag — article type matrix venstre, don't miss højre */}
+      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "0 24px 16px", display: "flex", gap: "24px", alignItems: "stretch" }}>
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+          <ArticleTypeMatrix
+            userSubs={userSubs}
+            shortNameMap={shortNameMap}
+            matrixRows={matrixRows}
+          />
+        </div>
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+          <TopArticlesWidget articles={globalArticles} />
+        </div>
+      </div>
+
+      {/* Newsletter — fuld bredde */}
+      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "0 24px 80px" }}>
         <NewsletterSection edition={{ ...edition, content: edition.content as { global_intro?: string } }} prevEditions={prevEditions} />
-        <ArticleTypeMatrix
-          userSubs={userSubs}
-          shortNameMap={shortNameMap}
-          matrixRows={matrixRows}
-        />
       </div>
 
       {/* Newsletter-artikler — smal container */}
