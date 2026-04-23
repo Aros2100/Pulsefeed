@@ -138,6 +138,7 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
         {/* Actions + stats (client component) */}
         <BatchDetailClient
           id={id}
+          module={batch.module}
           status={batch.status}
           ingestedAt={batch.ingested_at}
           stats={batch.stats}

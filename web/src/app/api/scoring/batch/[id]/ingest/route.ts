@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { finishScoringRun, failScoringRun } from "@/lib/scoring-runs";
 import { ingestSpecialtyBatchResults } from "@/lib/scoring/batch/specialty-batch";
+import { ingestSubspecialtyBatchResults } from "@/lib/scoring/batch/subspecialty-batch";
 
 export async function POST(
   _request: NextRequest,
@@ -59,12 +60,23 @@ export async function POST(
 
   let stats;
   try {
-    stats = await ingestSpecialtyBatchResults(
-      row.anthropic_batch_id,
-      row.custom_id_map as Record<string, string>,
-      row.specialty,
-      row.prompt_version
-    );
+    if (row.module === "subspecialty") {
+      const subStats = await ingestSubspecialtyBatchResults(
+        row.anthropic_batch_id,
+        row.custom_id_map as Record<string, string>,
+        row.specialty,
+        row.prompt_version
+      );
+      // Normalise to common shape for DB write below
+      stats = { scored: subStats.scored, approved: undefined, rejected: undefined, failed: subStats.failed, failedIds: subStats.failedIds };
+    } else {
+      stats = await ingestSpecialtyBatchResults(
+        row.anthropic_batch_id,
+        row.custom_id_map as Record<string, string>,
+        row.specialty,
+        row.prompt_version
+      );
+    }
   } catch (e) {
     const msg = (e as Error).message;
     console.error("[batch/ingest] ingest failed:", msg);
@@ -87,10 +99,10 @@ export async function POST(
       status:      "ingested",
       ingested_at: new Date().toISOString(),
       stats: {
-        scored:    stats.scored,
-        approved:  stats.approved,
-        rejected:  stats.rejected,
-        failed:    stats.failed,
+        scored:     stats.scored,
+        ...(stats.approved  !== undefined && { approved:  stats.approved }),
+        ...(stats.rejected  !== undefined && { rejected:  stats.rejected }),
+        failed:     stats.failed,
         failed_ids: stats.failedIds,
       },
     })

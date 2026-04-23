@@ -56,6 +56,22 @@ export default async function BatchesPage() {
 
   const promptVersion: string = promptRow?.version ?? "unknown";
 
+  // Pending subspecialty count — same RPC as scoring/page.tsx
+  const { data: subPendingRaw } = await admin.rpc("count_subspecialty_unscored", { p_specialty: specialty });
+  const subPending: number = (subPendingRaw as number | null) ?? 0;
+
+  // Active prompt version for subspecialty
+  const { data: subPromptRow } = await admin
+    .from("model_versions")
+    .select("version")
+    .eq("specialty", specialty)
+    .eq("module", "subspecialty")
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
+
+  const subPromptVersion: string = subPromptRow?.version ?? "unknown";
+
   // Recent 20 batches
   const { data: batchRows } = await admin
     .from("scoring_batches")
@@ -104,7 +120,29 @@ export default async function BatchesPage() {
               {pending.toLocaleString("en-US")} pending
             </span>
           </div>
-          <SubmitBatchForm pendingCount={pending} />
+          <SubmitBatchForm pendingCount={pending} apiRoute="/api/scoring/batch/specialty/submit" />
+        </div>
+
+        {/* Subspecialty batch card */}
+        <div style={sectionCard}>
+          <div style={sectionHeader}>
+            <div>
+              <span style={headerLabel}>Subspecialty batch</span>
+              <span style={{ marginLeft: "8px", fontSize: "13px", fontWeight: 600, color: "#1a1a1a", textTransform: "capitalize" }}>
+                {specialty}
+              </span>
+              <span style={{ marginLeft: "8px", fontSize: "12px", color: "#888" }}>{subPromptVersion}</span>
+            </div>
+            <span style={{
+              fontSize: "12px", fontWeight: 700,
+              color: subPending > 0 ? "#d97706" : "#15803d",
+              background: subPending > 0 ? "#fef9c3" : "#dcfce7",
+              borderRadius: "20px", padding: "2px 10px",
+            }}>
+              {subPending.toLocaleString("en-US")} pending
+            </span>
+          </div>
+          <SubmitBatchForm pendingCount={subPending} apiRoute="/api/scoring/batch/subspecialty/submit" />
         </div>
 
         {/* Recent batches card */}

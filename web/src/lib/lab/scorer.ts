@@ -208,6 +208,59 @@ export interface SubspecialtyResult {
   version: string;
 }
 
+// Deterministic request builder for subspecialty scoring. No side effects.
+export function buildSubspecialtyRequest(
+  article: { title: string; abstract: string | null },
+  _specialty: string,
+  activePrompt: ActivePrompt
+): {
+  model: string;
+  max_tokens: number;
+  thinking: { type: "disabled" };
+  system: string;
+  messages: { role: "user"; content: string }[];
+} {
+  const content = activePrompt.prompt
+    .replace(/\{\{title\}\}|\{title\}/g,       article.title)
+    .replace(/\{\{abstract\}\}|\{abstract\}/g, article.abstract ?? "No abstract available");
+
+  return {
+    model: SCORING_MODEL,
+    max_tokens: 32,
+    thinking: { type: "disabled" },
+    system: "You respond only with valid JSON. No explanation, no reasoning, no other text.",
+    messages: [{ role: "user", content }],
+  };
+}
+
+// Pure parser. codeMap required because the model returns numeric codes, not names.
+export function parseSubspecialtyResponse(
+  rawText: string,
+  version: string,
+  codeMap: Map<number, string>
+): SubspecialtyResult {
+  try {
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : rawText) as { subspecialty?: number[] };
+    const codes = Array.isArray(parsed.subspecialty) ? parsed.subspecialty : [];
+
+    const mapped: string[] = [];
+    for (const code of codes) {
+      const name = codeMap.get(Number(code));
+      if (name) mapped.push(name);
+    }
+
+    const PEDIATRIC = "Pediatric and foetal neurosurgery";
+    const maxSubs = mapped.includes(PEDIATRIC) ? 3 : 2;
+    const subspecialty = mapped.slice(0, maxSubs);
+    if (subspecialty.length === 0) subspecialty.push("Unknown");
+
+    return { subspecialty, version };
+  } catch {
+    return { subspecialty: ["Unknown"], version };
+  }
+}
+
 export async function scoreSubspecialty(
   article: { id?: string; title: string; abstract: string | null },
   specialty: string,
@@ -227,49 +280,10 @@ export async function scoreSubspecialty(
     (subspecialtyRows ?? []).map((r: { code: number; name: string }) => [r.code, r.name])
   );
 
-  const content = activePrompt.prompt
-    .replace(/\{\{title\}\}|\{title\}/g,       article.title)
-    .replace(/\{\{abstract\}\}|\{abstract\}/g, article.abstract ?? "No abstract available");
-
-  const message = await trackedCall(`subspecialty_${activePrompt.version}`, {
-    model: SCORING_MODEL,
-    max_tokens: 32,
-    thinking: { type: "disabled" },
-    system: "You respond only with valid JSON. No explanation, no reasoning, no other text.",
-    messages: [{ role: "user", content }],
-  }, article.id, "subspecialty");
-
+  const params = buildSubspecialtyRequest(article, specialty, activePrompt);
+  const message = await trackedCall(`subspecialty_${activePrompt.version}`, params, article.id, "subspecialty");
   const raw = (message.content[0] as { type: string; text: string }).text.trim();
-
-  try {
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw) as {
-      subspecialty?: number[];
-    };
-
-    const codes = Array.isArray(parsed.subspecialty) ? parsed.subspecialty : [];
-
-    const mapped: string[] = [];
-    for (const code of codes) {
-      const name = codeMap.get(Number(code));
-      if (name) {
-        mapped.push(name);
-      } else {
-        console.warn(`[scoreSubspecialty] unknown code ${code} for article ${article.id}`);
-      }
-    }
-
-    const PEDIATRIC = "Pediatric and foetal neurosurgery";
-    const maxSubs = mapped.includes(PEDIATRIC) ? 3 : 2;
-    const subspecialty = mapped.slice(0, maxSubs);
-
-    if (subspecialty.length === 0) subspecialty.push("Unknown");
-
-    return { subspecialty, version: activePrompt.version };
-  } catch {
-    console.error(`[scoreSubspecialty] failed to parse for article ${article.id}: ${raw}`);
-    return { subspecialty: ["Unknown"], version: activePrompt.version };
-  }
+  return parseSubspecialtyResponse(raw, activePrompt.version, codeMap);
 }
 
 export interface ArticleTypeResult {

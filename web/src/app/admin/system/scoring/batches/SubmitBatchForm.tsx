@@ -22,7 +22,13 @@ const inputStyle: React.CSSProperties = {
   color: "#1a1a1a",
 };
 
-export function SubmitBatchForm({ pendingCount }: { pendingCount: number }) {
+export function SubmitBatchForm({
+  pendingCount,
+  apiRoute = "/api/scoring/batch/specialty/submit",
+}: {
+  pendingCount: number;
+  apiRoute?: string;
+}) {
   const router = useRouter();
   const [edatFrom, setEdatFrom] = useState("");
   const [edatTo, setEdatTo]     = useState("");
@@ -38,7 +44,7 @@ export function SubmitBatchForm({ pendingCount }: { pendingCount: number }) {
       if (edatFrom) body.edat_from = edatFrom;
       if (edatTo)   body.edat_to   = edatTo;
 
-      const res = await fetch("/api/scoring/batch/specialty/submit", {
+      const res = await fetch(apiRoute, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

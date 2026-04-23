@@ -22,11 +22,13 @@ type Stats = {
 
 export function BatchDetailClient({
   id,
+  module,
   status,
   ingestedAt,
   stats,
 }: {
   id: string;
+  module: string;
   status: string;
   ingestedAt: string | null;
   stats: Stats | null;
@@ -123,12 +125,18 @@ export function BatchDetailClient({
           </div>
           <div style={{ padding: "20px 24px" }}>
             <div style={{ display: "flex", gap: "32px", marginBottom: "16px", flexWrap: "wrap" }}>
-              {[
-                { label: "Scored",    value: liveStats.scored,   color: "#1a1a1a" },
-                { label: "Approved",  value: liveStats.approved,  color: "#15803d" },
-                { label: "Rejected",  value: liveStats.rejected,  color: "#d97706" },
-                { label: "Failed",    value: liveStats.failed,    color: "#b91c1c" },
-              ].map(({ label, value, color }) => (
+              {(module === "subspecialty"
+                ? [
+                    { label: "Scored", value: liveStats.scored, color: "#1a1a1a" },
+                    { label: "Failed", value: liveStats.failed, color: "#b91c1c" },
+                  ]
+                : [
+                    { label: "Scored",   value: liveStats.scored,    color: "#1a1a1a" },
+                    { label: "Approved", value: liveStats.approved,   color: "#15803d" },
+                    { label: "Rejected", value: liveStats.rejected,   color: "#d97706" },
+                    { label: "Failed",   value: liveStats.failed,     color: "#b91c1c" },
+                  ]
+              ).map(({ label, value, color }) => (
                 <div key={label}>
                   <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>{label}</div>
                   <div style={{ fontSize: "28px", fontWeight: 800, color }}>{value ?? "—"}</div>
