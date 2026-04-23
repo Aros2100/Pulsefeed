@@ -97,6 +97,8 @@ export async function POST(request: NextRequest) {
                   article_id: article.id,
                   event_type: "condensation_text_scored",
                   meta: { version: condensation.version },
+                }).then(({ error }) => {
+                  if (error) console.error(`[score-condensation-text] article_events insert failed for ${article.id}:`, error.message);
                 });
                 scored++;
               } catch (e) {
