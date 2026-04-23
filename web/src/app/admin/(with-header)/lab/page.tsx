@@ -22,8 +22,8 @@ export default async function LabPage() {
 
   const modules = [
     {
-      title: "Condensation",
-      description: "Validate AI-generated headline, summary, bottom line, PICO and sample size",
+      title: "SARI Condensation",
+      description: "Validate AI-generated subject, action, result and implication",
       queue: cndQueueCount,
       href: "/admin/lab/condensation",
       color: "#059669",
