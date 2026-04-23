@@ -345,6 +345,117 @@ function TopArticlesWidget({ articles }: { articles: GlobalArticleRow[] }) {
   );
 }
 
+const ARTICLE_TYPE_ORDER = [
+  "Meta-analysis", "Review", "Intervention study", "Non-interventional study",
+  "Basic study", "Case", "Guideline", "Surgical Technique", "Tech",
+  "Administration", "Letters & Notices",
+];
+
+const ARTICLE_TYPE_SHORT: Record<string, string> = {
+  "Meta-analysis": "Meta",
+  "Review": "Review",
+  "Intervention study": "Intervention",
+  "Non-interventional study": "Non-interv.",
+  "Basic study": "Basic",
+  "Case": "Case",
+  "Guideline": "Guideline",
+  "Surgical Technique": "Surg. Tech.",
+  "Tech": "Tech",
+  "Administration": "Admin.",
+  "Letters & Notices": "Letters",
+};
+
+const ARTICLE_TYPE_TOOLTIP: Record<string, string> = {
+  "Meta-analysis": "Pooled quantitative analysis of multiple studies",
+  "Review": "Narrative reviews and literature overviews",
+  "Intervention study": "RCTs and other interventional trials",
+  "Non-interventional study": "Observational research — cohort, registry, cross-sectional",
+  "Basic study": "Laboratory, animal, or mechanistic research",
+  "Case": "Case reports and case series",
+  "Guideline": "Clinical practice guidelines and consensus statements",
+  "Surgical Technique": "Step-by-step descriptions of operative procedures",
+  "Tech": "New devices, implants, or technology evaluations",
+  "Administration": "Health economics, policy, and organizational research",
+  "Letters & Notices": "Correspondence, editorials, and brief communications",
+};
+
+function ArticleTypeMatrix({
+  userSubs,
+  shortNameMap,
+  matrixRows,
+}: {
+  userSubs: string[];
+  shortNameMap: Record<string, string>;
+  matrixRows: { subspecialty: string; article_type: string; article_count: number }[];
+}) {
+  if (userSubs.length === 0) return null;
+
+  const lookup: Record<string, Record<string, number>> = {};
+  for (const row of matrixRows) {
+    if (!lookup[row.subspecialty]) lookup[row.subspecialty] = {};
+    lookup[row.subspecialty][row.article_type] = row.article_count;
+  }
+
+  const cellColor = (n: number) => {
+    if (n === 0) return "#e5e9f0";
+    if (n >= 30) return "#E83B2A";
+    if (n >= 10) return "#888";
+    if (n >= 3) return "#bbb";
+    return "#ddd";
+  };
+
+  const cellWeight = (n: number) => n >= 10 ? 700 : 400;
+
+  return (
+    <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "20px 24px", marginTop: "24px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "6px" }}>
+        <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888" }}>
+          Article types in your subspecialties
+        </div>
+        <div style={{ fontSize: "11px", color: "#bbb" }}>Last 30 days</div>
+      </div>
+      <div style={{ fontSize: "12px", color: "#888", marginBottom: "16px", lineHeight: 1.5 }}>
+        We classify every article into <span style={{ fontWeight: 600, color: "#444" }}>one of 11 types</span> — here&apos;s what&apos;s been published in your subspecialties. Hover a column to learn more.
+      </div>
+
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left", padding: "0 0 10px 0", borderBottom: "1px solid #f0f2f5" }} />
+              {ARTICLE_TYPE_ORDER.map((type) => (
+                <th key={type} style={{ fontSize: "10px", fontWeight: 700, color: "#aaa", textAlign: "center", padding: "0 6px 10px 6px", borderBottom: "1px solid #f0f2f5", whiteSpace: "nowrap", position: "relative" }}
+                  title={ARTICLE_TYPE_TOOLTIP[type]}>
+                  <span style={{ borderBottom: "1px dashed #ddd", paddingBottom: "1px", cursor: "default" }}>
+                    {ARTICLE_TYPE_SHORT[type]}
+                  </span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {userSubs.map((sub, i) => (
+              <tr key={sub} style={{ borderBottom: i < userSubs.length - 1 ? "1px solid #f8f9fb" : "none" }}>
+                <td style={{ fontSize: "12px", fontWeight: 600, color: "#444", padding: "8px 16px 8px 0", whiteSpace: "nowrap" }}>
+                  {shortNameMap[sub] ?? sub}
+                </td>
+                {ARTICLE_TYPE_ORDER.map((type) => {
+                  const n = lookup[sub]?.[type] ?? 0;
+                  return (
+                    <td key={type} style={{ textAlign: "center", padding: "8px 6px", fontSize: "12px", fontWeight: cellWeight(n), color: cellColor(n) }}>
+                      {n === 0 ? "—" : n}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default async function HomeV1() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -502,6 +613,16 @@ export default async function HomeV1() {
     subWeekCounts = data ?? [];
   }
 
+  let matrixRows: { subspecialty: string; article_type: string; article_count: number }[] = [];
+  if (userSubs.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase as any).rpc("get_article_type_matrix", {
+      p_subspecialties: userSubs,
+      p_from_date: thirtyDaysAgoIso,
+    });
+    matrixRows = data ?? [];
+  }
+
   // Hent 3 tidligere approved editions
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: prevEditionsRaw } = await (supabase as any)
@@ -563,6 +684,11 @@ export default async function HomeV1() {
       {/* Newsletter-sektion — bred container */}
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "24px 24px 0" }}>
         <NewsletterSection edition={{ ...edition, content: edition.content as { global_intro?: string } }} prevEditions={prevEditions} />
+        <ArticleTypeMatrix
+          userSubs={userSubs}
+          shortNameMap={shortNameMap}
+          matrixRows={matrixRows}
+        />
       </div>
 
       {/* Newsletter-artikler — smal container */}
