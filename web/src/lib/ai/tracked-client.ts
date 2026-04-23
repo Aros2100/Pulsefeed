@@ -54,6 +54,7 @@ export function recordBatchUsage(args: {
       cost_usd:          batchPrice,
       article_id:        args.articleId ?? null,
       task:              args.task ?? null,
+      is_batch:          true,
     })
     .then(({ error }) => {
       if (error) console.error("[api_usage] batch insert failed:", error.message);

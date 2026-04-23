@@ -5,6 +5,7 @@ import { useState } from "react";
 type DashRow = {
   task:     string;
   is_lab:   boolean;
+  is_batch: boolean;
   lab_step: string | null;
   forbrug:  number;
   artikler: number;
@@ -35,7 +36,12 @@ function fmt$(n: number, decimals = 2): string {
 function nFmt(v: number) { return v.toLocaleString("da-DK"); }
 
 function getDrift(rows: DashRow[], taskKey: string) {
-  const r = rows.find((r) => r.task === taskKey && !r.is_lab);
+  const r = rows.find((r) => r.task === taskKey && !r.is_lab && !r.is_batch);
+  return r ?? { forbrug: 0, artikler: 0, kald: 0 };
+}
+
+function getBatch(rows: DashRow[], taskKey: string) {
+  const r = rows.find((r) => r.task === taskKey && !r.is_lab && r.is_batch);
   return r ?? { forbrug: 0, artikler: 0, kald: 0 };
 }
 
@@ -76,7 +82,8 @@ export default function CostChart({ today, week, month, all }: {
 
   const totalDrift     = TASKS.reduce((s, t) => s + getDrift(rows, t.key).forbrug, 0);
   const totalLab       = rows.filter((r) => r.is_lab).reduce((s, r) => s + Number(r.forbrug), 0);
-  const totalForbrug   = totalDrift + totalLab;
+  const totalBatch     = TASKS.reduce((s, t) => s + getBatch(rows, t.key).forbrug, 0);
+  const totalForbrug   = totalDrift + totalLab + totalBatch;
   const totalArtikler  = TASKS.reduce((s, t) => s + getDrift(rows, t.key).artikler, 0);
   const prisPerArtikler = totalArtikler > 0 ? totalDrift / totalArtikler : 0;
 
@@ -109,12 +116,13 @@ export default function CostChart({ today, week, month, all }: {
         </div>
 
         {/* KPI row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "28px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "12px", marginBottom: "28px" }}>
           {[
-            { label: "Drift",        value: fmt$(totalDrift) },
-            { label: "Lab",          value: fmt$(totalLab) },
-            { label: "Total",        value: fmt$(totalForbrug) },
-            { label: "Pris/artikel", value: totalArtikler > 0 ? fmt$(prisPerArtikler, 4) : "—" },
+            { label: "Drift (manuel)", value: fmt$(totalDrift) },
+            { label: "Lab",            value: fmt$(totalLab) },
+            { label: "Batch",          value: fmt$(totalBatch) },
+            { label: "Total",          value: fmt$(totalForbrug) },
+            { label: "Pris/artikel",   value: totalArtikler > 0 ? fmt$(prisPerArtikler, 4) : "—" },
           ].map(({ label, value }) => (
             <div key={label} style={{ ...card, padding: "20px 22px" }}>
               <div style={{ fontSize: "11px", color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: "6px" }}>{label}</div>
@@ -125,7 +133,7 @@ export default function CostChart({ today, week, month, all }: {
 
         {/* Drift table */}
         <div style={{ ...card, marginBottom: "20px" }}>
-          <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 20px", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#5a6a85" }}>Drift</div>
+          <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 20px", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#5a6a85" }}>Drift (manuel)</div>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
@@ -165,6 +173,53 @@ export default function CostChart({ today, week, month, all }: {
                 <td style={tdTotal}>{totalArtikler > 0 ? fmt$(totalDrift / totalArtikler, 4) : ""}</td>
                 <td style={tdTotal}>{nFmt(TASKS.reduce((s, t) => s + getDrift(rows, t.key).kald, 0))}</td>
                 <td style={tdTotal}>{TASKS.reduce((s, t) => s + getDrift(rows, t.key).kald, 0) > 0 ? fmt$(totalDrift / TASKS.reduce((s, t) => s + getDrift(rows, t.key).kald, 0), 4) : ""}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Batch table */}
+        <div style={{ ...card, marginBottom: "20px" }}>
+          <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 20px", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#5a6a85" }}>Batch</div>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>Task</th>
+                <th style={thR}>Total</th>
+                <th style={thR}>Artikler</th>
+                <th style={thR}>Pris/artikel</th>
+                <th style={thR}>Kald</th>
+                <th style={thR}>Pris/kald</th>
+              </tr>
+            </thead>
+            <tbody>
+              {TASKS.filter((t) => t.key !== "geo").map((task) => {
+                const d = getBatch(rows, task.key);
+                const ppa = d.artikler > 0 ? d.forbrug / d.artikler : null;
+                const ppk = d.kald > 0     ? d.forbrug / d.kald     : null;
+                return (
+                  <tr key={task.key}>
+                    <td style={td}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: task.color }} />
+                        <span style={{ fontWeight: 600 }}>{task.label}</span>
+                      </div>
+                    </td>
+                    <td style={{ ...tdR, fontWeight: 600 }}>{fmt$(Number(d.forbrug))}</td>
+                    <td style={tdR}>{d.artikler > 0 ? nFmt(d.artikler) : <span style={{ color: "#94a3b8" }}>—</span>}</td>
+                    <td style={tdR}>{ppa ? fmt$(ppa, 4) : <span style={{ color: "#94a3b8" }}>—</span>}</td>
+                    <td style={tdR}>{d.kald > 0 ? nFmt(d.kald) : <span style={{ color: "#94a3b8" }}>—</span>}</td>
+                    <td style={tdR}>{ppk ? fmt$(ppk, 4) : <span style={{ color: "#94a3b8" }}>—</span>}</td>
+                  </tr>
+                );
+              })}
+              <tr>
+                <td style={tdTotalL}>Total</td>
+                <td style={tdTotal}>{fmt$(totalBatch)}</td>
+                <td style={tdTotal}>{TASKS.filter(t => t.key !== "geo").reduce((s, t) => s + getBatch(rows, t.key).artikler, 0) > 0 ? nFmt(TASKS.filter(t => t.key !== "geo").reduce((s, t) => s + getBatch(rows, t.key).artikler, 0)) : ""}</td>
+                <td style={tdTotal}>{(() => { const a = TASKS.filter(t => t.key !== "geo").reduce((s, t) => s + getBatch(rows, t.key).artikler, 0); return a > 0 ? fmt$(totalBatch / a, 4) : ""; })()}</td>
+                <td style={tdTotal}>{nFmt(TASKS.filter(t => t.key !== "geo").reduce((s, t) => s + getBatch(rows, t.key).kald, 0))}</td>
+                <td style={tdTotal}>{(() => { const k = TASKS.filter(t => t.key !== "geo").reduce((s, t) => s + getBatch(rows, t.key).kald, 0); return k > 0 ? fmt$(totalBatch / k, 4) : ""; })()}</td>
               </tr>
             </tbody>
           </table>

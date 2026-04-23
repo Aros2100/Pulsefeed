@@ -26,6 +26,7 @@ function monthStart(): string {
 type DashRow = {
   task:     string;
   is_lab:   boolean;
+  is_batch: boolean;
   lab_step: string | null;
   forbrug:  number;
   artikler: number;
