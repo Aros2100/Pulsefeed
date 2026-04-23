@@ -47,7 +47,8 @@ export function BatchDetailClient({
       const res = await fetch(`/api/scoring/batch/${id}/poll`, { method: "POST" });
       const json = await res.json();
       if (!res.ok || !json.ok) { setError(json.error ?? `HTTP ${res.status}`); return; }
-      // Refresh to get updated server state
+      // Sync liveStatus from poll response so canIngest evaluates correctly
+      if (json.batch?.status) setLiveStatus(json.batch.status);
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
