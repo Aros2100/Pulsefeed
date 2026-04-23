@@ -35,8 +35,8 @@ export default async function LabPage() {
       queue: cndQueueCount,
       href: "/admin/lab/condensation-text",
       color: "#059669",
-      badge: "Aktiv",
-      badgeColor: "#059669",
+      badge: "Finished",
+      badgeColor: "#dc2626",
     },
     {
       title: "Specialty",
