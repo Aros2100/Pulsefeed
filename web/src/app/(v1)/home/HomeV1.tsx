@@ -396,16 +396,6 @@ function ArticleTypeMatrix({
     lookup[row.subspecialty][row.article_type] = row.article_count;
   }
 
-  const cellColor = (n: number) => {
-    if (n === 0) return "#e5e9f0";
-    if (n >= 30) return "#E83B2A";
-    if (n >= 10) return "#888";
-    if (n >= 3) return "#bbb";
-    return "#ddd";
-  };
-
-  const cellWeight = (n: number) => n >= 10 ? 700 : 400;
-
   return (
     <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "20px 24px", marginTop: "24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "6px" }}>
@@ -442,7 +432,7 @@ function ArticleTypeMatrix({
                 {ARTICLE_TYPE_ORDER.map((type) => {
                   const n = lookup[sub]?.[type] ?? 0;
                   return (
-                    <td key={type} style={{ textAlign: "center", padding: "8px 6px", fontSize: "12px", fontWeight: cellWeight(n), color: cellColor(n) }}>
+                    <td key={type} style={{ textAlign: "center", padding: "8px 6px", fontSize: "12px", fontWeight: 500, color: n === 0 ? "#ddd" : "#444" }}>
                       {n === 0 ? "—" : n}
                     </td>
                   );
