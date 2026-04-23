@@ -24,7 +24,7 @@ export default async function CondensationSariOverviewPage() {
     rejectedResult,
     lastResult,
   ] = await Promise.all([
-    admin.rpc("count_pico_not_validated", { p_specialty: specialty }),
+    admin.rpc("count_sari_not_validated", { p_specialty: specialty }),
 
     admin
       .from("lab_decisions")
