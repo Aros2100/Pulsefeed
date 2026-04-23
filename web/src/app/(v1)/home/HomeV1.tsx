@@ -410,7 +410,7 @@ function ArticleTypeMatrix({
     <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "20px 24px", marginTop: "24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "6px" }}>
         <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888" }}>
-          Article types in your subspecialties
+          Introducing article types
         </div>
         <div style={{ fontSize: "11px", color: "#bbb" }}>Last 30 days</div>
       </div>
