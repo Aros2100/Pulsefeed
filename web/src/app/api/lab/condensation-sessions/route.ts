@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       admin.from("article_events").insert({
         article_id: d.article_id,
         event_type: "condensation_validated",
-        meta: { module, decision: d.decision },
+        payload: { module, decision: d.decision },
       }).then(({ error }) => {
         if (error) console.error(`[condensation-sessions] article_events insert failed for ${d.article_id}:`, error.message);
       })

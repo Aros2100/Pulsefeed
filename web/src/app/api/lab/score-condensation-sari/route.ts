@@ -104,8 +104,10 @@ export async function POST(request: NextRequest) {
                 if (error) throw new Error(error.message);
                 void admin.from("article_events").insert({
                   article_id: article.id,
-                  event_type: "condensation_scored",
-                  meta: { sari_version: sari.version },
+                  event_type: "condensation_sari_scored",
+                  payload: { version: sari.version },
+                }).then(({ error }) => {
+                  if (error) console.error(`[score-condensation-sari] article_events insert failed for ${article.id}:`, error.message);
                 });
                 scored++;
               } catch (e) {
