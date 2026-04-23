@@ -8,23 +8,25 @@ export default async function LabPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
-  const [specQueueResult, clsQueueResult, cndQueueResult, atQueueResult] = await Promise.all([
+  const [specQueueResult, clsQueueResult, cndQueueResult, sariQueueResult, atQueueResult] = await Promise.all([
     admin.rpc("count_scored_not_validated", { p_specialty: specialty }),
     admin.rpc("count_subspecialty_not_validated", { p_specialty: specialty }),
     admin.rpc("count_condensation_not_validated", { p_specialty: specialty }),
+    admin.rpc("count_sari_not_validated", { p_specialty: specialty }),
     admin.rpc("count_article_type_not_validated"),
   ]);
 
   const specQueueCount = (specQueueResult.data as number | null) ?? 0;
   const clsQueueCount = (clsQueueResult.data as number | null) ?? 0;
   const cndQueueCount = (cndQueueResult.data as number | null) ?? 0;
+  const sariQueueCount = (sariQueueResult.data as number | null) ?? 0;
   const atQueueCount = (atQueueResult.data as number | null) ?? 0;
 
   const modules = [
     {
       title: "SARI Condensation",
       description: "Validate AI-generated subject, action, result and implication",
-      queue: cndQueueCount,
+      queue: sariQueueCount,
       href: "/admin/lab/condensation-sari",
       color: "#059669",
       badge: "New",
