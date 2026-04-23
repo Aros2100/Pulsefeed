@@ -30,6 +30,15 @@ export default async function LabPage() {
       badge: "New",
     },
     {
+      title: "Text Condensation",
+      description: "Validate AI-generated headline, summary and bottom line",
+      queue: cndQueueCount,
+      href: "/admin/lab/condensation-text",
+      color: "#059669",
+      badge: "Aktiv",
+      badgeColor: "#059669",
+    },
+    {
       title: "Specialty",
       description: "Validate AI tagging of articles to your specialty and train the model",
       queue: specQueueCount,

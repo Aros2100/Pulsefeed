@@ -85,9 +85,11 @@ const REJECT_REASONS = [
 interface Props {
   specialty: string;
   label: string;
+  scoringEndpoint?: string;
+  backHref?: string;
 }
 
-export default function TextValidationClient({ specialty, label }: Props) {
+export default function TextValidationClient({ specialty, label, scoringEndpoint = "/api/lab/score-condensation", backHref = "/admin/lab/condensation" }: Props) {
   const router = useRouter();
 
   const [articles, setArticles]               = useState<CondensationArticle[]>([]);
@@ -139,7 +141,7 @@ export default function TextValidationClient({ specialty, label }: Props) {
         setLoading(false);
 
         try {
-          const response = await fetch("/api/lab/score-condensation", {
+          const response = await fetch(scoringEndpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ specialty }),
@@ -314,7 +316,7 @@ export default function TextValidationClient({ specialty, label }: Props) {
   // ── Save ───────────────────────────────────────────────────────────────
 
   async function handleSave(navigateTo?: string) {
-    const destination = navigateTo ?? "/admin/lab/condensation";
+    const destination = navigateTo ?? backHref;
     const toSave = articles
       .filter((a) => verdicts[a.id] != null)
       .map((a) => ({
@@ -340,7 +342,7 @@ export default function TextValidationClient({ specialty, label }: Props) {
         setPendingHref(null);
         setToast(`${data.reviewed} artikler valideret`);
         setTimeout(() => {
-          router.push(navigateTo === undefined ? "/admin/lab/condensation" : destination);
+          router.push(navigateTo === undefined ? backHref : destination);
         }, 2500);
       } else {
         setToast(`Fejl: ${data.error ?? "Ukendt fejl"}`);
@@ -404,7 +406,7 @@ export default function TextValidationClient({ specialty, label }: Props) {
       <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f5f7fa", gap: "12px" }}>
         <div style={{ fontSize: "18px", fontWeight: 700, color: "#1a1a1a" }}>Ingen artikler at validere</div>
         <div style={{ fontSize: "14px", color: "#888" }}>Alle tekst-felter for {label} er allerede valideret.</div>
-        <button onClick={() => router.push("/admin/lab/condensation")} style={{ marginTop: "12px", borderRadius: "8px", padding: "10px 20px", background: "#1a1a1a", color: "#fff", border: "none", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
+        <button onClick={() => router.push(backHref)} style={{ marginTop: "12px", borderRadius: "8px", padding: "10px 20px", background: "#1a1a1a", color: "#fff", border: "none", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
           ← Tilbage til Kondensering
         </button>
       </div>
@@ -418,7 +420,7 @@ export default function TextValidationClient({ specialty, label }: Props) {
 
       {/* Header bar */}
       <header style={{ height: "48px", background: "#fff", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", padding: "0 20px", flexShrink: 0, gap: "12px" }}>
-        <a href="/admin/lab/condensation" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none", flexShrink: 0 }}>
+        <a href={backHref} style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none", flexShrink: 0 }}>
           ← Kondensering
         </a>
         <span style={{ color: "#dde3ed", flexShrink: 0 }}>·</span>
