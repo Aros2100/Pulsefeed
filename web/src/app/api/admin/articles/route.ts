@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     query = query.in("id", ids);
   }
   if (subspecialty)     query = query.contains("subspecialty", [subspecialty]);
-  if (no_subspecialty)  query = query.or("subspecialty.is.null,subspecialty.eq.{}");
+  if (no_subspecialty)  query = query.is("subspecialty", null);
   if (article_type)  query = query.eq("article_type", article_type);
   if (pub_date_from) query = query.gte("pubmed_indexed_at", pub_date_from);
   if (pub_date_to)   query = query.lte("pubmed_indexed_at", pub_date_to);
