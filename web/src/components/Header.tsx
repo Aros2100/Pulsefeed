@@ -44,7 +44,7 @@ export default function Header() {
       flexShrink: 0,
     }}>
       <Link href={isAdminMode ? "/admin" : "/"} style={{ textDecoration: "none", color: "inherit" }}>
-        <img src="/logo-horizontal.svg" alt="PulseFeed" style={{ height: "34px", display: "block" }} />
+        <img src="/pulsefeeds-stacked-onwhite-slate.svg" alt="PulseFeed" style={{ height: "34px", display: "block" }} />
       </Link>
 
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "16px" }}>

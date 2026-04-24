@@ -228,7 +228,7 @@ export default function NewsletterSelectClient({ articles, specialtyLabel, weekN
         padding: "0 32px",
         flexShrink: 0,
       }}>
-        <img src="/logo-horizontal.svg" alt="PulseFeed" style={{ height: "29px", display: "block" }} />
+        <img src="/pulsefeeds-stacked-onwhite-slate.svg" alt="PulseFeed" style={{ height: "29px", display: "block" }} />
         <div style={{
           fontSize: "14px", color: "#5a6a85",
           marginLeft: "24px", paddingLeft: "24px",

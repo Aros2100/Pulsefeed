@@ -114,7 +114,7 @@ export default function RegisterPage() {
         {/* Logo */}
         <div style={{ marginBottom: "28px", textAlign: "center" }}>
           <Image
-            src="/logo-horizontal.svg"
+            src="/pulsefeeds-stacked-onwhite-slate.svg"
             alt="PulseFeed"
             width={194}
             height={48}

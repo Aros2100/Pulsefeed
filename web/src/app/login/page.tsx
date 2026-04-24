@@ -191,7 +191,7 @@ export default function LoginPage() {
         {/* Header */}
         <div className="mb-8 text-center">
           <Image
-            src="/logo-horizontal.svg"
+            src="/pulsefeeds-stacked-onwhite-slate.svg"
             alt="PulseFeed"
             width={194}
             height={48}

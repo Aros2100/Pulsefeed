@@ -97,7 +97,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <Image
-            src="/logo-horizontal.svg"
+            src="/pulsefeeds-stacked-onwhite-slate.svg"
             alt="PulseFeed"
             width={194}
             height={48}
