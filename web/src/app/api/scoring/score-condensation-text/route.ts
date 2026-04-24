@@ -117,11 +117,11 @@ export async function POST(request: NextRequest) {
                 const { error } = await admin
                   .from("articles")
                   .update({
-                    short_headline:          condensation.short_headline,
-                    short_resume:            condensation.short_resume,
-                    bottom_line:             condensation.bottom_line,
-                    condensed_model_version: condensation.version,
-                    condensed_at:            new Date().toISOString(),
+                    short_headline:    condensation.short_headline,
+                    short_resume:      condensation.short_resume,
+                    bottom_line:       condensation.bottom_line,
+                    text_model_version: condensation.version,
+                    text_condensed_at:  new Date().toISOString(),
                   })
                   .eq("id", article.id);
                 if (error) throw new Error(error.message);

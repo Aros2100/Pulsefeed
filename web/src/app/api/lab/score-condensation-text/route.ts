@@ -81,12 +81,12 @@ export async function POST(request: NextRequest) {
               try {
                 await new Promise((r) => setTimeout(r, DELAY_MS));
                 const condensation = await scoreCondensation(article, specialty, activePrompt, "condensation_text");
+                // Approved-only principle: text_condensed_at + text_model_version are written
+                // by condensation-sessions/route.ts when decision = approved, not here.
                 const updatePayload = {
-                  short_headline:          condensation.short_headline,
-                  short_resume:            condensation.short_resume,
-                  bottom_line:             condensation.bottom_line,
-                  condensed_model_version: condensation.version,
-                  condensed_at:            new Date().toISOString(),
+                  short_headline: condensation.short_headline,
+                  short_resume:   condensation.short_resume,
+                  bottom_line:    condensation.bottom_line,
                 };
                 const { error } = await admin
                   .from("articles")

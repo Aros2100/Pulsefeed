@@ -17,7 +17,7 @@ interface CondensationArticle {
   short_headline: string | null;
   short_resume: string | null;
   bottom_line: string | null;
-  condensed_model_version: string | null;
+  text_model_version: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

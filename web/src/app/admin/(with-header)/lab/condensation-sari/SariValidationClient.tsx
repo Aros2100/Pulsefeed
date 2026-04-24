@@ -19,7 +19,7 @@ interface SariArticle {
   sari_result: string | null;
   sari_implication: string | null;
   sample_size: number | null;
-  condensed_model_version: string | null;
+  sari_model_version: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -569,9 +569,9 @@ export default function SariValidationClient({ specialty, label }: Props) {
                   </div>
 
                   {/* Model version */}
-                  {currentArticle.condensed_model_version && (
+                  {currentArticle.sari_model_version && (
                     <div style={{ marginTop: "12px", fontSize: "11px", color: "#aaa" }}>
-                      Model: {currentArticle.condensed_model_version}
+                      Model: {currentArticle.sari_model_version}
                     </div>
                   )}
                 </div>

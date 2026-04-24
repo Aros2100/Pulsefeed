@@ -29,7 +29,7 @@ export const MODULE_FILTERS = {
     description: "Approved C3 articles for condensation",
     filters: { status: "approved", circle: 3 },
     requireAbstract: true,
-    nullCheck: "condensed_at",
+    nullCheck: "text_condensed_at",
   },
   article_type: {
     description: "Approved articles for article type classification",

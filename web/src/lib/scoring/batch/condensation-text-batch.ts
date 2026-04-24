@@ -81,11 +81,11 @@ export async function ingestCondensationTextBatchResults(
       const { error } = await admin
         .from("articles")
         .update({
-          short_headline:          cls.short_headline,
-          short_resume:            cls.short_resume,
-          bottom_line:             cls.bottom_line,
-          condensed_model_version: cls.version,
-          condensed_at:            new Date().toISOString(),
+          short_headline:   cls.short_headline,
+          short_resume:     cls.short_resume,
+          bottom_line:      cls.bottom_line,
+          text_model_version: cls.version,
+          text_condensed_at:  new Date().toISOString(),
         })
         .eq("id", article_id);
 

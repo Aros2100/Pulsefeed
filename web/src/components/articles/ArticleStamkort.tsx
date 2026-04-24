@@ -51,8 +51,10 @@ export interface ArticleData {
   sari_result: string | null;
   sari_implication: string | null;
   sample_size: number | null;
-  condensed_model_version: string | null;
-  condensed_at: string | null;
+  text_model_version: string | null;
+  text_condensed_at: string | null;
+  sari_model_version: string | null;
+  sari_condensed_at: string | null;
   // Classification (computed)
   full_text_available: boolean | null;
   time_to_read: number | null;

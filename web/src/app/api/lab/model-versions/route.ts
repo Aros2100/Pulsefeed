@@ -50,23 +50,40 @@ export async function POST(request: NextRequest) {
       .eq("module", module);
   }
 
-  if (activate && module === "condensation") {
-    await admin
+  if (activate && (module === "condensation" || module === "condensation_text")) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (admin as any)
       .from("articles")
       .update({
-        short_headline:          null,
-        short_resume:            null,
-        bottom_line:             null,
-        pico_population:         null,
-        pico_intervention:       null,
-        pico_comparison:         null,
-        pico_outcome:            null,
-        sample_size:             null,
-        condensed_model_version: null,
-        condensed_at:            null,
+        short_headline:    null,
+        short_resume:      null,
+        bottom_line:       null,
+        pico_population:   null,
+        pico_intervention: null,
+        pico_comparison:   null,
+        pico_outcome:      null,
+        text_model_version: null,
+        text_condensed_at:  null,
       })
-      .not("condensed_model_version", "is", null)
+      .not("text_model_version", "is", null)
       .not("id", "in", `(SELECT article_id FROM lab_decisions WHERE module = 'condensation_text' AND decision = 'rejected' AND article_id IS NOT NULL)`);
+  }
+
+  if (activate && module === "condensation_sari") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (admin as any)
+      .from("articles")
+      .update({
+        sari_subject:      null,
+        sari_action:       null,
+        sari_result:       null,
+        sari_implication:  null,
+        sample_size:       null,
+        sari_model_version: null,
+        sari_condensed_at:  null,
+      })
+      .not("sari_model_version", "is", null)
+      .not("id", "in", `(SELECT article_id FROM lab_decisions WHERE module = 'condensation_sari' AND decision = 'rejected' AND article_id IS NOT NULL)`);
   }
 
   const { data, error } = await admin

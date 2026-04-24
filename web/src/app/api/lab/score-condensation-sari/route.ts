@@ -88,14 +88,14 @@ export async function POST(request: NextRequest) {
                   short_resume: article.short_resume,
                   bottom_line: article.bottom_line,
                 }, activePrompt);
+                // Approved-only principle: sari_condensed_at + sari_model_version are written
+                // by condensation-sessions/route.ts when decision = approved, not here.
                 const updatePayload = {
-                  sari_subject:            sari.sari_subject,
-                  sari_action:             sari.sari_action,
-                  sari_result:             sari.sari_result,
-                  sari_implication:        sari.sari_implication,
-                  sample_size:             sari.sample_size,
-                  condensed_model_version: sari.version,
-                  condensed_at:            new Date().toISOString(),
+                  sari_subject:     sari.sari_subject,
+                  sari_action:      sari.sari_action,
+                  sari_result:      sari.sari_result,
+                  sari_implication: sari.sari_implication,
+                  sample_size:      sari.sample_size,
                 };
                 const { error } = await admin
                   .from("articles")

@@ -35,16 +35,18 @@ export async function POST(request: NextRequest) {
   const { specialty, module, decisions } = result.data;
   const admin = createAdminClient();
 
-  // Fetch condensed_model_version for each article
+  // Fetch the relevant model version field for this module
   const articleIds = decisions.map((d) => d.article_id);
-  const { data: articleRows } = await admin
+  const versionField = module === "condensation_sari" ? "sari_model_version" : "text_model_version";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: articleRows } = await (admin as any)
     .from("articles")
-    .select("id, condensed_model_version")
+    .select(`id, ${versionField}`)
     .in("id", articleIds);
 
   const versionMap = new Map(
-    ((articleRows ?? []) as unknown as { id: string; condensed_model_version: string | null }[])
-      .map((r) => [r.id, r.condensed_model_version])
+    ((articleRows ?? []) as unknown as { id: string; [key: string]: string | null }[])
+      .map((r) => [r.id, r[versionField]])
   );
 
   // 1. Create lab_session row
@@ -91,6 +93,26 @@ export async function POST(request: NextRequest) {
   if (decisionsError) {
     console.error("[condensation-sessions] lab_decisions insert error:", decisionsError);
     return NextResponse.json({ ok: false, error: decisionsError.message }, { status: 500 });
+  }
+
+  // Write metadata to articles only for approved decisions (approved-only principle)
+  const approvedIds = decisions.filter((d) => d.decision === "approved").map((d) => d.article_id);
+  if (approvedIds.length > 0) {
+    const now = new Date().toISOString();
+    void Promise.all(
+      approvedIds.map((articleId) => {
+        const modelVersion = versionMap.get(articleId) ?? null;
+        const update =
+          module === "condensation_sari"
+            ? { sari_condensed_at: now, sari_model_version: modelVersion }
+            : { text_condensed_at: now, text_model_version: modelVersion };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (admin as any).from("articles").update(update).eq("id", articleId)
+          .then(({ error }: { error: { message: string } | null }) => {
+            if (error) console.error(`[condensation-sessions] metadata update failed for ${articleId}:`, error.message);
+          });
+      })
+    );
   }
 
   // Fire-and-forget: log article events
