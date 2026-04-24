@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import NotificationBell from "@/components/NotificationBell";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 interface Props {
   activePage: "articles" | "authors";
@@ -32,11 +33,17 @@ export default function UserHeader({ activePage, mode, onModeChange, onProfileCl
     <header style={{ height: 80 }} className="w-full bg-pf-header flex items-center px-6">
       <div className="w-full grid grid-cols-[1fr_auto_1fr] items-center">
 
-        {/* Left — Logo */}
+        {/* Left — Logo + specialty label */}
         <div className="flex items-center">
           <Link href="/" className="flex items-center">
-          <img src="/pulsefeeds-stacked-onwhite-slate.svg" alt="PulseFeed" style={{ height: "53px", display: "block" }} />
+            <img src="/pulsefeeds-stacked-onwhite-slate.svg" alt="PulseFeed" style={{ height: "53px", display: "block" }} />
           </Link>
+          {ACTIVE_SPECIALTY && (
+            <span className="hidden md:flex items-center">
+              <span className="mx-3 text-pf-red text-[15px] font-normal">/</span>
+              <span className="font-dm-mono text-[11px] text-pf-dark font-normal lowercase tracking-wide">{ACTIVE_SPECIALTY}</span>
+            </span>
+          )}
         </div>
 
         {/* Center — Nav links */}
