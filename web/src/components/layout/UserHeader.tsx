@@ -35,7 +35,7 @@ export default function UserHeader({ activePage, mode, onModeChange, onProfileCl
         {/* Left — Logo */}
         <div className="flex items-center">
           <Link href="/" className="flex items-center">
-          <img src="/pulsefeeds-stacked-onwhite-slate.svg" alt="PulseFeed" style={{ height: "48px", display: "block" }} />
+          <img src="/pulsefeeds-stacked-onwhite-slate.svg" alt="PulseFeed" style={{ height: "53px", display: "block" }} />
           </Link>
         </div>
 

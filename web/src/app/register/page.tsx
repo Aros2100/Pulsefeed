@@ -118,7 +118,7 @@ export default function RegisterPage() {
             alt="PulseFeed"
             width={194}
             height={48}
-            style={{ margin: "0 auto", height: "44px", width: "auto" }}
+            style={{ margin: "0 auto", height: "48px", width: "auto" }}
             priority
           />
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>

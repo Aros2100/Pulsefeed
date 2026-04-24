@@ -373,7 +373,7 @@ export default function UnsubscribePage() {
             alt="PulseFeed"
             width={194}
             height={48}
-            className="mx-auto h-11 w-auto"
+            className="mx-auto h-12 w-auto"
             priority
           />
         </div>

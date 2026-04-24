@@ -195,7 +195,7 @@ export default function LoginPage() {
             alt="PulseFeed"
             width={194}
             height={48}
-            className="mx-auto mb-3 h-11 w-auto"
+            className="mx-auto mb-3 h-12 w-auto"
             priority
           />
           <p className="text-sm text-slate-500">
