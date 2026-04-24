@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import NotificationBell from "@/components/NotificationBell";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null);
@@ -43,9 +44,17 @@ export default function Header() {
       zIndex: 100,
       flexShrink: 0,
     }}>
-      <Link href={isAdminMode ? "/admin" : "/"} style={{ textDecoration: "none", color: "inherit" }}>
-        <img src="/pulsefeeds-stacked-onwhite-slate.svg" alt="PulseFeed" style={{ height: "41px", display: "block" }} />
-      </Link>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <Link href={isAdminMode ? "/admin" : "/"} style={{ textDecoration: "none", color: "inherit" }}>
+          <img src="/pulsefeeds-stacked-onwhite-slate.svg" alt="PulseFeed" style={{ height: "41px", display: "block" }} />
+        </Link>
+        {ACTIVE_SPECIALTY && (
+          <span className="hidden md:flex" style={{ alignItems: "center" }}>
+            <span style={{ margin: "0 12px", color: "#E83B2A", fontSize: "15px", fontWeight: 400 }}>/</span>
+            <span style={{ fontFamily: "var(--font-dm-mono), monospace", fontSize: "11px", color: "#1a1a1a", fontWeight: 400, textTransform: "lowercase", letterSpacing: "0.03em" }}>{ACTIVE_SPECIALTY}</span>
+          </span>
+        )}
+      </div>
 
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "16px" }}>
         {isAdmin && (
