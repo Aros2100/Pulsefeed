@@ -296,18 +296,34 @@ export default function NewsletterOverviewClient({ editions }: Props) {
                   {ed.article_count} article{ed.article_count !== 1 ? "s" : ""}
                 </span>
                 <StatusBadge status={ed.status} />
-                <Link
-                  href={`/admin/newsletter/${ed.id}/preview`}
-                  style={{
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    color: "#5a6a85",
-                    textDecoration: "none",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Preview →
-                </Link>
+                <div style={{ display: "flex", gap: 12 }}>
+                  {ed.status === "draft" && (
+                    <Link
+                      href={`/admin/newsletter/${ed.id}/selection`}
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        color: "#1a1a1a",
+                        textDecoration: "none",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Edit →
+                    </Link>
+                  )}
+                  <Link
+                    href={`/admin/newsletter/${ed.id}/preview`}
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      color: "#5a6a85",
+                      textDecoration: "none",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Preview →
+                  </Link>
+                </div>
               </div>
             ))}
           </div>
