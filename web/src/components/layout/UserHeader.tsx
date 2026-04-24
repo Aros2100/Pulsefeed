@@ -89,32 +89,43 @@ export default function UserHeader({ activePage, mode, onModeChange, onProfileCl
               </button>
 
               {dropdownOpen && (
-                <div className="absolute top-full left-0 mt-2 w-60 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-2 overflow-hidden">
+                <div
+                  className="absolute top-full left-0 z-50 bg-white rounded-xl overflow-hidden"
+                  style={{
+                    marginTop: "8px",
+                    width: "220px",
+                    border: "1px solid rgba(0,0,0,0.07)",
+                    boxShadow: "0 4px 24px rgba(15,23,42,0.08), 0 1px 4px rgba(15,23,42,0.04)",
+                    padding: "6px",
+                    animation: "dropdownIn 0.12s ease-out",
+                  }}
+                >
+                  <style>{`@keyframes dropdownIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }`}</style>
+
                   {/* Your specialty */}
-                  <div className="px-3 pt-1 pb-1.5">
-                    <span className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">Your specialty</span>
+                  <div style={{ padding: "6px 10px 4px", fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8" }}>
+                    Your specialty
                   </div>
                   {AVAILABLE_SPECIALTIES.map((s) => (
                     <button
                       key={s}
                       onClick={() => setDropdownOpen(false)}
-                      className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-gray-50 transition-colors group"
+                      className="w-full flex items-center justify-between rounded-md hover:bg-slate-50 transition-colors"
+                      style={{ padding: "7px 10px", textAlign: "left", border: "none", background: "none", cursor: "pointer" }}
                     >
-                      <span style={{ fontFamily: "var(--font-dm-mono), monospace", fontSize: "13px", textTransform: "capitalize", color: s === ACTIVE_SPECIALTY ? "#E83B2A" : "#1a1a1a", fontWeight: s === ACTIVE_SPECIALTY ? 600 : 400 }}>
+                      <span style={{ fontSize: "13px", textTransform: "capitalize", color: s === ACTIVE_SPECIALTY ? "#E83B2A" : "#1a1a1a", fontWeight: s === ACTIVE_SPECIALTY ? 600 : 400 }}>
                         {s}
                       </span>
-                      {s === ACTIVE_SPECIALTY && <Check size={14} strokeWidth={2.5} style={{ color: "#E83B2A", flexShrink: 0 }} />}
+                      {s === ACTIVE_SPECIALTY && <Check size={13} strokeWidth={2.5} style={{ color: "#E83B2A", flexShrink: 0 }} />}
                     </button>
                   ))}
 
-                  <div className="border-t border-gray-100 my-2" />
-
                   {/* Coming soon */}
-                  <div className="px-3 pb-1">
-                    <span className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">Coming soon</span>
+                  <div style={{ padding: "8px 10px 4px", fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8" }}>
+                    Coming soon
                   </div>
-                  <div className="px-3 py-2 cursor-not-allowed">
-                    <span className="text-[13px] text-gray-400 italic">More specialties coming soon</span>
+                  <div style={{ padding: "7px 10px", fontSize: "13px", color: "#94a3b8", cursor: "not-allowed", userSelect: "none" }}>
+                    More coming soon
                   </div>
                 </div>
               )}
