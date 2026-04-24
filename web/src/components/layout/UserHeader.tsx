@@ -39,9 +39,9 @@ export default function UserHeader({ activePage, mode, onModeChange, onProfileCl
             <img src="/pulsefeeds-stacked-onwhite-slate.svg" alt="PulseFeed" style={{ height: "53px", display: "block" }} />
           </Link>
           {ACTIVE_SPECIALTY && (
-            <span className="hidden md:flex items-center">
-              <span className="mx-3 text-pf-red text-[15px] font-normal">/</span>
-              <span className="font-dm-mono text-[11px] text-pf-dark font-normal lowercase tracking-wide">{ACTIVE_SPECIALTY}</span>
+            <span className="hidden md:inline-flex items-center">
+              <span style={{ margin: "0 12px", color: "#E83B2A", fontSize: "15px", fontWeight: 400 }}>/</span>
+              <span style={{ fontFamily: "var(--font-dm-mono), monospace", fontSize: "11px", color: "#1a1a1a", fontWeight: 400, textTransform: "lowercase", letterSpacing: "0.03em" }}>{ACTIVE_SPECIALTY}</span>
             </span>
           )}
         </div>
