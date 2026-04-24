@@ -5,10 +5,8 @@ import { linkAuthorsToArticle } from "@/lib/import/author-import/find-or-create"
 import { runLinkingChecks } from "@/lib/import/quality-checks";
 import { logArticleEvent, logGeoUpdatedEvent, type GeoSnapshot } from "@/lib/article-events";
 import { notifyFollowedAuthorPublications } from "@/lib/notifications/followedAuthorNotify";
-import { getRegion, getContinent } from "@/lib/geo/country-map";
-import { lookupState } from "@/lib/geo/state-map";
-import { getCityCache, normalizeCityKey } from "@/lib/geo/city-cache";
 import { fetchWorksByDois, type OpenAlexWork } from "@/lib/openalex/client";
+import { determineArticleGeo } from "@/lib/import/author-import/find-or-create";
 import pLimit from "p-limit";
 
 const BATCH_SIZE = 250;
@@ -136,69 +134,45 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
               authorsProcessed += result.new + result.duplicates + result.rejected;
               console.error(`[author-linker] linked PMID ${article.pubmed_id} — new=${result.new} dup=${result.duplicates} rejected=${result.rejected}`);
 
-              const hasRoohollahi = authors.some(a => a.lastName === "Roohollahi");
-              if (hasRoohollahi) {
-                console.log(`[GEO-DEBUG Roohollahi] firstAuthorGeo after linkAuthorsToArticle:`, JSON.stringify(result.firstAuthorGeo));
-                console.log(`[GEO-DEBUG Roohollahi] lastAuthorGeo after linkAuthorsToArticle:`, JSON.stringify(result.lastAuthorGeo));
-              }
+              // Guard: if article already has geo_defined_at, geo is frozen — skip.
+              // Moved before geo computation so we don't parse unnecessarily.
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const { data: existingGeo } = await (admin as any)
+                .from("articles")
+                .select("geo_defined_at")
+                .eq("id", article.id)
+                .single();
 
-              // Populate article geo fields from first/last author affiliation
-              if (result.firstAuthorGeo || result.lastAuthorGeo) {
-                // Guard: if article already has geo_country, the deterministic parser
-                // has already set correct geo — skip the author-linker write.
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const { data: existingGeo } = await (admin as any)
-                  .from("articles")
-                  .select("geo_country")
-                  .eq("id", article.id)
-                  .single();
-                if (existingGeo?.geo_country) {
-                  // Parser geo takes precedence — do not overwrite
-                } else {
+              if (!existingGeo?.geo_defined_at) {
+                const firstOaAuthorship = oaWork?.authorships[0] ?? null;
+                const geoResult = await determineArticleGeo(admin, authors[0], firstOaAuthorship);
 
-                const first = result.firstAuthorGeo;
-                const last = result.lastAuthorGeo;
-
-                // City→country fallback: if parser found city but not country, try city-cache
-                let effectiveCountry = first?.country ?? null;
-                if (!effectiveCountry && first?.city) {
-                  const cityCache = await getCityCache();
-                  effectiveCountry = cityCache.countryMap.get(normalizeCityKey(first.city)) ?? null;
-                }
-
-                const firstRegion = effectiveCountry ? getRegion(effectiveCountry) : null;
-                const firstContinent = effectiveCountry ? getContinent(effectiveCountry) : null;
-                const firstState = first?.state ?? (first?.city && effectiveCountry ? lookupState(first.city, effectiveCountry) : null);
-                void last; // last author geo no longer written to separate columns
-
+                const now = new Date().toISOString();
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const db = admin as any;
-                const geoUpdate = {
-                  geo_department: first?.department ?? null,
-                  geo_continent: firstContinent,
-                  geo_region: firstRegion,
-                  geo_country: effectiveCountry,
-                  geo_state: firstState,
-                  geo_city: first?.city ?? null,
-                  geo_institution: first?.institution ?? null,
-                  location_parsed_at: new Date().toISOString(),
-                  location_confidence: first?.confidence ?? (last?.confidence ?? null),
-                };
-                if (hasRoohollahi) {
-                  console.log(`[GEO-DEBUG Roohollahi] writing to articles table:`, JSON.stringify(geoUpdate));
-                }
-                await db.from("articles").update(geoUpdate).eq("id", article.id);
+                await db.from("articles").update({
+                  geo_city:              geoResult.geo_city,
+                  geo_country:           geoResult.geo_country,
+                  geo_state:             geoResult.geo_state,
+                  geo_region:            geoResult.geo_region,
+                  geo_continent:         geoResult.geo_continent,
+                  geo_institution:       geoResult.geo_institution,
+                  geo_department:        geoResult.geo_department,
+                  geo_source:            geoResult.geo_source,
+                  geo_defined_at:        now,
+                  geo_parser_confidence: geoResult.parser_confidence,
+                }).eq("id", article.id);
+
                 const geoNext: GeoSnapshot = {
-                  geo_department: geoUpdate.geo_department,
-                  geo_continent: geoUpdate.geo_continent,
-                  geo_region: geoUpdate.geo_region,
-                  geo_country: geoUpdate.geo_country,
-                  geo_state: geoUpdate.geo_state,
-                  geo_city: geoUpdate.geo_city,
-                  geo_institution: geoUpdate.geo_institution,
+                  geo_city:        geoResult.geo_city,
+                  geo_country:     geoResult.geo_country,
+                  geo_state:       geoResult.geo_state,
+                  geo_region:      geoResult.geo_region,
+                  geo_continent:   geoResult.geo_continent,
+                  geo_institution: geoResult.geo_institution,
+                  geo_department:  geoResult.geo_department,
                 };
-                logGeoUpdatedEvent(article.id, "author_linker", null, geoNext);
-                } // end else (no existing geo_country)
+                logGeoUpdatedEvent(article.id, geoResult.geo_source, null, geoNext, geoResult.parser_confidence);
               }
 
               if (rejectedAuthors.length > 0) {
@@ -249,6 +223,15 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
       }
 
       console.error(`[author-linker] batch done — articles=${articlesProcessed} authors=${authorsLinked}`);
+
+      // Normalize geo city abbreviations after each batch
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: normErr } = await (admin as any).rpc("normalize_geo_city");
+        if (normErr) console.error("[author-linker] normalize_geo_city failed:", normErr.message);
+      } catch (normErr) {
+        console.error("[author-linker] normalize_geo_city threw:", normErr);
+      }
 
       if (batch.length < BATCH_SIZE) break;
       await new Promise((r) => setTimeout(r, 200));

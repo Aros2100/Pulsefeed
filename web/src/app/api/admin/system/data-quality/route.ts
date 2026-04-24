@@ -87,7 +87,7 @@ export async function GET() {
     db.from("articles").select("*", { count: "exact", head: true }).not("geo_region",  "is", null),
     db.from("articles").select("*", { count: "exact", head: true }).not("geo_city",    "is", null),
     db.from("articles").select("*", { count: "exact", head: true }).not("geo_state",   "is", null),
-    db.from("articles").select("*", { count: "exact", head: true }).is("location_parsed_at", null),
+    db.from("articles").select("*", { count: "exact", head: true }).is("geo_defined_at", null),
     db.from("articles").select("*", { count: "exact", head: true }).not("geo_country", "is", null).is("geo_state", null),
     db.from("articles").select("*", { count: "exact", head: true }).not("geo_country", "is", null).is("geo_city",  null),
     db.rpc("count_article_suspect_city_values"),

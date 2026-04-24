@@ -43,7 +43,7 @@ export async function logArticleEvent(
 
 // ── Geo update logging ────────────────────────────────────────────────────────
 
-export type GeoUpdateSource = "parser" | "backfill" | "author_linker" | "enrichment" | "manual";
+export type GeoUpdateSource = "parser" | "backfill" | "ror" | "parser_openalex" | "parser_pubmed" | "human" | "enrichment" | "manual";
 
 export type GeoSnapshot = {
   geo_city?: string | null;
@@ -70,6 +70,7 @@ export function logGeoUpdatedEvent(
   source: GeoUpdateSource,
   previous: GeoSnapshot | null,
   next: GeoSnapshot,
+  parserConfidence?: "high" | "low" | null,
 ): void {
   const fieldsUpdated = GEO_KEYS.filter((k) => {
     const n = next[k] ?? null;
@@ -79,6 +80,7 @@ export function logGeoUpdatedEvent(
   if (fieldsUpdated.length === 0) return;
   void logArticleEvent(articleId, "geo_updated", {
     source,
+    parser_confidence: parserConfidence ?? null,
     fields_updated: fieldsUpdated,
     previous: previous ?? null,
     new: next,

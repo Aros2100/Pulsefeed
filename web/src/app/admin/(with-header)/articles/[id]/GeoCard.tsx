@@ -11,9 +11,9 @@ interface GeoCardProps {
   geoCity: string | null;
   geoDepartment: string | null;
   geoInstitution: string | null;
-  locationConfidence: string | null;
+  geoParserConfidence: string | null;
   aiLocationAttempted: boolean | null;
-  locationParsedAt: string | null;
+  geoDefinedAt: string | null;
 }
 
 function fmt(iso: string | null) {

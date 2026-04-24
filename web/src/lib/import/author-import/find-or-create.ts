@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractEmail, stripEmailFromAffiliation } from "@/lib/geo/affiliation-utils";
 import { parseAffiliation as geoParseAffiliation } from "@/lib/geo/affiliation-parser";
-import { lookupCountry } from "@/lib/geo/country-map";
+import { lookupCountry, getRegion, getContinent } from "@/lib/geo/country-map";
 import { normalizeCountry } from "@/lib/geo/normalize";
 import { normalizeGeo } from "@/lib/geo/normalize-geo";
 import { logAuthorEvent } from "@/lib/author-events";
@@ -581,14 +581,10 @@ export async function linkAuthorsToArticle(
   new: number;
   duplicates: number;
   rejected: number;
-  firstAuthorGeo: AuthorGeo | null;
-  lastAuthorGeo: AuthorGeo | null;
 }> {
   let newCount = 0;
   let dupCount = 0;
   let rejectedCount = 0;
-  let firstAuthorGeo: AuthorGeo | null = null;
-  let lastAuthorGeo: AuthorGeo | null = null;
 
   const oaMatchMap = oaWork
     ? matchPubMedToOpenAlex(
@@ -629,10 +625,6 @@ export async function linkAuthorsToArticle(
     const author = authors[i];
 
     if (!author.lastName && !author.orcid) {
-      const rejPrimaryAff = author.affiliations[0] ?? null;
-      const geoParsed = rejPrimaryAff ? await geoParseAffiliation(rejPrimaryAff) : null;
-      if (i === 0 && geoParsed) firstAuthorGeo = { ...geoParsed, state: null };
-      if (i === authors.length - 1 && authors.length > 1 && geoParsed) lastAuthorGeo = { ...geoParsed, state: null };
       rejectedCount++;
       continue;
     }
@@ -644,36 +636,6 @@ export async function linkAuthorsToArticle(
       ? await enrichAuthorWithOpenAlex(admin, author, oaAuthorship, articleId, oaWork)
       : await findOrCreateAuthor(admin, author, articleId, preResolvedOAMap.get(i));
     console.error(`[import] resolve "${authorName}": ${Date.now() - tResolve}ms (${oaAuthorship ? "openalex" : "parser"})`);
-
-    if (i === 0 || (i === authors.length - 1 && authors.length > 1)) {
-      const linkPrimaryAff = author.affiliations[0] ?? null;
-      if (author.lastName === "Roohollahi") {
-        console.log(`[GEO-DEBUG Roohollahi] affiliation string: "${linkPrimaryAff}"`);
-      }
-      const geoParsed = linkPrimaryAff ? await geoParseAffiliation(linkPrimaryAff) : null;
-      if (author.lastName === "Roohollahi") {
-        console.log(`[GEO-DEBUG Roohollahi] parseAffiliation result:`, JSON.stringify(geoParsed));
-      }
-
-      let geoForArticle: AuthorGeo | null = null;
-      if (geoParsed) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: authorRow } = await (admin as any)
-          .from("authors")
-          .select("state")
-          .eq("id", authorId)
-          .maybeSingle();
-        geoForArticle = { ...geoParsed, state: (authorRow?.state as string | null) ?? null };
-      }
-
-      if (author.lastName === "Roohollahi") {
-        console.log(`[GEO-DEBUG Roohollahi] geoForArticle (with state):`, JSON.stringify(geoForArticle));
-      }
-      if (geoForArticle) {
-        if (i === 0) firstAuthorGeo = geoForArticle;
-        if (i === authors.length - 1 && authors.length > 1) lastAuthorGeo = geoForArticle;
-      }
-    }
 
     const { error } = await admin.from("article_authors").insert({
       article_id: articleId,
@@ -705,5 +667,98 @@ export async function linkAuthorsToArticle(
     }).eq("id", articleId);
   }
 
-  return { new: newCount, duplicates: dupCount, rejected: rejectedCount, firstAuthorGeo, lastAuthorGeo };
+  return { new: newCount, duplicates: dupCount, rejected: rejectedCount };
+}
+
+// ── Article geo determination ─────────────────────────────────────────────────
+
+export type ArticleGeoResult = {
+  geo_city: string | null;
+  geo_country: string | null;
+  geo_state: string | null;
+  geo_region: string | null;
+  geo_continent: string | null;
+  geo_institution: string | null;
+  geo_department: string | null;
+  geo_source: "ror" | "parser_openalex" | "parser_pubmed";
+  parser_confidence: "high" | "low" | null;
+};
+
+/**
+ * Determines article geo from the first author using authoritative sources:
+ *   1. ROR institution lookup (if oaAuthorship has a ROR ID)
+ *   2. OpenAlex raw affiliation string (parser fallback)
+ *   3. PubMed affiliation string (parser fallback)
+ * geo_region and geo_continent are derived deterministically from geo_country.
+ */
+export async function determineArticleGeo(
+  admin: AdminClient,
+  firstAuthor: Author,
+  firstOaAuthorship: OpenAlexAuthorship | null,
+): Promise<ArticleGeoResult> {
+  const primaryInst = firstOaAuthorship?.institutions[0] ?? null;
+
+  // ── 1. ROR-authoritative ──────────────────────────────────────────────────
+  if (primaryInst?.ror) {
+    const rorGeo = await fetchRorGeo(primaryInst.ror);
+    if (rorGeo.city || rorGeo.country) {
+      const country = rorGeo.country ?? null;
+      const { hospital, department } = primaryInst.displayName
+        ? splitInstitutionAndDepartment(primaryInst.displayName)
+        : { hospital: null, department: null };
+      return {
+        geo_city:        rorGeo.city,
+        geo_country:     country,
+        geo_state:       rorGeo.state,
+        geo_region:      country ? getRegion(country) : null,
+        geo_continent:   country ? getContinent(country) : null,
+        geo_institution: hospital,
+        geo_department:  department,
+        geo_source:      "ror",
+        parser_confidence: null,
+      };
+    }
+  }
+
+  // ── 2. Parser fallback ────────────────────────────────────────────────────
+  const oaRawAff = firstOaAuthorship?.rawAffiliationStrings[0] ?? null;
+  const pubmedAff = firstAuthor.affiliations[0]
+    ? stripEmailFromAffiliation(firstAuthor.affiliations[0])
+    : null;
+
+  const affString = oaRawAff ?? pubmedAff ?? null;
+  const geoSource: "parser_openalex" | "parser_pubmed" = oaRawAff ? "parser_openalex" : "parser_pubmed";
+
+  if (affString) {
+    const parsed = await geoParseAffiliation(affString);
+    if (parsed) {
+      const rawCity = parsed.city ? normalizeGeo(parsed.city, parsed.country ?? null).city : null;
+      const country = normalizeCountry(parsed.country) ?? null;
+      const state = await resolveState(admin, rawCity, country);
+      return {
+        geo_city:          rawCity,
+        geo_country:       country,
+        geo_state:         state,
+        geo_region:        country ? getRegion(country) : null,
+        geo_continent:     country ? getContinent(country) : null,
+        geo_institution:   parsed.institution ?? null,
+        geo_department:    parsed.department ?? null,
+        geo_source:        geoSource,
+        parser_confidence: parsed.confidence,
+      };
+    }
+  }
+
+  // ── 3. Nothing parseable ──────────────────────────────────────────────────
+  return {
+    geo_city:          null,
+    geo_country:       null,
+    geo_state:         null,
+    geo_region:        null,
+    geo_continent:     null,
+    geo_institution:   null,
+    geo_department:    null,
+    geo_source:        geoSource,
+    parser_confidence: null,
+  };
 }

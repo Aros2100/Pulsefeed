@@ -260,19 +260,5 @@ export async function runImport(
     }
   }
 
-  if (totalImported > 0) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: normRows, error: normErr } = await (admin as any).rpc("normalize_geo_city");
-      if (normErr) {
-        console.error("[import] normalize_geo_city failed:", normErr.message);
-      } else {
-        console.error(`[import] normalize_geo_city: ${normRows ?? 0} rows updated`);
-      }
-    } catch (normErr) {
-      console.error("[import] normalize_geo_city threw:", normErr);
-    }
-  }
-
   return { logId, imported: totalImported, skipped: totalSkipped, errors };
 }

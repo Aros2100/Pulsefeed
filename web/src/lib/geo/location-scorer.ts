@@ -58,7 +58,7 @@ export async function runLocationParsing(limit = 500): Promise<{
   const { data: articles, error } = await db
     .from("articles")
     .select("id, authors")
-    .is("location_parsed_at", null)
+    .is("geo_defined_at", null)
     .not("authors", "is", null)
     .limit(limit);
 
@@ -82,7 +82,7 @@ export async function runLocationParsing(limit = 500): Promise<{
     id: string;
     article_countries: string[];
     article_cities: string[];
-    location_parsed_at: string;
+    geo_defined_at: string;
   } & GeoFields;
 
   const updates: UpdatePayload[] = [];
@@ -129,7 +129,7 @@ export async function runLocationParsing(limit = 500): Promise<{
         id: article.id,
         article_countries: [],
         article_cities: [],
-        location_parsed_at: now,
+        geo_defined_at: now,
         ...await buildGeoFields(null, null),
       });
       continue;
@@ -164,7 +164,7 @@ export async function runLocationParsing(limit = 500): Promise<{
     updates.push({
       id: article.id,
       ...summary,
-      location_parsed_at: now,
+      geo_defined_at: now,
       ...geoFields,
     });
   }
@@ -177,7 +177,7 @@ export async function runLocationParsing(limit = 500): Promise<{
       id: article.id,
       article_countries: [],
       article_cities: [],
-      location_parsed_at: new Date().toISOString(),
+      geo_defined_at: new Date().toISOString(),
       ...await buildGeoFields(null, null),
     });
   }
@@ -205,7 +205,7 @@ export async function runLocationParsing(limit = 500): Promise<{
       geo_institution: u.geo_institution,
       geo_department: u.geo_department,
     };
-    logGeoUpdatedEvent(u.id, "parser", null, next);
+    logGeoUpdatedEvent(u.id, "parser", null, next, u.geo_parser_confidence);
   }
 
   return { parsed, highConfidence, lowConfidence, skipped };
@@ -227,8 +227,8 @@ export async function reparseLowConfidence(cutoffDate: string, limit = 500): Pro
   const { data: articles, error } = await db
     .from("articles")
     .select("id, authors")
-    .eq("location_confidence", "low")
-    .lt("location_parsed_at", cutoffDate)
+    .eq("geo_parser_confidence", "low")
+    .lt("geo_defined_at", cutoffDate)
     .not("authors", "is", null)
     .limit(limit);
 
@@ -276,7 +276,7 @@ export async function reparseLowConfidence(cutoffDate: string, limit = 500): Pro
       id: article.id,
       fields: {
         ...summaryR,
-        location_parsed_at: new Date().toISOString(),
+        geo_defined_at: new Date().toISOString(),
         ...geoFieldsR,
       },
     });

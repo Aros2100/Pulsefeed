@@ -297,8 +297,8 @@ export type Database = {
           journal_title: string | null
           keywords: string[] | null
           language: string | null
-          location_confidence: string | null
-          location_parsed_at: string | null
+          geo_defined_at: string | null
+          geo_parser_confidence: string | null
           long_resume: string | null
           mesh_terms: Json
           mesh_terms_text: string | null
@@ -401,8 +401,8 @@ export type Database = {
           journal_title?: string | null
           keywords?: string[] | null
           language?: string | null
-          location_confidence?: string | null
-          location_parsed_at?: string | null
+          geo_defined_at?: string | null
+          geo_parser_confidence?: string | null
           long_resume?: string | null
           mesh_terms?: Json
           mesh_terms_text?: string | null
@@ -505,8 +505,8 @@ export type Database = {
           journal_title?: string | null
           keywords?: string[] | null
           language?: string | null
-          location_confidence?: string | null
-          location_parsed_at?: string | null
+          geo_defined_at?: string | null
+          geo_parser_confidence?: string | null
           long_resume?: string | null
           mesh_terms?: Json
           mesh_terms_text?: string | null
@@ -957,42 +957,6 @@ export type Database = {
           id?: string
           last_run_at?: string | null
           max_results?: number | null
-          specialty?: string
-          type?: string
-          value?: string
-        }
-        Relationships: []
-      }
-      circle_3_sources: {
-        Row: {
-          active: boolean
-          created_at: string
-          description: string | null
-          id: string
-          last_run_at: string | null
-          max_results: number
-          specialty: string
-          type: string
-          value: string
-        }
-        Insert: {
-          active?: boolean
-          created_at?: string
-          description?: string | null
-          id?: string
-          last_run_at?: string | null
-          max_results?: number
-          specialty?: string
-          type?: string
-          value: string
-        }
-        Update: {
-          active?: boolean
-          created_at?: string
-          description?: string | null
-          id?: string
-          last_run_at?: string | null
-          max_results?: number
           specialty?: string
           type?: string
           value?: string

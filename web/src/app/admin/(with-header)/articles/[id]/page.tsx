@@ -1125,9 +1125,9 @@ export default async function AdminArticleLogPage({
         geoCity={raw.geo_city as string | null}
         geoDepartment={raw.geo_department as string | null}
         geoInstitution={raw.geo_institution as string | null}
-        locationConfidence={raw.location_confidence as string | null}
+        geoParserConfidence={raw.geo_parser_confidence as string | null}
         aiLocationAttempted={raw.ai_location_attempted as boolean | null}
-        locationParsedAt={raw.location_parsed_at as string | null}
+        geoDefinedAt={raw.geo_defined_at as string | null}
       />
 
       {/* Geo metadata */}
@@ -1141,9 +1141,9 @@ export default async function AdminArticleLogPage({
           />
           <DescriptionRow
             label="Confidence"
-            value={raw.location_confidence ? (
-              <Badge color={(raw.location_confidence as string) === "high" ? "green" : "orange"}>
-                {raw.location_confidence as string} confidence
+            value={raw.geo_parser_confidence ? (
+              <Badge color={(raw.geo_parser_confidence as string) === "high" ? "green" : "orange"}>
+                {raw.geo_parser_confidence as string} confidence
               </Badge>
             ) : null}
             description="Parser's confidence in the geo result — 'high' or 'low'. Based on how unambiguously the affiliation text could be parsed."
@@ -1158,9 +1158,9 @@ export default async function AdminArticleLogPage({
             description="Whether the AI fallback was invoked to assist geo parsing when the rule-based parser was insufficient."
           />
           <DescriptionRow
-            label="Parsed at"
-            value={raw.location_parsed_at ? fmt(raw.location_parsed_at as string) : null}
-            description="Timestamp of when geo parsing was last run for this article."
+            label="Geo defined at"
+            value={raw.geo_defined_at ? fmt(raw.geo_defined_at as string) : null}
+            description="Timestamp of when geo was first set for this article (frozen thereafter)."
           />
           <DescriptionRow
             label="Countries"

@@ -10,14 +10,14 @@ export async function GET() {
 
   const [parsedRes, highRes, lowRes, unparsedRes, aiAttemptedRes, aiUpgradedRes, aiConflictedRes, aiRemainingRes, totalRes] =
     await Promise.all([
-      admin.from("articles").select("id", { count: "exact", head: true }).not("location_parsed_at", "is", null),
-      admin.from("articles").select("id", { count: "exact", head: true }).eq("location_confidence", "high"),
-      admin.from("articles").select("id", { count: "exact", head: true }).eq("location_confidence", "low"),
-      admin.from("articles").select("id", { count: "exact", head: true }).is("location_parsed_at", null).not("authors", "is", null).neq("authors", "[]"),
+      admin.from("articles").select("id", { count: "exact", head: true }).not("geo_defined_at", "is", null),
+      admin.from("articles").select("id", { count: "exact", head: true }).eq("geo_parser_confidence", "high"),
+      admin.from("articles").select("id", { count: "exact", head: true }).eq("geo_parser_confidence", "low"),
+      admin.from("articles").select("id", { count: "exact", head: true }).is("geo_defined_at", null).not("authors", "is", null).neq("authors", "[]"),
       admin.from("articles").select("id", { count: "exact", head: true }).eq("ai_location_attempted", true),
-      admin.from("articles").select("id", { count: "exact", head: true }).eq("ai_location_attempted", true).eq("location_confidence", "high"),
-      admin.from("articles").select("id", { count: "exact", head: true }).eq("ai_location_attempted", true).eq("location_confidence", "low"),
-      admin.from("articles").select("id", { count: "exact", head: true }).eq("location_confidence", "low").eq("ai_location_attempted", false),
+      admin.from("articles").select("id", { count: "exact", head: true }).eq("ai_location_attempted", true).eq("geo_parser_confidence", "high"),
+      admin.from("articles").select("id", { count: "exact", head: true }).eq("ai_location_attempted", true).eq("geo_parser_confidence", "low"),
+      admin.from("articles").select("id", { count: "exact", head: true }).eq("geo_parser_confidence", "low").eq("ai_location_attempted", false),
       admin.from("articles").select("id", { count: "exact", head: true }),
     ]);
 

@@ -39,11 +39,11 @@ export type GeoFields = {
   geo_city: string | null;
   geo_department: string | null;
   geo_institution: string | null;
-  location_confidence: "high" | "low" | null;
+  geo_parser_confidence: "high" | "low" | null;
 };
 
 /**
- * Derives the geo_* fields and location_confidence from two parsed affiliations
+ * Derives the geo_* fields and geo_parser_confidence from two parsed affiliations
  * (first and last author). Always derived from first author; certainty flags
  * compare first vs last author.
  */
@@ -60,19 +60,19 @@ export async function buildGeoFields(
       geo_city: null,
       geo_department: null,
       geo_institution: null,
-      location_confidence: null,
+      geo_parser_confidence: null,
     };
   }
 
   // Determine overall confidence
-  let location_confidence: "high" | "low" | null = null;
+  let geo_parser_confidence: "high" | "low" | null = null;
   if (firstParsed && lastParsed) {
-    location_confidence =
+    geo_parser_confidence =
       firstParsed.confidence === "low" || lastParsed.confidence === "low"
         ? "low"
         : "high";
   } else {
-    location_confidence = (firstParsed ?? lastParsed)!.confidence;
+    geo_parser_confidence = (firstParsed ?? lastParsed)!.confidence;
   }
 
   // geo_* fields: always derived from first author
@@ -94,6 +94,6 @@ export async function buildGeoFields(
     geo_city: geoCity,
     geo_department: geoDepartment,
     geo_institution: geoInstitution,
-    location_confidence,
+    geo_parser_confidence,
   };
 }

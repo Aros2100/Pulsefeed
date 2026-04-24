@@ -100,8 +100,8 @@ export async function runAILocationParsing(
     .select(
       "id, authors, geo_city, geo_country, geo_department, geo_institution"
     )
-    .eq("location_confidence", "low")
-    .not("location_parsed_at", "is", null)
+    .eq("geo_parser_confidence", "low")
+    .not("geo_defined_at", "is", null)
     .eq("ai_location_attempted", false)
     .limit(limit);
 
@@ -231,8 +231,8 @@ export async function runAILocationParsing(
         geo_continent: geoContinentAI,
         geo_state: geoStateAI,
         ...summaryAI,
-        location_confidence: newConfidence,
-        location_parsed_at: new Date().toISOString(),
+        geo_parser_confidence: newConfidence,
+        geo_defined_at: new Date().toISOString(),
         ai_location_attempted: true,
       },
     });

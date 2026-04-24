@@ -253,17 +253,5 @@ export async function runImportCircle4(
     }
   }
 
-  if (totalImported > 0) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: normErr } = await (admin as any).rpc("normalize_geo_city");
-      if (normErr) {
-        console.error("[import-c4] normalize_geo_city failed:", normErr.message);
-      }
-    } catch (normErr) {
-      console.error("[import-c4] normalize_geo_city threw:", normErr);
-    }
-  }
-
   return { logId, imported: totalImported, skipped: totalSkipped, errors };
 }
