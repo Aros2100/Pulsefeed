@@ -17,7 +17,7 @@ export default async function VerifyEmailPage({
             alt="PulseFeed"
             width={194}
             height={48}
-            className="mx-auto h-10 w-auto"
+            className="mx-auto h-11 w-auto"
             priority
           />
         </div>

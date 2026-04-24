@@ -51,7 +51,7 @@ export default async function OnboardingPage() {
             alt="PulseFeed"
             width={194}
             height={48}
-            style={{ margin: "0 auto", height: "40px", width: "auto" }}
+            style={{ margin: "0 auto", height: "44px", width: "auto" }}
             priority
           />
         </div>

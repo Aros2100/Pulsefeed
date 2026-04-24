@@ -101,7 +101,7 @@ export default function ForgotPasswordPage() {
             alt="PulseFeed"
             width={194}
             height={48}
-            className="mx-auto mb-6 h-10 w-auto"
+            className="mx-auto mb-6 h-11 w-auto"
             priority
           />
           <h1 className="text-2xl font-bold text-slate-900">

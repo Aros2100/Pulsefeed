@@ -611,7 +611,7 @@ export default function TrainingClient({ specialty, label }: Props) {
 
       {/* Top header */}
       <header style={{ height: "56px", background: "#EEF2F7", borderBottom: "1px solid #dde3ed", display: "flex", alignItems: "center", padding: "0 32px", flexShrink: 0 }}>
-        <img src="/pulsefeeds-stacked-onwhite-slate.svg" alt="PulseFeed" style={{ height: "29px", display: "block" }} />
+        <img src="/pulsefeeds-stacked-onwhite-slate.svg" alt="PulseFeed" style={{ height: "32px", display: "block" }} />
         <div style={{ fontSize: "13px", color: "#5a6a85", marginLeft: "20px", paddingLeft: "20px", borderLeft: "1px solid #dde3ed", display: "flex", alignItems: "center", gap: "12px" }}>
           <a href="/admin/lab" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>← The Lab</a>
           <span style={{ color: "#dde3ed" }}>·</span>
