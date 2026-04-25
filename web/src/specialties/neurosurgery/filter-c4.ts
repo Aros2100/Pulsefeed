@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchPubMedIds, fetchArticleDetails, sleep } from "@/lib/import/article-import/fetcher";
+import { saveRawXml } from "@/lib/import/article-import/raw-writer";
 import { runArticleChecks } from "@/lib/import/quality-checks";
 import { logArticleEvent } from "@/lib/article-events";
 import { buildImportEventPayload } from "@/lib/article-events/import-payload";
@@ -113,7 +114,7 @@ export async function runImportCircle4(
       }
 
       if (newPmids.length > 0) {
-        const articles = await fetchArticleDetails(newPmids);
+        const { articles, rawXml } = await fetchArticleDetails(newPmids);
 
         for (let i = 0; i < articles.length; i += BATCH_SIZE) {
           const batch = articles.slice(i, i + BATCH_SIZE).map((a) => ({
@@ -199,6 +200,14 @@ export async function runImportCircle4(
               await (admin as any)
                 .from('article_specialties')
                 .upsert(specialtyRows, { onConflict: 'article_id,specialty', ignoreDuplicates: true });
+
+              void saveRawXml(
+                admin,
+                upsertedRows
+                  .filter((row) => rawXml.has(row.pubmed_id))
+                  .map((row) => ({ articleId: row.id, pubmedId: row.pubmed_id, rawXml: rawXml.get(row.pubmed_id)! })),
+                "import"
+              );
             }
           }
 

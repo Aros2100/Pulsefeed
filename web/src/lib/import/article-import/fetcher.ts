@@ -283,13 +283,30 @@ export async function fetchPubMedIds(
   return { pmids, totalCount };
 }
 
+export interface FetchResult {
+  articles: ArticleDetails[];
+  rawXml: Map<string, string>;  // pubmedId → individual <PubmedArticle>...</PubmedArticle> XML
+}
+
+function splitPubmedArticles(xml: string): { pmid: string; xml: string }[] {
+  const result: { pmid: string; xml: string }[] = [];
+  const articleRegex = /<PubmedArticle>[\s\S]*?<\/PubmedArticle>/g;
+  const matches = xml.match(articleRegex) ?? [];
+  for (const articleXml of matches) {
+    const pmidMatch = articleXml.match(/<PMID[^>]*>(\d+)<\/PMID>/);
+    if (!pmidMatch) continue;
+    result.push({ pmid: pmidMatch[1], xml: articleXml });
+  }
+  return result;
+}
+
 /**
  * Calls PubMed EFetch in batches of 20 and parses the XML response into
- * fully structured ArticleDetails objects.
+ * fully structured ArticleDetails objects. Also returns the raw XML per PMID.
  */
 export async function fetchArticleDetails(
   pmids: string[]
-): Promise<ArticleDetails[]> {
+): Promise<FetchResult> {
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: "@_",
@@ -316,6 +333,7 @@ export async function fetchArticleDetails(
   });
 
   const results: ArticleDetails[] = [];
+  const rawXmlMap = new Map<string, string>();
 
   for (let i = 0; i < pmids.length; i += BATCH_SIZE) {
     const batch = pmids.slice(i, i + BATCH_SIZE);
@@ -331,6 +349,11 @@ export async function fetchArticleDetails(
     if (!res.ok) throw new Error(`EFetch failed: HTTP ${res.status}`);
 
     const xml = await res.text();
+
+    for (const { pmid, xml: articleXml } of splitPubmedArticles(xml)) {
+      rawXmlMap.set(pmid, articleXml);
+    }
+
     const parsed = parser.parse(xml) as {
       PubmedArticleSet?: { PubmedArticle?: Record<string, unknown>[] };
     };
@@ -499,5 +522,5 @@ export async function fetchArticleDetails(
     }
   }
 
-  return results;
+  return { articles: results, rawXml: rawXmlMap };
 }
