@@ -13,6 +13,8 @@ export default async function Page() {
     pendingDiffsRes,
     resolvedDiffsRes,
     fieldDiffsRes,
+    categoryDiffsRes,
+    nullCategoryRes,
   ] = await Promise.all([
     admin.from("articles").select("id", { count: "exact", head: true }),
     admin.from("articles").select("id", { count: "exact", head: true }).not("pubmed_raw_latest_at", "is", null),
@@ -20,6 +22,9 @@ export default async function Page() {
     a.from("article_pubmed_diffs").select("id", { count: "exact", head: true }).eq("resolution", "pending"),
     a.from("article_pubmed_diffs").select("resolution").neq("resolution", "pending"),
     a.from("article_pubmed_diffs").select("field").eq("resolution", "pending"),
+    a.from("article_pubmed_diffs").select("category").eq("resolution", "pending"),
+    a.from("article_pubmed_diffs").select("id", { count: "exact", head: true })
+      .eq("resolution", "pending").is("category", null),
   ]);
 
   const totalArticles = totalRes.count ?? 0;
@@ -38,6 +43,12 @@ export default async function Page() {
     fieldMap[row.field] = (fieldMap[row.field] ?? 0) + 1;
   }
 
+  const categoryMap: Record<string, number> = {};
+  for (const row of (categoryDiffsRes.data ?? []) as { category: string | null }[]) {
+    const key = row.category ?? "__null__";
+    categoryMap[key] = (categoryMap[key] ?? 0) + 1;
+  }
+
   return (
     <PubmedRawPage
       initialStats={{
@@ -48,6 +59,8 @@ export default async function Page() {
         pendingDiffs,
         resolvedDiffs: resolvedMap,
         pendingDiffsByField: fieldMap,
+        pendingDiffsByCategory: categoryMap,
+        nullCategoryCount: nullCategoryRes.count ?? 0,
       }}
     />
   );

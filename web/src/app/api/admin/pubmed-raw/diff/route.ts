@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseTitleAndAbstract } from "@/lib/import/article-import/parse-single";
+import { categorizeDiff } from "@/lib/import/article-import/categorize-diff";
 
 function compareTitle(dbTitle: string, xmlTitle: string): boolean {
   return dbTitle.normalize("NFC").trim() !== xmlTitle.normalize("NFC").trim();
@@ -95,9 +96,10 @@ export async function POST(req: Request): Promise<Response> {
         const diffsToInsert: {
           article_id: string;
           raw_id: string;
-          field: string;
+          field: "title" | "abstract";
           db_value: string | null;
           xml_value: string | null;
+          category: string;
         }[] = [];
 
         for (const article of chunk) {
@@ -113,22 +115,28 @@ export async function POST(req: Request): Promise<Response> {
           }
 
           if (compareTitle(article.title ?? "", parsed.title)) {
+            const dbVal = article.title;
+            const xmlVal = parsed.title || null;
             diffsToInsert.push({
               article_id: article.id,
               raw_id: raw.id,
               field: "title",
-              db_value: article.title,
-              xml_value: parsed.title || null,
+              db_value: dbVal,
+              xml_value: xmlVal,
+              category: categorizeDiff("title", dbVal, xmlVal),
             });
           }
 
           if (compareAbstract(article.abstract, parsed.abstract)) {
+            const dbVal = article.abstract;
+            const xmlVal = parsed.abstract;
             diffsToInsert.push({
               article_id: article.id,
               raw_id: raw.id,
               field: "abstract",
-              db_value: article.abstract,
-              xml_value: parsed.abstract,
+              db_value: dbVal,
+              xml_value: xmlVal,
+              category: categorizeDiff("abstract", dbVal, xmlVal),
             });
           }
         }

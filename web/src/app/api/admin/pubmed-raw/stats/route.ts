@@ -17,6 +17,8 @@ export async function GET() {
     pendingDiffsRes,
     resolvedDiffsRes,
     fieldDiffsRes,
+    categoryDiffsRes,
+    nullCategoryRes,
   ] = await Promise.all([
     admin.from("articles").select("id", { count: "exact", head: true }),
     admin.from("articles").select("id", { count: "exact", head: true }).not("pubmed_raw_latest_at", "is", null),
@@ -24,25 +26,34 @@ export async function GET() {
     a.from("article_pubmed_diffs").select("id", { count: "exact", head: true }).eq("resolution", "pending"),
     a.from("article_pubmed_diffs").select("resolution").neq("resolution", "pending"),
     a.from("article_pubmed_diffs").select("field").eq("resolution", "pending"),
+    a.from("article_pubmed_diffs").select("category").eq("resolution", "pending"),
+    a.from("article_pubmed_diffs").select("id", { count: "exact", head: true })
+      .eq("resolution", "pending").is("category", null),
   ]);
 
-  const totalArticles   = totalRes.count ?? 0;
-  const hasRaw          = hasRawRes.count ?? 0;
-  const missingRaw      = totalArticles - hasRaw;
-  const rawRows         = rawRowsRes.count ?? 0;
-  const pendingDiffs    = pendingDiffsRes.count ?? 0;
+  const totalArticles = totalRes.count ?? 0;
+  const hasRaw        = hasRawRes.count ?? 0;
+  const missingRaw    = totalArticles - hasRaw;
+  const rawRows       = rawRowsRes.count ?? 0;
+  const pendingDiffs  = pendingDiffsRes.count ?? 0;
 
-  // Group resolved diffs by resolution
   const resolvedMap: Record<string, number> = {};
   for (const row of (resolvedDiffsRes.data ?? []) as { resolution: string }[]) {
     resolvedMap[row.resolution] = (resolvedMap[row.resolution] ?? 0) + 1;
   }
 
-  // Distribution of pending diffs by field
   const fieldMap: Record<string, number> = {};
   for (const row of (fieldDiffsRes.data ?? []) as { field: string }[]) {
     fieldMap[row.field] = (fieldMap[row.field] ?? 0) + 1;
   }
+
+  const categoryMap: Record<string, number> = {};
+  for (const row of (categoryDiffsRes.data ?? []) as { category: string | null }[]) {
+    const key = row.category ?? "__null__";
+    categoryMap[key] = (categoryMap[key] ?? 0) + 1;
+  }
+
+  const nullCategoryCount = nullCategoryRes.count ?? 0;
 
   return NextResponse.json({
     ok: true,
@@ -53,5 +64,7 @@ export async function GET() {
     pendingDiffs,
     resolvedDiffs: resolvedMap,
     pendingDiffsByField: fieldMap,
+    pendingDiffsByCategory: categoryMap,
+    nullCategoryCount,
   });
 }

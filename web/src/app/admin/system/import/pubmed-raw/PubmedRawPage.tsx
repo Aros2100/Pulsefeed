@@ -6,13 +6,15 @@ import Link from "next/link";
 /* ═══ Types ═══════════════════════════════════════════════════════════════════ */
 
 interface Stats {
-  totalArticles:       number;
-  hasRaw:              number;
-  missingRaw:          number;
-  rawRows:             number;
-  pendingDiffs:        number;
-  resolvedDiffs:       Record<string, number>;
-  pendingDiffsByField: Record<string, number>;
+  totalArticles:          number;
+  hasRaw:                 number;
+  missingRaw:             number;
+  rawRows:                number;
+  pendingDiffs:           number;
+  resolvedDiffs:          Record<string, number>;
+  pendingDiffsByField:    Record<string, number>;
+  pendingDiffsByCategory: Record<string, number>;
+  nullCategoryCount:      number;
 }
 
 type RunPhase = "idle" | "running" | "done" | "error";
@@ -23,6 +25,19 @@ interface Progress {
   errors:    number;
   extra?:    Record<string, number>;
 }
+
+/* ═══ Category config ════════════════════════════════════════════════════════ */
+
+const CATEGORY_META: Record<string, { label: string; color: string; bg: string }> = {
+  data_loss:         { label: "Data loss",          color: "#dc2626", bg: "#fef2f2" },
+  content_differs:   { label: "Content differs",    color: "#d97706", bg: "#fffbeb" },
+  casing_only:       { label: "Casing only",        color: "#6b7280", bg: "#f9fafb" },
+  unicode_variant:   { label: "Unicode variant",    color: "#6b7280", bg: "#f9fafb" },
+  db_shorter_labels: { label: "DB shorter (labels)", color: "#6b7280", bg: "#f9fafb" },
+  __null__:          { label: "Uncategorized",      color: "#9ca3af", bg: "#f3f4f6" },
+};
+
+const CATEGORY_ORDER = ["data_loss", "content_differs", "casing_only", "unicode_variant", "db_shorter_labels", "__null__"];
 
 /* ═══ Design tokens ═══════════════════════════════════════════════════════════ */
 
@@ -129,6 +144,11 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
   const [dLimit, setDLimit]       = useState("");
   const dReaderRef                = useRef<ReadableStreamDefaultReader | null>(null);
 
+  // Backfill-categories state
+  const [catPhase, setCatPhase]   = useState<RunPhase>("idle");
+  const [catUpdated, setCatUpdated] = useState<number | null>(null);
+  const [catError, setCatError]   = useState<string | null>(null);
+
   async function refreshStats() {
     const res = await fetch("/api/admin/pubmed-raw/stats");
     const data = await res.json() as { ok: boolean } & Stats;
@@ -201,7 +221,6 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
         }
       }
     } catch {
-      // Reader was cancelled via stop button — treat as idle
       setPhase("idle");
     } finally {
       readerRef.current = null;
@@ -215,6 +234,27 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
     readerRef.current?.cancel();
     readerRef.current = null;
     setPhase("idle");
+  }
+
+  async function handleBackfillCategories() {
+    setCatPhase("running");
+    setCatUpdated(null);
+    setCatError(null);
+    try {
+      const res = await fetch("/api/admin/pubmed-raw/backfill-categories", { method: "POST" });
+      const data = await res.json() as { ok: boolean; updated?: number; error?: string };
+      if (data.ok) {
+        setCatPhase("done");
+        setCatUpdated(data.updated ?? 0);
+        void refreshStats();
+      } else {
+        setCatPhase("error");
+        setCatError(data.error ?? "Unknown error");
+      }
+    } catch (e) {
+      setCatPhase("error");
+      setCatError(String(e));
+    }
   }
 
   function handleBackfill() {
@@ -239,7 +279,8 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
   }
 
   const rawPct = pct(stats.hasRaw, stats.totalArticles);
-  const pendingDiffTotal = Object.values(stats.pendingDiffsByField).reduce((s, v) => s + v, 0);
+  const hasCategoryData = Object.keys(stats.pendingDiffsByCategory).length > 0;
+  const anyDiffs = stats.pendingDiffs > 0 || Object.keys(stats.resolvedDiffs).length > 0;
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -299,18 +340,12 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
               <code style={{ fontSize: 12, background: "#f1f3f7", padding: "1px 5px", borderRadius: 4 }}>articles.pubmed_raw_latest_at</code>.
             </p>
 
-            {/* Controls row */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px", flexWrap: "wrap" }}>
               <LimitInput value={bLimit} onChange={setBLimit} disabled={bPhase === "running"} />
-
               {bPhase === "running" ? (
                 <button
                   onClick={() => stopJob(bReaderRef, setBPhase)}
-                  style={{
-                    padding: "6px 16px", fontSize: "12px", fontWeight: 700,
-                    background: "#1a1a1a", color: "#fff", border: "none", borderRadius: "6px",
-                    cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px",
-                  }}
+                  style={{ padding: "6px 16px", fontSize: "12px", fontWeight: 700, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
                 >
                   <Spinner /> Stop
                 </button>
@@ -318,12 +353,7 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
                 <button
                   onClick={handleBackfill}
                   disabled={dPhase === "running"}
-                  style={{
-                    padding: "6px 16px", fontSize: "12px", fontWeight: 700,
-                    background: dPhase === "running" ? "#9ca3af" : "#E83B2A",
-                    color: "#fff", border: "none", borderRadius: "6px",
-                    cursor: dPhase === "running" ? "default" : "pointer",
-                  }}
+                  style={{ padding: "6px 16px", fontSize: "12px", fontWeight: 700, background: dPhase === "running" ? "#9ca3af" : "#E83B2A", color: "#fff", border: "none", borderRadius: "6px", cursor: dPhase === "running" ? "default" : "pointer" }}
                 >
                   Backfill missing raw XML
                 </button>
@@ -331,28 +361,19 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
             </div>
 
             {bPhase === "idle" && stats.missingRaw === 0 && (
-              <div style={{ fontSize: "13px", color: "#15803d", fontWeight: 600 }}>
-                All articles have raw XML.
-              </div>
+              <div style={{ fontSize: "13px", color: "#15803d", fontWeight: 600 }}>All articles have raw XML.</div>
             )}
-
             {bPhase !== "idle" && bProgress && (
               <div style={{ marginBottom: 12 }}>
                 <ProgressBar processed={bProgress.processed} total={bProgress.total} />
-                {bProgress.errors > 0 && (
-                  <div style={{ marginTop: 8, fontSize: 12, color: "#dc2626" }}>
-                    {num(bProgress.errors)} errors
-                  </div>
-                )}
+                {bProgress.errors > 0 && <div style={{ marginTop: 8, fontSize: 12, color: "#dc2626" }}>{num(bProgress.errors)} errors</div>}
               </div>
             )}
-
             {bPhase === "done" && bProgress && (
               <div style={{ padding: "10px 14px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, fontSize: 13, color: "#15803d", fontWeight: 600 }}>
                 Done — {num(bProgress.processed)} articles processed, {num(bProgress.errors)} errors
               </div>
             )}
-
             {bPhase === "error" && (
               <div style={{ padding: "10px 14px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, fontSize: 13, color: "#b91c1c" }}>
                 Error: {bError}
@@ -377,41 +398,97 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
               Idempotent — existing pending diffs are not overwritten.
             </p>
 
-            {/* Diff stats */}
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: 16 }}>
-              <div style={{ background: "#f8f9fb", borderRadius: 8, padding: "12px 16px", minWidth: 110 }}>
-                <div style={{ fontSize: "11px", color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: 2 }}>Pending diffs</div>
-                <div style={{ fontSize: "20px", fontWeight: 700, color: stats.pendingDiffs > 0 ? "#d97706" : "#1a1a1a" }}>{num(stats.pendingDiffs)}</div>
-              </div>
-              {Object.entries(stats.pendingDiffsByField).map(([field, count]) => (
-                <div key={field} style={{ background: "#f8f9fb", borderRadius: 8, padding: "12px 16px", minWidth: 110 }}>
-                  <div style={{ fontSize: "11px", color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: 2 }}>{field}</div>
-                  <div style={{ fontSize: "20px", fontWeight: 700, color: "#d97706" }}>{num(count)}</div>
+            {/* Category breakdown */}
+            {anyDiffs && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5a6a85", marginBottom: 10 }}>
+                  Pending diffs — {num(stats.pendingDiffs)} total
                 </div>
-              ))}
-              {Object.entries(stats.resolvedDiffs).map(([res, count]) => (
-                <div key={res} style={{ background: "#f8f9fb", borderRadius: 8, padding: "12px 16px", minWidth: 110 }}>
-                  <div style={{ fontSize: "11px", color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, marginBottom: 2 }}>{res}</div>
-                  <div style={{ fontSize: "20px", fontWeight: 700, color: "#15803d" }}>{num(count)}</div>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  {CATEGORY_ORDER
+                    .filter((cat) => (stats.pendingDiffsByCategory[cat] ?? 0) > 0)
+                    .map((cat) => {
+                      const meta = CATEGORY_META[cat] ?? { label: cat, color: "#6b7280", bg: "#f9fafb" };
+                      const count = stats.pendingDiffsByCategory[cat] ?? 0;
+                      return (
+                        <div key={cat} style={{ background: meta.bg, border: `1px solid ${meta.color}22`, borderRadius: 8, padding: "10px 14px", minWidth: 110 }}>
+                          <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: meta.color, marginBottom: 2 }}>
+                            {meta.label}
+                          </div>
+                          <div style={{ fontSize: "20px", fontWeight: 700, color: meta.color, fontVariantNumeric: "tabular-nums" }}>
+                            {num(count)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  {!hasCategoryData && stats.pendingDiffs > 0 && (
+                    <div style={{ fontSize: 13, color: "#6b7280", alignSelf: "center" }}>
+                      No categories yet —{" "}
+                      <button
+                        onClick={() => void handleBackfillCategories()}
+                        disabled={catPhase === "running"}
+                        style={{ fontSize: 13, color: "#E83B2A", background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 600 }}
+                      >
+                        backfill categories
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ))}
-              {stats.pendingDiffs === 0 && pendingDiffTotal === 0 && Object.keys(stats.resolvedDiffs).length === 0 && (
-                <div style={{ fontSize: 13, color: "#888", alignSelf: "center" }}>No diffs recorded yet</div>
-              )}
-            </div>
 
-            {/* Controls row */}
+                {/* Resolved diffs summary */}
+                {Object.keys(stats.resolvedDiffs).length > 0 && (
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: 8 }}>
+                    {Object.entries(stats.resolvedDiffs).map(([res, count]) => (
+                      <div key={res} style={{ background: "#f0fdf4", border: "1px solid #bbf7d022", borderRadius: 8, padding: "10px 14px", minWidth: 90 }}>
+                        <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#15803d", marginBottom: 2 }}>{res}</div>
+                        <div style={{ fontSize: "20px", fontWeight: 700, color: "#15803d" }}>{num(count)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Backfill categories button — shown when some rows lack a category */}
+                {stats.nullCategoryCount > 0 && (
+                  <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                      {num(stats.nullCategoryCount)} pending diffs without a category
+                    </span>
+                    {catPhase !== "running" ? (
+                      <button
+                        onClick={() => void handleBackfillCategories()}
+                        style={{ fontSize: 12, fontWeight: 700, color: "#5a6a85", background: "#f1f3f7", border: "1px solid #d1d5db", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}
+                      >
+                        Backfill categories
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: 12, color: "#5a6a85", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <Spinner /> Backfilling…
+                      </span>
+                    )}
+                    {catPhase === "done" && catUpdated !== null && (
+                      <span style={{ fontSize: 12, color: "#15803d", fontWeight: 600 }}>
+                        {num(catUpdated)} rows updated
+                      </span>
+                    )}
+                    {catPhase === "error" && (
+                      <span style={{ fontSize: 12, color: "#dc2626" }}>{catError}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!anyDiffs && (
+              <div style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>No diffs recorded yet</div>
+            )}
+
+            {/* Controls */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px", flexWrap: "wrap" }}>
               <LimitInput value={dLimit} onChange={setDLimit} disabled={dPhase === "running"} />
-
               {dPhase === "running" ? (
                 <button
                   onClick={() => stopJob(dReaderRef, setDPhase)}
-                  style={{
-                    padding: "6px 16px", fontSize: "12px", fontWeight: 700,
-                    background: "#1a1a1a", color: "#fff", border: "none", borderRadius: "6px",
-                    cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px",
-                  }}
+                  style={{ padding: "6px 16px", fontSize: "12px", fontWeight: 700, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
                 >
                   <Spinner /> Stop
                 </button>
@@ -419,12 +496,7 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
                 <button
                   onClick={handleDiff}
                   disabled={bPhase === "running"}
-                  style={{
-                    padding: "6px 16px", fontSize: "12px", fontWeight: 700,
-                    background: bPhase === "running" ? "#9ca3af" : "#1a1a1a",
-                    color: "#fff", border: "none", borderRadius: "6px",
-                    cursor: bPhase === "running" ? "default" : "pointer",
-                  }}
+                  style={{ padding: "6px 16px", fontSize: "12px", fontWeight: 700, background: bPhase === "running" ? "#9ca3af" : "#1a1a1a", color: "#fff", border: "none", borderRadius: "6px", cursor: bPhase === "running" ? "default" : "pointer" }}
                 >
                   Run diff detection
                 </button>
@@ -440,20 +512,16 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
                   </div>
                 )}
                 {dProgress.errors > 0 && (
-                  <div style={{ marginTop: 4, fontSize: 12, color: "#dc2626" }}>
-                    {num(dProgress.errors)} parse errors
-                  </div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: "#dc2626" }}>{num(dProgress.errors)} parse errors</div>
                 )}
               </div>
             )}
-
             {dPhase === "done" && dProgress && (
               <div style={{ padding: "10px 14px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, fontSize: 13, color: "#15803d", fontWeight: 600 }}>
                 Done — {num(dProgress.processed)} articles checked,{" "}
                 {num(dProgress.extra?.diffsFound ?? 0)} new diffs recorded
               </div>
             )}
-
             {dPhase === "error" && (
               <div style={{ padding: "10px 14px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, fontSize: 13, color: "#b91c1c" }}>
                 Error: {dError}
