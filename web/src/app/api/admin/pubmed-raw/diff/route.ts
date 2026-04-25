@@ -16,9 +16,15 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-export async function POST() {
+export async function POST(req: Request): Promise<Response> {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
+
+  let limit = 0;
+  try {
+    const body = await req.json() as { limit?: number };
+    if (body.limit && typeof body.limit === "number") limit = body.limit;
+  } catch { /* no body */ }
 
   const encoder = new TextEncoder();
   const stream = new TransformStream<Uint8Array, Uint8Array>();
@@ -29,6 +35,7 @@ export async function POST() {
   };
 
   (async () => {
+    const signal = req.signal;
     const admin = createAdminClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const a = admin as any;
@@ -50,7 +57,8 @@ export async function POST() {
         page++;
       }
 
-      const total = articles.length;
+      const toProcess = limit > 0 ? articles.slice(0, limit) : articles;
+      const total = toProcess.length;
       send({ type: "start", total });
 
       let processed = 0;
@@ -58,8 +66,8 @@ export async function POST() {
       let errors = 0;
 
       const CHUNK = 100;
-      for (let i = 0; i < articles.length; i += CHUNK) {
-        const chunk = articles.slice(i, i + CHUNK);
+      for (let i = 0; i < toProcess.length; i += CHUNK) {
+        const chunk = toProcess.slice(i, i + CHUNK);
         const articleIds = chunk.map((a) => a.id);
 
         // Get latest raw XML row per article
@@ -154,7 +162,10 @@ export async function POST() {
         processed += chunk.length;
         send({ type: "progress", processed, total, diffsFound, errors });
 
-        if (i + CHUNK < articles.length) await sleep(50);
+        // Stop gracefully if client disconnected
+        if (signal.aborted) break;
+
+        if (i + CHUNK < toProcess.length) await sleep(50);
       }
 
       send({ type: "done", processed, total, diffsFound, errors });

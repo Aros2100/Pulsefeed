@@ -26,7 +26,7 @@ function splitPubmedArticles(xml: string): { pmid: string; xml: string }[] {
   return result;
 }
 
-export async function POST(req: Request) {
+export async function POST(req: Request): Promise<Response> {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
 
@@ -46,6 +46,7 @@ export async function POST(req: Request) {
   };
 
   (async () => {
+    const signal = req.signal;
     const admin = createAdminClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const a = admin as any;
@@ -136,6 +137,9 @@ export async function POST(req: Request) {
         }
 
         send({ type: "progress", processed, total, errors });
+
+        // Stop gracefully if client disconnected
+        if (signal.aborted) break;
 
         if (i + BATCH_SIZE < pmids.length) await sleep(RATE_MS);
       }

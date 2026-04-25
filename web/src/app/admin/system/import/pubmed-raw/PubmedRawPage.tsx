@@ -6,12 +6,12 @@ import Link from "next/link";
 /* ═══ Types ═══════════════════════════════════════════════════════════════════ */
 
 interface Stats {
-  totalArticles:      number;
-  hasRaw:             number;
-  missingRaw:         number;
-  rawRows:            number;
-  pendingDiffs:       number;
-  resolvedDiffs:      Record<string, number>;
+  totalArticles:       number;
+  hasRaw:              number;
+  missingRaw:          number;
+  rawRows:             number;
+  pendingDiffs:        number;
+  resolvedDiffs:       Record<string, number>;
   pendingDiffsByField: Record<string, number>;
 }
 
@@ -43,7 +43,7 @@ const headerLabel: React.CSSProperties = {
 
 /* ═══ Helpers ════════════════════════════════════════════════════════════════ */
 
-function num(v: number) { return v.toLocaleString("da-DK"); }
+function num(v: number) { return v.toLocaleString("en-US"); }
 
 function pct(a: number, b: number) {
   if (b === 0) return "—";
@@ -87,43 +87,57 @@ function ProgressBar({ processed, total }: { processed: number; total: number })
   );
 }
 
+function LimitInput({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled: boolean }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      <label style={{ fontSize: "12px", fontWeight: 600, color: "#5a6a85", whiteSpace: "nowrap" }}>
+        Limit (articles)
+      </label>
+      <input
+        type="number"
+        min={1}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        placeholder="all"
+        style={{
+          width: "90px", border: "1px solid #d1d5db", borderRadius: "6px",
+          padding: "5px 9px", fontSize: "13px", color: "#1a1a1a", outline: "none",
+          background: disabled ? "#f3f4f6" : "#fff",
+        }}
+      />
+    </div>
+  );
+}
+
 /* ═══ Main component ══════════════════════════════════════════════════════════ */
 
 export default function PubmedRawPage({ initialStats }: { initialStats: Stats }) {
-  const [stats, setStats]       = useState<Stats>(initialStats);
+  const [stats, setStats] = useState<Stats>(initialStats);
 
   // Backfill state
-  const [bPhase, setBPhase]     = useState<RunPhase>("idle");
+  const [bPhase, setBPhase]       = useState<RunPhase>("idle");
   const [bProgress, setBProgress] = useState<Progress | null>(null);
-  const [bError, setBError]     = useState<string | null>(null);
-  const bReaderRef              = useRef<ReadableStreamDefaultReader | null>(null);
+  const [bError, setBError]       = useState<string | null>(null);
+  const [bLimit, setBLimit]       = useState("");
+  const bReaderRef                = useRef<ReadableStreamDefaultReader | null>(null);
 
   // Diff state
-  const [dPhase, setDPhase]     = useState<RunPhase>("idle");
+  const [dPhase, setDPhase]       = useState<RunPhase>("idle");
   const [dProgress, setDProgress] = useState<Progress | null>(null);
-  const [dError, setDError]     = useState<string | null>(null);
-  const dReaderRef              = useRef<ReadableStreamDefaultReader | null>(null);
+  const [dError, setDError]       = useState<string | null>(null);
+  const [dLimit, setDLimit]       = useState("");
+  const dReaderRef                = useRef<ReadableStreamDefaultReader | null>(null);
 
   async function refreshStats() {
     const res = await fetch("/api/admin/pubmed-raw/stats");
     const data = await res.json() as { ok: boolean } & Stats;
-    if (data.ok) {
-      setStats({
-        totalArticles: data.totalArticles,
-        hasRaw: data.hasRaw,
-        missingRaw: data.missingRaw,
-        rawRows: data.rawRows,
-        pendingDiffs: data.pendingDiffs,
-        resolvedDiffs: data.resolvedDiffs,
-        pendingDiffsByField: data.pendingDiffsByField,
-      });
-    }
+    if (data.ok) setStats(data);
   }
 
   async function runSSE(
     url: string,
-    method: string,
-    body: object | null,
+    body: object,
     setPhase: (p: RunPhase) => void,
     setProgress: (p: Progress | null) => void,
     setError: (e: string | null) => void,
@@ -135,9 +149,9 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
     setError(null);
 
     const res = await fetch(url, {
-      method,
-      headers: body ? { "Content-Type": "application/json" } : {},
-      body: body ? JSON.stringify(body) : undefined,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
 
     if (!res.ok || !res.body) {
@@ -150,58 +164,74 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
     readerRef.current = reader as unknown as ReadableStreamDefaultReader;
 
     let buffer = "";
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += value;
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        try {
-          const msg = JSON.parse(line.slice(6)) as {
-            type: string;
-            processed?: number;
-            total?: number;
-            errors?: number;
-            error?: string;
-            diffsFound?: number;
-          };
-          if (msg.type === "start") {
-            setProgress({ processed: 0, total: msg.total ?? 0, errors: 0 });
-          } else if (msg.type === "progress" || msg.type === "done") {
-            const extra = extraKey && msg[extraKey as keyof typeof msg] !== undefined
-              ? { [extraKey]: msg[extraKey as keyof typeof msg] as number }
-              : {};
-            setProgress({ processed: msg.processed ?? 0, total: msg.total ?? 0, errors: msg.errors ?? 0, extra });
-            if (msg.type === "done") {
-              setPhase("done");
-              void refreshStats();
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += value;
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const msg = JSON.parse(line.slice(6)) as {
+              type: string;
+              processed?: number;
+              total?: number;
+              errors?: number;
+              error?: string;
+              diffsFound?: number;
+            };
+            if (msg.type === "start") {
+              setProgress({ processed: 0, total: msg.total ?? 0, errors: 0 });
+            } else if (msg.type === "progress" || msg.type === "done") {
+              const extra = extraKey && msg[extraKey as keyof typeof msg] !== undefined
+                ? { [extraKey]: msg[extraKey as keyof typeof msg] as number }
+                : {};
+              setProgress({ processed: msg.processed ?? 0, total: msg.total ?? 0, errors: msg.errors ?? 0, extra });
+              if (msg.type === "done") {
+                setPhase("done");
+                void refreshStats();
+              }
+            } else if (msg.type === "error") {
+              setPhase("error");
+              setError(msg.error ?? "Unknown error");
             }
-          } else if (msg.type === "error") {
-            setPhase("error");
-            setError(msg.error ?? "Unknown error");
-          }
-        } catch { /* malformed line */ }
+          } catch { /* malformed line */ }
+        }
       }
+    } catch {
+      // Reader was cancelled via stop button — treat as idle
+      setPhase("idle");
+    } finally {
+      readerRef.current = null;
     }
   }
 
+  function stopJob(
+    readerRef: React.MutableRefObject<ReadableStreamDefaultReader | null>,
+    setPhase: (p: RunPhase) => void,
+  ) {
+    readerRef.current?.cancel();
+    readerRef.current = null;
+    setPhase("idle");
+  }
+
   function handleBackfill() {
+    const limitVal = bLimit.trim() ? parseInt(bLimit, 10) : undefined;
     void runSSE(
       "/api/admin/pubmed-raw/backfill",
-      "POST",
-      {},
+      limitVal ? { limit: limitVal } : {},
       setBPhase, setBProgress, setBError,
       bReaderRef,
     );
   }
 
   function handleDiff() {
+    const limitVal = dLimit.trim() ? parseInt(dLimit, 10) : undefined;
     void runSSE(
       "/api/admin/pubmed-raw/diff",
-      "POST",
-      null,
+      limitVal ? { limit: limitVal } : {},
       setDPhase, setDProgress, setDError,
       dReaderRef,
       "diffsFound",
@@ -220,7 +250,7 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
         {/* Breadcrumb */}
         <div style={{ marginBottom: "8px" }}>
           <Link href="/admin/system/import" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
-            ← Import oversigt
+            ← Import overview
           </Link>
         </div>
 
@@ -229,13 +259,13 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
           <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
             System · Import
           </div>
-          <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>Raw XML Lager</h1>
+          <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>Raw XML Storage</h1>
           <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>
-            Gem rå PubMed XML per artikel — bruges til audit, diff-detektion og re-parsing
+            Store raw PubMed XML per article — used for audit, diff detection, and re-parsing
           </p>
         </div>
 
-        {/* ═══ STATUS-OVERSIGT ═══ */}
+        {/* ═══ STATUS ═══ */}
         <div style={cardStyle}>
           <div style={sectionHeader}>
             <span style={headerLabel}>Status</span>
@@ -243,47 +273,66 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
               onClick={() => void refreshStats()}
               style={{ fontSize: "12px", color: "#5a6a85", background: "none", border: "none", cursor: "pointer", padding: 0 }}
             >
-              Opdater
+              Refresh
             </button>
           </div>
           <div style={{ padding: "20px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            <KpiBox label="Total artikler" value={stats.totalArticles} />
-            <KpiBox label="Har raw XML" value={`${num(stats.hasRaw)} (${rawPct})`} color={stats.hasRaw === stats.totalArticles ? "#15803d" : "#1a1a1a"} />
-            <KpiBox label="Mangler raw" value={stats.missingRaw} color={stats.missingRaw > 0 ? "#d97706" : "#15803d"} />
-            <KpiBox label="Raw rækker i DB" value={stats.rawRows} />
+            <KpiBox label="Total articles" value={stats.totalArticles} />
+            <KpiBox label="Has raw XML" value={`${num(stats.hasRaw)} (${rawPct})`} color={stats.hasRaw === stats.totalArticles ? "#15803d" : "#1a1a1a"} />
+            <KpiBox label="Missing raw" value={stats.missingRaw} color={stats.missingRaw > 0 ? "#d97706" : "#15803d"} />
+            <KpiBox label="Raw rows in DB" value={stats.rawRows} />
           </div>
         </div>
 
-        {/* ═══ SEKTION A: BACKFILL ═══ */}
+        {/* ═══ SECTION A: BACKFILL ═══ */}
         <div style={cardStyle}>
           <div style={sectionHeader}>
             <span style={headerLabel}>Backfill raw XML</span>
-            <button
-              onClick={handleBackfill}
-              disabled={bPhase === "running" || dPhase === "running"}
-              style={{
-                padding: "6px 16px", fontSize: "12px", fontWeight: 700,
-                background: bPhase === "running" ? "#9ca3af" : "#E83B2A",
-                color: "#fff", border: "none", borderRadius: "6px",
-                cursor: bPhase === "running" ? "default" : "pointer",
-                display: "inline-flex", alignItems: "center", gap: "6px",
-              }}
-            >
-              {bPhase === "running" && <Spinner />}
-              {bPhase === "running" ? "Henter XML…" : "Backfill manglende raw XML"}
-            </button>
           </div>
 
           <div style={{ padding: "20px 24px" }}>
             <p style={{ fontSize: "13px", color: "#5a6a85", margin: "0 0 16px", lineHeight: 1.6 }}>
-              Henter rå PubMed XML for alle artikler der endnu ikke har et raw-lager.
-              Kører nyeste artikler først. Skriver til <code style={{ fontSize: 12, background: "#f1f3f7", padding: "1px 5px", borderRadius: 4 }}>article_pubmed_raw</code> og
-              opdaterer <code style={{ fontSize: 12, background: "#f1f3f7", padding: "1px 5px", borderRadius: 4 }}>articles.pubmed_raw_latest_at</code>.
+              Fetches raw PubMed XML for all articles that don&apos;t yet have a raw record.
+              Newest articles first. Writes to{" "}
+              <code style={{ fontSize: 12, background: "#f1f3f7", padding: "1px 5px", borderRadius: 4 }}>article_pubmed_raw</code>{" "}
+              and updates{" "}
+              <code style={{ fontSize: 12, background: "#f1f3f7", padding: "1px 5px", borderRadius: 4 }}>articles.pubmed_raw_latest_at</code>.
             </p>
+
+            {/* Controls row */}
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px", flexWrap: "wrap" }}>
+              <LimitInput value={bLimit} onChange={setBLimit} disabled={bPhase === "running"} />
+
+              {bPhase === "running" ? (
+                <button
+                  onClick={() => stopJob(bReaderRef, setBPhase)}
+                  style={{
+                    padding: "6px 16px", fontSize: "12px", fontWeight: 700,
+                    background: "#1a1a1a", color: "#fff", border: "none", borderRadius: "6px",
+                    cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px",
+                  }}
+                >
+                  <Spinner /> Stop
+                </button>
+              ) : (
+                <button
+                  onClick={handleBackfill}
+                  disabled={dPhase === "running"}
+                  style={{
+                    padding: "6px 16px", fontSize: "12px", fontWeight: 700,
+                    background: dPhase === "running" ? "#9ca3af" : "#E83B2A",
+                    color: "#fff", border: "none", borderRadius: "6px",
+                    cursor: dPhase === "running" ? "default" : "pointer",
+                  }}
+                >
+                  Backfill missing raw XML
+                </button>
+              )}
+            </div>
 
             {bPhase === "idle" && stats.missingRaw === 0 && (
               <div style={{ fontSize: "13px", color: "#15803d", fontWeight: 600 }}>
-                Alle artikler har raw XML.
+                All articles have raw XML.
               </div>
             )}
 
@@ -292,7 +341,7 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
                 <ProgressBar processed={bProgress.processed} total={bProgress.total} />
                 {bProgress.errors > 0 && (
                   <div style={{ marginTop: 8, fontSize: 12, color: "#dc2626" }}>
-                    {num(bProgress.errors)} fejl
+                    {num(bProgress.errors)} errors
                   </div>
                 )}
               </div>
@@ -300,43 +349,32 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
 
             {bPhase === "done" && bProgress && (
               <div style={{ padding: "10px 14px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, fontSize: 13, color: "#15803d", fontWeight: 600 }}>
-                Færdig — {num(bProgress.processed)} artikler behandlet, {num(bProgress.errors)} fejl
+                Done — {num(bProgress.processed)} articles processed, {num(bProgress.errors)} errors
               </div>
             )}
 
             {bPhase === "error" && (
               <div style={{ padding: "10px 14px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, fontSize: 13, color: "#b91c1c" }}>
-                Fejl: {bError}
+                Error: {bError}
               </div>
             )}
           </div>
         </div>
 
-        {/* ═══ SEKTION B: DIFF ═══ */}
+        {/* ═══ SECTION B: DIFF DETECTION ═══ */}
         <div style={cardStyle}>
           <div style={sectionHeader}>
-            <span style={headerLabel}>Diff-detektion</span>
-            <button
-              onClick={handleDiff}
-              disabled={dPhase === "running" || bPhase === "running"}
-              style={{
-                padding: "6px 16px", fontSize: "12px", fontWeight: 700,
-                background: dPhase === "running" ? "#9ca3af" : "#1a1a1a",
-                color: "#fff", border: "none", borderRadius: "6px",
-                cursor: dPhase === "running" ? "default" : "pointer",
-                display: "inline-flex", alignItems: "center", gap: "6px",
-              }}
-            >
-              {dPhase === "running" && <Spinner />}
-              {dPhase === "running" ? "Sammenligner…" : "Kør diff-detektion"}
-            </button>
+            <span style={headerLabel}>Diff detection</span>
           </div>
 
           <div style={{ padding: "20px 24px" }}>
             <p style={{ fontSize: "13px", color: "#5a6a85", margin: "0 0 16px", lineHeight: 1.6 }}>
-              Re-parser rå XML og sammenligner <strong>title</strong> og <strong>abstract</strong> med nuværende værdier i
-              databasen. Afvigelser logges i <code style={{ fontSize: 12, background: "#f1f3f7", padding: "1px 5px", borderRadius: 4 }}>article_pubmed_diffs</code> med <code style={{ fontSize: 12, background: "#f1f3f7", padding: "1px 5px", borderRadius: 4 }}>resolution = pending</code>.
-              Idempotent — eksisterende pending diffs overskrives ikke.
+              Re-parses raw XML and compares <strong>title</strong> and <strong>abstract</strong> with current values
+              in the database. Differences are logged to{" "}
+              <code style={{ fontSize: 12, background: "#f1f3f7", padding: "1px 5px", borderRadius: 4 }}>article_pubmed_diffs</code>{" "}
+              with{" "}
+              <code style={{ fontSize: 12, background: "#f1f3f7", padding: "1px 5px", borderRadius: 4 }}>resolution = pending</code>.
+              Idempotent — existing pending diffs are not overwritten.
             </p>
 
             {/* Diff stats */}
@@ -358,7 +396,38 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
                 </div>
               ))}
               {stats.pendingDiffs === 0 && pendingDiffTotal === 0 && Object.keys(stats.resolvedDiffs).length === 0 && (
-                <div style={{ fontSize: 13, color: "#888", alignSelf: "center" }}>Ingen diffs registreret endnu</div>
+                <div style={{ fontSize: 13, color: "#888", alignSelf: "center" }}>No diffs recorded yet</div>
+              )}
+            </div>
+
+            {/* Controls row */}
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px", flexWrap: "wrap" }}>
+              <LimitInput value={dLimit} onChange={setDLimit} disabled={dPhase === "running"} />
+
+              {dPhase === "running" ? (
+                <button
+                  onClick={() => stopJob(dReaderRef, setDPhase)}
+                  style={{
+                    padding: "6px 16px", fontSize: "12px", fontWeight: 700,
+                    background: "#1a1a1a", color: "#fff", border: "none", borderRadius: "6px",
+                    cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px",
+                  }}
+                >
+                  <Spinner /> Stop
+                </button>
+              ) : (
+                <button
+                  onClick={handleDiff}
+                  disabled={bPhase === "running"}
+                  style={{
+                    padding: "6px 16px", fontSize: "12px", fontWeight: 700,
+                    background: bPhase === "running" ? "#9ca3af" : "#1a1a1a",
+                    color: "#fff", border: "none", borderRadius: "6px",
+                    cursor: bPhase === "running" ? "default" : "pointer",
+                  }}
+                >
+                  Run diff detection
+                </button>
               )}
             </div>
 
@@ -367,12 +436,12 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
                 <ProgressBar processed={dProgress.processed} total={dProgress.total} />
                 {dProgress.extra?.diffsFound !== undefined && (
                   <div style={{ marginTop: 6, fontSize: 12, color: "#5a6a85" }}>
-                    {num(dProgress.extra.diffsFound)} nye diffs fundet
+                    {num(dProgress.extra.diffsFound)} new diffs found
                   </div>
                 )}
                 {dProgress.errors > 0 && (
                   <div style={{ marginTop: 4, fontSize: 12, color: "#dc2626" }}>
-                    {num(dProgress.errors)} parse-fejl
+                    {num(dProgress.errors)} parse errors
                   </div>
                 )}
               </div>
@@ -380,14 +449,14 @@ export default function PubmedRawPage({ initialStats }: { initialStats: Stats })
 
             {dPhase === "done" && dProgress && (
               <div style={{ padding: "10px 14px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, fontSize: 13, color: "#15803d", fontWeight: 600 }}>
-                Færdig — {num(dProgress.processed)} artikler gennemgået,{" "}
-                {num(dProgress.extra?.diffsFound ?? 0)} nye diffs registreret
+                Done — {num(dProgress.processed)} articles checked,{" "}
+                {num(dProgress.extra?.diffsFound ?? 0)} new diffs recorded
               </div>
             )}
 
             {dPhase === "error" && (
               <div style={{ padding: "10px 14px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, fontSize: 13, color: "#b91c1c" }}>
-                Fejl: {dError}
+                Error: {dError}
               </div>
             )}
           </div>
