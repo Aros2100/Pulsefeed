@@ -149,6 +149,8 @@ export const CITY_TO_COUNTRY: Record<string, CityInfo> = {
   "alberta": { city: "Edmonton", country: "Canada" },
   "british columbia": { city: "Vancouver", country: "Canada" },
   "ontario": { city: "Toronto", country: "Canada" },
+  "quebec city": { city: "Quebec City", country: "Canada" },
+  "québec city": { city: "Quebec City", country: "Canada" },
   "quebec": { city: "Montreal", country: "Canada" },
 
   // === Scandinavia ===

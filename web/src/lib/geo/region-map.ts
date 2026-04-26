@@ -53,6 +53,9 @@ const REGIONS = new Set([
   "minas gerais", "rio grande do sul", "paraná", "parana",
   "santa catarina", "bahia", "pernambuco", "ceará", "ceara",
 
+  // Mexican states
+  "mexico",  // Estado de México — also protects "Mexico City" from being stripped to "Mexico"
+
   // Canadian provinces
   "alberta", "ontario", "quebec", "british columbia", "manitoba",
   "saskatchewan", "nova scotia", "new brunswick",

@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       await runPubmedSync({
         mindate: fmtDate(yesterday),
         maxdate: fmtDate(new Date()),
-        esearchRetmax: 500,
+        esearchRetmax: 10_000,
       });
     } catch (e) {
       console.error("[trigger-pubmed-sync] failed:", e);

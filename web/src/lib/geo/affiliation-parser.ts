@@ -200,16 +200,23 @@ function cleanCity(raw: string, cityNames: Set<string>): string {
   }
   // Strip " - State of ..." suffix (Brazilian cities: "São Paulo - State of São Paulo")
   city = city.replace(/\s+-\s+State\s+of\s+.*$/i, "").trim();
-  // Strip trailing "City" if the base name is a known city (e.g. "Mexico City" → "Mexico" only if "Mexico" is in city names)
+  // Strip trailing "City" if the base name is a known city AND NOT an administrative region.
+  // Protects "Province City" patterns (e.g. "Quebec City" stays "Quebec City", not "Quebec").
   if (city.endsWith(" City")) {
     const base = city.slice(0, -5).trim();
-    if (base && cityNames.has(base.toLowerCase())) {
+    if (base && cityNames.has(base.toLowerCase()) && !isAdministrativeRegion(base)) {
       city = base;
     }
   }
-  // Strip Japanese -City suffix: "Kagoshima-City" → "Kagoshima", "Kagoshima City" → "Kagoshima"
+  // Strip Japanese -City suffix: "Kagoshima-City" → "Kagoshima"
   city = city.replace(/-City$/i, "").trim();
-  city = city.replace(/\s+City$/i, "").trim();
+  // Strip " City" suffix UNLESS base is admin region (protects "Quebec City", "Oklahoma City")
+  if (/\s+City$/i.test(city)) {
+    const base = city.replace(/\s+City$/i, "").trim();
+    if (!isAdministrativeRegion(base)) {
+      city = base;
+    }
+  }
   // Strip Korean administrative suffixes: "Suwon-si" → "Suwon", "Gwangju-si" → "Gwangju"
   city = city.replace(/-si$/i, "").trim();
   city = city.replace(/-gu$/i, "").trim();
@@ -244,13 +251,21 @@ function countryCommaRe(): RegExp {
     // Common country aliases absent from the canonical list
     names.push("USA", "U\\.S\\.A\\.", "U\\.S\\.");
     // (?<! of) prevents splitting "University of Hong Kong" → "University of, Hong Kong"
+    // (?<!\bNew ) prevents splitting "New Mexico" → "New, Mexico" and "New Zealand" → "New, Zealand"
     _countryCommaRe = new RegExp(
-      `(?<!,)(?<! of)\\s+(${names.join("|")})(?=[,.]|$)`,
+      `(?<!,)(?<! of)(?<!\\bNew )\\s+(${names.join("|")})(?=[,.]|$)`,
       "g"
     );
   }
   return _countryCommaRe;
 }
+
+// Brazilian state abbreviations (2 letters, all 27 federative units)
+const BRAZILIAN_STATES = [
+  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO",
+  "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI",
+  "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+];
 
 // Lazy-compiled regex: inserts a comma before a 2-letter US state abbreviation
 // when immediately followed by a US country name variant.
@@ -270,10 +285,41 @@ function stateCommaRe(): RegExp {
   return _stateCommaRe;
 }
 
+// Lazy-compiled regex: inserts a comma before a 2-letter Brazilian state abbreviation
+// when immediately followed by "Brazil". "São Paulo SP, Brazil" → "São Paulo, SP, Brazil".
+let _brStateCommaRe: RegExp | null = null;
+function brStateCommaRe(): RegExp {
+  if (!_brStateCommaRe) {
+    const abbrevs = BRAZILIAN_STATES.map(escapeRegExp);
+    _brStateCommaRe = new RegExp(
+      `(?<!,)\\s+(${abbrevs.join("|")})(?=,\\s*Brazil\\b)`,
+      "g"
+    );
+  }
+  return _brStateCommaRe;
+}
+
+/**
+ * If a segment is "US state abbrev + ZIP" (e.g. "NY 10029", "CA 91361-1234"),
+ * returns just the state abbrev. Otherwise returns null.
+ *
+ * Used by step 5 to preserve state information when stripping a ZIP that's
+ * glued to a state abbrev.
+ */
+function extractUsStateFromZipSegment(segment: string): string | null {
+  const s = segment.trim();
+  const match = s.match(/^([A-Z]{2})\s+\d{5}(?:-\d{4})?$/);
+  if (!match) return null;
+  const stateAbbr = match[1];
+  if (US_STATES[stateAbbr]) return stateAbbr;
+  return null;
+}
+
 /** Insert commas before bare country names and US state+country sequences. */
 function normalizeCommas(text: string): string {
   text = text.replace(countryCommaRe(), ", $1");
   text = text.replace(stateCommaRe(), ", $1");
+  text = text.replace(brStateCommaRe(), ", $1");
   return text;
 }
 
@@ -282,11 +328,13 @@ function normalizeCommas(text: string): string {
 /**
  * Parse one clean affiliation segment (no semicolons) into structured geo fields.
  * Called by parseAffiliation for each semicolon-separated part.
+ * When `trace` is provided, key decision points are appended to it.
  */
 function parseSingleSegment(
   rawText: string,
   cityNames: Set<string>,
-  cityCountryMap: Map<string, string>
+  cityCountryMap: Map<string, string>,
+  trace?: string[]
 ): ParsedAffiliation | null {
   let text = rawText;
 
@@ -300,8 +348,9 @@ function parseSingleSegment(
 
   // Step 2c: Split on country name directly followed by uppercase letter without separator.
   // "Denmark Laboratory for..." → "Denmark; Laboratory for..."
+  // (?!City\b) prevents splitting "Mexico City", "Guatemala City", etc.
   text = text.replace(
-    new RegExp(`(${CANONICAL_COUNTRIES.map(escapeRegExp).join("|")})\\s+(?=[A-Z])`, "g"),
+    new RegExp(`(${CANONICAL_COUNTRIES.map(escapeRegExp).join("|")})\\s+(?!City\\b)(?=[A-Z])`, "g"),
     "$1; "
   );
 
@@ -341,8 +390,8 @@ function parseSingleSegment(
   if (/^[A-Z]\.\s?[A-Z]\.?$/.test(text.trim())) return null;
   // Reject "Full Member of" / "Corporate Member of" lines
   if (/^(Full|Corporate)\s+Member\s+of\b/i.test(text)) return null;
-  // Reject "Ministry of" lines
-  if (/^Ministry\s+of\b/i.test(text)) return null;
+  // Reject "Ministry of" lines (only if no comma — comma means there's geo data after it)
+  if (/^Ministry\s+of\b/i.test(text) && !text.includes(",")) return null;
   // Reject "Republic of" fragments
   if (/^Republic\s+of\b/i.test(text) && !text.includes(",")) return null;
   // Reject "P. R" / "P.R." — People's Republic abbreviation
@@ -350,13 +399,20 @@ function parseSingleSegment(
 
   // Step 4: Split into segments
   const segments = text.split(/,\s*/).map((s) => s.trim()).filter(Boolean);
+  trace?.push(`step4: split → [${segments.map(s => JSON.stringify(s)).join(", ")}]`);
   if (segments.length === 0) return null;
 
   // Step 5: Remove postal code and phone number segments
   for (let i = segments.length - 1; i >= 0; i--) {
     const seg = segments[i];
     if (isPostalCode(seg)) {
-      segments.splice(i, 1);
+      // Preserve US state abbrev if segment is "STATE ZIP" (e.g. "NY 10029" → "NY")
+      const preservedState = extractUsStateFromZipSegment(seg);
+      if (preservedState) {
+        segments[i] = preservedState;
+      } else {
+        segments.splice(i, 1);
+      }
     } else if (isPhoneNumber(seg)) {
       segments.splice(i, 1);
     } else {
@@ -387,11 +443,14 @@ function parseSingleSegment(
     }
   }
 
+  trace?.push(`step5: after postal removal → [${segments.map(s => JSON.stringify(s)).join(", ")}]`);
   if (segments.length === 0) return null;
 
   // Step 6: Check for known institution as last segment (early return)
+  let institutionFallbackCity: string | null = null;
   for (let i = segments.length - 1; i >= Math.max(0, segments.length - 2); i--) {
     const instInfo = lookupInstitution(segments[i]);
+    trace?.push(`step6: lookupInstitution(${JSON.stringify(segments[i])}) → ${instInfo ? `{city:${instInfo.city}, country:${instInfo.country}}` : "null"}`);
     if (instInfo) {
       // Guard: if the affiliation string contains an explicit city that differs
       // from institution-map, trust the affiliation string over the map.
@@ -417,7 +476,12 @@ function parseSingleSegment(
         return lookupCountry(cleaned) !== null || US_STATES[cleaned.toUpperCase()] !== undefined;
       });
 
-      if (!hasCountryAfter) {
+      if (hasCountryAfter) {
+        if (!institutionFallbackCity) {
+          institutionFallbackCity = instInfo.city;
+          trace?.push(`step6: hasCountryAfter — saved institutionFallbackCity=${JSON.stringify(instInfo.city)}`);
+        }
+      } else {
         let department: string | null = null;
         const institution = segments[i];
 
@@ -431,6 +495,7 @@ function parseSingleSegment(
           department = segments[0];
         }
 
+        trace?.push(`step6: early-return via institution-map → city=${instInfo.city} country=${instInfo.country}`);
         return {
           department,
           institution,
@@ -507,9 +572,11 @@ function parseSingleSegment(
           // Last segment is not a recognized country — don't use it as country
           confidence = "low";
           // Don't pop — leave segment for dept/inst extraction
+          trace?.push(`step7: no country match for lastSeg=${JSON.stringify(lastSeg)} → confidence=low`);
         }
       }
     }
+    trace?.push(`step7: country=${JSON.stringify(country)} isUS=${isUS} cityFromFallback=${cityFromCountryFallback} remainingSegments=[${segments.map(s => JSON.stringify(s)).join(", ")}]`);
 
     // Strip short segments that are ≤4 chars and only uppercase+dots (e.g. "D.C", "D.C.")
     for (let i = segments.length - 1; i >= 0; i--) {
@@ -524,13 +591,36 @@ function parseSingleSegment(
       const maybeSt = segments[segments.length - 1].replace(/\.+$/, "").trim();
       const maybeStUpper = maybeSt.toUpperCase();
       if (US_STATES[maybeStUpper]) {
-        segments.pop();
+        // If maybeSt is also a known city (e.g. "New York" is both state and city),
+        // only pop it if another remaining segment is a known city. Otherwise
+        // leave it for step 8 to pick up as the city.
+        const isAlsoCity = cityNames.has(maybeSt.toLowerCase()) || !!lookupCity(maybeSt);
+        if (isAlsoCity) {
+          const hasAlternativeCity = segments.slice(0, -1).some((seg) => {
+            const cleaned = seg.replace(/\.+$/, "").trim();
+            return cityNames.has(cleaned.toLowerCase()) || !!lookupCity(cleaned);
+          });
+          if (hasAlternativeCity) {
+            trace?.push(`step7: consumed US state abbreviation ${JSON.stringify(maybeSt)} (alternative city found)`);
+            segments.pop();
+          } else {
+            trace?.push(`step7: skip state-pop — ${JSON.stringify(maybeSt)} also a known city, no alternative`);
+            // Don't pop — leave for step 8
+          }
+        } else {
+          trace?.push(`step7: consumed US state abbreviation ${JSON.stringify(maybeSt)}`);
+          segments.pop();
+        }
       } else if (lookupCountry(maybeSt) === "United States") {
         // Only pop a full state name if it's not the last remaining segment —
         // otherwise the city scanner still needs it (e.g. "New York" as city).
-        if (segments.length > 1) segments.pop();
+        if (segments.length > 1) {
+          trace?.push(`step7: consumed US full state name ${JSON.stringify(maybeSt)}`);
+          segments.pop();
+        }
       }
     }
+    trace?.push(`step7: after state-consume → segments=[${segments.map(s => JSON.stringify(s)).join(", ")}]`);
   }
 
   // Step 8: Extract city — scan from right, continue if no city match at current segment
@@ -539,6 +629,8 @@ function parseSingleSegment(
     while (cityIdx >= 0) {
       const candidate = segments[cityIdx].replace(/\.+$/, "").trim();
       const candidateCleaned = candidate.replace(/\s+\d{4,6}$/, "").trim();
+      trace?.push(`step8: trying cityIdx=${cityIdx} candidate=${JSON.stringify(candidate)}`);
+
       // Skip admin regions — but allow through if they are a known city (e.g. "New York" city
       // after the state "New York" has already been consumed in Step 7).
       const isAdmin = isAdministrativeRegion(candidate) || isAdministrativeRegion(candidateCleaned);
@@ -547,30 +639,52 @@ function parseSingleSegment(
         const adminIsCity = cityNames.has(adminKey) || !!lookupCity(candidate);
         // Explicit fallthrough for US state names that are also known cities (e.g. "New York")
         const isUSStateCity = !!US_STATES[candidate.trim().toUpperCase()] && cityNames.has(adminKey);
-        if (!adminIsCity && !isUSStateCity) { cityIdx--; continue; }
+        if (!adminIsCity && !isUSStateCity) {
+          trace?.push(`step8: skip — isAdmin and not a city`);
+          cityIdx--;
+          continue;
+        }
+        // Even if admin-region is also a known city, skip it if a better city
+        // candidate exists earlier in segments (e.g. "Toronto, Ontario" → skip Ontario, use Toronto)
+        if (adminIsCity) {
+          const hasEarlierCity = segments.slice(0, cityIdx).some((seg) => {
+            const cleaned = seg.replace(/\.+$/, "").trim();
+            return cityNames.has(cleaned.toLowerCase()) || !!lookupCity(cleaned);
+          });
+          if (hasEarlierCity) {
+            trace?.push(`step8: skip — isAdmin with better city candidate earlier`);
+            cityIdx--;
+            continue;
+          }
+        }
       }
-      if (candidate.length <= 4 && (US_STATES[candidate.toUpperCase()] || isProvinceCode(candidate))) { cityIdx--; continue; }
-      if (isPostalCode(candidate)) { cityIdx--; continue; }
+      if (candidate.length <= 4 && (US_STATES[candidate.toUpperCase()] || isProvinceCode(candidate))) { trace?.push(`step8: skip — short US state/province code`); cityIdx--; continue; }
+      if (isPostalCode(candidate)) { trace?.push(`step8: skip — postal code`); cityIdx--; continue; }
       // Allow city-state-country: if candidate is a country name but country is already set
       // and matches (e.g. "Hong Kong, Hong Kong"), treat it as city candidate.
       // Exception: SAR/territories that appear as both country AND city in affiliations
       // e.g. "Hong Kong, China" — "Hong Kong" is a country in our map but also the city.
       if (lookupCountry(candidate) !== null && lookupCountry(candidate) !== country) {
         const isCityToo = cityNames.has(candidate.trim().toLowerCase()) || !!lookupCity(candidate);
-        if (!isCityToo) { cityIdx--; continue; }
+        if (!isCityToo) { trace?.push(`step8: skip — is a different country (${lookupCountry(candidate)})`); cityIdx--; continue; }
         // Fall through — treat as city despite being a known country name
       }
-      if (matchesKeywords(candidate, DEPT_KEYWORDS)) { cityIdx--; continue; }
+      if (matchesKeywords(candidate, DEPT_KEYWORDS)) { trace?.push(`step8: skip — matches dept keywords`); cityIdx--; continue; }
 
       // Candidate passed guards — try to match as city
       const rawCity = cleanCity(segments[cityIdx], cityNames);
+      trace?.push(`step8: cleanCity(${JSON.stringify(segments[cityIdx])}) → ${JSON.stringify(rawCity)}`);
+      trace?.push(`step8: cityNames.has(${JSON.stringify(rawCity?.trim().toLowerCase())}) → ${rawCity ? cityNames.has(rawCity.trim().toLowerCase()) : false}`);
       if (rawCity && cityNames.has(rawCity.trim().toLowerCase())) {
+        trace?.push(`step8: MATCH via cityNames → city=${JSON.stringify(rawCity)}`);
         city = rawCity;
         segments.splice(cityIdx, 1);
         break;
       }
       const cityInfo = rawCity ? lookupCity(rawCity) : null;
+      trace?.push(`step8: lookupCity(${JSON.stringify(rawCity)}) → ${cityInfo ? `{city:${cityInfo.city}, country:${cityInfo.country}}` : "null"}`);
       if (cityInfo) {
+        trace?.push(`step8: MATCH via lookupCity → city=${JSON.stringify(cityInfo.city)}`);
         city = cityInfo.city;
         if (!country) country = cityInfo.country;
         segments.splice(cityIdx, 1);
@@ -578,8 +692,16 @@ function parseSingleSegment(
       }
 
       // No city match — continue scanning leftward
+      trace?.push(`step8: no match, scanning left`);
       cityIdx--;
     }
+    if (city === null) trace?.push(`step8: exhausted all candidates → city=null`);
+  }
+
+  // Step 8b: Fallback to city from institution-map if step 8 found nothing
+  if (city === null && institutionFallbackCity) {
+    trace?.push(`step8b: fallback to institution-map city → ${JSON.stringify(institutionFallbackCity)}`);
+    city = institutionFallbackCity;
   }
 
   // Step 9: Extract department and institution from remaining segments
@@ -662,6 +784,16 @@ export async function parseAffiliation(raw: string | null): Promise<ParsedAffili
   // Step 1: Handle null/empty
   if (!raw || !raw.trim()) return null;
 
+  // Step 1a: HTML-entity decode (hex entities only — e.g., &#xe5; → å)
+  // Must run before any splitting to avoid splitting mid-entity on ";".
+  raw = raw.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
+    try {
+      return String.fromCodePoint(parseInt(hex, 16));
+    } catch {
+      return _;
+    }
+  });
+
   const { names: cityNames, countryMap: cityCountryMap } = await getCityCache();
 
   // Step 1b: Strip trailing author initials from raw string BEFORE splitting on ";"
@@ -685,4 +817,54 @@ export async function parseAffiliation(raw: string | null): Promise<ParsedAffili
     if (!bestResult && result) bestResult = result;
   }
   return bestResult;
+}
+
+export type ParsedAffiliationWithTrace = {
+  input: string;
+  result: ParsedAffiliation | null;
+  trace: string[];
+};
+
+/**
+ * Debug variant of parseAffiliation that returns a trace of key parsing decisions.
+ * For diagnostic use only — not called in production paths.
+ */
+export async function parseAffiliationWithTrace(
+  raw: string
+): Promise<ParsedAffiliationWithTrace> {
+  if (!raw.trim()) {
+    return { input: raw, result: null, trace: ["step1: empty input"] };
+  }
+
+  // Step 1a: HTML-entity decode (hex entities only — e.g., &#xe5; → å)
+  raw = raw.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
+    try {
+      return String.fromCodePoint(parseInt(hex, 16));
+    } catch {
+      return _;
+    }
+  });
+
+  const { names: cityNames, countryMap: cityCountryMap } = await getCityCache();
+
+  let text = raw.replace(/\s*\([A-Za-z][A-Za-z.\-,\s]{2,}\)\s*\.?\s*$/, "").trim();
+  text = text.replace(/\([A-Z]{1,3}(?:,\s*[A-Z]{1,3})+\)/g, "").trim();
+
+  const parts = text.split(/\.\s*;\s*|;\s+/).map((p) => p.trim()).filter(Boolean);
+
+  const allTrace: string[] = [`step1: input=${JSON.stringify(raw)}`, `step1: parts after semicolon-split: ${parts.length}`];
+
+  let bestResult: ParsedAffiliation | null = null;
+  for (let pi = 0; pi < parts.length; pi++) {
+    const partTrace: string[] = [];
+    allTrace.push(`--- part ${pi + 1}/${parts.length}: ${JSON.stringify(parts[pi])}`);
+    const result = parseSingleSegment(parts[pi], cityNames, cityCountryMap, partTrace);
+    allTrace.push(...partTrace);
+    allTrace.push(`--- part ${pi + 1} result: ${JSON.stringify(result)}`);
+    if (result?.country) {
+      return { input: raw, result, trace: allTrace };
+    }
+    if (!bestResult && result) bestResult = result;
+  }
+  return { input: raw, result: bestResult, trace: allTrace };
 }

@@ -6,7 +6,13 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { XMLParser } from "fast-xml-parser";
+import {
+  splitPubmedArticles,
+  parseArticleFragment,
+  articleDetailsToDbUpdate,
+  type ArticleDetails,
+} from "@/lib/import/article-import/fetcher";
+import { saveRawXml } from "@/lib/import/article-import/raw-writer";
 
 // ── Config ─────────────────────────────────────────────────────────────────
 
@@ -19,37 +25,12 @@ const EFETCH_TIMEOUT_MS  = 30_000;
 const EFETCH_MAX_RETRIES = 3;
 const EFETCH_BACKOFF_MS  = [1_000, 3_000, 8_000];
 
-// ── XML parser ─────────────────────────────────────────────────────────────
-
-const parser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: "@_",
-  textNodeName: "#text",
-  isArray: (name) => [
-    "PubmedArticle", "Author", "AffiliationInfo",
-    "AbstractText", "MeshHeading", "QualifierName",
-    "Keyword", "PublicationType", "Identifier",
-  ].includes(name),
-});
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
 function fmtDate(d: Date): string {
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function getText(node: unknown): string {
-  if (!node) return "";
-  if (typeof node === "string") return node;
-  if (typeof node === "object") return String((node as Record<string, unknown>)["#text"] ?? "");
-  return String(node);
-}
-
-function toArr<T>(val: unknown): T[] {
-  if (!val) return [];
-  return Array.isArray(val) ? (val as T[]) : [val as T];
 }
 
 // ── Normalizers ─────────────────────────────────────────────────────────────
@@ -102,19 +83,8 @@ function normAuthors(authors: unknown): string {
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-interface PmArticle {
-  pubmedId:         string;
-  title:            string;
-  abstract:         string;
-  meshTerms:        { descriptor: string; major: boolean; qualifiers: string[] }[];
-  keywords:         string[];
-  publicationTypes: string[];
-  authors:          { lastName: string; foreName: string; affiliations: string[]; orcid: string | null }[];
-  dateRevised:      string | null;
-  isRetracted:      boolean;
-}
-
 interface DbArticle {
+  id:                string;
   pubmed_id:         string;
   title:             string | null;
   abstract:          string | null;
@@ -122,6 +92,23 @@ interface DbArticle {
   keywords:          unknown;
   publication_types: unknown;
   authors:           unknown;
+  doi:               string | null;
+  pmc_id:            string | null;
+  language:          string | null;
+  journal_title:     string | null;
+  journal_abbr:      string | null;
+  published_year:    number | null;
+  published_date:    string | null;
+  date_completed:    string | null;
+  pubmed_indexed_at: string | null;
+  volume:            string | null;
+  issue:             string | null;
+  article_number:    string | null;
+  issn_electronic:   string | null;
+  issn_print:        string | null;
+  coi_statement:     string | null;
+  grants:            unknown;
+  substances:        unknown;
 }
 
 interface SyncLogEntry {
@@ -133,65 +120,12 @@ interface SyncLogEntry {
 
 type AdminDb = ReturnType<typeof createAdminClient>;
 
-// ── PubMed XML → PmArticle ─────────────────────────────────────────────────
-
-function parseArticle(raw: Record<string, unknown>): PmArticle | null {
-  try {
-    const medline = raw.MedlineCitation as Record<string, unknown>;
-    const pubmedId = getText(medline?.PMID);
-    if (!pubmedId) return null;
-
-    const article = medline?.Article as Record<string, unknown>;
-    const title = getText(article?.ArticleTitle);
-    const abstractNode = article?.Abstract as Record<string, unknown> | undefined;
-    const abstract = toArr<unknown>(abstractNode?.AbstractText).map(getText).join(" ").trim();
-
-    const meshList = medline?.MeshHeadingList as Record<string, unknown> | undefined;
-    const meshTerms = toArr<Record<string, unknown>>(meshList?.MeshHeading).map(h => {
-      const desc = h.DescriptorName as Record<string, unknown> | undefined;
-      return {
-        descriptor: getText(desc),
-        major:      desc?.["@_MajorTopicYN"] === "Y",
-        qualifiers: toArr<unknown>(h.QualifierName).map(getText).filter(Boolean),
-      };
-    });
-
-    const kwList = medline?.KeywordList as Record<string, unknown> | undefined;
-    const keywords = toArr<unknown>(kwList?.Keyword).map(getText).filter(Boolean);
-
-    const ptList = article?.PublicationTypeList as Record<string, unknown> | undefined;
-    const publicationTypes = toArr<unknown>(ptList?.PublicationType).map(getText).filter(Boolean);
-
-    const authorList = article?.AuthorList as Record<string, unknown> | undefined;
-    const authors = toArr<Record<string, unknown>>(authorList?.Author).map(a => {
-      const orcidNode = toArr<Record<string, unknown>>(a.Identifier)
-        .find(id => id["@_Source"] === "ORCID");
-      return {
-        lastName:     getText(a.LastName),
-        foreName:     getText(a.ForeName) || getText(a.Initials),
-        affiliations: toArr<Record<string, unknown>>(a.AffiliationInfo)
-          .map(ai => getText(ai.Affiliation))
-          .filter(Boolean),
-        orcid: orcidNode ? getText(orcidNode).replace(/^https?:\/\/orcid\.org\//, "") : null,
-      };
-    });
-
-    const dr = medline?.DateRevised as Record<string, unknown> | undefined;
-    const dateRevised = dr
-      ? `${getText(dr.Year)}-${getText(dr.Month).padStart(2, "0")}-${getText(dr.Day).padStart(2, "0")}`
-      : null;
-
-    const isRetracted = publicationTypes.some(pt => pt.toLowerCase().includes("retracted publication"));
-
-    return { pubmedId, title, abstract, meshTerms, keywords, publicationTypes, authors, dateRevised, isRetracted };
-  } catch {
-    return null;
-  }
-}
-
 // ── EFetch (with retry + timeout) ──────────────────────────────────────────
 
-async function efetchBatch(pmids: string[], apiKey: string): Promise<PmArticle[]> {
+async function efetchBatch(
+  pmids: string[],
+  apiKey: string,
+): Promise<{ articles: ArticleDetails[]; rawXmlByPmid: Map<string, string> }> {
   const p = new URLSearchParams({ db: "pubmed", id: pmids.join(","), retmode: "xml" });
   if (apiKey) p.set("api_key", apiKey);
 
@@ -211,10 +145,17 @@ async function efetchBatch(pmids: string[], apiKey: string): Promise<PmArticle[]
       }
 
       const xml = await res.text();
-      const parsed = parser.parse(xml);
-      return toArr<Record<string, unknown>>(parsed.PubmedArticleSet?.PubmedArticle)
-        .map(parseArticle)
-        .filter((a): a is PmArticle => a !== null);
+      const articleParts = splitPubmedArticles(xml);
+
+      const articles: ArticleDetails[] = [];
+      const rawXmlByPmid = new Map<string, string>();
+      for (const { pmid, xml: articleXml } of articleParts) {
+        rawXmlByPmid.set(pmid, articleXml);
+        const details = parseArticleFragment(articleXml);
+        if (details) articles.push(details);
+      }
+
+      return { articles, rawXmlByPmid };
     } catch (e) {
       clearTimeout(timer);
       lastErr = e;
@@ -296,9 +237,15 @@ async function esearch(
   retmax: number,
   apiKey: string,
 ): Promise<string[]> {
+  // PubMed ESearch hard-caps retstart at 9998; attempting higher returns malformed JSON.
+  const PUBMED_ESEARCH_MAX = 9998;
   const all: string[] = [];
   let retstart = 0;
   for (;;) {
+    if (retstart > PUBMED_ESEARCH_MAX) {
+      console.warn(`[pubmed-sync] ESearch pagination cap reached (retstart=${retstart}), stopping at ${all.length} IDs`);
+      break;
+    }
     const p = new URLSearchParams({
       db: "pubmed", term: query,
       datetype: "mdat", mindate, maxdate,
@@ -313,8 +260,20 @@ async function esearch(
       body: p,
     });
     if (!res.ok) throw new Error(`esearch HTTP ${res.status}`);
-    const json = await res.json() as { esearchresult: { idlist: string[]; count: string } };
+    const rawText = await res.text();
+    let json: { esearchresult: { idlist: string[]; count: string; ERROR?: string } };
+    try {
+      json = JSON.parse(rawText) as typeof json;
+    } catch {
+      // PubMed sometimes returns invalid JSON (unescaped newlines) in error responses
+      console.warn(`[pubmed-sync] ESearch JSON parse failed at retstart=${retstart}, stopping at ${all.length} IDs. Raw (first 300): ${rawText.slice(0, 300)}`);
+      break;
+    }
     const result = json.esearchresult;
+    if (result?.ERROR) {
+      console.warn(`[pubmed-sync] ESearch returned error at retstart=${retstart}: ${String(result.ERROR).slice(0, 200)}`);
+      break;
+    }
     const ids = result?.idlist ?? [];
     all.push(...ids);
     const total = Number(result?.count ?? 0);
@@ -383,15 +342,32 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<SyncRunn
     }
     console.log(`[pubmed-sync] ${dbIds.size} artikler i DB`);
 
-    // Step 2 — Build filter query
+    // Step 2 — Build filter query (C1 + C4 from pubmed_filters, C2 from circle_2_sources)
     const { data: filters, error: filterErr } = await db
       .from("pubmed_filters")
       .select("query_string, circle")
       .eq("active", true)
-      .in("circle", [1, 2, 4]);
+      .in("circle", [1, 4]);
     if (filterErr) throw filterErr;
-    if (!filters?.length) throw new Error("Ingen aktive C1/C2 filtre fundet i pubmed_filters");
-    const filterQuery = filters.map(f => `(${f.query_string})`).join(" OR ");
+
+    const { data: c2Sources, error: c2Err } = await db
+      .from("circle_2_sources")
+      .select("type, value")
+      .eq("active", true);
+    if (c2Err) throw c2Err;
+
+    const c1c4Parts = (filters ?? []).map(f => `(${f.query_string})`);
+    const c2Parts   = (c2Sources ?? []).map(s => `("${s.value.replace(/"/g, '\\"')}"[AD])`);
+
+    const allParts = [...c1c4Parts, ...c2Parts];
+    if (allParts.length === 0) {
+      throw new Error("No active filters found in pubmed_filters or circle_2_sources");
+    }
+    const filterQuery = allParts.join(" OR ");
+    console.log(
+      `[pubmed-sync] Filter: ${c1c4Parts.length} from pubmed_filters (C1/C4), ` +
+      `${c2Parts.length} from circle_2_sources (C2)`,
+    );
 
     // Step 3 — ESearch
     const pubmedIds = await esearch(filterQuery, mindate, maxdate, esearchRetmax, apiKey);
@@ -429,7 +405,7 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<SyncRunn
       const batch = matches.slice(i, i + 1_000);
       const { data, error } = await db
         .from("articles")
-        .select("pubmed_id, title, abstract, mesh_terms, keywords, publication_types, authors")
+        .select("id, pubmed_id, title, abstract, mesh_terms, keywords, publication_types, authors, doi, pmc_id, language, journal_title, journal_abbr, published_year, published_date, date_completed, pubmed_indexed_at, volume, issue, article_number, issn_electronic, issn_print, coi_statement, grants, substances")
         .in("pubmed_id", batch);
       if (error) throw error;
       for (const row of data ?? []) dbMap.set(row.pubmed_id, row as DbArticle);
@@ -437,9 +413,12 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<SyncRunn
 
     for (let i = 0; i < matches.length; i += PUBMED_BATCH) {
       const batch = matches.slice(i, i + PUBMED_BATCH);
-      let fetched: PmArticle[];
+      let fetched: ArticleDetails[];
+      let rawXmlByPmid: Map<string, string>;
       try {
-        fetched = await efetchBatch(batch, apiKey);
+        const result = await efetchBatch(batch, apiKey);
+        fetched = result.articles;
+        rawXmlByPmid = result.rawXmlByPmid;
         await markPmidsResolved(db, batch);
       } catch (e) {
         const msg = String((e as Error)?.message ?? e).slice(0, 200);
@@ -454,49 +433,75 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<SyncRunn
         const row = dbMap.get(pm.pubmedId);
         if (!row) continue;
 
+        // Save raw XML — fire-and-forget
+        const rawXml = rawXmlByPmid.get(pm.pubmedId);
+        if (rawXml) {
+          saveRawXml(db, [{ articleId: row.id, pubmedId: pm.pubmedId, rawXml }], "pubmed_sync")
+            .catch(err => console.error(`[pubmed-sync] saveRawXml failed for ${pm.pubmedId}:`, err));
+        }
+
+        const fullUpdate = articleDetailsToDbUpdate(pm);
+        const now = new Date().toISOString();
+        const update: Record<string, unknown> = { pubmed_synced_at: now };
         const changed: string[] = [];
-        if (normStr(row.title)              !== normStr(pm.title))              changed.push("title");
-        if (normStr(row.abstract)           !== normStr(pm.abstract))           changed.push("abstract");
-        if (normMesh(row.mesh_terms)        !== normMesh(pm.meshTerms))         changed.push("mesh_terms");
-        if (normKeywords(row.keywords)      !== normKeywords(pm.keywords))      changed.push("keywords");
-        if (normPubTypes(row.publication_types) !== normPubTypes(pm.publicationTypes)) changed.push("publication_types");
-        const authorsChanged = normAuthors(row.authors) !== normAuthors(pm.authors);
-        if (authorsChanged) changed.push("authors");
-        const isRetracted = pm.isRetracted;
 
-        if (changed.length > 0 || isRetracted) {
-          const update: Record<string, unknown> = { pubmed_synced_at: new Date().toISOString() };
-          if (changed.includes("title"))             update.title             = pm.title;
-          if (changed.includes("abstract"))          update.abstract          = pm.abstract;
-          if (changed.includes("mesh_terms"))        update.mesh_terms        = pm.meshTerms;
-          if (changed.includes("keywords"))          update.keywords          = pm.keywords;
-          if (changed.includes("publication_types")) update.publication_types = pm.publicationTypes;
-          if (authorsChanged) {
-            update.authors_changed = true;
-            update.authors_raw_new = pm.authors;
-          }
-          if (isRetracted) {
-            update.retracted = true;
-            if (!changed.includes("publication_types")) changed.push("publication_types");
-          }
-          if (pm.dateRevised) update.pubmed_modified_at = pm.dateRevised;
+        // Helper to normalize values for comparison
+        const norm = (v: unknown): string => {
+          if (v == null) return "";
+          if (typeof v === "string") return v.trim();
+          return JSON.stringify(v);
+        };
 
-          const { error: updateErr } = await db
-            .from("articles").update(update).eq("pubmed_id", pm.pubmedId);
-          if (!updateErr) {
-            const event: "updated" | "retracted" = isRetracted ? "retracted" : "updated";
-            logEntries.push({
-              pubmed_id:          pm.pubmedId,
-              event,
-              fields_changed:     changed.length > 0 ? changed : null,
-              pubmed_modified_at: pm.dateRevised,
-            });
+        for (const [key, newVal] of Object.entries(fullUpdate)) {
+          const oldVal = (row as unknown as Record<string, unknown>)[key];
+          if (norm(oldVal) !== norm(newVal)) {
+            update[key] = newVal;
+            changed.push(key);
           }
-        } else {
+        }
+
+        // isRetracted check
+        const isRetracted = pm.publicationTypes.some(
+          (pt) => pt.toLowerCase().includes("retracted publication"),
+        );
+        if (isRetracted) {
+          update.retracted = true;
+          if (!changed.includes("publication_types")) changed.push("publication_types");
+        }
+
+        // Track authors change for audit fields
+        if (changed.includes("authors")) {
+          update.authors_changed = true;
+          update.authors_raw_new = pm.authors;
+        }
+
+        // dateRevised → pubmed_modified_at
+        if (pm.dateRevised) {
+          update.pubmed_modified_at = pm.dateRevised;
+        }
+
+        if (changed.length === 0 && !isRetracted) {
+          // No changes — just update sync timestamp
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           await (db as any).from("articles")
-            .update({ pubmed_synced_at: new Date().toISOString() })
+            .update({ pubmed_synced_at: now })
             .eq("pubmed_id", pm.pubmedId);
+          continue;
+        }
+
+        // Apply update
+        const { error: updateErr } = await db
+          .from("articles").update(update).eq("pubmed_id", pm.pubmedId);
+        if (!updateErr) {
+          const event: "updated" | "retracted" = isRetracted ? "retracted" : "updated";
+          logEntries.push({
+            pubmed_id:          pm.pubmedId,
+            event,
+            fields_changed:     changed.length > 0 ? changed : null,
+            pubmed_modified_at: pm.dateRevised ?? null,
+          });
+        } else {
+          console.error(`[pubmed-sync] update fejl for ${pm.pubmedId}: ${updateErr.message}`);
         }
       }
 

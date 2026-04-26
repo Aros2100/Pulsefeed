@@ -85,6 +85,7 @@ const COLORS: Record<string, { dot: string; border: string; bg: string; label: s
   condensation_text_scored:  { dot: "#059669", border: "#a7f3d0", bg: "#f0fdf4", label: "TEXT CONDENSED" },
   condensation_scored:       { dot: "#7c3aed", border: "#ddd6fe", bg: "#f5f3ff", label: "SARI SCORED" },
   condensation_validated:    { dot: "#10b981", border: "#a7f3d0", bg: "#f0fdf4", label: "CONDENSATION VALIDATED" },
+  geo_updated:               { dot: "#14b8a6", border: "#99f6e4", bg: "#f0fdfa", label: "Geo updated" },
 };
 const FALLBACK_COLOR = { dot: "#6b7280", border: "#d1d5db", bg: "#f9fafb", label: "Event" };
 
@@ -409,6 +410,57 @@ function CondensationValidatedCard({ p }: { p: P }) {
   );
 }
 
+function GeoUpdatedCard({ p }: { p: P }) {
+  const source = p.source as string | null;
+  const fields = Array.isArray(p.fields_updated) ? (p.fields_updated as string[]) : [];
+  const confidence = p.parser_confidence as string | null;
+  const prev = p.previous as Record<string, string | null> | null;
+  const next = p.new as Record<string, string | null> | null;
+
+  const SOURCE_BADGE: Record<string, string> = {
+    human:           "green",
+    ror_enriched:    "green",
+    parser_openalex: "blue",
+    parser_pubmed:   "purple",
+    parser:          "purple",
+    enrichment:      "blue",
+    manual:          "gray",
+  };
+  const sourceColor = source ? (SOURCE_BADGE[source] ?? "gray") : "gray";
+
+  const cityChanged  = fields.includes("geo_city");
+  const countryChanged = fields.includes("geo_country");
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      {source && (
+        <KV label="Source" value={<Badge color={sourceColor}>{source}</Badge>} />
+      )}
+      {fields.length > 0 && (
+        <KV label="Fields updated" value={
+          <span style={{ fontSize: "12px", color: "#374151" }}>{fields.join(", ")}</span>
+        } />
+      )}
+      {confidence && (
+        <KV label="Parser confidence" value={<Badge color={confidence === "high" ? "green" : "orange"}>{confidence}</Badge>} />
+      )}
+      {(cityChanged || countryChanged) && prev && next && (
+        <KV label="Location" value={
+          <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}>
+            <span style={{ color: "#9ca3af" }}>
+              {[prev.geo_city, prev.geo_country].filter(Boolean).join(", ") || "—"}
+            </span>
+            <span style={{ color: "#9ca3af" }}>→</span>
+            <span style={{ color: "#1a1a1a", fontWeight: 600 }}>
+              {[next.geo_city, next.geo_country].filter(Boolean).join(", ") || "—"}
+            </span>
+          </span>
+        } />
+      )}
+    </div>
+  );
+}
+
 function EventCard({ eventType, payload }: { eventType: string; payload: P }) {
   switch (eventType) {
     case "imported":              return <ImportedCard           p={payload} />;
@@ -425,6 +477,7 @@ function EventCard({ eventType, payload }: { eventType: string; payload: P }) {
     case "condensation_text_scored": return <TextCondensedCard         p={payload} />;
     case "condensation_scored":      return <SariScoredCard            p={payload} />;
     case "condensation_validated":   return <CondensationValidatedCard p={payload} />;
+    case "geo_updated":              return <GeoUpdatedCard            p={payload} />;
     default:
       return <pre style={{ fontSize: "11px", color: "#6b7280", margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{JSON.stringify(payload, null, 2)}</pre>;
   }
@@ -1305,6 +1358,7 @@ export default async function AdminArticleLogPage({
   const SECTIONS: { title: string; types: string[]; alwaysShow?: boolean; filter?: (ev: typeof events[0]) => boolean }[] = [
     { title: "Article import",     types: ["imported"],                                                      alwaysShow: true },
     { title: "Author import",      types: ["author_linked"],                                                 alwaysShow: true },
+    { title: "Geo Updates",        types: ["geo_updated"] },
     { title: "AI Scoring",         types: ["enriched"] },
     { title: "Auto-Tagging",       types: ["auto_tagged"] },
     { title: "Lab validation",     types: ["lab_decision"] },

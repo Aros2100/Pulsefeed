@@ -31,6 +31,28 @@ export function getText(v: unknown): string {
   return "";
 }
 
+/**
+ * Extracts plain text from an XML fragment as found in PubMed ArticleTitle
+ * and AbstractText elements. Handles inline tags:
+ * - <mml:math>...</mml:math> blocks are dropped entirely (incl. content)
+ * - All other inline tags (<i>, <b>, <sub>, <sup>, etc.) are stripped,
+ *   keeping their text content
+ * - Whitespace is normalized
+ *
+ * Operates on raw XML strings (not fast-xml-parser output) because mixed
+ * content ordering is not preserved by the default parser config.
+ */
+export function extractTextFromXmlFragment(innerXml: string): string {
+  if (!innerXml) return "";
+  // 1. Remove <mml:math>...</mml:math> blocks entirely
+  let result = innerXml.replace(/<mml:math\b[^>]*>[\s\S]*?<\/mml:math>/g, "");
+  // 2. Strip remaining tags (opening, closing, self-closing)
+  result = result.replace(/<\/?[a-zA-Z][a-zA-Z0-9:_-]*[^>]*\/?>/g, "");
+  // 3. Normalize whitespace
+  result = result.replace(/\s+/g, " ").trim();
+  return result;
+}
+
 function parsePubYear(pubDate: unknown): number | null {
   if (!pubDate || typeof pubDate !== "object") return null;
   const pd = pubDate as Record<string, unknown>;
@@ -91,15 +113,42 @@ function parseDateCompleted(dc: unknown): string | null {
 
 // ── HTML entity decoding ───────────────────────────────────────────────────────
 
-export function decodeHtmlEntities(str: string): string {
+const NAMED_ENTITIES: Record<string, string> = {
+  amp:    "&",
+  lt:     "<",
+  gt:     ">",
+  quot:   '"',
+  apos:   "'",
+  nbsp:   "\u00a0",
+  copy:   "©",
+  reg:    "®",
+  trade:  "™",
+  hellip: "…",
+  ndash:  "–",
+  mdash:  "—",
+  lsquo:  "\u2018",
+  rsquo:  "\u2019",
+  ldquo:  "\u201c",
+  rdquo:  "\u201d",
+};
+
+function decodeOnce(str: string): string {
   return str
     .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
     .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'");
+    .replace(/&([a-zA-Z]+);/g, (match, name) => NAMED_ENTITIES[name] ?? match);
+}
+
+export function decodeHtmlEntities(str: string): string {
+  // Iterate to handle double-encoded entities (e.g. PubMed's &amp;#xD;).
+  // Stops as soon as a pass makes no change; cap at 5 as safety guard.
+  let prev = str;
+  for (let i = 0; i < 5; i++) {
+    const next = decodeOnce(prev);
+    if (next === prev) return next;
+    prev = next;
+  }
+  return prev;
 }
 
 // ── Author name normalization ──────────────────────────────────────────────────
@@ -165,9 +214,9 @@ function parseMeshTerms(meshHeadingList: unknown): MeshTerm[] {
   return toArray(raw).map((heading) => {
     const h = heading as Record<string, unknown>;
     const descriptorNode = h.DescriptorName as Record<string, unknown> | undefined;
-    const descriptor = getText(descriptorNode);
+    const descriptor = decodeHtmlEntities(getText(descriptorNode));
     const major = descriptorNode?.["@_MajorTopicYN"] === "Y";
-    const qualifiers = toArray(h.QualifierName).map(getText).filter(Boolean);
+    const qualifiers = toArray(h.QualifierName).map(getText).map(decodeHtmlEntities).filter(Boolean);
     return { descriptor, major, qualifiers };
   });
 }
@@ -182,8 +231,8 @@ function parseGrants(grantList: unknown): Grant[] {
   return toArray(raw).map((grant) => {
     const g = grant as Record<string, unknown>;
     return {
-      grantId: getText(g.GrantID) || null,
-      agency: getText(g.Agency) || null,
+      grantId: g.GrantID ? decodeHtmlEntities(getText(g.GrantID)) || null : null,
+      agency:  g.Agency  ? decodeHtmlEntities(getText(g.Agency))  || null : null,
     };
   });
 }
@@ -199,7 +248,7 @@ function parseSubstances(chemicalList: unknown): Substance[] {
     const c = chem as Record<string, unknown>;
     return {
       registryNumber: getText(c.RegistryNumber) || null,
-      name: getText(c.NameOfSubstance),
+      name: decodeHtmlEntities(getText(c.NameOfSubstance)),
     };
   });
 }
@@ -224,6 +273,7 @@ export interface ArticleDetails {
   publishedYear: number | null;
   publishedDate: string | null;
   dateCompleted: string | null;
+  dateRevised: string | null;
   volume: string | null;
   issue: string | null;
   authors: Author[];
@@ -288,7 +338,33 @@ export interface FetchResult {
   rawXml: Map<string, string>;  // pubmedId → individual <PubmedArticle>...</PubmedArticle> XML
 }
 
-function splitPubmedArticles(xml: string): { pmid: string; xml: string }[] {
+// Module-level parser — shared by fetchArticleDetails and parseArticleFragment
+const articleParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: "@_",
+  textNodeName: "#text",
+  processEntities: false,
+  isArray: (name) =>
+    [
+      "PubmedArticle",
+      "Author",
+      "AffiliationInfo",
+      "Identifier",
+      "ArticleId",
+      "AbstractText",
+      "MeshHeading",
+      "QualifierName",
+      "Grant",
+      "Chemical",
+      "Keyword",
+      "PublicationType",
+      "ELocationID",
+      "ISSN",
+      "PubMedPubDate",
+    ].includes(name),
+});
+
+export function splitPubmedArticles(xml: string): { pmid: string; xml: string }[] {
   const result: { pmid: string; xml: string }[] = [];
   const articleRegex = /<PubmedArticle>[\s\S]*?<\/PubmedArticle>/g;
   const matches = xml.match(articleRegex) ?? [];
@@ -301,37 +377,237 @@ function splitPubmedArticles(xml: string): { pmid: string; xml: string }[] {
 }
 
 /**
+ * Parses a single <PubmedArticle>...</PubmedArticle> XML fragment into
+ * an ArticleDetails object. Returns null if the fragment is unparseable.
+ * Used by fetchArticleDetails and the fix-entities-from-raw script.
+ */
+export function parseArticleFragment(articleXml: string): ArticleDetails | null {
+  try {
+    const wrapped = `<PubmedArticleSet>${articleXml}</PubmedArticleSet>`;
+    const parsed = articleParser.parse(wrapped) as {
+      PubmedArticleSet?: { PubmedArticle?: Record<string, unknown>[] };
+    };
+    const article = parsed.PubmedArticleSet?.PubmedArticle?.[0];
+    if (!article) return null;
+    return parseArticleObject(article, articleXml);
+  } catch {
+    return null;
+  }
+}
+
+function parseArticleObject(
+  article: Record<string, unknown>,
+  articleXml: string,
+): ArticleDetails | null {
+  const citation = article.MedlineCitation as Record<string, unknown> | undefined;
+  const art = citation?.Article as Record<string, unknown> | undefined;
+
+  const pubmedId = getText(citation?.PMID);
+  if (!pubmedId) return null;
+
+  // Title
+  const titleMatch = articleXml.match(/<ArticleTitle[^>]*>([\s\S]*?)<\/ArticleTitle>/);
+  const title = titleMatch
+    ? extractTextFromXmlFragment(decodeHtmlEntities(titleMatch[1]))
+    : decodeHtmlEntities(getText(art?.ArticleTitle));
+
+  // Abstract (may have multiple structured parts)
+  const abstractParts = toArray(
+    (art?.Abstract as Record<string, unknown> | undefined)?.AbstractText
+  );
+  const abstractTextMatches = [
+    ...articleXml.matchAll(/<AbstractText([^>]*)>([\s\S]*?)<\/AbstractText>/g),
+  ];
+  const abstract =
+    abstractTextMatches.length > 0
+      ? abstractTextMatches
+          .map((m, idx) => {
+            const innerXml = m[2];
+            const text = extractTextFromXmlFragment(decodeHtmlEntities(innerXml));
+            const part = abstractParts[idx] as Record<string, unknown> | undefined;
+            const label = part?.["@_Label"] as string | undefined;
+            return label ? `${label}: ${text}` : text;
+          })
+          .filter(Boolean)
+          .join("\n\n")
+      : null;
+
+  // Language
+  const language = getText(art?.Language) || null;
+
+  // Publication types
+  const pubTypesRaw = toArray(
+    (art?.PublicationTypeList as Record<string, unknown> | undefined)?.PublicationType
+  );
+  const publicationTypes = pubTypesRaw.map(getText).filter(Boolean);
+
+  // Authors: [{ lastName, foreName, affiliation, orcid }]
+  const authors = parseAuthors(art?.AuthorList);
+
+  // Journal fields
+  const journal = art?.Journal as Record<string, unknown> | undefined;
+  const journalIssue = journal?.JournalIssue as Record<string, unknown> | undefined;
+  const journalTitle = decodeHtmlEntities(getText(journal?.Title)) || null;
+  const journalAbbr =
+    decodeHtmlEntities(
+      getText(journal?.ISOAbbreviation) ||
+      getText((citation?.MedlineJournalInfo as Record<string, unknown> | undefined)?.MedlineTA)
+    ) || null;
+  const publishedYear = parsePubYear(journalIssue?.PubDate);
+  const publishedDate = parsePubDateFull(journalIssue?.PubDate);
+  const volume = getText(journalIssue?.Volume) || null;
+  const issue = getText(journalIssue?.Issue) || null;
+
+  // ISSN: electronic and print
+  const issnArr = toArray(journal?.ISSN);
+  const issnElectronic =
+    getText(issnArr.find((s) => (s as Record<string, unknown>)["@_IssnType"] === "Electronic")) || null;
+  const issnPrint =
+    getText(issnArr.find((s) => (s as Record<string, unknown>)["@_IssnType"] === "Print")) || null;
+
+  // Date completed
+  const dateCompleted = parseDateCompleted(citation?.DateCompleted);
+
+  // DateRevised
+  const dateRevised = parseDateCompleted(citation?.DateRevised);
+
+  // MeSH terms: [{ descriptor, qualifier }]
+  const meshTerms = parseMeshTerms(citation?.MeshHeadingList);
+
+  // Keywords
+  const keywordsRaw = toArray(
+    (citation?.KeywordList as Record<string, unknown> | undefined)?.Keyword
+  );
+  const keywords = keywordsRaw.map(getText).map(decodeHtmlEntities).filter(Boolean);
+
+  // Grants: [{ grantId, agency }]
+  const grants = parseGrants(art?.GrantList);
+
+  // Chemical substances: [{ registryNumber, name }]
+  const substances = parseSubstances(citation?.ChemicalList);
+
+  // COI statement
+  const coiStatement = decodeHtmlEntities(getText(citation?.CoiStatement)) || null;
+
+  // ELocationID array (used for doi fallback)
+  const elocations = toArray(art?.ELocationID as unknown);
+
+  // Article IDs (DOI, PMC, PII)
+  const articleIdList = (
+    (article.PubmedData as Record<string, unknown> | undefined)
+      ?.ArticleIdList as Record<string, unknown> | undefined
+  )?.ArticleId;
+  const idArr = toArray(articleIdList);
+
+  const doiEntry = idArr.find(
+    (id) => (id as Record<string, unknown>)["@_IdType"] === "doi"
+  );
+  const doiFromEloc = elocations.find(
+    (e) => (e as Record<string, unknown>)["@_EIdType"] === "doi"
+  );
+  const doi =
+    (doiEntry ? getText(doiEntry) : null) ||
+    (doiFromEloc ? getText(doiFromEloc) : null) ||
+    null;
+
+  const pmcEntry = idArr.find(
+    (id) => (id as Record<string, unknown>)["@_IdType"] === "pmc"
+  );
+  const pmcId = pmcEntry ? getText(pmcEntry) || null : null;
+
+  // Article number: MedlinePgn (page range or article number, e.g. "233" or "123-145")
+  const articleNumber =
+    getText((art?.Pagination as Record<string, unknown> | undefined)?.MedlinePgn) || null;
+
+  // PubMed date
+  const historyObj = (article.PubmedData as Record<string, unknown> | undefined)
+    ?.History as Record<string, unknown> | undefined;
+  const pubMedDates = toArray(historyObj?.PubMedPubDate);
+  const pubmedDateEntry = pubMedDates.find(
+    (d) => (d as Record<string, unknown>)["@_PubStatus"] === "pubmed"
+  );
+  const pubmedDate = pubmedDateEntry
+    ? parsePubMedHistoryDate(pubmedDateEntry)
+    : null;
+
+  const entrezDateEntry = pubMedDates.find(
+    (d) => (d as Record<string, unknown>)["@_PubStatus"] === "entrez"
+  );
+  const pubmedIndexedAt = entrezDateEntry
+    ? parsePubMedHistoryDate(entrezDateEntry)
+    : null;
+
+  return {
+    pubmedId,
+    doi,
+    pmcId,
+    title: title || `Article ${pubmedId}`,
+    abstract,
+    language,
+    publicationTypes,
+    meshTerms,
+    keywords,
+    coiStatement,
+    grants,
+    substances,
+    journalAbbr,
+    journalTitle,
+    publishedYear,
+    publishedDate,
+    dateCompleted,
+    dateRevised,
+    volume,
+    issue,
+    authors,
+    articleNumber,
+    pubmedDate,
+    pubmedIndexedAt,
+    issnElectronic,
+    issnPrint,
+  };
+}
+
+/**
+ * Maps ArticleDetails fields to their corresponding articles table column names.
+ * Used by both sync-runner and re-parse scripts to avoid field-mapping divergence.
+ * Does NOT include pubmed_synced_at or pubmed_modified_at — handled separately.
+ */
+export function articleDetailsToDbUpdate(d: ArticleDetails): Record<string, unknown> {
+  return {
+    title:             d.title,
+    abstract:          d.abstract,
+    doi:               d.doi,
+    pmc_id:            d.pmcId,
+    language:          d.language,
+    publication_types: d.publicationTypes,
+    mesh_terms:        d.meshTerms,
+    keywords:          d.keywords,
+    authors:           d.authors,
+    coi_statement:     d.coiStatement,
+    grants:            d.grants,
+    substances:        d.substances,
+    journal_title:     d.journalTitle,
+    journal_abbr:      d.journalAbbr,
+    published_year:    d.publishedYear,
+    published_date:    d.publishedDate,
+    date_completed:    d.dateCompleted,
+    pubmed_date:       d.pubmedDate,
+    pubmed_indexed_at: d.pubmedIndexedAt,
+    volume:            d.volume,
+    issue:             d.issue,
+    article_number:    d.articleNumber,
+    issn_electronic:   d.issnElectronic,
+    issn_print:        d.issnPrint,
+  };
+}
+
+/**
  * Calls PubMed EFetch in batches of 20 and parses the XML response into
  * fully structured ArticleDetails objects. Also returns the raw XML per PMID.
  */
 export async function fetchArticleDetails(
   pmids: string[]
 ): Promise<FetchResult> {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: "@_",
-    textNodeName: "#text",
-    processEntities: false,
-    isArray: (name) =>
-      [
-        "PubmedArticle",
-        "Author",
-        "AffiliationInfo",
-        "Identifier",
-        "ArticleId",
-        "AbstractText",
-        "MeshHeading",
-        "QualifierName",
-        "Grant",
-        "Chemical",
-        "Keyword",
-        "PublicationType",
-        "ELocationID",
-        "ISSN",
-        "PubMedPubDate",
-      ].includes(name),
-  });
-
   const results: ArticleDetails[] = [];
   const rawXmlMap = new Map<string, string>();
 
@@ -352,169 +628,8 @@ export async function fetchArticleDetails(
 
     for (const { pmid, xml: articleXml } of splitPubmedArticles(xml)) {
       rawXmlMap.set(pmid, articleXml);
-    }
-
-    const parsed = parser.parse(xml) as {
-      PubmedArticleSet?: { PubmedArticle?: Record<string, unknown>[] };
-    };
-
-    for (const article of parsed.PubmedArticleSet?.PubmedArticle ?? []) {
-      const citation = article.MedlineCitation as Record<string, unknown> | undefined;
-      const art = citation?.Article as Record<string, unknown> | undefined;
-
-      const pubmedId = getText(citation?.PMID);
-      if (!pubmedId) continue;
-
-      // Title
-      const title = decodeHtmlEntities(getText(art?.ArticleTitle));
-
-      // Abstract (may have multiple structured parts)
-      const abstractParts = toArray(
-        (art?.Abstract as Record<string, unknown> | undefined)?.AbstractText
-      );
-      const abstract =
-        abstractParts.length > 0
-          ? decodeHtmlEntities(
-              abstractParts
-                .map((part) => {
-                  const p = part as Record<string, unknown>;
-                  const label = p["@_Label"] as string | undefined;
-                  const text = getText(part);
-                  return label ? `${label}: ${text}` : text;
-                })
-                .filter(Boolean)
-                .join("\n\n")
-            )
-          : null;
-
-      // Language
-      const language = getText(art?.Language) || null;
-
-      // Publication types
-      const pubTypesRaw = toArray(
-        (art?.PublicationTypeList as Record<string, unknown> | undefined)?.PublicationType
-      );
-      const publicationTypes = pubTypesRaw.map(getText).filter(Boolean);
-
-      // Authors: [{ lastName, foreName, affiliation, orcid }]
-      const authors = parseAuthors(art?.AuthorList);
-
-      // Journal fields
-      const journal = art?.Journal as Record<string, unknown> | undefined;
-      const journalIssue = journal?.JournalIssue as Record<string, unknown> | undefined;
-      const journalTitle = getText(journal?.Title) || null;
-      const journalAbbr =
-        getText(journal?.ISOAbbreviation) ||
-        getText((citation?.MedlineJournalInfo as Record<string, unknown> | undefined)?.MedlineTA) ||
-        null;
-      const publishedYear = parsePubYear(journalIssue?.PubDate);
-      const publishedDate = parsePubDateFull(journalIssue?.PubDate);
-      const volume = getText(journalIssue?.Volume) || null;
-      const issue = getText(journalIssue?.Issue) || null;
-
-      // ISSN: electronic and print
-      const issnArr = toArray(journal?.ISSN);
-      const issnElectronic =
-        getText(issnArr.find((s) => (s as Record<string, unknown>)["@_IssnType"] === "Electronic")) || null;
-      const issnPrint =
-        getText(issnArr.find((s) => (s as Record<string, unknown>)["@_IssnType"] === "Print")) || null;
-
-      // Date completed
-      const dateCompleted = parseDateCompleted(citation?.DateCompleted);
-
-      // MeSH terms: [{ descriptor, qualifier }]
-      const meshTerms = parseMeshTerms(citation?.MeshHeadingList);
-
-      // Keywords
-      const keywordsRaw = toArray(
-        (citation?.KeywordList as Record<string, unknown> | undefined)?.Keyword
-      );
-      const keywords = keywordsRaw.map(getText).filter(Boolean);
-
-      // Grants: [{ grantId, agency }]
-      const grants = parseGrants(art?.GrantList);
-
-      // Chemical substances: [{ registryNumber, name }]
-      const substances = parseSubstances(citation?.ChemicalList);
-
-      // COI statement
-      const coiStatement = getText(art?.CoiStatement) || null;
-
-      // ELocationID array (used for doi fallback)
-      const elocations = toArray(art?.ELocationID as unknown);
-
-      // Article IDs (DOI, PMC, PII)
-      const articleIdList = (
-        (article.PubmedData as Record<string, unknown> | undefined)
-          ?.ArticleIdList as Record<string, unknown> | undefined
-      )?.ArticleId;
-      const idArr = toArray(articleIdList);
-
-      const doiEntry = idArr.find(
-        (id) => (id as Record<string, unknown>)["@_IdType"] === "doi"
-      );
-      const doiFromEloc = elocations.find(
-        (e) => (e as Record<string, unknown>)["@_EIdType"] === "doi"
-      );
-      const doi =
-        (doiEntry ? getText(doiEntry) : null) ||
-        (doiFromEloc ? getText(doiFromEloc) : null) ||
-        null;
-
-      const pmcEntry = idArr.find(
-        (id) => (id as Record<string, unknown>)["@_IdType"] === "pmc"
-      );
-      const pmcId = pmcEntry ? getText(pmcEntry) || null : null;
-
-      // Article number: MedlinePgn (page range or article number, e.g. "233" or "123-145")
-      const articleNumber =
-        getText((art?.Pagination as Record<string, unknown> | undefined)?.MedlinePgn) || null;
-
-      // PubMed date
-      const historyObj = (article.PubmedData as Record<string, unknown> | undefined)
-        ?.History as Record<string, unknown> | undefined;
-      const pubMedDates = toArray(historyObj?.PubMedPubDate);
-      const pubmedDateEntry = pubMedDates.find(
-        (d) => (d as Record<string, unknown>)["@_PubStatus"] === "pubmed"
-      );
-      const pubmedDate = pubmedDateEntry
-        ? parsePubMedHistoryDate(pubmedDateEntry)
-        : null;
-
-      const entrezDateEntry = pubMedDates.find(
-        (d) => (d as Record<string, unknown>)["@_PubStatus"] === "entrez"
-      );
-      const pubmedIndexedAt = entrezDateEntry
-        ? parsePubMedHistoryDate(entrezDateEntry)
-        : null;
-
-      results.push({
-        pubmedId,
-        doi,
-        pmcId,
-        title: title || `Article ${pubmedId}`,
-        abstract,
-        language,
-        publicationTypes,
-        meshTerms,
-        keywords,
-        coiStatement,
-        grants,
-        substances,
-        journalAbbr,
-        journalTitle,
-        publishedYear,
-        publishedDate,
-        dateCompleted,
-        volume,
-        issue,
-        authors,
-        articleNumber,
-        pubmedDate,
-        pubmedIndexedAt,
-        issnElectronic,
-        issnPrint,
-      });
+      const details = parseArticleFragment(articleXml);
+      if (details) results.push(details);
     }
 
     if (i + BATCH_SIZE < pmids.length) {

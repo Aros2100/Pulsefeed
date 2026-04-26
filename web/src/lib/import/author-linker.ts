@@ -172,7 +172,9 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
                   geo_institution: geoResult.geo_institution,
                   geo_department:  geoResult.geo_department,
                 };
-                logGeoUpdatedEvent(article.id, geoResult.geo_source, null, geoNext, geoResult.parser_confidence);
+                if (geoResult.geo_source) {
+                  logGeoUpdatedEvent(article.id, geoResult.geo_source, null, geoNext, geoResult.parser_confidence);
+                }
               }
 
               if (rejectedAuthors.length > 0) {

@@ -132,6 +132,7 @@ export default function GeoCard(props: GeoCardProps) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Live state for geo fields (updated after save)
   const [geo, setGeo] = useState({
@@ -149,6 +150,7 @@ export default function GeoCard(props: GeoCardProps) {
     state: geo.state ?? "",
     city: geo.city ?? "",
     institution: geo.institution ?? "",
+    department: geo.department ?? "",
   });
 
   function startEditing() {
@@ -157,9 +159,11 @@ export default function GeoCard(props: GeoCardProps) {
       state: geo.state ?? "",
       city: geo.city ?? "",
       institution: geo.institution ?? "",
+      department: geo.department ?? "",
     });
     setEditing(true);
     setSavedMsg(false);
+    setErrorMsg(null);
   }
 
   function cancel() {
@@ -168,6 +172,7 @@ export default function GeoCard(props: GeoCardProps) {
 
   async function save() {
     setSaving(true);
+    setErrorMsg(null);
     try {
       const res = await fetch(`/api/admin/articles/${props.articleId}/geo`, {
         method: "POST",
@@ -182,15 +187,17 @@ export default function GeoCard(props: GeoCardProps) {
           country: form.country || null,
           state: form.state || null,
           city: form.city || null,
-          department: geo.department,
+          department: form.department || null,
           institution: form.institution || null,
         });
         setEditing(false);
         setSavedMsg(true);
         setTimeout(() => setSavedMsg(false), 3000);
+      } else {
+        setErrorMsg(data.error ?? "Ukendt fejl");
       }
-    } catch {
-      // silent
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : "Netværksfejl");
     } finally {
       setSaving(false);
     }
@@ -335,6 +342,20 @@ export default function GeoCard(props: GeoCardProps) {
               {editRow("State", "state")}
               {editRow("City", "city")}
               {editRow("Institution", "institution")}
+              {editRow("Department", "department")}
+              {errorMsg && (
+                <div style={{
+                  marginTop: "8px",
+                  padding: "8px 12px",
+                  background: "#fef2f2",
+                  border: "1px solid #fca5a5",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  color: "#b91c1c",
+                }}>
+                  {errorMsg}
+                </div>
+              )}
               <div
                 style={{
                   display: "flex",

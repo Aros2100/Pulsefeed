@@ -43,7 +43,7 @@ export async function logArticleEvent(
 
 // ── Geo update logging ────────────────────────────────────────────────────────
 
-export type GeoUpdateSource = "parser" | "backfill" | "ror" | "parser_openalex" | "parser_pubmed" | "human" | "enrichment" | "manual";
+export type GeoUpdateSource = "parser" | "backfill" | "ror_enriched" | "parser_openalex" | "parser_pubmed" | "human" | "enrichment" | "manual";
 
 export type GeoSnapshot = {
   geo_city?: string | null;

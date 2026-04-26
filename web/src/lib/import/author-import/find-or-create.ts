@@ -680,16 +680,30 @@ export type ArticleGeoResult = {
   geo_continent: string | null;
   geo_institution: string | null;
   geo_department: string | null;
-  geo_source: "ror" | "parser_openalex" | "parser_pubmed";
+  geo_source: "ror_enriched" | "parser_pubmed" | "parser_openalex" | null;
   parser_confidence: "high" | "low" | null;
 };
 
+/** Accent-strip + lowercase for city comparison. */
+function normCityForMatch(c: string | null): string {
+  return (c ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
 /**
- * Determines article geo from the first author using authoritative sources:
- *   1. ROR institution lookup (if oaAuthorship has a ROR ID)
- *   2. OpenAlex raw affiliation string (parser fallback)
- *   3. PubMed affiliation string (parser fallback)
- * geo_region and geo_continent are derived deterministically from geo_country.
+ * Determines article geo from the first author.
+ *
+ * Priority:
+ *   1. Parse PubMed affiliation (authors[0].affiliations[0]) — primary source.
+ *      If parser found city: optionally enrich institution/state from ROR when
+ *      ROR city matches parser city (case-insensitive, accent-stripped).
+ *        → geo_source = "ror_enriched" (with ROR enrichment)
+ *        → geo_source = "parser_pubmed" (without ROR enrichment)
+ *   2. Fallback: parse OpenAlex rawAffiliationStrings[0] when PubMed affiliation
+ *      is absent or unparseable. No ROR enrichment in this path.
+ *        → geo_source = "parser_openalex"
+ *   3. Nothing parseable: all geo fields null, geo_source = null.
+ *
+ * geo_region and geo_continent derived deterministically from geo_country.
  */
 export async function determineArticleGeo(
   admin: AdminClient,
@@ -698,39 +712,60 @@ export async function determineArticleGeo(
 ): Promise<ArticleGeoResult> {
   const primaryInst = firstOaAuthorship?.institutions[0] ?? null;
 
-  // ── 1. ROR-authoritative ──────────────────────────────────────────────────
-  if (primaryInst?.ror) {
-    const rorGeo = await fetchRorGeo(primaryInst.ror);
-    if (rorGeo.city || rorGeo.country) {
-      const country = rorGeo.country ?? null;
-      const { hospital, department } = primaryInst.displayName
-        ? splitInstitutionAndDepartment(primaryInst.displayName)
-        : { hospital: null, department: null };
-      return {
-        geo_city:        rorGeo.city,
-        geo_country:     country,
-        geo_state:       rorGeo.state,
-        geo_region:      country ? getRegion(country) : null,
-        geo_continent:   country ? getContinent(country) : null,
-        geo_institution: hospital,
-        geo_department:  department,
-        geo_source:      "ror",
-        parser_confidence: null,
-      };
-    }
-  }
-
-  // ── 2. Parser fallback ────────────────────────────────────────────────────
-  const oaRawAff = firstOaAuthorship?.rawAffiliationStrings[0] ?? null;
+  // ── 1. PubMed affiliation (primary) ──────────────────────────────────────
   const pubmedAff = firstAuthor.affiliations[0]
     ? stripEmailFromAffiliation(firstAuthor.affiliations[0])
     : null;
 
-  const affString = oaRawAff ?? pubmedAff ?? null;
-  const geoSource: "parser_openalex" | "parser_pubmed" = oaRawAff ? "parser_openalex" : "parser_pubmed";
+  if (pubmedAff) {
+    const parsed = await geoParseAffiliation(pubmedAff);
+    if (parsed) {
+      const rawCity = parsed.city ? normalizeGeo(parsed.city, parsed.country ?? null).city : null;
+      const country = normalizeCountry(parsed.country) ?? null;
+      const state = await resolveState(admin, rawCity, country);
 
-  if (affString) {
-    const parsed = await geoParseAffiliation(affString);
+      // ── 1a. ROR enrichment — only when parser city matches ROR city ────────
+      if (primaryInst?.ror && rawCity) {
+        const rorGeo = await fetchRorGeo(primaryInst.ror);
+        const parserCityNorm = normCityForMatch(rawCity);
+        const rorCityNorm = normCityForMatch(rorGeo.city);
+        if (parserCityNorm && rorCityNorm && parserCityNorm === rorCityNorm) {
+          const { hospital, department } = primaryInst.displayName
+            ? splitInstitutionAndDepartment(primaryInst.displayName)
+            : { hospital: null, department: null };
+          return {
+            geo_city:          rawCity,
+            geo_country:       country,
+            geo_state:         rorGeo.state ?? state,
+            geo_region:        country ? getRegion(country) : null,
+            geo_continent:     country ? getContinent(country) : null,
+            geo_institution:   hospital ?? parsed.institution ?? null,
+            geo_department:    department ?? parsed.department ?? null,
+            geo_source:        "ror_enriched",
+            parser_confidence: parsed.confidence,
+          };
+        }
+      }
+
+      // ── 1b. Parser only ───────────────────────────────────────────────────
+      return {
+        geo_city:          rawCity,
+        geo_country:       country,
+        geo_state:         state,
+        geo_region:        country ? getRegion(country) : null,
+        geo_continent:     country ? getContinent(country) : null,
+        geo_institution:   parsed.institution ?? null,
+        geo_department:    parsed.department ?? null,
+        geo_source:        "parser_pubmed",
+        parser_confidence: parsed.confidence,
+      };
+    }
+  }
+
+  // ── 2. OpenAlex raw affiliation fallback ──────────────────────────────────
+  const oaRawAff = firstOaAuthorship?.rawAffiliationStrings[0] ?? null;
+  if (oaRawAff) {
+    const parsed = await geoParseAffiliation(oaRawAff);
     if (parsed) {
       const rawCity = parsed.city ? normalizeGeo(parsed.city, parsed.country ?? null).city : null;
       const country = normalizeCountry(parsed.country) ?? null;
@@ -743,7 +778,7 @@ export async function determineArticleGeo(
         geo_continent:     country ? getContinent(country) : null,
         geo_institution:   parsed.institution ?? null,
         geo_department:    parsed.department ?? null,
-        geo_source:        geoSource,
+        geo_source:        "parser_openalex",
         parser_confidence: parsed.confidence,
       };
     }
@@ -758,7 +793,7 @@ export async function determineArticleGeo(
     geo_continent:     null,
     geo_institution:   null,
     geo_department:    null,
-    geo_source:        geoSource,
+    geo_source:        null,
     parser_confidence: null,
   };
 }

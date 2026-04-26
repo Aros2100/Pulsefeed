@@ -13,15 +13,20 @@ export async function POST(
 
   const { id } = await params;
   const body = await req.json();
-  const { country, state, city, institution } = body as {
+  const { country, state, city, institution, department } = body as {
     country?: string;
     state?: string;
     city?: string;
     institution?: string;
+    department?: string;
   };
 
-  const region = country ? getRegion(country) : null;
-  const continent = country ? getContinent(country) : null;
+  if (!country?.trim()) {
+    return NextResponse.json({ error: "Country is required" }, { status: 400 });
+  }
+
+  const region = getRegion(country);
+  const continent = getContinent(country);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
@@ -34,30 +39,38 @@ export async function POST(
     .single();
   const prevGeo: GeoSnapshot | null = prevData ?? null;
 
+  const now = new Date().toISOString();
+  const newGeoFields = {
+    geo_country:           country.trim(),
+    geo_state:             state?.trim() || null,
+    geo_city:              city?.trim() || null,
+    geo_institution:       institution?.trim() || null,
+    geo_department:        department?.trim() || null,
+    geo_region:            region,
+    geo_continent:         continent,
+    geo_source:            "human",
+    geo_defined_at:        now,
+    geo_parser_confidence: null,
+  };
+
   const { error } = await admin
     .from("articles")
-    .update({
-      geo_country: country || null,
-      geo_state: state || null,
-      geo_city: city || null,
-      geo_institution: institution || null,
-      geo_region: region,
-      geo_continent: continent,
-    })
+    .update(newGeoFields)
     .eq("id", id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  logGeoUpdatedEvent(id, "manual", prevGeo, {
-    geo_country: country || null,
-    geo_state: state || null,
-    geo_city: city || null,
-    geo_institution: institution || null,
-    geo_region: region,
-    geo_continent: continent,
-  });
+  logGeoUpdatedEvent(id, "human", prevGeo, {
+    geo_country:    newGeoFields.geo_country,
+    geo_state:      newGeoFields.geo_state,
+    geo_city:       newGeoFields.geo_city,
+    geo_institution: newGeoFields.geo_institution,
+    geo_department: newGeoFields.geo_department,
+    geo_region:     newGeoFields.geo_region,
+    geo_continent:  newGeoFields.geo_continent,
+  }, null);
 
   return NextResponse.json({ ok: true, region, continent });
 }

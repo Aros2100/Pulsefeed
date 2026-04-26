@@ -18,14 +18,32 @@ export async function getCityCache(): Promise<CityCache> {
 
   const admin = createAdminClient();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (admin as any).rpc("get_city_country_map");
-  if (error) throw new Error(`Failed to load city cache: ${error.message}`);
+  const BATCH_SIZE = 1000;
+  const allRows: Array<{ name: string; country: string }> = [];
+  let offset = 0;
+
+  while (true) {
+    if (offset > 200_000) {
+      throw new Error(`city-cache pagination runaway: offset=${offset}`);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (admin as any)
+      .rpc("get_city_country_map")
+      .range(offset, offset + BATCH_SIZE - 1);
+
+    if (error) throw new Error(`Failed to load city cache: ${error.message}`);
+
+    const batch = (data ?? []) as Array<{ name: string; country: string }>;
+    allRows.push(...batch);
+
+    if (batch.length < BATCH_SIZE) break;
+    offset += BATCH_SIZE;
+  }
 
   const names = new Set<string>();
   const countryMap = new Map<string, string>();
 
-  for (const row of data ?? []) {
+  for (const row of allRows) {
     const key = (row.name as string).trim().toLowerCase();
     const keyUnaccented = unaccent(key);
     const country = lookupCountry(row.country) ?? row.country;
