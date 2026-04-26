@@ -24,7 +24,19 @@ import {
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const limitIdx = args.indexOf("--limit");
-const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : Infinity;
+const pmidsIdx = args.indexOf("--pmids");
+
+const pmidList: string[] = pmidsIdx !== -1
+  ? args[pmidsIdx + 1].split(",").map((s) => s.trim()).filter(Boolean)
+  : [];
+
+if (pmidsIdx !== -1 && pmidList.length === 0) {
+  console.error("Error: --pmids given but list is empty after trim.");
+  process.exit(1);
+}
+
+const usePmids = pmidList.length > 0;
+const limit = (!usePmids && limitIdx !== -1) ? parseInt(args[limitIdx + 1], 10) : Infinity;
 
 const PAGE = 50; // small page to avoid upstream timeout on large raw_xml payloads
 
@@ -34,7 +46,11 @@ async function main() {
 
   console.log("\n══════════════════════════════════════════════════════════════");
   console.log("  re-parse-from-raw.ts");
-  console.log(`  mode: ${dryRun ? "DRY RUN" : "LIVE"}${isFinite(limit) ? `, limit: ${limit}` : ""}`);
+  if (usePmids) {
+    console.log(`  mode: ${dryRun ? "DRY RUN" : "LIVE"}, pmids: ${pmidList.join(", ")}`);
+  } else {
+    console.log(`  mode: ${dryRun ? "DRY RUN" : "LIVE"}${isFinite(limit) ? `, limit: ${limit}` : ""}`);
+  }
   console.log("══════════════════════════════════════════════════════════════\n");
 
   let updated = 0;
@@ -47,11 +63,17 @@ async function main() {
     const from = page * PAGE;
     const to   = from + PAGE - 1;
 
-    const { data, error } = await admin
+    let query = admin
       .from("article_pubmed_raw")
-      .select("id, article_id, pubmed_id, raw_xml")
-      .eq("fetch_source", "backfill")
-      .range(from, to);
+      .select("id, article_id, pubmed_id, raw_xml");
+
+    if (usePmids) {
+      query = query.in("pubmed_id", pmidList);
+    } else {
+      query = query.eq("fetch_source", "backfill").range(from, to);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     if (!data || data.length === 0) break;

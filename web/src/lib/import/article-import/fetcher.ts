@@ -425,7 +425,8 @@ function parseArticleObject(
             const innerXml = m[2];
             const text = extractTextFromXmlFragment(decodeHtmlEntities(innerXml));
             const part = abstractParts[idx] as Record<string, unknown> | undefined;
-            const label = part?.["@_Label"] as string | undefined;
+            const labelRaw = part?.["@_Label"] as string | undefined;
+            const label = labelRaw ? decodeHtmlEntities(labelRaw) : undefined;
             return label ? `${label}: ${text}` : text;
           })
           .filter(Boolean)
