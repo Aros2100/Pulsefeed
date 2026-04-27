@@ -57,32 +57,11 @@ async function main() {
   let skipped = 0;
   let failed  = 0;
   let totalProcessed = 0;
-  let page = 0;
 
-  for (;;) {
-    const from = page * PAGE;
-    const to   = from + PAGE - 1;
+  type RawRow = { id: string; article_id: string; pubmed_id: string; raw_xml: string };
 
-    let query = admin
-      .from("article_pubmed_raw")
-      .select("id, article_id, pubmed_id, raw_xml");
-
-    if (usePmids) {
-      query = query.in("pubmed_id", pmidList);
-    } else {
-      query = query.eq("fetch_source", "backfill").range(from, to);
-    }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
-    if (!data || data.length === 0) break;
-
-    if (page === 0) {
-      console.log(`First page fetched (${data.length} rows). Processing...\n`);
-    }
-
-    for (const row of data as { id: string; article_id: string; pubmed_id: string; raw_xml: string }[]) {
+  async function processRows(rows: RawRow[], batchLabel: string) {
+    for (const row of rows) {
       if (isFinite(limit) && totalProcessed >= limit) break;
       totalProcessed++;
 
@@ -118,13 +97,45 @@ async function main() {
 
       updated++;
       if (updated % 500 === 0) {
-        console.log(`Progress: ${updated} updated, ${skipped} skipped, ${failed} failed (page ${page + 1})`);
+        console.log(`Progress: ${updated} updated, ${skipped} skipped, ${failed} failed (${batchLabel})`);
       }
     }
+  }
 
-    if (isFinite(limit) && totalProcessed >= limit) break;
-    if (data.length < PAGE) break;
-    page++;
+  if (usePmids) {
+    // Chunk pmidList into PAGE-sized batches to avoid PostgREST limits.
+    // Each chunk is a separate .in() query — no page counter, no infinite loop.
+    for (let i = 0; i < pmidList.length; i += PAGE) {
+      if (isFinite(limit) && totalProcessed >= limit) break;
+      const chunk = pmidList.slice(i, i + PAGE);
+      const { data, error } = await admin
+        .from("article_pubmed_raw")
+        .select("id, article_id, pubmed_id, raw_xml")
+        .in("pubmed_id", chunk);
+      if (error) throw error;
+      if (!data || data.length === 0) continue;
+      if (i === 0) console.log(`First chunk fetched (${data.length} rows). Processing...\n`);
+      await processRows(data as RawRow[], `chunk ${Math.floor(i / PAGE) + 1}`);
+    }
+  } else {
+    // Default: paginate over all backfill rows.
+    let page = 0;
+    for (;;) {
+      const from = page * PAGE;
+      const to   = from + PAGE - 1;
+      const { data, error } = await admin
+        .from("article_pubmed_raw")
+        .select("id, article_id, pubmed_id, raw_xml")
+        .eq("fetch_source", "backfill")
+        .range(from, to);
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      if (page === 0) console.log(`First page fetched (${data.length} rows). Processing...\n`);
+      await processRows(data as RawRow[], `page ${page + 1}`);
+      if (isFinite(limit) && totalProcessed >= limit) break;
+      if (data.length < PAGE) break;
+      page++;
+    }
   }
 
   console.log("\n──────────────────────────────────────────────────────────────");

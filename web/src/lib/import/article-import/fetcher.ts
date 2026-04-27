@@ -53,6 +53,52 @@ export function extractTextFromXmlFragment(innerXml: string): string {
   return result;
 }
 
+/**
+ * Extract plain text from a named XML element by working on raw XML.
+ * Uses the same decode-then-strip order as the title/abstract pipeline:
+ *   1. Find the element by name in the raw XML string
+ *   2. Decode HTML entities (handles HTML-encoded inline tags like &lt;italic&gt;)
+ *   3. Strip inline tags via extractTextFromXmlFragment
+ *
+ * Returns null if the element is not found.
+ *
+ * Note: This handles ONE occurrence. For elements that may repeat (Keyword,
+ * Affiliation), use extractElementTextAll.
+ */
+export function extractElementText(
+  rawXml: string,
+  elementName: string
+): string | null {
+  const re = new RegExp(
+    `<${elementName}(?:\\s[^>]*)?>([\\s\\S]*?)</${elementName}>`
+  );
+  const match = rawXml.match(re);
+  if (!match) return null;
+  const inner = match[1];
+  return extractTextFromXmlFragment(decodeHtmlEntities(inner));
+}
+
+/**
+ * Extract plain text from all occurrences of a named XML element.
+ * Same decode-then-strip order as extractElementText.
+ */
+export function extractElementTextAll(
+  rawXml: string,
+  elementName: string
+): string[] {
+  const re = new RegExp(
+    `<${elementName}(?:\\s[^>]*)?>([\\s\\S]*?)</${elementName}>`,
+    "g"
+  );
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(rawXml)) !== null) {
+    const text = extractTextFromXmlFragment(decodeHtmlEntities(m[1]));
+    if (text) out.push(text);
+  }
+  return out;
+}
+
 function parsePubYear(pubDate: unknown): number | null {
   if (!pubDate || typeof pubDate !== "object") return null;
   const pd = pubDate as Record<string, unknown>;
@@ -181,6 +227,11 @@ export interface Author {
 
 export type AuthorOutcome = "new" | "duplicate" | "rejected";
 
+function cleanAffiliationText(s: string | null | undefined): string {
+  if (!s) return "";
+  return extractTextFromXmlFragment(decodeHtmlEntities(s));
+}
+
 export function parseAuthors(authorList: unknown): Author[] {
   const raw = (authorList as Record<string, unknown> | undefined)?.Author;
   return toArray(raw).map((a) => {
@@ -190,7 +241,7 @@ export function parseAuthors(authorList: unknown): Author[] {
 
     const affiliationInfos = toArray(r.AffiliationInfo);
     const affiliations = affiliationInfos
-      .map((ai) => decodeHtmlEntities(getText((ai as Record<string, unknown>).Affiliation)))
+      .map((ai) => cleanAffiliationText(getText((ai as Record<string, unknown>).Affiliation)))
       .filter(Boolean);
 
     const identifiers = toArray(r.Identifier);
@@ -476,10 +527,7 @@ function parseArticleObject(
   const meshTerms = parseMeshTerms(citation?.MeshHeadingList);
 
   // Keywords
-  const keywordsRaw = toArray(
-    (citation?.KeywordList as Record<string, unknown> | undefined)?.Keyword
-  );
-  const keywords = keywordsRaw.map(getText).map(decodeHtmlEntities).filter(Boolean);
+  const keywords = extractElementTextAll(articleXml, "Keyword");
 
   // Grants: [{ grantId, agency }]
   const grants = parseGrants(art?.GrantList);
@@ -488,7 +536,7 @@ function parseArticleObject(
   const substances = parseSubstances(citation?.ChemicalList);
 
   // COI statement
-  const coiStatement = decodeHtmlEntities(getText(citation?.CoiStatement)) || null;
+  const coiStatement = extractElementText(articleXml, "CoiStatement");
 
   // ELocationID array (used for doi fallback)
   const elocations = toArray(art?.ELocationID as unknown);

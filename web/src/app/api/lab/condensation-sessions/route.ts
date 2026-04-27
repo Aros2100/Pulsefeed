@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { logArticleEvent } from "@/lib/article-events";
+import { getActivePrompt } from "@/lib/lab/scorer";
 
 const schema = z.object({
   specialty: z.string().refine(
@@ -35,19 +36,15 @@ export async function POST(request: NextRequest) {
   const { specialty, module, decisions } = result.data;
   const admin = createAdminClient();
 
-  // Fetch the relevant model version field for this module
-  const articleIds = decisions.map((d) => d.article_id);
-  const versionField = module === "condensation_sari" ? "sari_model_version" : "text_model_version";
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: articleRows } = await (admin as any)
-    .from("articles")
-    .select(`id, ${versionField}`)
-    .in("id", articleIds);
-
-  const versionMap = new Map(
-    ((articleRows ?? []) as unknown as { id: string; [key: string]: string | null }[])
-      .map((r) => [r.id, r[versionField]])
-  );
+  // Fetch the active prompt version for this module — avoids reading from articles
+  // where sari_model_version / text_model_version is NULL until after approval.
+  let activeVersion: string;
+  try {
+    const activePrompt = await getActivePrompt(specialty, module);
+    activeVersion = activePrompt.version;
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
+  }
 
   // 1. Create lab_session row
   const { data: session, error: sessionError } = await admin
@@ -72,22 +69,19 @@ export async function POST(request: NextRequest) {
   const sessionId = session.id as string;
 
   // 2. Insert 1 lab_decision per article for the specified module
-  const decisionRows = decisions.map((d) => {
-    const modelVersion = versionMap.get(d.article_id) ?? null;
-    return {
-      session_id:          sessionId,
-      article_id:          d.article_id,
-      specialty,
-      module,
-      decision:            d.decision,
-      comment:             d.comment,
-      ai_decision:         "approved",
-      ai_confidence:       null,
-      disagreement_reason: null,
-      reject_reasons:      d.reject_reasons,
-      model_version:       modelVersion,
-    };
-  });
+  const decisionRows = decisions.map((d) => ({
+    session_id:          sessionId,
+    article_id:          d.article_id,
+    specialty,
+    module,
+    decision:            d.decision,
+    comment:             d.comment,
+    ai_decision:         "approved",
+    ai_confidence:       null,
+    disagreement_reason: null,
+    reject_reasons:      d.reject_reasons,
+    model_version:       activeVersion,
+  }));
 
   const { error: decisionsError } = await admin.from("lab_decisions").insert(decisionRows);
   if (decisionsError) {
@@ -101,11 +95,10 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
     void Promise.all(
       approvedIds.map((articleId) => {
-        const modelVersion = versionMap.get(articleId) ?? null;
         const update =
           module === "condensation_sari"
-            ? { sari_condensed_at: now, sari_model_version: modelVersion }
-            : { text_condensed_at: now, text_model_version: modelVersion };
+            ? { sari_condensed_at: now, sari_model_version: activeVersion }
+            : { text_condensed_at: now, text_model_version: activeVersion };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return (admin as any).from("articles").update(update).eq("id", articleId)
           .then(({ error }: { error: { message: string } | null }) => {
