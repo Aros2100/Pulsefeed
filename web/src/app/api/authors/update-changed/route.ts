@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest, after } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { runAuthorUpdateBatch } from "@/lib/import/author-import/update-authors";
 
 export const maxDuration = 300;
@@ -24,13 +24,12 @@ export async function POST(request: NextRequest) {
     if (body.triggeredBy === "cron") triggeredBy = "cron";
   } catch { /* body optional */ }
 
-  after(async () => {
-    try {
-      await runAuthorUpdateBatch({ dryRun, limit, articleId, triggeredBy });
-    } catch (e) {
-      console.error("[update-changed] failed:", e);
-    }
-  });
-
-  return NextResponse.json({ ok: true, dryRun, limit });
+  try {
+    const result = await runAuthorUpdateBatch({ dryRun, limit, articleId, triggeredBy });
+    return NextResponse.json({ ok: true, ...result });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("[update-changed] batch failed:", message);
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
 }

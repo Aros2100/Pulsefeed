@@ -312,25 +312,27 @@ async function runSnapshotMode(
   const articleIds = (snapRows as { article_id: string }[]).map((r) => r.article_id);
   console.log(`Snapshot table has ${articleIds.length} rows.\n`);
 
-  // 2. Fetch full article data from articles
-  // PostgREST .in() handles up to a few hundred IDs fine
-  const { data: articleRows, error: artErr } = await admin
-    .from("articles")
-    .select(
-      "id, pubmed_id, authors, geo_city, geo_state, geo_country, geo_region, " +
-      "geo_continent, geo_institution, geo_department, geo_source, geo_parser_confidence"
-    )
-    .in("id", articleIds);
-  if (artErr) throw artErr;
-
-  const rows = (articleRows ?? []) as RawArticleRow[];
+  // 2. Fetch full article data from articles — chunk to stay under PostgREST URL limit
+  const CHUNK = 100;
+  const rows: RawArticleRow[] = [];
+  for (let i = 0; i < articleIds.length; i += CHUNK) {
+    const chunk = articleIds.slice(i, i + CHUNK);
+    const { data: chunkRows, error: chunkErr } = await admin
+      .from("articles")
+      .select(
+        "id, pubmed_id, authors, geo_city, geo_state, geo_country, geo_region, " +
+        "geo_continent, geo_institution, geo_department, geo_source, geo_parser_confidence"
+      )
+      .in("id", chunk);
+    if (chunkErr) throw chunkErr;
+    rows.push(...((chunkRows ?? []) as RawArticleRow[]));
+  }
   console.log(`Fetched ${rows.length} articles from DB.\n`);
 
   // 3. Counters
   let processed = 0;
   let r5Skipped = 0;
   let errors    = 0;
-  const fieldChanged = { city: 0, state: 0, country: 0, institution: 0, department: 0 };
 
   // 4. Process each article
   for (const article of rows) {
@@ -403,13 +405,6 @@ async function runSnapshotMode(
       const { city, state, country, region, continent, institution, department } =
         applyRules(article, raw, inputAffiliation);
 
-      // Track field changes (after vs before = same as after vs article current)
-      if (!same(article.geo_city,        city))        fieldChanged.city++;
-      if (!same(article.geo_state,       state))       fieldChanged.state++;
-      if (!same(article.geo_country,     country))     fieldChanged.country++;
-      if (!same(article.geo_institution, institution)) fieldChanged.institution++;
-      if (!same(article.geo_department,  department))  fieldChanged.department++;
-
       // Write after_* to snapshot table (use canonical geo_source, not reparsed_280426)
       await admin.from(table).update({
         after_city:              city,
@@ -440,17 +435,10 @@ async function runSnapshotMode(
   }
 
   console.log(`\n=== Snapshot run on ${table} ===`);
-  console.log(p("Articles to process:",    articleIds.length));
-  console.log(p("Articles processed:",     processed));
+  console.log(p("Articles to process:",   articleIds.length));
+  console.log(p("Articles processed:",    processed));
   console.log(p("Articles skipped (R5):", r5Skipped));
   console.log(p("Errors during parse:",   errors));
-  console.log("");
-  console.log("Field changes (after vs before):");
-  console.log(p("  geo_city changed:",        fieldChanged.city));
-  console.log(p("  geo_state changed:",       fieldChanged.state));
-  console.log(p("  geo_country changed:",     fieldChanged.country));
-  console.log(p("  geo_institution changed:", fieldChanged.institution));
-  console.log(p("  geo_department changed:",  fieldChanged.department));
   console.log("");
   console.log(`Done. Inspect with:`);
   console.log(`  SELECT * FROM ${table} WHERE after_captured_at IS NOT NULL;`);

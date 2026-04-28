@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: rpcArticles, error: rpcError } = await (admin as any).rpc(
     "get_text_unscored_articles",
-    { p_specialty: specialty, p_limit: BATCH_LIMIT },
+    { p_specialty: specialty, p_limit: BATCH_LIMIT, p_edat_from: null, p_edat_to: null },
   );
   if (rpcError) return NextResponse.json({ ok: false, error: rpcError.message }, { status: 500 });
   const toScore = (rpcArticles ?? []) as Article[];

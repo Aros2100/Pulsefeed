@@ -101,9 +101,15 @@ export function BatchListClient({ initialBatches }: { initialBatches: BatchRow[]
               <td style={{ padding: "9px 14px", color: "#444" }}>
                 {b.stats ? (
                   <span>
-                    <span style={{ color: "#15803d" }}>{b.stats.approved ?? "—"} ✓</span>
-                    {" · "}
-                    <span style={{ color: "#d97706" }}>{b.stats.rejected ?? "—"} ✗</span>
+                    {b.module === "specialty" ? (
+                      <>
+                        <span style={{ color: "#15803d" }}>{b.stats.approved ?? 0} ✓</span>
+                        {" · "}
+                        <span style={{ color: "#d97706" }}>{b.stats.rejected ?? 0} ✗</span>
+                      </>
+                    ) : (
+                      <span style={{ color: "#15803d" }}>{b.stats.scored ?? 0} ✓</span>
+                    )}
                     {(b.stats.failed ?? 0) > 0 && <span style={{ color: "#b91c1c" }}>{" · "}{b.stats.failed} failed</span>}
                   </span>
                 ) : "—"}

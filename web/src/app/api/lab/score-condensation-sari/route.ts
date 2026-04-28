@@ -17,7 +17,8 @@ const schema = z.object({
   ),
 });
 
-type Article = { id: string; title: string; abstract: string | null; short_headline: string | null; short_resume: string | null; bottom_line: string | null };
+type RpcArticle  = { id: string; title: string; abstract: string | null };
+type FullArticle = RpcArticle & { short_headline: string | null; short_resume: string | null; bottom_line: string | null };
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
@@ -44,11 +45,32 @@ export async function POST(request: NextRequest) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: rpcArticles, error: rpcError } = await (admin as any).rpc(
-    "get_condensation_unscored_articles",
-    { p_specialty: specialty, p_limit: BATCH_LIMIT },
+    "get_sari_unscored_articles",
+    { p_specialty: specialty, p_limit: BATCH_LIMIT, p_edat_from: null, p_edat_to: null },
   );
   if (rpcError) return NextResponse.json({ ok: false, error: rpcError.message }, { status: 500 });
-  const toScore = (rpcArticles ?? []) as Article[];
+  const rpcRows = (rpcArticles ?? []) as RpcArticle[];
+
+  // Fetch condensation fields needed by the SARI prompt (not returned by get_sari_unscored_articles)
+  let toScore: FullArticle[] = [];
+  if (rpcRows.length > 0) {
+    const ids = rpcRows.map((a) => a.id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: condRows } = await (admin as any)
+      .from("articles")
+      .select("id, short_headline, short_resume, bottom_line")
+      .in("id", ids);
+    const condMap = Object.fromEntries(
+      ((condRows ?? []) as { id: string; short_headline: string | null; short_resume: string | null; bottom_line: string | null }[])
+        .map((r) => [r.id, r])
+    );
+    toScore = rpcRows.map((a) => ({
+      ...a,
+      short_headline: condMap[a.id]?.short_headline ?? null,
+      short_resume:   condMap[a.id]?.short_resume   ?? null,
+      bottom_line:    condMap[a.id]?.bottom_line     ?? null,
+    }));
+  }
 
   if (toScore.length === 0) {
     const stream = new ReadableStream({

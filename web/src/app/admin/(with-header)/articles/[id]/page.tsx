@@ -83,7 +83,7 @@ const COLORS: Record<string, { dot: string; border: string; bg: string; label: s
   auto_tagged:            { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff", label: "Auto-Tagged" },
   citation_count_updated:    { dot: "#0891b2", border: "#a5f3fc", bg: "#ecfeff", label: "Citation count updated" },
   condensation_text_scored:  { dot: "#059669", border: "#a7f3d0", bg: "#f0fdf4", label: "TEXT CONDENSED" },
-  condensation_scored:       { dot: "#7c3aed", border: "#ddd6fe", bg: "#f5f3ff", label: "SARI SCORED" },
+  condensation_sari_scored:  { dot: "#7c3aed", border: "#ddd6fe", bg: "#f5f3ff", label: "SARI SCORED" },
   condensation_validated:    { dot: "#10b981", border: "#a7f3d0", bg: "#f0fdf4", label: "CONDENSATION VALIDATED" },
   geo_updated:               { dot: "#14b8a6", border: "#99f6e4", bg: "#f0fdfa", label: "Geo updated" },
 };
@@ -475,7 +475,7 @@ function EventCard({ eventType, payload }: { eventType: string; payload: P }) {
     case "impact_factor_updated":    return <ImpactFactorUpdatedCard   p={payload} />;
     case "citation_count_updated":   return <CitationCountUpdatedCard  p={payload} />;
     case "condensation_text_scored": return <TextCondensedCard         p={payload} />;
-    case "condensation_scored":      return <SariScoredCard            p={payload} />;
+    case "condensation_sari_scored":  return <SariScoredCard            p={payload} />;
     case "condensation_validated":   return <CondensationValidatedCard p={payload} />;
     case "geo_updated":              return <GeoUpdatedCard            p={payload} />;
     default:
@@ -1364,7 +1364,7 @@ export default async function AdminArticleLogPage({
     { title: "Lab validation",     types: ["lab_decision"] },
     { title: "Bibliometrics",      types: ["citation_count_updated"] },
     { title: "Text Condensation",  types: ["condensation_text_scored", "condensation_validated"], filter: (ev) => ev.event_type === "condensation_text_scored" || (ev.event_type === "condensation_validated" && (ev.payload as P).module === "condensation_text") },
-    { title: "SARI Condensation",  types: ["condensation_scored",      "condensation_validated"], filter: (ev) => ev.event_type === "condensation_scored"      || (ev.event_type === "condensation_validated" && (ev.payload as P).module === "condensation_sari") },
+    { title: "SARI Condensation",  types: ["condensation_sari_scored", "condensation_validated"], filter: (ev) => ev.event_type === "condensation_sari_scored" || (ev.event_type === "condensation_validated" && (ev.payload as P).module === "condensation_sari") },
   ];
 
   const grouped = SECTIONS.map((s) => ({

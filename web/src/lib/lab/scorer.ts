@@ -542,7 +542,7 @@ export async function scoreSari(
     thinking: { type: "disabled" },
     system: "You respond only with valid JSON. No explanation, no other text.",
     messages: [{ role: "user", content }],
-  }, article.id, "sari");
+  }, article.id, "condensation_sari");
 
   const raw = (message.content[0] as { type: string; text: string }).text.trim();
   try {

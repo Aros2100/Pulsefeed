@@ -126,16 +126,16 @@ export function BatchDetailClient({
           </div>
           <div style={{ padding: "20px 24px" }}>
             <div style={{ display: "flex", gap: "32px", marginBottom: "16px", flexWrap: "wrap" }}>
-              {(module === "subspecialty"
+              {(module === "specialty"
                 ? [
-                    { label: "Scored", value: liveStats.scored, color: "#1a1a1a" },
-                    { label: "Failed", value: liveStats.failed, color: "#b91c1c" },
-                  ]
-                : [
                     { label: "Scored",   value: liveStats.scored,    color: "#1a1a1a" },
                     { label: "Approved", value: liveStats.approved,   color: "#15803d" },
                     { label: "Rejected", value: liveStats.rejected,   color: "#d97706" },
                     { label: "Failed",   value: liveStats.failed,     color: "#b91c1c" },
+                  ]
+                : [
+                    { label: "Scored", value: liveStats.scored, color: "#1a1a1a" },
+                    { label: "Failed", value: liveStats.failed, color: "#b91c1c" },
                   ]
               ).map(({ label, value, color }) => (
                 <div key={label}>
