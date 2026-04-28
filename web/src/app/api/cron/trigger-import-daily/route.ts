@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       await runImport(undefined, false, undefined, "cron", 1);
       await runImportCircle4(undefined, false, undefined, "cron", 1);
       await runImportCircle2(ACTIVE_SPECIALTY, undefined, "cron", 1);
-      await runPubmedSync({ esearchRetmax: 500 });
+      await runPubmedSync();
     } catch (e) {
       console.error("[trigger-import-daily] failed:", e);
     }
