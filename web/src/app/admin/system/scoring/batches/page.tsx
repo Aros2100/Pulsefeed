@@ -104,6 +104,22 @@ export default async function BatchesPage() {
 
   const condPromptVersion: string = condPromptRow?.version ?? "unknown";
 
+  // Pending condensation_sari count
+  const { data: sariPendingRaw } = await admin.rpc("count_sari_unscored", { p_specialty: specialty });
+  const sariPending: number = (sariPendingRaw as number | null) ?? 0;
+
+  // Active prompt version for condensation_sari
+  const { data: sariPromptRow } = await admin
+    .from("model_versions")
+    .select("version")
+    .eq("specialty", specialty)
+    .eq("module", "condensation_sari")
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
+
+  const sariPromptVersion: string = sariPromptRow?.version ?? "unknown";
+
   // Recent 20 batches
   const { data: batchRows } = await admin
     .from("scoring_batches")
@@ -219,6 +235,28 @@ export default async function BatchesPage() {
             </span>
           </div>
           <SubmitBatchForm pendingCount={condPending} apiRoute="/api/scoring/batch/condensation-text/submit" />
+        </div>
+
+        {/* SARI condensation batch card */}
+        <div style={sectionCard}>
+          <div style={sectionHeader}>
+            <div>
+              <span style={headerLabel}>SARI condensation batch</span>
+              <span style={{ marginLeft: "8px", fontSize: "13px", fontWeight: 600, color: "#1a1a1a", textTransform: "capitalize" }}>
+                {specialty}
+              </span>
+              <span style={{ marginLeft: "8px", fontSize: "12px", color: "#888" }}>{sariPromptVersion}</span>
+            </div>
+            <span style={{
+              fontSize: "12px", fontWeight: 700,
+              color: sariPending > 0 ? "#d97706" : "#15803d",
+              background: sariPending > 0 ? "#fef9c3" : "#dcfce7",
+              borderRadius: "20px", padding: "2px 10px",
+            }}>
+              {sariPending.toLocaleString("en-US")} pending
+            </span>
+          </div>
+          <SubmitBatchForm pendingCount={sariPending} apiRoute="/api/scoring/batch/condensation-sari/submit" />
         </div>
 
         {/* Recent batches card */}

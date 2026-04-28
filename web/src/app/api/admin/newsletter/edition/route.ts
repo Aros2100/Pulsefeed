@@ -2,6 +2,13 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
+
+const postSchema = z.object({
+  week_number: z.number().int().min(1).max(53),
+  year:        z.number().int().min(2020).max(2100),
+  specialty:   z.string().refine((v) => v === ACTIVE_SPECIALTY, { message: "Invalid specialty" }),
+});
 
 const patchSchema = z.object({
   id:      z.string().min(1),
@@ -11,6 +18,49 @@ const patchSchema = z.object({
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const admin = createAdminClient() as any;
+
+export async function POST(request: NextRequest) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+
+  let body: unknown;
+  try { body = await request.json(); }
+  catch { return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 }); }
+
+  const result = postSchema.safeParse(body);
+  if (!result.success) {
+    return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
+  }
+
+  const { week_number, year, specialty } = result.data;
+
+  // Check for duplicate
+  const { data: existing, error: checkError } = await admin
+    .from("newsletter_editions")
+    .select("id")
+    .eq("week_number", week_number)
+    .eq("year", year)
+    .eq("specialty", specialty)
+    .maybeSingle();
+
+  if (checkError) return NextResponse.json({ ok: false, error: checkError.message }, { status: 500 });
+  if (existing) {
+    return NextResponse.json(
+      { ok: false, error: `Edition for week ${week_number}/${year} already exists` },
+      { status: 409 }
+    );
+  }
+
+  const { data: edition, error: insertError } = await admin
+    .from("newsletter_editions")
+    .insert({ week_number, year, specialty, status: "draft", content: {} })
+    .select("id")
+    .single();
+
+  if (insertError) return NextResponse.json({ ok: false, error: insertError.message }, { status: 500 });
+
+  return NextResponse.json({ ok: true, id: edition.id as string });
+}
 
 export async function PATCH(request: NextRequest) {
   const auth = await requireAdmin();

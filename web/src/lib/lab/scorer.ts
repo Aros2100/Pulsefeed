@@ -600,6 +600,56 @@ export function buildCondensationTextRequest(
   };
 }
 
+// Deterministic request builder for condensation_sari batch scoring. No side effects.
+export function buildCondensationSariRequest(
+  article: { title: string; short_headline?: string | null; short_resume?: string | null; bottom_line?: string | null },
+  activePrompt: ActivePrompt
+): {
+  model: string;
+  max_tokens: number;
+  messages: { role: "user"; content: string }[];
+} {
+  const content = activePrompt.prompt
+    .replace(/\{\{title\}\}|\{title\}/g,                   article.title)
+    .replace(/\{\{short_headline\}\}|\{short_headline\}/g, article.short_headline ?? "")
+    .replace(/\{\{short_resume\}\}|\{short_resume\}/g,     article.short_resume ?? "")
+    .replace(/\{\{bottom_line\}\}|\{bottom_line\}/g,       article.bottom_line ?? "");
+
+  return {
+    model:      SCORING_MODEL,
+    max_tokens: 512,
+    messages:   [{ role: "user", content }],
+  };
+}
+
+// Pure parser for condensation_sari batch results.
+export function parseCondensationSariResponse(
+  rawText: string,
+  version: string
+): SariResult {
+  try {
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : rawText) as {
+      sari_subject?: string;
+      sari_action?: string;
+      sari_result?: string;
+      sari_implication?: string;
+      sample_size?: unknown;
+    };
+    const rawSize = Number(parsed.sample_size);
+    return {
+      sari_subject:     typeof parsed.sari_subject     === "string" ? parsed.sari_subject     : null,
+      sari_action:      typeof parsed.sari_action      === "string" ? parsed.sari_action      : null,
+      sari_result:      typeof parsed.sari_result      === "string" ? parsed.sari_result      : null,
+      sari_implication: typeof parsed.sari_implication === "string" ? parsed.sari_implication : null,
+      sample_size: Number.isFinite(rawSize) && rawSize > 0 ? Math.round(rawSize) : null,
+      version,
+    };
+  } catch {
+    return { sari_subject: null, sari_action: null, sari_result: null, sari_implication: null, sample_size: null, version };
+  }
+}
+
 // Pure parser. Returns only the 3 text fields written by the condensation_text flow.
 export function parseCondensationTextResponse(
   rawText: string,

@@ -16,7 +16,8 @@ export type ArticleEventType =
   | "specialty_scored"
   | "subspecialty_scored"
   | "article_type_scored"
-  | "condensation_text_scored";
+  | "condensation_text_scored"
+  | "condensation_sari_scored";
 
 export async function logArticleEvent(
   articleId: string,

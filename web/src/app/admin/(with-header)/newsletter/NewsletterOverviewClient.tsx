@@ -1,6 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
+
+function getCurrentISOWeek(): { week_number: number; year: number } {
+  const now = new Date();
+  const thursday = new Date(now);
+  thursday.setUTCDate(now.getUTCDate() + 4 - (now.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((thursday.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return { week_number: week, year: thursday.getUTCFullYear() };
+}
 
 interface Edition {
   id: string;
@@ -244,14 +256,65 @@ function CurrentEditionCard({ edition }: { edition: Edition }) {
 }
 
 export default function NewsletterOverviewClient({ editions }: Props) {
+  const router = useRouter();
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  async function handleNewEdition() {
+    setCreating(true);
+    setCreateError(null);
+    const { week_number, year } = getCurrentISOWeek();
+    try {
+      const res = await fetch("/api/admin/newsletter/edition", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ week_number, year, specialty: ACTIVE_SPECIALTY }),
+      });
+      const json = await res.json() as { ok: boolean; error?: string };
+      if (!json.ok) {
+        setCreateError(json.error ?? "Unknown error");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setCreateError("Request failed");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   const current = editions[0] ?? null;
   const previous = editions.slice(1);
 
   return (
     <div style={{ maxWidth: 760, margin: "0 auto", padding: "32px 24px" }}>
-      <h1 style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a", marginBottom: 24, marginTop: 0 }}>
-        Newsletter
-      </h1>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+        <h1 style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a", margin: 0 }}>
+          Newsletter
+        </h1>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+          <button
+            onClick={handleNewEdition}
+            disabled={creating}
+            style={{
+              padding: "8px 16px",
+              borderRadius: "7px",
+              border: "none",
+              background: creating ? "#9ca3af" : "#1a1a1a",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#fff",
+              cursor: creating ? "not-allowed" : "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {creating ? "Creating…" : "New edition →"}
+          </button>
+          {createError && (
+            <span style={{ fontSize: "12px", color: "#dc2626" }}>{createError}</span>
+          )}
+        </div>
+      </div>
 
       {current ? (
         <CurrentEditionCard edition={current} />

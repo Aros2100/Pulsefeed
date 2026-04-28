@@ -89,6 +89,11 @@ const MODULE_CONFIG: Record<string, {
     apiRoute: "/api/scoring/score-condensation-text",
     requestBody: (specialty) => ({ specialty }),
   },
+  condensation_sari: {
+    label: "SARI Condensation",
+    apiRoute: "/api/scoring/score-condensation-sari",
+    requestBody: (specialty) => ({ specialty }),
+  },
 };
 
 export default async function ScoringPage() {
@@ -100,7 +105,7 @@ export default async function ScoringPage() {
     .from("model_versions")
     .select("specialty, module, version")
     .eq("active", true)
-    .in("module", ["specialty", "subspecialty", "article_type_prod", "condensation_text"]);
+    .in("module", ["specialty", "subspecialty", "article_type_prod", "condensation_text", "condensation_sari"]);
 
   const rows: ModelVersion[] = allModules ?? [];
 
@@ -126,6 +131,10 @@ export default async function ScoringPage() {
       }
       if (mod === "condensation_text") {
         const { data } = await admin.rpc("count_text_unscored", { p_specialty: specialty });
+        return [mod, (data as number | null) ?? 0] as const;
+      }
+      if (mod === "condensation_sari") {
+        const { data } = await admin.rpc("count_sari_unscored", { p_specialty: specialty });
         return [mod, (data as number | null) ?? 0] as const;
       }
       // article_type_prod

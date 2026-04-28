@@ -6,6 +6,7 @@ import { ingestSpecialtyBatchResults } from "@/lib/scoring/batch/specialty-batch
 import { ingestSubspecialtyBatchResults } from "@/lib/scoring/batch/subspecialty-batch";
 import { ingestArticleTypeBatchResults } from "@/lib/scoring/batch/article-type-batch";
 import { ingestCondensationTextBatchResults } from "@/lib/scoring/batch/condensation-text-batch";
+import { ingestCondensationSariBatchResults } from "@/lib/scoring/batch/condensation-sari-batch";
 
 export async function POST(
   _request: NextRequest,
@@ -96,6 +97,13 @@ export async function POST(
         row.prompt_version
       );
       stats = { scored: condStats.scored, approved: undefined, rejected: undefined, failed: condStats.failed, failedIds: condStats.failedIds };
+    } else if (row.module === "condensation_sari") {
+      const sariStats = await ingestCondensationSariBatchResults(
+        row.anthropic_batch_id,
+        row.custom_id_map as Record<string, string>,
+        row.prompt_version
+      );
+      stats = { scored: sariStats.scored, approved: undefined, rejected: undefined, failed: sariStats.failed, failedIds: sariStats.failedIds };
     } else {
       stats = await ingestSpecialtyBatchResults(
         row.anthropic_batch_id,
