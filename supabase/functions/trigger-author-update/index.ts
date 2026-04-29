@@ -21,7 +21,7 @@ Deno.serve(async (_req: Request) => {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${cronSecret}`,
       },
-      body: JSON.stringify({ dryRun: false, limit: 200 }),
+      body: JSON.stringify({ dryRun: false, limit: 1500, triggeredBy: "cron" }),
     });
     const body = await res.json();
     console.log("[trigger-author-update] Response:", res.status, JSON.stringify(body));
