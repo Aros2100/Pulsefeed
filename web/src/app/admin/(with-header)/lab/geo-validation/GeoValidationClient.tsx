@@ -92,7 +92,7 @@ export default function GeoValidationClient({ bucket }: Props) {
   const [fragment, setFragment] = useState<{ institution: boolean; department: boolean }>({ institution: false, department: false });
   const [notes,    setNotes]    = useState("");
 
-  const firstInputRef = useRef<HTMLInputElement | null>(null);
+  const firstInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const fetchNext = useCallback(async () => {
     setLoading(true);
@@ -366,12 +366,23 @@ export default function GeoValidationClient({ bucket }: Props) {
                       {source}
                     </span>
 
-                    {/* Truth input */}
-                    <input
+                    {/* Truth input — textarea auto-resizes to content */}
+                    <textarea
                       ref={idx === 0 ? firstInputRef : undefined}
-                      type="text"
+                      rows={1}
                       value={truthVal}
-                      onChange={(e) => setTruth((prev) => ({ ...prev, [field]: e.target.value }))}
+                      onChange={(e) => {
+                        setTruth((prev) => ({ ...prev, [field]: e.target.value }));
+                        // Auto-resize
+                        const el = e.target;
+                        el.style.height = "auto";
+                        el.style.height = `${el.scrollHeight}px`;
+                      }}
+                      onFocus={(e) => {
+                        const el = e.target;
+                        el.style.height = "auto";
+                        el.style.height = `${el.scrollHeight}px`;
+                      }}
                       placeholder="empty"
                       autoComplete="new-password"
                       style={{
@@ -385,6 +396,11 @@ export default function GeoValidationClient({ bucket }: Props) {
                         marginRight: "12px",
                         color: "#1a1a1a",
                         background: "#fafafa",
+                        resize: "none" as const,
+                        overflow: "hidden",
+                        lineHeight: "1.4",
+                        minHeight: "32px",
+                        display: "block",
                       }}
                     />
 
