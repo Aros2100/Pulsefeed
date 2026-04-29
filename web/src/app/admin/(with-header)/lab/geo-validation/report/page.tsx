@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 type ValidationRow = {
   bucket:              string;
   out_of_scope:        boolean;
+  affiliation:         string | null;
   verdict_country:     string;
   verdict_city:        string;
   verdict_state:       string;
@@ -93,13 +94,49 @@ export default async function GeoValidationReportPage() {
 
   const { data, error } = await admin
     .from("geo_validation_results")
-    .select("bucket, out_of_scope, verdict_country, verdict_city, verdict_state, verdict_institution, verdict_department");
+    .select("bucket, out_of_scope, affiliation, verdict_country, verdict_city, verdict_state, verdict_institution, verdict_department");
 
   const rows      = (error ? [] : data ?? []) as ValidationRow[];
   const total     = rows.length;
   const oosRows   = rows.filter((r) => r.out_of_scope);
   const inScope   = rows.filter((r) => !r.out_of_scope);
   const oosCount  = oosRows.length;
+
+  // --- Length statistics ---
+  function affLen(r: ValidationRow) { return (r.affiliation ?? "").length; }
+
+  const oosLengths    = oosRows.map(affLen).sort((a, b) => a - b);
+  const inScopeLengths = inScope.map(affLen);
+
+  const mean = (arr: number[]) => arr.length ? Math.round(arr.reduce((s, v) => s + v, 0) / arr.length) : 0;
+  const median = (sorted: number[]) => {
+    if (!sorted.length) return 0;
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+  };
+  const p90 = (sorted: number[]) => {
+    if (!sorted.length) return 0;
+    return sorted[Math.floor(sorted.length * 0.9)] ?? sorted[sorted.length - 1];
+  };
+
+  const oosMean   = mean(oosLengths);
+  const oosMedian = median(oosLengths);
+  const oosP90    = p90(oosLengths);
+  const inScopeMean = mean(inScopeLengths);
+
+  const HIST_BUCKETS = [
+    { label: "< 50",      min: 0,   max: 50  },
+    { label: "50–150",    min: 50,  max: 150 },
+    { label: "150–250",   min: 150, max: 250 },
+    { label: "250–350",   min: 250, max: 350 },
+    { label: "350–500",   min: 350, max: 500 },
+    { label: "> 500",     min: 500, max: Infinity },
+  ] as const;
+
+  const histCounts = HIST_BUCKETS.map(({ min, max }) =>
+    oosLengths.filter((l) => l >= min && l < max).length
+  );
+  const histMax = Math.max(...histCounts, 1);
 
   // --- Report 1: Per-field quality — in-scope rows only ---
   const fieldTotals: Record<Field, FieldStat> = {
@@ -237,6 +274,104 @@ export default async function GeoValidationReportPage() {
                 }}>
                   {pct(oosCount, total)}
                 </span>
+              </div>
+            )}
+
+            {/* OOS length statistics */}
+            {oosCount > 0 && (
+              <div style={{ ...sectionStyle }}>
+                <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 700 }}>Out-of-scope affiliation length</div>
+                  <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>
+                    Character length of out-of-scope affiliations vs in-scope — basis for safe-parsing length cap decisions
+                  </div>
+                </div>
+
+                {/* Key metrics row */}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, 1fr)",
+                  borderBottom: "1px solid #e5e7eb",
+                }}>
+                  {[
+                    { label: "OOS mean",      value: oosMean,    },
+                    { label: "OOS median",     value: oosMedian,  },
+                    { label: "OOS p90",        value: oosP90,     highlight: true },
+                    { label: "In-scope mean",  value: inScopeMean, muted: true },
+                  ].map(({ label, value, highlight, muted }) => (
+                    <div key={label} style={{
+                      padding: "16px 20px",
+                      borderRight: "1px solid #f3f4f6",
+                    }}>
+                      <div style={{ fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.04em", textTransform: "uppercase" as const, marginBottom: "4px" }}>
+                        {label}
+                      </div>
+                      <div style={{
+                        fontSize: "22px",
+                        fontWeight: 700,
+                        color: muted ? "#9ca3af" : highlight ? "#d97706" : "#1a1a1a",
+                      }}>
+                        {value}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#bbb", marginTop: "2px" }}>chars</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Histogram */}
+                <div style={{ padding: "20px" }}>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.04em", textTransform: "uppercase" as const, marginBottom: "14px" }}>
+                    Length distribution (out-of-scope articles)
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column" as const, gap: "8px" }}>
+                    {HIST_BUCKETS.map(({ label }, i) => {
+                      const count = histCounts[i];
+                      const barPct = Math.round((count / histMax) * 100);
+                      return (
+                        <div key={label} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <span style={{ fontSize: "12px", color: "#5a6a85", width: "64px", flexShrink: 0, textAlign: "right" as const }}>
+                            {label}
+                          </span>
+                          <div style={{ flex: 1, background: "#f3f4f6", borderRadius: "3px", height: "18px", overflow: "hidden" }}>
+                            <div style={{
+                              background: "#d97706",
+                              width: count > 0 ? `${Math.max(barPct, 2)}%` : "0%",
+                              height: "100%",
+                              borderRadius: "3px",
+                              transition: "width 0.3s",
+                            }} />
+                          </div>
+                          <span style={{ fontSize: "12px", fontWeight: 600, color: count > 0 ? "#1a1a1a" : "#bbb", width: "32px", flexShrink: 0 }}>
+                            {count}
+                          </span>
+                          <span style={{ fontSize: "11px", color: "#bbb", width: "36px", flexShrink: 0 }}>
+                            {oosCount > 0 ? `${Math.round((count / oosCount) * 100)}%` : ""}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* In-scope comparison note */}
+                  {inScope.length > 0 && (
+                    <div style={{
+                      marginTop: "16px",
+                      padding: "10px 14px",
+                      background: "#f9fafb",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      color: "#5a6a85",
+                    }}>
+                      OOS mean <strong>{oosMean}</strong> chars vs in-scope mean <strong>{inScopeMean}</strong> chars
+                      {oosMean > inScopeMean
+                        ? <> — OOS affiliations are <strong style={{ color: "#d97706" }}>{oosMean - inScopeMean} chars longer</strong> on average</>
+                        : oosMean < inScopeMean
+                          ? <> — OOS affiliations are <strong>{inScopeMean - oosMean} chars shorter</strong> on average</>
+                          : <> — same mean length</>
+                      }
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
