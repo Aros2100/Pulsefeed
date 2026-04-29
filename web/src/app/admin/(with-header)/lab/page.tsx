@@ -24,6 +24,14 @@ export default async function LabPage() {
 
   const modules = [
     {
+      title: "Geo Validation",
+      description: "Validate geo pipeline output on 1.000 test articles",
+      queue: 0,
+      href: "/admin/lab/geo-validation",
+      color: "#15803d",
+      badge: "New",
+    },
+    {
       title: "SARI Condensation",
       description: "Validate AI-generated subject, action, result and implication",
       queue: sariQueueCount,
