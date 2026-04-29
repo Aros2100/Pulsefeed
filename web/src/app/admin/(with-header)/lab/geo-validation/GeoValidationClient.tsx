@@ -29,7 +29,7 @@ type ProgressRow = {
 
 type VerdictType = "correct" | "wrong_value" | "missing" | "hallucinated" | "fragment" | "";
 
-const FIELDS = ["country", "city", "state", "institution", "department"] as const;
+const FIELDS = ["department", "institution", "state", "city", "country"] as const;
 type Field = typeof FIELDS[number];
 
 const FIELD_LABELS: Record<Field, string> = {
@@ -88,7 +88,7 @@ export default function GeoValidationClient({ bucket }: Props) {
   const [done,      setDone]      = useState(false);
   const [savedCount, setSavedCount] = useState(0);
 
-  const [truth,    setTruth]    = useState<Record<Field, string>>({ country: "", city: "", state: "", institution: "", department: "" });
+  const [truth,    setTruth]    = useState<Record<Field, string>>({ department: "", institution: "", state: "", city: "", country: "" });
   const [fragment, setFragment] = useState<{ institution: boolean; department: boolean }>({ institution: false, department: false });
   const [notes,    setNotes]    = useState("");
 
@@ -105,8 +105,16 @@ export default function GeoValidationClient({ bucket }: Props) {
       setProgress(data.progress ?? []);
       if (!data.article) { setDone(true); setArticle(null); return; }
 
-      setArticle(data.article);
-      setTruth({ country: "", city: "", state: "", institution: "", department: "" });
+      const art = data.article;
+      setArticle(art);
+      // Pre-fill truth with pipeline values so no-change → correct verdict
+      setTruth({
+        department:  art.pipeline.department  ?? "",
+        institution: art.pipeline.institution ?? "",
+        state:       art.pipeline.state       ?? "",
+        city:        art.pipeline.city        ?? "",
+        country:     art.pipeline.country     ?? "",
+      });
       setFragment({ institution: false, department: false });
       setNotes("");
       setDone(false);
@@ -364,7 +372,8 @@ export default function GeoValidationClient({ bucket }: Props) {
                       type="text"
                       value={truthVal}
                       onChange={(e) => setTruth((prev) => ({ ...prev, [field]: e.target.value }))}
-                      placeholder={pipelineVal ?? "empty"}
+                      placeholder="empty"
+                      autoComplete="new-password"
                       style={{
                         fontSize: "13px",
                         border: "1px solid #e5e7eb",
@@ -452,7 +461,7 @@ export default function GeoValidationClient({ bucket }: Props) {
               border: "1px solid #e5e7eb",
             }}>
               <span style={{ fontSize: "12px", color: "#aaa" }}>
-                {savedCount} valideret i denne session
+                {savedCount} validated in this session
               </span>
               <button
                 onClick={handleSave}
@@ -469,7 +478,7 @@ export default function GeoValidationClient({ bucket }: Props) {
                   transition: "background 0.15s",
                 }}
               >
-                {saving ? "Gemmer…" : "Gem og næste →"}
+                {saving ? "Saving…" : "Save and next →"}
               </button>
             </div>
 
