@@ -93,6 +93,16 @@ export default function GeoValidationClient({ bucket }: Props) {
   const [notes,    setNotes]    = useState("");
 
   const firstInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const tableRef      = useRef<HTMLDivElement | null>(null);
+
+  // Resize all truth textareas whenever a new article loads (pre-filled values)
+  useEffect(() => {
+    if (!tableRef.current) return;
+    tableRef.current.querySelectorAll<HTMLTextAreaElement>("textarea[data-truth]").forEach((ta) => {
+      ta.style.height = "auto";
+      ta.style.height = `${ta.scrollHeight}px`;
+    });
+  }, [article]);
 
   const fetchNext = useCallback(async () => {
     setLoading(true);
@@ -293,7 +303,7 @@ export default function GeoValidationClient({ bucket }: Props) {
             </div>
 
             {/* Field validation table */}
-            <div style={{
+            <div ref={tableRef} style={{
               background: "#fff",
               borderRadius: "12px",
               border: "1px solid #e5e7eb",
@@ -369,6 +379,7 @@ export default function GeoValidationClient({ bucket }: Props) {
                     {/* Truth input — textarea auto-resizes to content */}
                     <textarea
                       ref={idx === 0 ? firstInputRef : undefined}
+                      data-truth
                       rows={1}
                       value={truthVal}
                       onChange={(e) => {
