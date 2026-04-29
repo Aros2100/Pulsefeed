@@ -16,6 +16,11 @@ type RpcRow = {
   enriched_state_source: string | null;
   ai_fields: string[] | null;
   ai_needed: string;
+  ai_country: string | null;
+  ai_city: string | null;
+  ai_state: string | null;
+  ai_institution: string | null;
+  ai_department: string | null;
 };
 
 type ProgressRow = {
@@ -69,16 +74,26 @@ export async function GET(request: NextRequest) {
     sourcePerField[f] = deriveSource(f, row.enriched_state, aiFields);
   }
 
+  // For each field: if it was scored by AI, use ai_<field>; else use parser output.
+  // State special-case: prefer enriched_state over after_state for parser source.
+  function pipelineVal(field: typeof fields[number]): string | null {
+    if (aiFields.includes(field)) {
+      return row[`ai_${field}` as keyof RpcRow] as string | null;
+    }
+    if (field === "state") return row.enriched_state ?? row.after_state;
+    return row[`after_${field}` as keyof RpcRow] as string | null;
+  }
+
   const article = {
-    pubmed_id: row.pubmed_id,
-    affiliation: row.affiliation,
-    bucket: row.ai_needed,
+    pubmed_id:      row.pubmed_id,
+    affiliation:    row.affiliation,
+    bucket:         row.ai_needed,
     pipeline: {
-      country:     row.after_country,
-      city:        row.after_city,
-      state:       row.enriched_state ?? row.after_state,
-      institution: row.after_institution,
-      department:  row.after_department,
+      country:     pipelineVal("country"),
+      city:        pipelineVal("city"),
+      state:       pipelineVal("state"),
+      institution: pipelineVal("institution"),
+      department:  pipelineVal("department"),
     },
     sourcePerField,
   };
