@@ -3,15 +3,16 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 
-const VERDICT_OPTIONS = ["correct", "wrong_value", "missing", "hallucinated", "fragment"] as const;
+const VERDICT_OPTIONS = ["correct", "wrong_value", "missing", "hallucinated", "fragment", "out_of_scope"] as const;
 type Verdict = typeof VERDICT_OPTIONS[number];
 
 const verdictField = z.enum(VERDICT_OPTIONS).optional();
 
 const schema = z.object({
-  pubmed_id:   z.string(),
-  affiliation: z.string().nullable(),
-  bucket:      z.string(),
+  pubmed_id:    z.string(),
+  affiliation:  z.string().nullable(),
+  bucket:       z.string(),
+  out_of_scope: z.boolean().default(false),
   pipeline: z.object({
     country:     z.string().nullable(),
     city:        z.string().nullable(),
@@ -31,7 +32,6 @@ const schema = z.object({
     institution: z.boolean().default(false),
     department:  z.boolean().default(false),
   }).default({ institution: false, department: false }),
-  // Optional manual overrides (client may pre-compute for special cases)
   verdictOverride: z.object({
     country:     verdictField,
     city:        verdictField,
@@ -73,17 +73,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: parsed.error.issues[0].message }, { status: 400 });
   }
 
-  const { pubmed_id, affiliation, bucket, pipeline, pipeline_source_per_field, truth, fragment, verdictOverride, notes } = parsed.data;
+  const { pubmed_id, affiliation, bucket, out_of_scope, pipeline, pipeline_source_per_field, truth, fragment, verdictOverride, notes } = parsed.data;
 
   const fields = ["country", "city", "state", "institution", "department"] as const;
   const verdicts: Record<string, Verdict> = {};
-  for (const f of fields) {
-    const override = verdictOverride?.[f];
-    if (override) {
-      verdicts[f] = override;
-    } else {
-      const isFragment = (f === "institution" && fragment.institution) || (f === "department" && fragment.department);
-      verdicts[f] = computeVerdict(pipeline[f], truth[f], isFragment);
+
+  if (out_of_scope) {
+    // All verdict fields forced to out_of_scope regardless of truth values
+    for (const f of fields) verdicts[f] = "out_of_scope";
+  } else {
+    for (const f of fields) {
+      const override = verdictOverride?.[f];
+      if (override) {
+        verdicts[f] = override;
+      } else {
+        const isFragment = (f === "institution" && fragment.institution) || (f === "department" && fragment.department);
+        verdicts[f] = computeVerdict(pipeline[f], truth[f], isFragment);
+      }
     }
   }
 
@@ -95,6 +101,7 @@ export async function POST(request: NextRequest) {
     validated_at:              new Date().toISOString(),
     validated_by:              auth.userId,
     affiliation:               affiliation ?? "",
+    out_of_scope,
     pipeline_country:          pipeline.country,
     pipeline_city:             pipeline.city,
     pipeline_state:            pipeline.state,

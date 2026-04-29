@@ -88,9 +88,10 @@ export default function GeoValidationClient({ bucket }: Props) {
   const [done,      setDone]      = useState(false);
   const [savedCount, setSavedCount] = useState(0);
 
-  const [truth,    setTruth]    = useState<Record<Field, string>>({ department: "", institution: "", state: "", city: "", country: "" });
-  const [fragment, setFragment] = useState<{ institution: boolean; department: boolean }>({ institution: false, department: false });
-  const [notes,    setNotes]    = useState("");
+  const [truth,       setTruth]       = useState<Record<Field, string>>({ department: "", institution: "", state: "", city: "", country: "" });
+  const [fragment,    setFragment]    = useState<{ institution: boolean; department: boolean }>({ institution: false, department: false });
+  const [outOfScope,  setOutOfScope]  = useState(false);
+  const [notes,       setNotes]       = useState("");
 
   const firstInputRef = useRef<HTMLTextAreaElement | null>(null);
   const tableRef      = useRef<HTMLDivElement | null>(null);
@@ -126,6 +127,7 @@ export default function GeoValidationClient({ bucket }: Props) {
         country:     art.pipeline.country     ?? "",
       });
       setFragment({ institution: false, department: false });
+      setOutOfScope(false);
       setNotes("");
       setDone(false);
     } catch (e) {
@@ -147,6 +149,7 @@ export default function GeoValidationClient({ bucket }: Props) {
         pubmed_id:                 article.pubmed_id,
         affiliation:               article.affiliation,
         bucket:                    article.bucket,
+        out_of_scope:              outOfScope,
         pipeline:                  article.pipeline,
         pipeline_source_per_field: article.sourcePerField,
         truth: {
@@ -173,7 +176,7 @@ export default function GeoValidationClient({ bucket }: Props) {
     } finally {
       setSaving(false);
     }
-  }, [article, truth, fragment, notes, saving, fetchNext]);
+  }, [article, truth, fragment, outOfScope, notes, saving, fetchNext]);
 
   // Keyboard shortcut: Ctrl/Cmd+Enter → save
   useEffect(() => {
@@ -444,6 +447,32 @@ export default function GeoValidationClient({ bucket }: Props) {
                   </div>
                 );
               })}
+            </div>
+
+            {/* Out of scope */}
+            <div style={{
+              background: outOfScope ? "#fffbeb" : "#fff",
+              borderRadius: "12px",
+              border: outOfScope ? "1px solid #fde68a" : "1px solid #e5e7eb",
+              padding: "16px 20px",
+              transition: "background 0.15s, border-color 0.15s",
+            }}>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={outOfScope}
+                  onChange={(e) => setOutOfScope(e.target.checked)}
+                  style={{ marginTop: "2px", cursor: "pointer", flexShrink: 0 }}
+                />
+                <div>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: outOfScope ? "#d97706" : "#1a1a1a" }}>
+                    Affiliation too complex / out of scope
+                  </span>
+                  <p style={{ fontSize: "12px", color: "#888", margin: "2px 0 0" }}>
+                    For affiliations with multiple competing institutions, hierarchical org structures, or otherwise too complex to validate against the string. All verdict fields will be set to <em>out_of_scope</em>.
+                  </p>
+                </div>
+              </label>
             </div>
 
             {/* Notes */}

@@ -2,24 +2,30 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type ValidationRow = {
-  bucket:             string;
-  verdict_country:    string;
-  verdict_city:       string;
-  verdict_state:      string;
+  bucket:              string;
+  out_of_scope:        boolean;
+  verdict_country:     string;
+  verdict_city:        string;
+  verdict_state:       string;
   verdict_institution: string;
-  verdict_department: string;
+  verdict_department:  string;
 };
 
 type FieldStat = {
-  total:       number;
-  correct:     number;
-  wrong_value: number;
-  missing:     number;
+  total:        number;
+  correct:      number;
+  wrong_value:  number;
+  missing:      number;
   hallucinated: number;
-  fragment:    number;
+  fragment:     number;
 };
 
-type BucketStat = Record<string, FieldStat>;
+type BucketStat = {
+  articles:     number;
+  oos:          number;
+  verdicts:     number;
+  correct:      number;
+};
 
 const FIELDS = ["country", "city", "state", "institution", "department"] as const;
 type Field = typeof FIELDS[number];
@@ -87,12 +93,15 @@ export default async function GeoValidationReportPage() {
 
   const { data, error } = await admin
     .from("geo_validation_results")
-    .select("bucket, verdict_country, verdict_city, verdict_state, verdict_institution, verdict_department");
+    .select("bucket, out_of_scope, verdict_country, verdict_city, verdict_state, verdict_institution, verdict_department");
 
-  const rows = (error ? [] : data ?? []) as ValidationRow[];
-  const totalValidated = rows.length;
+  const rows      = (error ? [] : data ?? []) as ValidationRow[];
+  const total     = rows.length;
+  const oosRows   = rows.filter((r) => r.out_of_scope);
+  const inScope   = rows.filter((r) => !r.out_of_scope);
+  const oosCount  = oosRows.length;
 
-  // --- Report 1: Per-field quality across all validated ---
+  // --- Report 1: Per-field quality — in-scope rows only ---
   const fieldTotals: Record<Field, FieldStat> = {
     country:     emptyFieldStat(),
     city:        emptyFieldStat(),
@@ -100,43 +109,46 @@ export default async function GeoValidationReportPage() {
     institution: emptyFieldStat(),
     department:  emptyFieldStat(),
   };
-  for (const row of rows) {
+  for (const row of inScope) {
     for (const f of FIELDS) {
       const v = row[`verdict_${f}` as keyof ValidationRow] as VerdictType;
       const stat = fieldTotals[f];
       stat.total++;
-      if (v in stat) stat[v as keyof Omit<FieldStat, "total">]++;
+      if (v in stat) (stat as Record<string, number>)[v]++;
     }
   }
 
-  // --- Report 2: Verdict distribution across all 5 fields ---
+  // --- Report 2: Verdict distribution — in-scope rows only ---
   const verdictTotals: Record<VerdictType, number> = {
     correct: 0, wrong_value: 0, missing: 0, hallucinated: 0, fragment: 0,
   };
   let totalVerdicts = 0;
-  for (const row of rows) {
+  for (const row of inScope) {
     for (const f of FIELDS) {
       const v = row[`verdict_${f}` as keyof ValidationRow] as VerdictType;
       if (v && v in verdictTotals) {
-        verdictTotals[v as VerdictType]++;
+        verdictTotals[v]++;
         totalVerdicts++;
       }
     }
   }
 
-  // --- Report 3: Per-bucket quality (accuracy = correct / total) ---
-  const bucketStats: BucketStat = {};
+  // --- Report 3: Per-bucket quality + OOS breakdown ---
+  const bucketStats: Record<string, BucketStat> = {};
   for (const row of rows) {
     const b = row.bucket;
-    if (!bucketStats[b]) bucketStats[b] = emptyFieldStat();
+    if (!bucketStats[b]) bucketStats[b] = { articles: 0, oos: 0, verdicts: 0, correct: 0 };
     const stat = bucketStats[b];
-    stat.total += FIELDS.length;
-    for (const f of FIELDS) {
-      const v = row[`verdict_${f}` as keyof ValidationRow] as VerdictType;
-      if (v === "correct") stat.correct++;
+    stat.articles++;
+    if (row.out_of_scope) {
+      stat.oos++;
+    } else {
+      stat.verdicts += FIELDS.length;
+      for (const f of FIELDS) {
+        if ((row[`verdict_${f}` as keyof ValidationRow] as string) === "correct") stat.correct++;
+      }
     }
   }
-
   const bucketKeys = Object.keys(bucketStats).sort();
 
   const sectionStyle = {
@@ -181,33 +193,65 @@ export default async function GeoValidationReportPage() {
             Geo Validation
           </div>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
-            Rapport
+            Report
           </h1>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
-            {totalValidated} artikler valideret
+            {total} articles validated
           </p>
         </div>
 
-        {totalValidated === 0 && (
+        {total === 0 && (
           <div style={{ color: "#888", fontSize: "14px", padding: "40px 0", textAlign: "center" as const }}>
-            Ingen validerede artikler endnu.
+            No validated articles yet.
           </div>
         )}
 
-        {totalValidated > 0 && (
+        {total > 0 && (
           <>
-            {/* Report 1: Per-field quality */}
+            {/* Out-of-scope summary */}
+            {oosCount > 0 && (
+              <div style={{
+                background: "#fffbeb",
+                border: "1px solid #fde68a",
+                borderRadius: "12px",
+                padding: "16px 20px",
+                marginBottom: "24px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}>
+                <div>
+                  <span style={{ fontSize: "14px", fontWeight: 700, color: "#d97706" }}>
+                    Out of scope: {oosCount} / {total} articles ({pct(oosCount, total)})
+                  </span>
+                  <p style={{ fontSize: "12px", color: "#888", margin: "2px 0 0" }}>
+                    Excluded from accuracy calculations below. {inScope.length} in-scope articles remain.
+                  </p>
+                </div>
+                <span style={{
+                  fontSize: "20px",
+                  fontWeight: 700,
+                  color: "#d97706",
+                  minWidth: "48px",
+                  textAlign: "right" as const,
+                }}>
+                  {pct(oosCount, total)}
+                </span>
+              </div>
+            )}
+
+            {/* Report 1: Per-field quality (in-scope only) */}
             <div style={sectionStyle}>
               <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb" }}>
-                <div style={{ fontSize: "14px", fontWeight: 700 }}>Kvalitet per felt</div>
+                <div style={{ fontSize: "14px", fontWeight: 700 }}>Field quality</div>
                 <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>
-                  Fordeling af udfald for hvert geo-felt
+                  Verdict breakdown per geo field — {inScope.length} in-scope articles, out-of-scope excluded
                 </div>
               </div>
               <table style={tableStyle}>
                 <thead>
                   <tr>
-                    <th style={TH_STYLE}>Felt</th>
+                    <th style={TH_STYLE}>Field</th>
                     <th style={TH_STYLE}>Total</th>
                     <th style={{ ...TH_STYLE, color: VERDICT_COLORS.correct }}>Correct</th>
                     <th style={{ ...TH_STYLE, color: VERDICT_COLORS.wrong_value }}>Wrong value</th>
@@ -245,20 +289,20 @@ export default async function GeoValidationReportPage() {
               </table>
             </div>
 
-            {/* Report 2: Overall verdict distribution */}
+            {/* Report 2: Overall verdict distribution (in-scope only) */}
             <div style={sectionStyle}>
               <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb" }}>
-                <div style={{ fontSize: "14px", fontWeight: 700 }}>Samlet udfaldfordeling</div>
+                <div style={{ fontSize: "14px", fontWeight: 700 }}>Overall verdict distribution</div>
                 <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>
-                  Alle 5 felter på tværs af {totalValidated} artikler ({totalVerdicts} udfald i alt)
+                  All 5 fields across {inScope.length} in-scope articles ({totalVerdicts} verdicts total)
                 </div>
               </div>
               <table style={tableStyle}>
                 <thead>
                   <tr>
-                    <th style={TH_STYLE}>Udfald</th>
-                    <th style={TH_STYLE}>Antal</th>
-                    <th style={TH_STYLE}>Andel</th>
+                    <th style={TH_STYLE}>Verdict</th>
+                    <th style={TH_STYLE}>Count</th>
+                    <th style={TH_STYLE}>Share</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -282,43 +326,51 @@ export default async function GeoValidationReportPage() {
               </table>
             </div>
 
-            {/* Report 3: Per-bucket quality */}
+            {/* Report 3: Per-bucket quality + OOS breakdown */}
             <div style={sectionStyle}>
               <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb" }}>
-                <div style={{ fontSize: "14px", fontWeight: 700 }}>Kvalitet per bucket</div>
+                <div style={{ fontSize: "14px", fontWeight: 700 }}>Per-bucket quality</div>
                 <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>
-                  Samlet accuracy (correct / alle udfald) per bucket
+                  Accuracy (correct / in-scope verdicts) and out-of-scope rate per bucket
                 </div>
               </div>
               <table style={tableStyle}>
                 <thead>
                   <tr>
                     <th style={TH_STYLE}>Bucket</th>
-                    <th style={TH_STYLE}>Artikler</th>
-                    <th style={TH_STYLE}>Udfald</th>
+                    <th style={TH_STYLE}>Articles</th>
+                    <th style={{ ...TH_STYLE, color: "#d97706" }}>Out of scope</th>
+                    <th style={TH_STYLE}>Verdicts</th>
                     <th style={{ ...TH_STYLE, color: VERDICT_COLORS.correct }}>Correct</th>
                     <th style={TH_STYLE}>Accuracy</th>
                   </tr>
                 </thead>
                 <tbody>
                   {bucketKeys.map((b) => {
-                    const stat  = bucketStats[b];
-                    const arts  = rows.filter((r) => r.bucket === b).length;
-                    const accPct = stat.total > 0 ? Math.round((stat.correct / stat.total) * 100) : 0;
+                    const stat    = bucketStats[b];
+                    const accPct  = stat.verdicts > 0 ? Math.round((stat.correct / stat.verdicts) * 100) : 0;
+                    const oosPct  = stat.articles > 0 ? Math.round((stat.oos / stat.articles) * 100) : 0;
+                    const hasInScope = stat.verdicts > 0;
                     return (
                       <tr key={b}>
                         <td style={{ ...TD_STYLE, fontWeight: 600 }}>{b}</td>
-                        <td style={TD_STYLE}>{arts}</td>
-                        <td style={TD_STYLE}>{stat.total}</td>
+                        <td style={TD_STYLE}>{stat.articles}</td>
+                        <td style={{ ...TD_STYLE, color: stat.oos > 0 ? "#d97706" : "#bbb", fontWeight: stat.oos > 0 ? 600 : 400 }}>
+                          {stat.oos > 0 ? `${stat.oos} (${oosPct}%)` : "—"}
+                        </td>
+                        <td style={TD_STYLE}>{stat.verdicts}</td>
                         <td style={TD_STYLE}>
-                          {stat.correct} <span style={{ color: "#888" }}>({pct(stat.correct, stat.total)})</span>
+                          {hasInScope
+                            ? <>{stat.correct} <span style={{ color: "#888" }}>({pct(stat.correct, stat.verdicts)})</span></>
+                            : <span style={{ color: "#bbb" }}>—</span>
+                          }
                         </td>
                         <td style={{
                           ...TD_STYLE,
                           fontWeight: 700,
-                          color: accPct >= 80 ? "#15803d" : accPct >= 60 ? "#d97706" : "#dc2626",
+                          color: !hasInScope ? "#bbb" : accPct >= 80 ? "#15803d" : accPct >= 60 ? "#d97706" : "#dc2626",
                         }}>
-                          {accPct}%
+                          {hasInScope ? `${accPct}%` : "—"}
                         </td>
                       </tr>
                     );
