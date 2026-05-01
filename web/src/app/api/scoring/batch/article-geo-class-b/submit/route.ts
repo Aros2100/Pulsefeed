@@ -12,6 +12,8 @@ import {
 const schema = z.object({
   limit:     z.number().int().positive().max(10000).optional(),
   specialty: z.string().optional(),
+  edat_from: z.string().optional(),
+  edat_to:   z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -27,12 +29,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: result.error.issues[0].message }, { status: 400 });
   }
 
-  const { limit, specialty } = result.data;
+  const { limit, specialty, edat_from, edat_to } = result.data;
   const userId = auth.userId;
 
   let prepared;
   try {
-    prepared = await prepareArticleGeoClassBBatch({ limit, specialty });
+    prepared = await prepareArticleGeoClassBBatch({ limit, specialty, edat_from, edat_to });
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 422 });
   }

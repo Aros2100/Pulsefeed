@@ -66,6 +66,8 @@ interface AiOutput {
 export interface PrepareOptions {
   limit?:     number;
   specialty?: string;
+  edat_from?: string;
+  edat_to?:   string;
 }
 
 export interface PreparedBatch {
@@ -218,7 +220,8 @@ export async function prepareArticleGeoClassBBatch(
   // 2. Candidate article_ids via RPC
   const { data: candidates, error: candErr } = await admin.rpc(
     "get_article_geo_class_b_candidates",
-    { p_specialty: options.specialty ?? "neurosurgery", p_limit: options.limit ?? 1000 }
+    { p_specialty: options.specialty ?? "neurosurgery", p_limit: options.limit ?? 1000,
+      p_edat_from: options.edat_from ?? null, p_edat_to: options.edat_to ?? null }
   );
   if (candErr) throw new Error(`Failed to fetch class B candidates: ${candErr.message}`);
 
