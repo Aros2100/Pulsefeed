@@ -164,6 +164,8 @@ function isGeoSegment(seg: string, cityNames: Set<string>): boolean {
  */
 function isAddressFragment(segment: string): boolean {
   const s = segment.trim();
+  // Bare street number (1–4 digits): "2", "17", "100" — never a valid institution name.
+  if (/^\d{1,4}$/.test(s)) return true;
   // A1: Room/suite code — digit followed immediately by letters/digits, no spaces
   //     "1R203", "2A14", "3F" — but NOT research-unit IDs like "UMR5287" (starts with letter)
   if (/^\d[A-Z0-9]{1,7}$/.test(s)) return true;
@@ -520,7 +522,7 @@ function parseSingleAddress(
       // Must be checked before the generic zipCountryMatch so the city name is
       // extracted cleanly (not left as "Toulon Cedex 9" which city-lookup may miss).
       const cedexMatch = seg.match(
-        /^(?:\d{3,6}\s+)?([A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F\-'\s]+?)\s+[Cc]é?dex\b.*$/i
+        /^(?:\d{3,6}\s+)?([A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F\-'\s]+?)\s+[Cc][eé]?dex\b.*$/i
       );
       if (cedexMatch) {
         segments[i] = cedexMatch[1].trim();
@@ -980,6 +982,9 @@ export async function parseAffiliation(raw: string | null): Promise<ParsedAffili
   // "; user@host.edu") which would otherwise trigger the multi-address guard below.
   text = text.replace(/\.\s*Electronic\s+address:.*$/i, "").trim();
   text = text.replace(/\s*[-–—;]?\s*[\w.+-]+@[\w.-]+\.\w+\s*\.?$/, "").trim();
+  // Normalize fused tokens: "Hospital;Dept" → "Hospital; Dept", "BrisbaneQLD" → "Brisbane QLD"
+  text = text.replace(/;([^\s])/g, '; $1');
+  text = text.replace(/([a-zà-ÿ])([A-Z])/g, '$1 $2');
 
   // Klasse A/C rule: any remaining semicolon = multi-address string → reject.
   if (text.includes(";")) return null;
@@ -1045,6 +1050,9 @@ export async function parseAffiliationWithTrace(
   text = text.replace(/\([A-Z]{1,3}(?:,\s*[A-Z]{1,3})+\)/g, "").trim();
   text = text.replace(/\.\s*Electronic\s+address:.*$/i, "").trim();
   text = text.replace(/\s*[-–—;]?\s*[\w.+-]+@[\w.-]+\.\w+\s*\.?$/, "").trim();
+  // Normalize fused tokens: "Hospital;Dept" → "Hospital; Dept", "BrisbaneQLD" → "Brisbane QLD"
+  text = text.replace(/;([^\s])/g, '; $1');
+  text = text.replace(/([a-zà-ÿ])([A-Z])/g, '$1 $2');
 
   const allTrace: string[] = [
     `input=${JSON.stringify(raw)}`,
