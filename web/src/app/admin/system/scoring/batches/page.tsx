@@ -136,6 +136,22 @@ export default async function BatchesPage() {
 
   const geoPromptVersion: string = geoPromptRow?.version ?? "unknown";
 
+  // Pending article geo Class B count
+  const { data: geoBPendingRaw } = await admin.rpc("count_article_geo_class_b_unscored", { p_specialty: specialty });
+  const geoBPending: number = (geoBPendingRaw as number | null) ?? 0;
+
+  // Active prompt version for article_geo_class_b
+  const { data: geoBPromptRow } = await admin
+    .from("model_versions")
+    .select("version")
+    .eq("specialty", specialty)
+    .eq("module", "article_geo_class_b")
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
+
+  const geoBPromptVersion: string = geoBPromptRow?.version ?? "unknown";
+
   // Recent 20 batches
   const { data: batchRows } = await admin
     .from("scoring_batches")
@@ -292,6 +308,25 @@ export default async function BatchesPage() {
             </span>
           </div>
           <SubmitBatchForm pendingCount={geoPending} apiRoute="/api/scoring/batch/article-geo-class-a/submit" />
+        </div>
+
+        {/* Article geo Class B batch card */}
+        <div style={sectionCard}>
+          <div style={sectionHeader}>
+            <div>
+              <span style={headerLabel}>Article geo Class B batch</span>
+              <span style={{ marginLeft: "8px", fontSize: "12px", color: "#888" }}>{geoBPromptVersion}</span>
+            </div>
+            <span style={{
+              fontSize: "12px", fontWeight: 700,
+              color: geoBPending > 0 ? "#d97706" : "#15803d",
+              background: geoBPending > 0 ? "#fef9c3" : "#dcfce7",
+              borderRadius: "20px", padding: "2px 10px",
+            }}>
+              {geoBPending.toLocaleString("en-US")} pending
+            </span>
+          </div>
+          <SubmitBatchForm pendingCount={geoBPending} apiRoute="/api/scoring/batch/article-geo-class-b/submit" />
         </div>
 
         {/* Recent batches card */}
