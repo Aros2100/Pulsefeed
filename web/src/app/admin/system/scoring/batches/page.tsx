@@ -120,6 +120,22 @@ export default async function BatchesPage() {
 
   const sariPromptVersion: string = sariPromptRow?.version ?? "unknown";
 
+  // Pending article geo Class A count
+  const { data: geoPendingRaw } = await admin.rpc("count_article_geo_class_a_unscored");
+  const geoPending: number = (geoPendingRaw as number | null) ?? 0;
+
+  // Active prompt version for article_geo_class_a
+  const { data: geoPromptRow } = await admin
+    .from("model_versions")
+    .select("version")
+    .eq("specialty", specialty)
+    .eq("module", "article_geo_class_a")
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
+
+  const geoPromptVersion: string = geoPromptRow?.version ?? "unknown";
+
   // Recent 20 batches
   const { data: batchRows } = await admin
     .from("scoring_batches")
@@ -257,6 +273,25 @@ export default async function BatchesPage() {
             </span>
           </div>
           <SubmitBatchForm pendingCount={sariPending} apiRoute="/api/scoring/batch/condensation-sari/submit" />
+        </div>
+
+        {/* Article geo Class A batch card */}
+        <div style={sectionCard}>
+          <div style={sectionHeader}>
+            <div>
+              <span style={headerLabel}>Article geo Class A batch</span>
+              <span style={{ marginLeft: "8px", fontSize: "12px", color: "#888" }}>{geoPromptVersion}</span>
+            </div>
+            <span style={{
+              fontSize: "12px", fontWeight: 700,
+              color: geoPending > 0 ? "#d97706" : "#15803d",
+              background: geoPending > 0 ? "#fef9c3" : "#dcfce7",
+              borderRadius: "20px", padding: "2px 10px",
+            }}>
+              {geoPending.toLocaleString("en-US")} pending
+            </span>
+          </div>
+          <SubmitBatchForm pendingCount={geoPending} apiRoute="/api/scoring/batch/article-geo-class-a/submit" />
         </div>
 
         {/* Recent batches card */}

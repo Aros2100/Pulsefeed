@@ -273,10 +273,17 @@ export type Database = {
           full_text_available: boolean | null
           fwci: number | null
           geo_city: string | null
+          geo_class: string | null
           geo_continent: string | null
           geo_country: string | null
           geo_department: string | null
+          geo_department2: string | null
+          geo_department3: string | null
+          geo_departments_overflow: string[] | null
           geo_institution: string | null
+          geo_institution2: string | null
+          geo_institution3: string | null
+          geo_institutions_overflow: string[] | null
           geo_region: string | null
           geo_source: string | null
           geo_state: string | null
@@ -377,10 +384,17 @@ export type Database = {
           full_text_available?: boolean | null
           fwci?: number | null
           geo_city?: string | null
+          geo_class?: string | null
           geo_continent?: string | null
           geo_country?: string | null
           geo_department?: string | null
+          geo_department2?: string | null
+          geo_department3?: string | null
+          geo_departments_overflow?: string[] | null
           geo_institution?: string | null
+          geo_institution2?: string | null
+          geo_institution3?: string | null
+          geo_institutions_overflow?: string[] | null
           geo_region?: string | null
           geo_source?: string | null
           geo_state?: string | null
@@ -481,10 +495,17 @@ export type Database = {
           full_text_available?: boolean | null
           fwci?: number | null
           geo_city?: string | null
+          geo_class?: string | null
           geo_continent?: string | null
           geo_country?: string | null
           geo_department?: string | null
+          geo_department2?: string | null
+          geo_department3?: string | null
+          geo_departments_overflow?: string[] | null
           geo_institution?: string | null
+          geo_institution2?: string | null
+          geo_institution3?: string | null
+          geo_institutions_overflow?: string[] | null
           geo_region?: string | null
           geo_source?: string | null
           geo_state?: string | null

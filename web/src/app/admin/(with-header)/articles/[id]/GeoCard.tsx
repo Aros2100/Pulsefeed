@@ -4,16 +4,32 @@ import { useState } from "react";
 
 interface GeoCardProps {
   articleId: string;
+  geoClass: string | null;
   geoContinent: string | null;
   geoRegion: string | null;
   geoCountry: string | null;
   geoState: string | null;
   geoCity: string | null;
   geoDepartment: string | null;
+  geoDepartment2: string | null;
+  geoDepartment3: string | null;
+  geoDepartmentsOverflow: string[];
   geoInstitution: string | null;
+  geoInstitution2: string | null;
+  geoInstitution3: string | null;
+  geoInstitutionsOverflow: string[];
   geoParserConfidence: string | null;
   aiLocationAttempted: boolean | null;
   geoDefinedAt: string | null;
+  // article_geo_metadata
+  metaGeoConfidence: string | null;
+  metaParserProcessedAt: string | null;
+  metaParserVersion: string | null;
+  metaAiProcessedAt: string | null;
+  metaAiModel: string | null;
+  metaAiChanges: string[];
+  metaEnrichedAt: string | null;
+  metaEnrichedStateSource: string | null;
 }
 
 function fmt(iso: string | null) {
@@ -136,13 +152,20 @@ export default function GeoCard(props: GeoCardProps) {
 
   // Live state for geo fields (updated after save)
   const [geo, setGeo] = useState({
+    geoClass: props.geoClass,
     continent: props.geoContinent,
     region: props.geoRegion,
     country: props.geoCountry,
     state: props.geoState,
     city: props.geoCity,
     department: props.geoDepartment,
+    department2: props.geoDepartment2,
+    department3: props.geoDepartment3,
+    departmentsOverflow: props.geoDepartmentsOverflow,
     institution: props.geoInstitution,
+    institution2: props.geoInstitution2,
+    institution3: props.geoInstitution3,
+    institutionsOverflow: props.geoInstitutionsOverflow,
   });
 
   const [form, setForm] = useState({
@@ -181,7 +204,8 @@ export default function GeoCard(props: GeoCardProps) {
       });
       const data = await res.json();
       if (data.ok) {
-        setGeo({
+        setGeo((prev) => ({
+          ...prev,
           continent: data.continent ?? null,
           region: data.region ?? null,
           country: form.country || null,
@@ -189,7 +213,7 @@ export default function GeoCard(props: GeoCardProps) {
           city: form.city || null,
           department: form.department || null,
           institution: form.institution || null,
-        });
+        }));
         setEditing(false);
         setSavedMsg(true);
         setTimeout(() => setSavedMsg(false), 3000);
@@ -395,8 +419,26 @@ export default function GeoCard(props: GeoCardProps) {
             </div>
           ) : (
             <>
-              {geoRow("Department", geo.department)}
-              {geoRow("Institution", geo.institution)}
+              {geo.geoClass && (
+                <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontSize: "14px" }}>
+                  <span style={{ color: "#888" }}>Class</span>
+                  <span>
+                    <Badge color={geo.geoClass === "A" ? "green" : "gray"}>
+                      {geo.geoClass === "A" ? "Klasse A" : "Klasse C"}
+                    </Badge>
+                  </span>
+                </div>
+              )}
+              {/* Departments */}
+              {[geo.department, geo.department2, geo.department3]
+                .filter(Boolean)
+                .map((v, i) => geoRow(i === 0 ? "Department" : `Department ${i + 1}`, v))}
+              {geo.departmentsOverflow.length > 0 && geoRow("Departments +", geo.departmentsOverflow.join(" · "))}
+              {/* Institutions */}
+              {[geo.institution, geo.institution2, geo.institution3]
+                .filter(Boolean)
+                .map((v, i) => geoRow(i === 0 ? "Institution" : `Institution ${i + 1}`, v))}
+              {geo.institutionsOverflow.length > 0 && geoRow("Institutions +", geo.institutionsOverflow.join(" · "))}
               {geoRow("City", geo.city)}
               {geoRow("State", geo.state)}
               {geoRow("Country", geo.country)}
@@ -404,6 +446,28 @@ export default function GeoCard(props: GeoCardProps) {
               {geoRow("Continent", geo.continent)}
             </>
           )}
+        </CardBody>
+      </Card>
+
+      {/* Geo Metadata */}
+      <Card>
+        <CardHeader label="Geo Metadata" />
+        <CardBody>
+          <div style={{ fontSize: "13px", color: "#555" }}>
+            {geoRow("Confidence", props.metaGeoConfidence)}
+            {geoRow("Parser version", props.metaParserVersion)}
+            {geoRow("Parser ran at", props.metaParserProcessedAt ? fmt(props.metaParserProcessedAt) : null)}
+            {geoRow("AI ran at", props.metaAiProcessedAt ? fmt(props.metaAiProcessedAt) : null)}
+            {geoRow("AI model", props.metaAiModel)}
+            {props.metaAiChanges.length > 0 && geoRow("AI changes", props.metaAiChanges.join(" · "))}
+            {geoRow("Enriched at", props.metaEnrichedAt ? fmt(props.metaEnrichedAt) : null)}
+            {geoRow("Enriched state source", props.metaEnrichedStateSource)}
+            {!props.metaParserProcessedAt && (
+              <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#9ca3af", fontStyle: "italic" }}>
+                Parser har ikke kørt for denne artikel endnu.
+              </p>
+            )}
+          </div>
         </CardBody>
       </Card>
 

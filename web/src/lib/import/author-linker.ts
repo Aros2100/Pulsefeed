@@ -134,35 +134,56 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
               authorsProcessed += result.new + result.duplicates + result.rejected;
               console.error(`[author-linker] linked PMID ${article.pubmed_id} — new=${result.new} dup=${result.duplicates} rejected=${result.rejected}`);
 
-              // Guard: if article already has geo_defined_at, geo is frozen — skip.
-              // Moved before geo computation so we don't parse unnecessarily.
+              // Guard: skip if parser already ran for this article (tracked in article_geo_metadata).
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const { data: existingGeo } = await (admin as any)
-                .from("articles")
-                .select("geo_defined_at")
-                .eq("id", article.id)
-                .single();
+              const { data: existingMeta } = await (admin as any)
+                .from("article_geo_metadata")
+                .select("parser_processed_at")
+                .eq("article_id", article.id)
+                .maybeSingle();
 
-              if (!existingGeo?.geo_defined_at) {
+              if (!existingMeta?.parser_processed_at) {
                 const firstOaAuthorship = oaWork?.authorships[0] ?? null;
                 const geoResult = await determineArticleGeo(admin, authors[0], firstOaAuthorship);
 
                 const now = new Date().toISOString();
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const db = admin as any;
+
+                // 1. Write all geo fields to articles (3+3+overflow + class)
                 await db.from("articles").update({
-                  geo_city:              geoResult.geo_city,
-                  geo_country:           geoResult.geo_country,
-                  geo_state:             geoResult.geo_state,
-                  geo_region:            geoResult.geo_region,
-                  geo_continent:         geoResult.geo_continent,
-                  geo_institution:       geoResult.geo_institution,
-                  geo_department:        geoResult.geo_department,
-                  geo_source:            geoResult.geo_source,
-                  geo_defined_at:        now,
-                  geo_parser_confidence: geoResult.parser_confidence,
+                  geo_class:                 geoResult.geo_class,
+                  geo_city:                  geoResult.geo_city,
+                  geo_country:               geoResult.geo_country,
+                  geo_state:                 geoResult.geo_state,
+                  geo_region:                geoResult.geo_region,
+                  geo_continent:             geoResult.geo_continent,
+                  geo_institution:           geoResult.geo_institution,
+                  geo_institution2:          geoResult.geo_institution2,
+                  geo_institution3:          geoResult.geo_institution3,
+                  geo_institutions_overflow: geoResult.geo_institutions_overflow,
+                  geo_department:            geoResult.geo_department,
+                  geo_department2:           geoResult.geo_department2,
+                  geo_department3:           geoResult.geo_department3,
+                  geo_departments_overflow:  geoResult.geo_departments_overflow,
+                  geo_source:                geoResult.geo_source,
+                  geo_defined_at:            now,
+                  geo_parser_confidence:     geoResult.parser_confidence,
                 }).eq("id", article.id);
 
+                // 2. Upsert parser metadata to article_geo_metadata
+                await db.from("article_geo_metadata").upsert({
+                  article_id:            article.id,
+                  geo_class:             geoResult.geo_class,
+                  geo_confidence:        geoResult.geo_confidence,
+                  parser_processed_at:   now,
+                  parser_version:        geoResult.parser_version,
+                  enriched_at:           geoResult.enriched_state_source ? now : null,
+                  enriched_state_source: geoResult.enriched_state_source,
+                  updated_at:            now,
+                }, { onConflict: "article_id" });
+
+                // 3. Event log
                 const geoNext: GeoSnapshot = {
                   geo_city:        geoResult.geo_city,
                   geo_country:     geoResult.geo_country,
@@ -172,8 +193,8 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
                   geo_institution: geoResult.geo_institution,
                   geo_department:  geoResult.geo_department,
                 };
-                if (geoResult.geo_source) {
-                  logGeoUpdatedEvent(article.id, geoResult.geo_source, null, geoNext, geoResult.parser_confidence);
+                if (geoResult.geo_class === "A" && geoResult.geo_country) {
+                  logGeoUpdatedEvent(article.id, geoResult.geo_source ?? "parser", null, geoNext, geoResult.parser_confidence);
                 }
               }
 

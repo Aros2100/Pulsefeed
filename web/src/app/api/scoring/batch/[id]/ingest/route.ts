@@ -7,6 +7,7 @@ import { ingestSubspecialtyBatchResults } from "@/lib/scoring/batch/subspecialty
 import { ingestArticleTypeBatchResults } from "@/lib/scoring/batch/article-type-batch";
 import { ingestCondensationTextBatchResults } from "@/lib/scoring/batch/condensation-text-batch";
 import { ingestCondensationSariBatchResults } from "@/lib/scoring/batch/condensation-sari-batch";
+import { ingestArticleGeoClassABatchResults } from "@/lib/scoring/batch/article-geo-class-a-batch";
 
 export async function POST(
   _request: NextRequest,
@@ -104,6 +105,13 @@ export async function POST(
         row.prompt_version
       );
       stats = { scored: sariStats.scored, approved: undefined, rejected: undefined, failed: sariStats.failed, failedIds: sariStats.failedIds };
+    } else if (row.module === "article_geo_class_a") {
+      const geoStats = await ingestArticleGeoClassABatchResults(
+        row.anthropic_batch_id,
+        row.custom_id_map as Record<string, string>,
+        row.prompt_version
+      );
+      stats = { scored: geoStats.scored, approved: undefined, rejected: undefined, failed: geoStats.failed, failedIds: geoStats.failedIds };
     } else {
       stats = await ingestSpecialtyBatchResults(
         row.anthropic_batch_id,

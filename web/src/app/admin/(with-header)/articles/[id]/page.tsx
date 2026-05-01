@@ -511,7 +511,7 @@ export default async function AdminArticleLogPage({
   const { id } = await params;
   const admin = createAdminClient();
 
-  const [articleResult, eventsResult, authorLinksResult, specialtyResult, subspecialtiesList, articleTypesList] = await Promise.all([
+  const [articleResult, eventsResult, authorLinksResult, specialtyResult, subspecialtiesList, articleTypesList, geoMetaResult] = await Promise.all([
     admin.from("articles").select("*").eq("id", id).maybeSingle(),
     admin.from("article_events").select("*").eq("article_id", id).order("sequence", { ascending: true }),
     admin.from("article_authors").select("author_id, position, authors(author_score, department, hospital, city, state, country, verified_by)").eq("article_id", id),
@@ -519,6 +519,8 @@ export default async function AdminArticleLogPage({
     (admin as any).from("article_specialties").select("specialty, specialty_match, scored_by, scored_at, source, specialty_confidence, specialty_reason").eq("article_id", id).eq("specialty", ACTIVE_SPECIALTY).maybeSingle(),
     getSubspecialties(ACTIVE_SPECIALTY),
     getArticleTypes(ACTIVE_SPECIALTY),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (admin as any).from("article_geo_metadata").select("geo_class, geo_confidence, parser_processed_at, parser_version, ai_processed_at, ai_model, ai_changes, enriched_at, enriched_state_source").eq("article_id", id).maybeSingle(),
   ]);
 
   const article = articleResult.data;
@@ -536,6 +538,7 @@ export default async function AdminArticleLogPage({
 
   const a   = article as unknown as ArticleData;
   const raw = article as Record<string, unknown>;
+  const geoMeta = (geoMetaResult as { data: Record<string, unknown> | null }).data ?? null;
 
   const authorIdByPosition = new Map(
     (authorLinksResult.data ?? []).map((r) => [r.position as number, r.author_id as string])
@@ -1171,16 +1174,31 @@ export default async function AdminArticleLogPage({
       {/* GeoCard */}
       <GeoCard
         articleId={id}
+        geoClass={raw.geo_class as string | null}
         geoContinent={raw.geo_continent as string | null}
         geoRegion={raw.geo_region as string | null}
         geoCountry={raw.geo_country as string | null}
         geoState={raw.geo_state as string | null}
         geoCity={raw.geo_city as string | null}
         geoDepartment={raw.geo_department as string | null}
+        geoDepartment2={raw.geo_department2 as string | null}
+        geoDepartment3={raw.geo_department3 as string | null}
+        geoDepartmentsOverflow={(raw.geo_departments_overflow as string[] | null) ?? []}
         geoInstitution={raw.geo_institution as string | null}
+        geoInstitution2={raw.geo_institution2 as string | null}
+        geoInstitution3={raw.geo_institution3 as string | null}
+        geoInstitutionsOverflow={(raw.geo_institutions_overflow as string[] | null) ?? []}
         geoParserConfidence={raw.geo_parser_confidence as string | null}
         aiLocationAttempted={raw.ai_location_attempted as boolean | null}
         geoDefinedAt={raw.geo_defined_at as string | null}
+        metaGeoConfidence={geoMeta?.geo_confidence as string | null ?? null}
+        metaParserProcessedAt={geoMeta?.parser_processed_at as string | null ?? null}
+        metaParserVersion={geoMeta?.parser_version as string | null ?? null}
+        metaAiProcessedAt={geoMeta?.ai_processed_at as string | null ?? null}
+        metaAiModel={geoMeta?.ai_model as string | null ?? null}
+        metaAiChanges={(geoMeta?.ai_changes as string[] | null) ?? []}
+        metaEnrichedAt={geoMeta?.enriched_at as string | null ?? null}
+        metaEnrichedStateSource={geoMeta?.enriched_state_source as string | null ?? null}
       />
 
       {/* Geo metadata */}

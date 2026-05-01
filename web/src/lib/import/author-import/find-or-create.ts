@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractEmail, stripEmailFromAffiliation } from "@/lib/geo/affiliation-utils";
 import { parseAffiliation as geoParseAffiliation } from "@/lib/geo/affiliation-parser";
+import { parseAffiliation as parseAffiliationV2 } from "@/lib/geo/v2/affiliation-parser";
 import { lookupCountry, getRegion, getContinent } from "@/lib/geo/country-map";
 import { normalizeCountry } from "@/lib/geo/normalize";
 import { normalizeGeo } from "@/lib/geo/normalize-geo";
@@ -673,15 +674,27 @@ export async function linkAuthorsToArticle(
 // ── Article geo determination ─────────────────────────────────────────────────
 
 export type ArticleGeoResult = {
-  geo_city: string | null;
-  geo_country: string | null;
-  geo_state: string | null;
-  geo_region: string | null;
-  geo_continent: string | null;
-  geo_institution: string | null;
-  geo_department: string | null;
+  // Geo-felter (skrives til articles)
+  geo_class:                 "A" | "C" | null;
+  geo_city:                  string | null;
+  geo_country:               string | null;
+  geo_state:                 string | null;
+  geo_region:                string | null;
+  geo_continent:             string | null;
+  geo_institution:           string | null;
+  geo_institution2:          string | null;
+  geo_institution3:          string | null;
+  geo_institutions_overflow: string[];
+  geo_department:            string | null;
+  geo_department2:           string | null;
+  geo_department3:           string | null;
+  geo_departments_overflow:  string[];
   geo_source: "ror_enriched" | "parser_pubmed" | "parser_openalex" | null;
-  parser_confidence: "high" | "low" | null;
+  // Metadata-felter (skrives til article_geo_metadata)
+  parser_version:            string;
+  geo_confidence:            "high" | "low" | null;
+  parser_confidence:         "high" | "low" | null;  // alias for compat
+  enriched_state_source:     string | null;
 };
 
 /** Accent-strip + lowercase for city comparison. */
@@ -689,21 +702,45 @@ function normCityForMatch(c: string | null): string {
   return (c ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
+const GEO_PARSER_VERSION = "v2.0";
+
+/** Null result — Klasse C: no parseable affiliation. */
+function nullGeoResult(): ArticleGeoResult {
+  return {
+    geo_class:                 "C",
+    geo_city:                  null,
+    geo_country:               null,
+    geo_state:                 null,
+    geo_region:                null,
+    geo_continent:             null,
+    geo_institution:           null,
+    geo_institution2:          null,
+    geo_institution3:          null,
+    geo_institutions_overflow: [],
+    geo_department:            null,
+    geo_department2:           null,
+    geo_department3:           null,
+    geo_departments_overflow:  [],
+    geo_source:                null,
+    parser_version:            GEO_PARSER_VERSION,
+    geo_confidence:            null,
+    parser_confidence:         null,
+    enriched_state_source:     null,
+  };
+}
+
 /**
- * Determines article geo from the first author.
+ * Determines article geo from the first author using v2 lab parser.
  *
  * Priority:
- *   1. Parse PubMed affiliation (authors[0].affiliations[0]) — primary source.
- *      If parser found city: optionally enrich institution/state from ROR when
- *      ROR city matches parser city (case-insensitive, accent-stripped).
- *        → geo_source = "ror_enriched" (with ROR enrichment)
- *        → geo_source = "parser_pubmed" (without ROR enrichment)
- *   2. Fallback: parse OpenAlex rawAffiliationStrings[0] when PubMed affiliation
- *      is absent or unparseable. No ROR enrichment in this path.
- *        → geo_source = "parser_openalex"
- *   3. Nothing parseable: all geo fields null, geo_source = null.
+ *   1. Parse PubMed affiliation via v2 parser — primary source (geo_class='A').
+ *      ROR enrichment: if ROR city matches parser city, use ROR institution as
+ *      geo_institution (slot 1); preserve parser institution2/3/overflow unchanged.
+ *   2. Fallback: OpenAlex rawAffiliationStrings[0] — no ROR enrichment (geo_class='A').
+ *   3. Nothing parseable → geo_class='C', all fields null.
  *
- * geo_region and geo_continent derived deterministically from geo_country.
+ * State: v2 parser resolves internally; resolveState(DB) called only when parser
+ * returned no state. enriched_state_source tracks the enrichment source.
  */
 export async function determineArticleGeo(
   admin: AdminClient,
@@ -718,46 +755,59 @@ export async function determineArticleGeo(
     : null;
 
   if (pubmedAff) {
-    const parsed = await geoParseAffiliation(pubmedAff);
+    const parsed = await parseAffiliationV2(pubmedAff);
     if (parsed) {
       const rawCity = parsed.city ? normalizeGeo(parsed.city, parsed.country ?? null).city : null;
       const country = normalizeCountry(parsed.country) ?? null;
-      const state = await resolveState(admin, rawCity, country);
 
-      // ── 1a. ROR enrichment — only when parser city matches ROR city ────────
+      // State: prefer parser's own resolution; enrich via DB only if parser returned null
+      let finalState = parsed.state;
+      let enrichedStateSource: string | null = null;
+      if (!finalState) {
+        const dbState = await resolveState(admin, rawCity, country);
+        if (dbState) {
+          finalState = dbState;
+          enrichedStateSource = "geo_city_state_cache";
+        }
+      }
+
+      // ── 1a. ROR enrichment: replace slot-1 institution when cities match ──
+      let institution = parsed.institution;
+      let geoSource: ArticleGeoResult["geo_source"] = "parser_pubmed";
       if (primaryInst?.ror && rawCity) {
         const rorGeo = await fetchRorGeo(primaryInst.ror);
         const parserCityNorm = normCityForMatch(rawCity);
         const rorCityNorm = normCityForMatch(rorGeo.city);
         if (parserCityNorm && rorCityNorm && parserCityNorm === rorCityNorm) {
-          const { hospital, department } = primaryInst.displayName
+          const { hospital } = primaryInst.displayName
             ? splitInstitutionAndDepartment(primaryInst.displayName)
-            : { hospital: null, department: null };
-          return {
-            geo_city:          rawCity,
-            geo_country:       country,
-            geo_state:         rorGeo.state ?? state,
-            geo_region:        country ? getRegion(country) : null,
-            geo_continent:     country ? getContinent(country) : null,
-            geo_institution:   hospital ?? parsed.institution ?? null,
-            geo_department:    department ?? parsed.department ?? null,
-            geo_source:        "ror_enriched",
-            parser_confidence: parsed.confidence,
-          };
+            : { hospital: null };
+          if (hospital) institution = hospital;
+          if (rorGeo.state && !finalState) finalState = rorGeo.state;
+          geoSource = "ror_enriched";
         }
       }
 
-      // ── 1b. Parser only ───────────────────────────────────────────────────
       return {
-        geo_city:          rawCity,
-        geo_country:       country,
-        geo_state:         state,
-        geo_region:        country ? getRegion(country) : null,
-        geo_continent:     country ? getContinent(country) : null,
-        geo_institution:   parsed.institution ?? null,
-        geo_department:    parsed.department ?? null,
-        geo_source:        "parser_pubmed",
-        parser_confidence: parsed.confidence,
+        geo_class:                 "A",
+        geo_city:                  rawCity,
+        geo_country:               country,
+        geo_state:                 finalState,
+        geo_region:                country ? getRegion(country) : null,
+        geo_continent:             country ? getContinent(country) : null,
+        geo_institution:           institution,
+        geo_institution2:          parsed.institution2,
+        geo_institution3:          parsed.institution3,
+        geo_institutions_overflow: parsed.institutions_overflow,
+        geo_department:            parsed.department,
+        geo_department2:           parsed.department2,
+        geo_department3:           parsed.department3,
+        geo_departments_overflow:  parsed.departments_overflow,
+        geo_source:                geoSource,
+        parser_version:            GEO_PARSER_VERSION,
+        geo_confidence:            parsed.confidence,
+        parser_confidence:         parsed.confidence,
+        enriched_state_source:     enrichedStateSource,
       };
     }
   }
@@ -765,35 +815,43 @@ export async function determineArticleGeo(
   // ── 2. OpenAlex raw affiliation fallback ──────────────────────────────────
   const oaRawAff = firstOaAuthorship?.rawAffiliationStrings[0] ?? null;
   if (oaRawAff) {
-    const parsed = await geoParseAffiliation(oaRawAff);
+    const parsed = await parseAffiliationV2(oaRawAff);
     if (parsed) {
       const rawCity = parsed.city ? normalizeGeo(parsed.city, parsed.country ?? null).city : null;
       const country = normalizeCountry(parsed.country) ?? null;
-      const state = await resolveState(admin, rawCity, country);
+      let finalState = parsed.state;
+      let enrichedStateSource: string | null = null;
+      if (!finalState) {
+        const dbState = await resolveState(admin, rawCity, country);
+        if (dbState) {
+          finalState = dbState;
+          enrichedStateSource = "geo_city_state_cache";
+        }
+      }
       return {
-        geo_city:          rawCity,
-        geo_country:       country,
-        geo_state:         state,
-        geo_region:        country ? getRegion(country) : null,
-        geo_continent:     country ? getContinent(country) : null,
-        geo_institution:   parsed.institution ?? null,
-        geo_department:    parsed.department ?? null,
-        geo_source:        "parser_openalex",
-        parser_confidence: parsed.confidence,
+        geo_class:                 "A",
+        geo_city:                  rawCity,
+        geo_country:               country,
+        geo_state:                 finalState,
+        geo_region:                country ? getRegion(country) : null,
+        geo_continent:             country ? getContinent(country) : null,
+        geo_institution:           parsed.institution,
+        geo_institution2:          parsed.institution2,
+        geo_institution3:          parsed.institution3,
+        geo_institutions_overflow: parsed.institutions_overflow,
+        geo_department:            parsed.department,
+        geo_department2:           parsed.department2,
+        geo_department3:           parsed.department3,
+        geo_departments_overflow:  parsed.departments_overflow,
+        geo_source:                "parser_openalex",
+        parser_version:            GEO_PARSER_VERSION,
+        geo_confidence:            parsed.confidence,
+        parser_confidence:         parsed.confidence,
+        enriched_state_source:     enrichedStateSource,
       };
     }
   }
 
-  // ── 3. Nothing parseable ──────────────────────────────────────────────────
-  return {
-    geo_city:          null,
-    geo_country:       null,
-    geo_state:         null,
-    geo_region:        null,
-    geo_continent:     null,
-    geo_institution:   null,
-    geo_department:    null,
-    geo_source:        null,
-    parser_confidence: null,
-  };
+  // ── 3. Nothing parseable → Klasse C ──────────────────────────────────────
+  return nullGeoResult();
 }
