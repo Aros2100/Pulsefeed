@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { extractEmail, stripEmailFromAffiliation } from "@/lib/geo/affiliation-utils";
 import { parseAffiliation as geoParseAffiliation } from "@/lib/geo/affiliation-parser";
 import { parseAffiliation as parseAffiliationV2 } from "@/lib/geo/v2/affiliation-parser";
+import { parseClassB, type AddressRow } from "@/lib/geo/v2/affiliation-parser-b";
 import { lookupCountry, getRegion, getContinent } from "@/lib/geo/country-map";
 import { normalizeCountry } from "@/lib/geo/normalize";
 import { normalizeGeo } from "@/lib/geo/normalize-geo";
@@ -675,7 +676,9 @@ export async function linkAuthorsToArticle(
 
 export type ArticleGeoResult = {
   // Geo-felter (skrives til articles)
-  geo_class:                 "A" | "C" | null;
+  geo_class:                 "A" | "B" | "C" | null;
+  // Klasse B kun: alle adresser. articles.geo_* forbliver null for B.
+  class_b_addresses?:        AddressRow[];
   geo_city:                  string | null;
   geo_country:               string | null;
   geo_state:                 string | null;
@@ -703,6 +706,34 @@ function normCityForMatch(c: string | null): string {
 }
 
 const GEO_PARSER_VERSION = "v2.0";
+const GEO_PARSER_B_VERSION = "v1.0";
+
+/** Klasse B result — multi-address. articles.geo_* forbliver null;
+ *  alle adresser skrives til article_geo_addresses af caller. */
+function classBResult(addresses: AddressRow[]): ArticleGeoResult {
+  return {
+    geo_class:                 "B",
+    class_b_addresses:         addresses,
+    geo_city:                  null,
+    geo_country:               null,
+    geo_state:                 null,
+    geo_region:                null,
+    geo_continent:             null,
+    geo_institution:           null,
+    geo_institution2:          null,
+    geo_institution3:          null,
+    geo_institutions_overflow: [],
+    geo_department:            null,
+    geo_department2:           null,
+    geo_department3:           null,
+    geo_departments_overflow:  [],
+    geo_source:                null,
+    parser_version:            GEO_PARSER_B_VERSION,
+    geo_confidence:            null,
+    parser_confidence:         null,
+    enriched_state_source:     null,
+  };
+}
 
 /** Null result — Klasse C: no parseable affiliation. */
 function nullGeoResult(): ArticleGeoResult {
@@ -755,6 +786,15 @@ export async function determineArticleGeo(
     : null;
 
   if (pubmedAff) {
+    // ── Klasse B-forsøg først hvis strengen indeholder semikolon ──────────
+    if (pubmedAff.includes(";")) {
+      const classB = await parseClassB(pubmedAff);
+      if (classB && classB.length >= 2) {
+        return classBResult(classB);
+      }
+      // null → fortsæt med Klasse A
+    }
+
     const parsed = await parseAffiliationV2(pubmedAff);
     if (parsed) {
       const rawCity = parsed.city ? normalizeGeo(parsed.city, parsed.country ?? null).city : null;
@@ -815,6 +855,13 @@ export async function determineArticleGeo(
   // ── 2. OpenAlex raw affiliation fallback ──────────────────────────────────
   const oaRawAff = firstOaAuthorship?.rawAffiliationStrings[0] ?? null;
   if (oaRawAff) {
+    if (oaRawAff.includes(";")) {
+      const classB = await parseClassB(oaRawAff);
+      if (classB && classB.length >= 2) {
+        return classBResult(classB);
+      }
+    }
+
     const parsed = await parseAffiliationV2(oaRawAff);
     if (parsed) {
       const rawCity = parsed.city ? normalizeGeo(parsed.city, parsed.country ?? null).city : null;

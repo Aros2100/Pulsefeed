@@ -7,6 +7,7 @@ import { logArticleEvent, logGeoUpdatedEvent, type GeoSnapshot } from "@/lib/art
 import { notifyFollowedAuthorPublications } from "@/lib/notifications/followedAuthorNotify";
 import { fetchWorksByDois, type OpenAlexWork } from "@/lib/openalex/client";
 import { determineArticleGeo } from "@/lib/import/author-import/find-or-create";
+import { getRegion, getContinent } from "@/lib/geo/country-map";
 import pLimit from "p-limit";
 
 const BATCH_SIZE = 250;
@@ -150,7 +151,8 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const db = admin as any;
 
-                // 1. Write all geo fields to articles (3+3+overflow + class)
+                // 1. Write all geo fields to articles (3+3+overflow + class).
+                //    For Klasse B: all flat geo_* fields stay null (per-row data lives in article_geo_addresses).
                 await db.from("articles").update({
                   geo_class:                 geoResult.geo_class,
                   geo_city:                  geoResult.geo_city,
@@ -171,16 +173,44 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
                   geo_parser_confidence:     geoResult.parser_confidence,
                 }).eq("id", article.id);
 
+                // 1b. Klasse B: replace per-row data in article_geo_addresses with region/continent enrichment
+                if (geoResult.geo_class === "B" && geoResult.class_b_addresses) {
+                  await db.from("article_geo_addresses").delete().eq("article_id", article.id);
+
+                  const insertRows = geoResult.class_b_addresses.map((addr) => ({
+                    article_id:            article.id,
+                    position:              addr.position,
+                    city:                  addr.city,
+                    state:                 addr.state,
+                    country:               addr.country,
+                    region:                addr.country ? getRegion(addr.country) : null,
+                    continent:             addr.country ? getContinent(addr.country) : null,
+                    institution:           addr.institution,
+                    institution2:          addr.institution2,
+                    institution3:          addr.institution3,
+                    institutions_overflow: addr.institutions_overflow,
+                    department:            addr.department,
+                    department2:           addr.department2,
+                    department3:           addr.department3,
+                    departments_overflow:  addr.departments_overflow,
+                    confidence:            addr.confidence,
+                    state_source:          addr.state ? "parser" : null,
+                  }));
+                  await db.from("article_geo_addresses").insert(insertRows);
+                }
+
                 // 2. Upsert parser metadata to article_geo_metadata
                 await db.from("article_geo_metadata").upsert({
-                  article_id:            article.id,
-                  geo_class:             geoResult.geo_class,
-                  geo_confidence:        geoResult.geo_confidence,
-                  parser_processed_at:   now,
-                  parser_version:        geoResult.parser_version,
-                  enriched_at:           geoResult.enriched_state_source ? now : null,
-                  enriched_state_source: geoResult.enriched_state_source,
-                  updated_at:            now,
+                  article_id:                article.id,
+                  geo_class:                 geoResult.geo_class,
+                  geo_confidence:            geoResult.geo_confidence,
+                  parser_processed_at:       now,
+                  parser_version:            geoResult.parser_version,
+                  enriched_at:               geoResult.enriched_state_source ? now : null,
+                  enriched_state_source:     geoResult.enriched_state_source,
+                  class_b_address_count:     geoResult.geo_class === "B" ? geoResult.class_b_addresses?.length ?? null : null,
+                  class_b_parser_version:    geoResult.geo_class === "B" ? geoResult.parser_version : null,
+                  updated_at:                now,
                 }, { onConflict: "article_id" });
 
                 // 3. Event log
