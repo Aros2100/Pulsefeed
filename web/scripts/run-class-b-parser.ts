@@ -1,10 +1,11 @@
 /**
- * Kør Klasse B-parseren på alle 'pending' artikler i geo_parser_b_run_1000.
+ * Kør Klasse B-parseren på N pending artikler i geo_parser_b_run_1000.
  * Skriver adresse-rows til geo_addresses_lab og opdaterer parser_status.
  *
  * Usage:
  *   set -a && source .env.local && set +a
- *   npx tsx scripts/run-class-b-parser.ts
+ *   npx tsx scripts/run-class-b-parser.ts        # default: 25
+ *   npx tsx scripts/run-class-b-parser.ts 100    # override
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -16,28 +17,35 @@ const db = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 ) as any;
 
-const BATCH_SIZE = 50;
+const CONCURRENCY = 10; // parallel parser calls within a run
+
+const runLimit = parseInt(process.argv[2] ?? "25", 10);
+if (isNaN(runLimit) || runLimit < 1) {
+  console.error("Ugyldigt antal:", process.argv[2]);
+  process.exit(1);
+}
 
 async function main() {
-  // ── 1. Hent pending artikler ──────────────────────────────────────────────
-  console.log("Henter pending artikler fra geo_parser_b_run_1000...");
+  // ── 1. Hent N pending artikler (ordered by created_at) ───────────────────
+  console.log(`Henter ${runLimit} pending artikler fra geo_parser_b_run_1000...`);
   const { data, error } = await db
     .from("geo_parser_b_run_1000")
     .select("pubmed_id, affiliation")
     .eq("parser_status", "pending")
-    .order("pubmed_id", { ascending: true });
+    .order("created_at", { ascending: true })
+    .limit(runLimit);
 
   if (error || !data) throw new Error(error?.message ?? "no data");
   const rows = data as Array<{ pubmed_id: string; affiliation: string }>;
-  console.log(`  ${rows.length} pending artikler.\n`);
+  console.log(`  ${rows.length} artikler hentet til denne kørsel.\n`);
 
   let parsed   = 0;
   let rejected = 0;
   let errors   = 0;
   let totalAddressRows = 0;
 
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < rows.length; i += CONCURRENCY) {
+    const batch = rows.slice(i, i + CONCURRENCY);
 
     await Promise.all(batch.map(async (row) => {
       const now = new Date().toISOString();
@@ -109,20 +117,37 @@ async function main() {
     }));
 
     process.stdout.write(
-      `\r  [${Math.min(i + BATCH_SIZE, rows.length)}/${rows.length}]  parsed=${parsed}  rejected=${rejected}  errors=${errors}     `
+      `\r  [${Math.min(i + CONCURRENCY, rows.length)}/${rows.length}]  parsed=${parsed}  rejected=${rejected}  errors=${errors}     `
     );
   }
-  console.log("\nParser-kørsel færdig.");
+  console.log("\nKørsel færdig.");
 
-  // ── 2. Aggregat-rapport ───────────────────────────────────────────────────
-  console.log(`\n── Overordnet rapport ──`);
-  console.log(`  Total:          ${rows.length}`);
-  console.log(`  Klasse B:       ${parsed}`);
-  console.log(`  Rejected:       ${rejected}`);
-  console.log(`  Errors:         ${errors}`);
-  console.log(`  Address-rows:   ${totalAddressRows}`);
+  // ── 2. Denne-kørsel rapport ───────────────────────────────────────────────
+  console.log(`\n── Denne kørsel (${rows.length} artikler) ──`);
+  console.log(`  Klasse B:    ${parsed}`);
+  console.log(`  Rejected:    ${rejected}`);
+  console.log(`  Errors:      ${errors}`);
   if (parsed > 0) {
-    console.log(`  Avg addresses:  ${(totalAddressRows / parsed).toFixed(2)}`);
+    console.log(`  Addr-rows:   ${totalAddressRows}  (avg ${(totalAddressRows / parsed).toFixed(2)})`);
+  }
+
+  // ── 3. Totaler på tværs af alle kørsler ──────────────────────────────────
+  const { data: totals } = await db
+    .from("geo_parser_b_run_1000")
+    .select("parser_status");
+
+  if (totals) {
+    const all = totals as Array<{ parser_status: string }>;
+    const totalParsed   = all.filter((r) => r.parser_status === "parsed").length;
+    const totalRejected = all.filter((r) => r.parser_status === "rejected").length;
+    const totalErrors   = all.filter((r) => r.parser_status === "error").length;
+    const totalPending  = all.filter((r) => r.parser_status === "pending").length;
+    console.log(`\n── Total (alle kørsler) ──`);
+    console.log(`  Processeret:  ${totalParsed + totalRejected + totalErrors} / ${all.length}`);
+    console.log(`  Klasse B:     ${totalParsed}`);
+    console.log(`  Rejected:     ${totalRejected}`);
+    console.log(`  Errors:       ${totalErrors}`);
+    console.log(`  Pending:      ${totalPending}`);
   }
 
   // ── 3. Fordeling (num_addresses) ─────────────────────────────────────────
