@@ -520,7 +520,7 @@ export default async function AdminArticleLogPage({
     getSubspecialties(ACTIVE_SPECIALTY),
     getArticleTypes(ACTIVE_SPECIALTY),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (admin as any).from("article_geo_metadata").select("geo_class, geo_confidence, parser_processed_at, parser_version, ai_processed_at, ai_model, ai_changes, enriched_at, enriched_state_source, class_b_address_count, class_b_parser_version, class_b_ai_prompt_version, class_b_ai_processed_at, class_b_enrichment_at").eq("article_id", id).maybeSingle(),
+    (admin as any).from("article_geo_metadata").select("geo_confidence, parser_processed_at, parser_version, ai_processed_at, ai_model, ai_prompt_version, ai_changes, enriched_at, enriched_state_source, class_b_address_count").eq("article_id", id).maybeSingle(),
   ]);
 
   const article = articleResult.data;
@@ -1192,57 +1192,10 @@ export default async function AdminArticleLogPage({
         metaAiChanges={(geoMeta?.ai_changes as string[] | null) ?? []}
         metaEnrichedAt={geoMeta?.enriched_at as string | null ?? null}
         metaEnrichedStateSource={geoMeta?.enriched_state_source as string | null ?? null}
+        metaAiPromptVersion={geoMeta?.ai_prompt_version as string | null ?? null}
         metaClassBAddressCount={geoMeta?.class_b_address_count as number | null ?? null}
-        metaClassBParserVersion={geoMeta?.class_b_parser_version as string | null ?? null}
-        metaClassBAiPromptVersion={geoMeta?.class_b_ai_prompt_version as string | null ?? null}
-        metaClassBAiProcessedAt={geoMeta?.class_b_ai_processed_at as string | null ?? null}
-        metaClassBEnrichmentAt={geoMeta?.class_b_enrichment_at as string | null ?? null}
       />
 
-      {/* Geo metadata */}
-      <Card>
-        <CardHeader label="Geo Metadata" />
-        <CardBody>
-          <DescriptionRow
-            label="Geo source"
-            value={raw.geo_source as string | null}
-            description="How the geo data was obtained — 'ror' (from ROR institution database), 'parser' (from affiliation text parsing), 'user' or 'admin' (manually set)."
-          />
-          <DescriptionRow
-            label="Confidence"
-            value={raw.geo_parser_confidence ? (
-              <Badge color={(raw.geo_parser_confidence as string) === "high" ? "green" : "orange"}>
-                {raw.geo_parser_confidence as string} confidence
-              </Badge>
-            ) : null}
-            description="Parser's confidence in the geo result — 'high' or 'low'. Based on how unambiguously the affiliation text could be parsed."
-          />
-          <DescriptionRow
-            label="AI attempted"
-            value={raw.ai_location_attempted != null ? (
-              <Badge color={raw.ai_location_attempted ? "purple" : "gray"}>
-                AI {raw.ai_location_attempted ? "yes" : "no"}
-              </Badge>
-            ) : null}
-            description="Whether the AI fallback was invoked to assist geo parsing when the rule-based parser was insufficient."
-          />
-          <DescriptionRow
-            label="Geo defined at"
-            value={raw.geo_defined_at ? fmt(raw.geo_defined_at as string) : null}
-            description="Timestamp of when geo was first set for this article (frozen thereafter)."
-          />
-          <DescriptionRow
-            label="Countries"
-            value={(() => { const c = parseSubArray(raw.article_countries); return c.length > 0 ? c.join(", ") : null; })()}
-            description="Aggregated list of all countries represented among the article's authors. Derived from author geo data."
-          />
-          <DescriptionRow
-            label="Cities"
-            value={(() => { const c = parseSubArray(raw.article_cities); return c.length > 0 ? c.join(", ") : null; })()}
-            description="Aggregated list of all cities represented among the article's authors. Derived from author geo data."
-          />
-        </CardBody>
-      </Card>
     </div>
   );
 

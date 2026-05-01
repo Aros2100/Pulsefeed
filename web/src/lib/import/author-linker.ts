@@ -212,16 +212,14 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
 
                 // 2. Upsert parser metadata to article_geo_metadata
                 await db.from("article_geo_metadata").upsert({
-                  article_id:                article.id,
-                  geo_class:                 geoResult.geo_class,
-                  geo_confidence:            geoResult.geo_confidence,
-                  parser_processed_at:       now,
-                  parser_version:            geoResult.parser_version,
-                  enriched_at:               geoResult.enriched_state_source ? now : null,
-                  enriched_state_source:     geoResult.enriched_state_source,
-                  class_b_address_count:     geoResult.geo_class === "B" ? geoResult.class_b_addresses?.length ?? null : null,
-                  class_b_parser_version:    geoResult.geo_class === "B" ? geoResult.parser_version : null,
-                  updated_at:                now,
+                  article_id:            article.id,
+                  geo_confidence:        geoResult.geo_confidence,
+                  parser_processed_at:   now,
+                  parser_version:        geoResult.parser_version,
+                  enriched_at:           geoResult.enriched_state_source ? now : null,
+                  enriched_state_source: geoResult.enriched_state_source,
+                  class_b_address_count: geoResult.geo_class === "B" ? geoResult.class_b_addresses?.length ?? null : null,
+                  updated_at:            now,
                 }, { onConflict: "article_id" });
 
                 // 3. Event log

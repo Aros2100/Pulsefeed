@@ -32,20 +32,16 @@ interface GeoCardProps {
   geoClass:    string | null;
   addressRows: ClassBAddress[];          // all rows from article_geo_addresses
   // article_geo_metadata
-  metaGeoConfidence:        string | null;
-  metaParserProcessedAt:    string | null;
-  metaParserVersion:        string | null;
-  metaAiProcessedAt:        string | null;
-  metaAiModel:              string | null;
-  metaAiChanges:            string[];
-  metaEnrichedAt:           string | null;
-  metaEnrichedStateSource:  string | null;
-  // Class B metadata
-  metaClassBAddressCount?:     number | null;
-  metaClassBAiProcessedAt?:    string | null;
-  metaClassBAiPromptVersion?:  string | null;
-  metaClassBEnrichmentAt?:     string | null;
-  metaClassBParserVersion?:    string | null;
+  metaGeoConfidence:       string | null;
+  metaParserProcessedAt:   string | null;
+  metaParserVersion:       string | null;
+  metaAiProcessedAt:       string | null;
+  metaAiModel:             string | null;
+  metaAiPromptVersion:     string | null;
+  metaAiChanges:           string[];
+  metaEnrichedAt:          string | null;
+  metaEnrichedStateSource: string | null;
+  metaClassBAddressCount?: number | null;
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -439,29 +435,23 @@ export default function GeoCard(props: GeoCardProps) {
         <CardHeader label="Geo Metadata" />
         <CardBody>
           <div style={{ fontSize: "13px", color: "#555" }}>
-            {isClassB ? (
-              <>
-                <GeoRow label="Addresses"      value={props.metaClassBAddressCount != null ? String(props.metaClassBAddressCount) : null} />
-                <GeoRow label="Parser version" value={props.metaClassBParserVersion ?? null} />
-                <GeoRow label="AI prompt"      value={props.metaClassBAiPromptVersion ?? null} />
-                <GeoRow label="AI ran at"      value={props.metaClassBAiProcessedAt ? fmt(props.metaClassBAiProcessedAt) : null} />
-                <GeoRow label="Enriched at"    value={props.metaClassBEnrichmentAt ? fmt(props.metaClassBEnrichmentAt) : null} />
-              </>
-            ) : (
-              <>
-                <GeoRow label="Confidence"           value={props.metaGeoConfidence} />
-                <GeoRow label="Parser version"        value={props.metaParserVersion} />
-                <GeoRow label="Parser ran at"         value={props.metaParserProcessedAt ? fmt(props.metaParserProcessedAt) : null} />
-                <GeoRow label="AI ran at"             value={props.metaAiProcessedAt ? fmt(props.metaAiProcessedAt) : null} />
-                <GeoRow label="AI model"              value={props.metaAiModel} />
-                {props.metaAiChanges.length > 0 && (
-                  <GeoRow label="AI changes" value={props.metaAiChanges.join(" · ")} />
-                )}
-                <GeoRow label="Enriched at"           value={props.metaEnrichedAt ? fmt(props.metaEnrichedAt) : null} />
-                <GeoRow label="Enriched state source" value={props.metaEnrichedStateSource} />
-              </>
-            )}
-            {!props.metaParserProcessedAt && !isClassB && (
+            <>
+              {isClassB && props.metaClassBAddressCount != null && (
+                <GeoRow label="Addresses"    value={String(props.metaClassBAddressCount)} />
+              )}
+              <GeoRow label="Confidence"     value={props.metaGeoConfidence} />
+              <GeoRow label="Parser version" value={props.metaParserVersion} />
+              <GeoRow label="Parser ran at"  value={props.metaParserProcessedAt ? fmt(props.metaParserProcessedAt) : null} />
+              <GeoRow label="AI ran at"      value={props.metaAiProcessedAt ? fmt(props.metaAiProcessedAt) : null} />
+              <GeoRow label="AI model"       value={props.metaAiModel} />
+              <GeoRow label="AI prompt"      value={props.metaAiPromptVersion} />
+              {props.metaAiChanges.length > 0 && (
+                <GeoRow label="AI changes"   value={props.metaAiChanges.join(" · ")} />
+              )}
+              <GeoRow label="Enriched at"    value={props.metaEnrichedAt ? fmt(props.metaEnrichedAt) : null} />
+              <GeoRow label="State source"   value={props.metaEnrichedStateSource} />
+            </>
+            {!props.metaParserProcessedAt && (
               <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#9ca3af", fontStyle: "italic" }}>
                 Parser has not run for this article yet.
               </p>

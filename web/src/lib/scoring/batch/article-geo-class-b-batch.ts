@@ -334,15 +334,13 @@ export async function ingestArticleGeoClassBBatchResults(
 
     const now = new Date().toISOString();
     const { error: metaErr } = await db.from("article_geo_metadata").update({
-      class_b_ai_prompt_version: promptVersion,
-      class_b_ai_processed_at:   now,
-      class_b_enrichment_at:     now,
-      class_b_address_count:     output.addresses.length,
-      ai_changes:                output.changes,
-      ai_processed_at:           now,
-      ai_model:                  GEO_AI_MODEL,
-      ai_prompt_version:         promptVersion,
-      updated_at:                now,
+      class_b_address_count: output.addresses.length,
+      ai_changes:            output.changes,
+      ai_processed_at:       now,
+      ai_model:              GEO_AI_MODEL,
+      ai_prompt_version:     promptVersion,
+      enriched_at:           now,
+      updated_at:            now,
     }).eq("article_id", article_id);
     if (metaErr) {
       console.error(`[ingestGeoClassB] metadata update failed for ${article_id}: ${metaErr.message}`);
@@ -397,15 +395,13 @@ export async function processArticleSync(
 
   const now = new Date().toISOString();
   await db.from("article_geo_metadata").update({
-    class_b_ai_prompt_version: promptVersion,
-    class_b_ai_processed_at:   now,
-    class_b_enrichment_at:     now,
-    class_b_address_count:     output.addresses.length,
-    ai_changes:                output.changes,
-    ai_processed_at:           now,
-    ai_model:                  GEO_AI_MODEL,
-    ai_prompt_version:         promptVersion,
-    updated_at:                now,
+    class_b_address_count: output.addresses.length,
+    ai_changes:            output.changes,
+    ai_processed_at:       now,
+    ai_model:              GEO_AI_MODEL,
+    ai_prompt_version:     promptVersion,
+    enriched_at:           now,
+    updated_at:            now,
   }).eq("article_id", article.id);
 
   return {
