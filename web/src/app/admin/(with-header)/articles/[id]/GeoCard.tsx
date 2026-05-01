@@ -28,40 +28,24 @@ export interface ClassBAddress {
 }
 
 interface GeoCardProps {
-  articleId: string;
-  geoClass: string | null;
-  geoContinent: string | null;
-  geoRegion: string | null;
-  geoCountry: string | null;
-  geoState: string | null;
-  geoCity: string | null;
-  geoDepartment: string | null;
-  geoDepartment2: string | null;
-  geoDepartment3: string | null;
-  geoDepartmentsOverflow: string[];
-  geoInstitution: string | null;
-  geoInstitution2: string | null;
-  geoInstitution3: string | null;
-  geoInstitutionsOverflow: string[];
-  geoParserConfidence: string | null;
-  aiLocationAttempted: boolean | null;
-  geoDefinedAt: string | null;
+  articleId:   string;
+  geoClass:    string | null;
+  addressRows: ClassBAddress[];          // all rows from article_geo_addresses
   // article_geo_metadata
-  metaGeoConfidence: string | null;
-  metaParserProcessedAt: string | null;
-  metaParserVersion: string | null;
-  metaAiProcessedAt: string | null;
-  metaAiModel: string | null;
-  metaAiChanges: string[];
-  metaEnrichedAt: string | null;
-  metaEnrichedStateSource: string | null;
-  // Class B
-  classBAddresses?: ClassBAddress[];
-  metaClassBAddressCount?: number | null;
-  metaClassBAiProcessedAt?: string | null;
-  metaClassBAiPromptVersion?: string | null;
-  metaClassBEnrichmentAt?: string | null;
-  metaClassBParserVersion?: string | null;
+  metaGeoConfidence:        string | null;
+  metaParserProcessedAt:    string | null;
+  metaParserVersion:        string | null;
+  metaAiProcessedAt:        string | null;
+  metaAiModel:              string | null;
+  metaAiChanges:            string[];
+  metaEnrichedAt:           string | null;
+  metaEnrichedStateSource:  string | null;
+  // Class B metadata
+  metaClassBAddressCount?:     number | null;
+  metaClassBAiProcessedAt?:    string | null;
+  metaClassBAiPromptVersion?:  string | null;
+  metaClassBEnrichmentAt?:     string | null;
+  metaClassBParserVersion?:    string | null;
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -172,19 +156,21 @@ function classBadgeLabel(cls: string | null): string {
   if (cls === "A") return "Class A";
   if (cls === "B") return "Class B";
   if (cls === "C") return "Class C";
-  return cls ?? "—";
+  return cls ?? "Unknown";
 }
 
-// ── Class B address edit sub-component ────────────────────────────────────────
+// ── Address row (shared by A and B) ──────────────────────────────────────────
 
-function ClassBAddressRow({
+function AddressRow({
   articleId,
   addr,
+  showPositionHeader,
   onSaved,
 }: {
-  articleId: string;
-  addr: ClassBAddress;
-  onSaved: (updated: Partial<ClassBAddress>) => void;
+  articleId:         string;
+  addr:              ClassBAddress;
+  showPositionHeader: boolean;
+  onSaved:           (updates: Partial<ClassBAddress>) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [saving,  setSaving]  = useState(false);
@@ -192,28 +178,28 @@ function ClassBAddressRow({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    country:     addr.country     ?? "",
-    state:       addr.state       ?? "",
-    city:        addr.city        ?? "",
-    institution: addr.institution ?? "",
+    country:      addr.country      ?? "",
+    state:        addr.state        ?? "",
+    city:         addr.city         ?? "",
+    institution:  addr.institution  ?? "",
     institution2: addr.institution2 ?? "",
     institution3: addr.institution3 ?? "",
-    department:  addr.department  ?? "",
-    department2: addr.department2 ?? "",
-    department3: addr.department3 ?? "",
+    department:   addr.department   ?? "",
+    department2:  addr.department2  ?? "",
+    department3:  addr.department3  ?? "",
   });
 
   function startEdit() {
     setForm({
-      country:     addr.country     ?? "",
-      state:       addr.state       ?? "",
-      city:        addr.city        ?? "",
-      institution: addr.institution ?? "",
+      country:      addr.country      ?? "",
+      state:        addr.state        ?? "",
+      city:         addr.city         ?? "",
+      institution:  addr.institution  ?? "",
       institution2: addr.institution2 ?? "",
       institution3: addr.institution3 ?? "",
-      department:  addr.department  ?? "",
-      department2: addr.department2 ?? "",
-      department3: addr.department3 ?? "",
+      department:   addr.department   ?? "",
+      department2:  addr.department2  ?? "",
+      department3:  addr.department3  ?? "",
     });
     setEditing(true);
     setSavedMsg(false);
@@ -232,17 +218,17 @@ function ClassBAddressRow({
       const data = await res.json();
       if (data.ok) {
         onSaved({
-          country:     form.country     || null,
-          state:       form.state       || null,
-          city:        form.city        || null,
-          region:      data.region      ?? null,
-          continent:   data.continent   ?? null,
-          institution: form.institution || null,
+          country:      form.country      || null,
+          state:        form.state        || null,
+          city:         form.city         || null,
+          region:       data.region       ?? null,
+          continent:    data.continent    ?? null,
+          institution:  form.institution  || null,
           institution2: form.institution2 || null,
           institution3: form.institution3 || null,
-          department:  form.department  || null,
-          department2: form.department2 || null,
-          department3: form.department3 || null,
+          department:   form.department   || null,
+          department2:  form.department2  || null,
+          department3:  form.department3  || null,
           state_source: (form.state && form.state !== addr.state) ? "manual" : addr.state_source,
         });
         setEditing(false);
@@ -275,17 +261,26 @@ function ClassBAddressRow({
     );
   }
 
-  return (
-    <div style={{
-      border: "1px solid #e5e7eb", borderRadius: "8px",
-      padding: "16px 20px", marginBottom: "12px", background: "#fafafa",
-    }}>
-      {/* Address header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+  const wrapper = (children: React.ReactNode) =>
+    showPositionHeader ? (
+      <div style={{
+        border: "1px solid #e5e7eb", borderRadius: "8px",
+        padding: "16px 20px", marginBottom: "12px", background: "#fafafa",
+      }}>
+        {children}
+      </div>
+    ) : <>{children}</>;
+
+  return wrapper(
+    <>
+      {/* Header row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: showPositionHeader ? "12px" : "8px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{ fontSize: "12px", fontWeight: 700, color: "#5a6a85" }}>
-            Address {addr.position}
-          </span>
+          {showPositionHeader && (
+            <span style={{ fontSize: "12px", fontWeight: 700, color: "#5a6a85" }}>
+              Address {addr.position}
+            </span>
+          )}
           {addr.confidence && (
             <Badge color={addr.confidence === "high" ? "green" : "orange"}>
               {addr.confidence}
@@ -320,15 +315,15 @@ function ClassBAddressRow({
             <span style={{ color: "#888", fontSize: "14px" }}>Region</span>
             <span style={{ fontSize: "14px", color: "#9ca3af", fontStyle: "italic" }}>Auto-calculated from country</span>
           </div>
-          {editField("Country",      "country")}
-          {editField("State",        "state")}
-          {editField("City",         "city")}
-          {editField("Institution",  "institution")}
-          {editField("Institution 2","institution2")}
-          {editField("Institution 3","institution3")}
-          {editField("Department",   "department")}
-          {editField("Department 2", "department2")}
-          {editField("Department 3", "department3")}
+          {editField("Country",       "country")}
+          {editField("State",         "state")}
+          {editField("City",          "city")}
+          {editField("Institution",   "institution")}
+          {editField("Institution 2", "institution2")}
+          {editField("Institution 3", "institution3")}
+          {editField("Department",    "department")}
+          {editField("Department 2",  "department2")}
+          {editField("Department 3",  "department3")}
           {errorMsg && (
             <div style={{
               marginTop: "8px", padding: "8px 12px", background: "#fef2f2",
@@ -375,235 +370,67 @@ function ClassBAddressRow({
           <GeoRow label="Continent" value={addr.continent} />
         </>
       )}
-    </div>
+    </>
   );
 }
 
 // ── Main GeoCard ───────────────────────────────────────────────────────────────
 
 export default function GeoCard(props: GeoCardProps) {
-  const [editing,  setEditing]  = useState(false);
-  const [saving,   setSaving]   = useState(false);
-  const [savedMsg, setSavedMsg] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [rows, setRows] = useState<ClassBAddress[]>(props.addressRows);
 
-  const [geo, setGeo] = useState({
-    geoClass:            props.geoClass,
-    continent:           props.geoContinent,
-    region:              props.geoRegion,
-    country:             props.geoCountry,
-    state:               props.geoState,
-    city:                props.geoCity,
-    department:          props.geoDepartment,
-    department2:         props.geoDepartment2,
-    department3:         props.geoDepartment3,
-    departmentsOverflow: props.geoDepartmentsOverflow,
-    institution:         props.geoInstitution,
-    institution2:        props.geoInstitution2,
-    institution3:        props.geoInstitution3,
-    institutionsOverflow: props.geoInstitutionsOverflow,
-  });
-
-  const [form, setForm] = useState({
-    country:     geo.country     ?? "",
-    state:       geo.state       ?? "",
-    city:        geo.city        ?? "",
-    institution: geo.institution ?? "",
-    department:  geo.department  ?? "",
-  });
-
-  // Class B: mutable address list
-  const [classBAddrs, setClassBAddrs] = useState<ClassBAddress[]>(
-    props.classBAddresses ?? []
-  );
-
-  function updateClassBAddr(id: string, updates: Partial<ClassBAddress>) {
-    setClassBAddrs((prev) => prev.map((a) => a.id === id ? { ...a, ...updates } : a));
+  function updateRow(id: string, updates: Partial<ClassBAddress>) {
+    setRows((prev) => prev.map((r) => r.id === id ? { ...r, ...updates } : r));
   }
 
-  function startEditing() {
-    setForm({
-      country:     geo.country     ?? "",
-      state:       geo.state       ?? "",
-      city:        geo.city        ?? "",
-      institution: geo.institution ?? "",
-      department:  geo.department  ?? "",
-    });
-    setEditing(true);
-    setSavedMsg(false);
-    setErrorMsg(null);
-  }
-
-  async function save() {
-    setSaving(true);
-    setErrorMsg(null);
-    try {
-      const res = await fetch(`/api/admin/articles/${props.articleId}/geo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setGeo((prev) => ({
-          ...prev,
-          continent:   data.continent ?? null,
-          region:      data.region    ?? null,
-          country:     form.country   || null,
-          state:       form.state     || null,
-          city:        form.city      || null,
-          department:  form.department  || null,
-          institution: form.institution || null,
-        }));
-        setEditing(false);
-        setSavedMsg(true);
-        setTimeout(() => setSavedMsg(false), 3000);
-      } else {
-        setErrorMsg(data.error ?? "Unknown error");
-      }
-    } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : "Network error");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const editRow = (label: string, field: keyof typeof form) => (
-    <div style={{
-      display: "grid", gridTemplateColumns: "140px 1fr",
-      padding: "5px 0", alignItems: "center",
-    }}>
-      <span style={{ color: "#888", fontSize: "14px" }}>{label}</span>
-      <input
-        style={INPUT_STYLE}
-        value={form[field]}
-        onChange={(e) => setForm({ ...form, [field]: e.target.value })}
-        placeholder="—"
-      />
-    </div>
-  );
-
-  const isClassB = geo.geoClass === "B";
+  const isClassB = props.geoClass === "B";
+  const hasRows  = rows.length > 0;
 
   return (
     <>
-      {/* Sektion 1: Artiklens lokation */}
+      {/* Geo Location */}
       <Card>
-        <CardHeader
-          label="Geo Location"
-          right={
-            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-              {savedMsg && (
-                <span style={{ fontSize: "11px", color: "#15803d", fontWeight: 600 }}>Saved ✓</span>
-              )}
-              {!isClassB && !editing && (
-                <button onClick={startEditing} style={ghostBtn}>Edit</button>
-              )}
-            </div>
-          }
-        />
+        <CardHeader label="Geo Location" />
         <CardBody>
-          {/* Class badge row (always shown when class is set) */}
-          {geo.geoClass && (
+          {/* Class badge */}
+          {props.geoClass && (
             <div style={{
               display: "grid", gridTemplateColumns: "140px 1fr",
               padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontSize: "14px",
+              marginBottom: hasRows ? "12px" : 0,
             }}>
               <span style={{ color: "#888" }}>Class</span>
-              <Badge color={classBadgeColor(geo.geoClass)}>
-                {classBadgeLabel(geo.geoClass)}
+              <Badge color={classBadgeColor(props.geoClass)}>
+                {classBadgeLabel(props.geoClass)}
               </Badge>
             </div>
           )}
 
-          {/* ── Class B: multi-address list ── */}
-          {isClassB && (
-            <>
-              {classBAddrs.length === 0 ? (
-                <p style={{ margin: "12px 0 0", fontSize: "13px", color: "#9ca3af", fontStyle: "italic" }}>
-                  No address rows found — run author-linker to populate.
-                </p>
-              ) : (
-                <div style={{ marginTop: "12px" }}>
-                  {classBAddrs.map((addr) => (
-                    <ClassBAddressRow
-                      key={addr.id}
-                      articleId={props.articleId}
-                      addr={addr}
-                      onSaved={(updates) => updateClassBAddr(addr.id, updates)}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* ── Class A / C: flat view ── */}
-          {!isClassB && !editing && !geo.department && !geo.institution && !geo.city && !geo.state && !geo.country && !geo.region && !geo.continent ? (
+          {!hasRows ? (
             <p style={{ margin: 0, fontSize: "13px", color: "#9ca3af", fontStyle: "italic" }}>
-              Location data not available — affiliation text could not be parsed.
+              Location data not available — article has not been parsed with the new geo pipeline yet.
             </p>
-          ) : !isClassB && editing ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", padding: "5px 0", alignItems: "center" }}>
-                <span style={{ color: "#888", fontSize: "14px" }}>Continent</span>
-                <span style={{ fontSize: "14px", color: "#9ca3af", fontStyle: "italic" }}>Auto-calculated from country</span>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", padding: "5px 0", alignItems: "center" }}>
-                <span style={{ color: "#888", fontSize: "14px" }}>Region</span>
-                <span style={{ fontSize: "14px", color: "#9ca3af", fontStyle: "italic" }}>Auto-calculated from country</span>
-              </div>
-              {editRow("Country",     "country")}
-              {editRow("State",       "state")}
-              {editRow("City",        "city")}
-              {editRow("Institution", "institution")}
-              {editRow("Department",  "department")}
-              {errorMsg && (
-                <div style={{
-                  marginTop: "8px", padding: "8px 12px", background: "#fef2f2",
-                  border: "1px solid #fca5a5", borderRadius: "6px",
-                  fontSize: "13px", color: "#b91c1c",
-                }}>
-                  {errorMsg}
-                </div>
-              )}
-              <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
-                <button onClick={save} disabled={saving} style={{
-                  padding: "8px 16px", borderRadius: "7px", border: "none",
-                  fontFamily: "inherit", fontSize: "13px", fontWeight: 600,
-                  cursor: saving ? "not-allowed" : "pointer",
-                  background: saving ? "#e5e7eb" : "#1a1a1a",
-                  color: saving ? "#9ca3af" : "#fff",
-                }}>
-                  {saving ? "Saving…" : "Save"}
-                </button>
-                <button onClick={() => setEditing(false)} disabled={saving}
-                  style={{ ...ghostBtn, padding: "8px 16px", fontSize: "13px" }}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : !isClassB ? (
-            <>
-              {[geo.department, geo.department2, geo.department3]
-                .filter(Boolean)
-                .map((v, i) => <GeoRow key={i} label={i === 0 ? "Department" : `Department ${i + 1}`} value={v} />)}
-              {geo.departmentsOverflow.length > 0 && (
-                <GeoRow label="Departments +" value={geo.departmentsOverflow.join(" · ")} />
-              )}
-              {[geo.institution, geo.institution2, geo.institution3]
-                .filter(Boolean)
-                .map((v, i) => <GeoRow key={i} label={i === 0 ? "Institution" : `Institution ${i + 1}`} value={v} />)}
-              {geo.institutionsOverflow.length > 0 && (
-                <GeoRow label="Institutions +" value={geo.institutionsOverflow.join(" · ")} />
-              )}
-              <GeoRow label="City"      value={geo.city} />
-              <GeoRow label="State"     value={geo.state} />
-              <GeoRow label="Country"   value={geo.country} />
-              <GeoRow label="Region"    value={geo.region} />
-              <GeoRow label="Continent" value={geo.continent} />
-            </>
-          ) : null}
+          ) : isClassB ? (
+            /* Klasse B: list of address cards */
+            rows.map((addr) => (
+              <AddressRow
+                key={addr.id}
+                articleId={props.articleId}
+                addr={addr}
+                showPositionHeader
+                onSaved={(u) => updateRow(addr.id, u)}
+              />
+            ))
+          ) : (
+            /* Klasse A: single address, flat style */
+            <AddressRow
+              key={rows[0].id}
+              articleId={props.articleId}
+              addr={rows[0]}
+              showPositionHeader={false}
+              onSaved={(u) => updateRow(rows[0].id, u)}
+            />
+          )}
         </CardBody>
       </Card>
 
@@ -614,23 +441,23 @@ export default function GeoCard(props: GeoCardProps) {
           <div style={{ fontSize: "13px", color: "#555" }}>
             {isClassB ? (
               <>
-                <GeoRow label="Addresses"           value={props.metaClassBAddressCount != null ? String(props.metaClassBAddressCount) : null} />
-                <GeoRow label="Parser version"      value={props.metaClassBParserVersion ?? null} />
-                <GeoRow label="AI prompt"           value={props.metaClassBAiPromptVersion ?? null} />
-                <GeoRow label="AI ran at"           value={props.metaClassBAiProcessedAt ? fmt(props.metaClassBAiProcessedAt) : null} />
-                <GeoRow label="Enriched at"         value={props.metaClassBEnrichmentAt ? fmt(props.metaClassBEnrichmentAt) : null} />
+                <GeoRow label="Addresses"      value={props.metaClassBAddressCount != null ? String(props.metaClassBAddressCount) : null} />
+                <GeoRow label="Parser version" value={props.metaClassBParserVersion ?? null} />
+                <GeoRow label="AI prompt"      value={props.metaClassBAiPromptVersion ?? null} />
+                <GeoRow label="AI ran at"      value={props.metaClassBAiProcessedAt ? fmt(props.metaClassBAiProcessedAt) : null} />
+                <GeoRow label="Enriched at"    value={props.metaClassBEnrichmentAt ? fmt(props.metaClassBEnrichmentAt) : null} />
               </>
             ) : (
               <>
-                <GeoRow label="Confidence"          value={props.metaGeoConfidence} />
-                <GeoRow label="Parser version"      value={props.metaParserVersion} />
-                <GeoRow label="Parser ran at"       value={props.metaParserProcessedAt ? fmt(props.metaParserProcessedAt) : null} />
-                <GeoRow label="AI ran at"           value={props.metaAiProcessedAt ? fmt(props.metaAiProcessedAt) : null} />
-                <GeoRow label="AI model"            value={props.metaAiModel} />
+                <GeoRow label="Confidence"           value={props.metaGeoConfidence} />
+                <GeoRow label="Parser version"        value={props.metaParserVersion} />
+                <GeoRow label="Parser ran at"         value={props.metaParserProcessedAt ? fmt(props.metaParserProcessedAt) : null} />
+                <GeoRow label="AI ran at"             value={props.metaAiProcessedAt ? fmt(props.metaAiProcessedAt) : null} />
+                <GeoRow label="AI model"              value={props.metaAiModel} />
                 {props.metaAiChanges.length > 0 && (
-                  <GeoRow label="AI changes"        value={props.metaAiChanges.join(" · ")} />
+                  <GeoRow label="AI changes" value={props.metaAiChanges.join(" · ")} />
                 )}
-                <GeoRow label="Enriched at"         value={props.metaEnrichedAt ? fmt(props.metaEnrichedAt) : null} />
+                <GeoRow label="Enriched at"           value={props.metaEnrichedAt ? fmt(props.metaEnrichedAt) : null} />
                 <GeoRow label="Enriched state source" value={props.metaEnrichedStateSource} />
               </>
             )}

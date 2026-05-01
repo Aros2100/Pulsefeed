@@ -540,16 +540,13 @@ export default async function AdminArticleLogPage({
   const raw = article as Record<string, unknown>;
   const geoMeta = (geoMetaResult as { data: Record<string, unknown> | null }).data ?? null;
 
-  // Fetch Class B address rows when geo_class = 'B'
-  const isClassB = (raw.geo_class as string | null) === "B";
+  // Fetch all address rows from article_geo_addresses (Klasse A: 1 row, Klasse B: N rows)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: classBAddressRows } = isClassB
-    ? await (admin as any)
-        .from("article_geo_addresses")
-        .select("id, position, city, state, country, region, continent, institution, institution2, institution3, institutions_overflow, department, department2, department3, departments_overflow, confidence, state_source, ai_action, ai_changes, ai_processed_at")
-        .eq("article_id", id)
-        .order("position", { ascending: true })
-    : { data: null };
+  const { data: geoAddressRows } = await (admin as any)
+    .from("article_geo_addresses")
+    .select("id, position, city, state, country, region, continent, institution, institution2, institution3, institutions_overflow, department, department2, department3, departments_overflow, confidence, state_source, ai_action, ai_changes, ai_processed_at")
+    .eq("article_id", id)
+    .order("position", { ascending: true });
 
   const authorIdByPosition = new Map(
     (authorLinksResult.data ?? []).map((r) => [r.position as number, r.author_id as string])
@@ -1186,22 +1183,7 @@ export default async function AdminArticleLogPage({
       <GeoCard
         articleId={id}
         geoClass={raw.geo_class as string | null}
-        geoContinent={raw.geo_continent as string | null}
-        geoRegion={raw.geo_region as string | null}
-        geoCountry={raw.geo_country as string | null}
-        geoState={raw.geo_state as string | null}
-        geoCity={raw.geo_city as string | null}
-        geoDepartment={raw.geo_department as string | null}
-        geoDepartment2={raw.geo_department2 as string | null}
-        geoDepartment3={raw.geo_department3 as string | null}
-        geoDepartmentsOverflow={(raw.geo_departments_overflow as string[] | null) ?? []}
-        geoInstitution={raw.geo_institution as string | null}
-        geoInstitution2={raw.geo_institution2 as string | null}
-        geoInstitution3={raw.geo_institution3 as string | null}
-        geoInstitutionsOverflow={(raw.geo_institutions_overflow as string[] | null) ?? []}
-        geoParserConfidence={raw.geo_parser_confidence as string | null}
-        aiLocationAttempted={raw.ai_location_attempted as boolean | null}
-        geoDefinedAt={raw.geo_defined_at as string | null}
+        addressRows={(geoAddressRows ?? []) as import("./GeoCard").ClassBAddress[]}
         metaGeoConfidence={geoMeta?.geo_confidence as string | null ?? null}
         metaParserProcessedAt={geoMeta?.parser_processed_at as string | null ?? null}
         metaParserVersion={geoMeta?.parser_version as string | null ?? null}
@@ -1210,7 +1192,6 @@ export default async function AdminArticleLogPage({
         metaAiChanges={(geoMeta?.ai_changes as string[] | null) ?? []}
         metaEnrichedAt={geoMeta?.enriched_at as string | null ?? null}
         metaEnrichedStateSource={geoMeta?.enriched_state_source as string | null ?? null}
-        classBAddresses={(classBAddressRows ?? []) as import("./GeoCard").ClassBAddress[]}
         metaClassBAddressCount={geoMeta?.class_b_address_count as number | null ?? null}
         metaClassBParserVersion={geoMeta?.class_b_parser_version as string | null ?? null}
         metaClassBAiPromptVersion={geoMeta?.class_b_ai_prompt_version as string | null ?? null}
