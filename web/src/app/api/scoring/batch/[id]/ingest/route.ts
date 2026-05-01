@@ -8,6 +8,7 @@ import { ingestArticleTypeBatchResults } from "@/lib/scoring/batch/article-type-
 import { ingestCondensationTextBatchResults } from "@/lib/scoring/batch/condensation-text-batch";
 import { ingestCondensationSariBatchResults } from "@/lib/scoring/batch/condensation-sari-batch";
 import { ingestArticleGeoClassABatchResults } from "@/lib/scoring/batch/article-geo-class-a-batch";
+import { ingestArticleGeoClassBBatchResults } from "@/lib/scoring/batch/article-geo-class-b-batch";
 
 export async function POST(
   _request: NextRequest,
@@ -112,6 +113,13 @@ export async function POST(
         row.prompt_version
       );
       stats = { scored: geoStats.scored, approved: undefined, rejected: undefined, failed: geoStats.failed, failedIds: geoStats.failedIds };
+    } else if (row.module === "article_geo_class_b") {
+      const geoBStats = await ingestArticleGeoClassBBatchResults(
+        row.anthropic_batch_id,
+        row.custom_id_map as Record<string, string>,
+        row.prompt_version
+      );
+      stats = { scored: geoBStats.scored, approved: undefined, rejected: undefined, failed: geoBStats.failed, failedIds: geoBStats.failedIds };
     } else {
       stats = await ingestSpecialtyBatchResults(
         row.anthropic_batch_id,
