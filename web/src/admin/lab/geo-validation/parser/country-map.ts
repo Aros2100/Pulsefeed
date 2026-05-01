@@ -324,6 +324,8 @@ const RAW_COUNTRY_MAP: Record<string, string> = {
   "chile": "Chile",
   "taiwan": "Taiwan",
   "r.o.c": "Taiwan",   // Republic of China — lookupCountry strips trailing dot before lookup
+  "taiwan, roc": "Taiwan",
+  "iran (the islamic republic of)": "Iran",
   "singapore": "Singapore",
   "hong kong": "Hong Kong",
   "thailand": "Thailand",
