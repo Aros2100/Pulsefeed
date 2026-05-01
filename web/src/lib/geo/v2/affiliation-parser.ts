@@ -516,8 +516,18 @@ function parseSingleAddress(
     } else if (isPhoneNumber(seg)) {
       segments.splice(i, 1);
     } else {
-      const zipCountryMatch = seg.match(/^(\d{3,6})\s+(.+)$/);
-      if (zipCountryMatch) segments[i] = zipCountryMatch[2].trim();
+      // Cedex format: "83800 Toulon Cedex 9" or "Toulon Cedex 9" → "Toulon"
+      // Must be checked before the generic zipCountryMatch so the city name is
+      // extracted cleanly (not left as "Toulon Cedex 9" which city-lookup may miss).
+      const cedexMatch = seg.match(
+        /^(?:\d{3,6}\s+)?([A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F\-'\s]+?)\s+[Cc]é?dex\b.*$/i
+      );
+      if (cedexMatch) {
+        segments[i] = cedexMatch[1].trim();
+      } else {
+        const zipCountryMatch = seg.match(/^(\d{3,6})\s+(.+)$/);
+        if (zipCountryMatch) segments[i] = zipCountryMatch[2].trim();
+      }
     }
   }
 
