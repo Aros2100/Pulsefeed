@@ -524,6 +524,24 @@ function parseSingleAddress(
       );
       if (cedexMatch) {
         segments[i] = cedexMatch[1].trim();
+        // Also strip any preceding street segments that belong to the same
+        // address block: a street name (isAddressFragment) and/or a bare
+        // street number (/^\d+$/) immediately before the Cedex segment.
+        // e.g. "2, boulevard Sainte-Anne, 83800 Toulon Cedex 9"
+        //       → remove "boulevard Sainte-Anne" (address fragment)
+        //       → remove "2" (bare street number)
+        const toRemove: number[] = [];
+        let check = i - 1;
+        if (check >= 0 && isAddressFragment(segments[check])) {
+          toRemove.push(check--);
+        }
+        if (check >= 0 && /^\d+$/.test(segments[check])) {
+          toRemove.push(check);
+        }
+        // Splice highest index first to preserve lower indices
+        for (const idx of toRemove.sort((a, b) => b - a)) {
+          segments.splice(idx, 1);
+        }
       } else {
         const zipCountryMatch = seg.match(/^(\d{3,6})\s+(.+)$/);
         if (zipCountryMatch) segments[i] = zipCountryMatch[2].trim();
