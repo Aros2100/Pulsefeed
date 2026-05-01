@@ -520,7 +520,7 @@ export default async function AdminArticleLogPage({
     getSubspecialties(ACTIVE_SPECIALTY),
     getArticleTypes(ACTIVE_SPECIALTY),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (admin as any).from("article_geo_metadata").select("geo_class, geo_confidence, parser_processed_at, parser_version, ai_processed_at, ai_model, ai_changes, enriched_at, enriched_state_source").eq("article_id", id).maybeSingle(),
+    (admin as any).from("article_geo_metadata").select("geo_class, geo_confidence, parser_processed_at, parser_version, ai_processed_at, ai_model, ai_changes, enriched_at, enriched_state_source, class_b_address_count, class_b_parser_version, class_b_ai_prompt_version, class_b_ai_processed_at, class_b_enrichment_at").eq("article_id", id).maybeSingle(),
   ]);
 
   const article = articleResult.data;
@@ -539,6 +539,17 @@ export default async function AdminArticleLogPage({
   const a   = article as unknown as ArticleData;
   const raw = article as Record<string, unknown>;
   const geoMeta = (geoMetaResult as { data: Record<string, unknown> | null }).data ?? null;
+
+  // Fetch Class B address rows when geo_class = 'B'
+  const isClassB = (raw.geo_class as string | null) === "B";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: classBAddressRows } = isClassB
+    ? await (admin as any)
+        .from("article_geo_addresses")
+        .select("id, position, city, state, country, region, continent, institution, institution2, institution3, institutions_overflow, department, department2, department3, departments_overflow, confidence, state_source, ai_action, ai_changes, ai_processed_at")
+        .eq("article_id", id)
+        .order("position", { ascending: true })
+    : { data: null };
 
   const authorIdByPosition = new Map(
     (authorLinksResult.data ?? []).map((r) => [r.position as number, r.author_id as string])
@@ -1199,6 +1210,12 @@ export default async function AdminArticleLogPage({
         metaAiChanges={(geoMeta?.ai_changes as string[] | null) ?? []}
         metaEnrichedAt={geoMeta?.enriched_at as string | null ?? null}
         metaEnrichedStateSource={geoMeta?.enriched_state_source as string | null ?? null}
+        classBAddresses={(classBAddressRows ?? []) as import("./GeoCard").ClassBAddress[]}
+        metaClassBAddressCount={geoMeta?.class_b_address_count as number | null ?? null}
+        metaClassBParserVersion={geoMeta?.class_b_parser_version as string | null ?? null}
+        metaClassBAiPromptVersion={geoMeta?.class_b_ai_prompt_version as string | null ?? null}
+        metaClassBAiProcessedAt={geoMeta?.class_b_ai_processed_at as string | null ?? null}
+        metaClassBEnrichmentAt={geoMeta?.class_b_enrichment_at as string | null ?? null}
       />
 
       {/* Geo metadata */}
