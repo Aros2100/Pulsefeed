@@ -154,9 +154,9 @@ async function main() {
       const allProcessed = after.every((r) => r.ai_processed_at !== null);
       const { data: meta } = await db
         .from("article_geo_metadata")
-        .select("class_b_ai_processed_at, class_b_ai_prompt_version, class_b_address_count")
+        .select("ai_processed_at, ai_prompt_version, class_b_address_count")
         .eq("article_id", article.id).maybeSingle();
-      const metaOk = meta?.class_b_ai_processed_at !== null && meta?.class_b_ai_prompt_version === promptVersion;
+      const metaOk = meta?.ai_processed_at !== null && meta?.ai_prompt_version === promptVersion;
 
       for (const r of after) {
         aiActionDist.set(r.ai_action ?? "(null)", (aiActionDist.get(r.ai_action ?? "(null)") ?? 0) + 1);
