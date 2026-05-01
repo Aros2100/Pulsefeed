@@ -41,7 +41,14 @@ export async function GET(request: NextRequest) {
   if (subspecialty) query = query.contains("subspecialty_ai",   [subspecialty]);
   if (country)      query = query.contains("article_countries", [country]);
   if (city)         query = query.contains("article_cities",    [city]);
-  if (region)       query = query.eq("geo_region",              region);
+  if (region) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: geoRows } = await (supabase as any)
+      .from("article_geo_addresses").select("article_id").eq("region", region);
+    const geoIds = [...new Set(((geoRows ?? []) as Array<{ article_id: string }>).map((r) => r.article_id))];
+    if (geoIds.length === 0) return NextResponse.json({ count: 0 });
+    query = query.in("id", geoIds);
+  }
 
   const { count, error } = await query;
   if (error) return NextResponse.json({ count: 0 }, { status: 500 });

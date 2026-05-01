@@ -64,10 +64,18 @@ export async function GET(request: NextRequest) {
   }
 
   if (subspecialty) query = query.contains("subspecialty_ai",   [subspecialty]);
-  if (region)       query = query.eq("geo_region",               region);
-  if (country)      query = query.contains("article_countries",  [country]);
-  if (city)         query = query.contains("article_cities",     [city]);
-  if (institution)  query = query.eq("geo_institution",          institution);
+  if (region || institution) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let geoQ = (supabase as any).from("article_geo_addresses").select("article_id");
+    if (region)      geoQ = geoQ.eq("region",      region);
+    if (institution) geoQ = geoQ.eq("institution", institution);
+    const { data: geoRows } = await geoQ;
+    const geoIds = [...new Set(((geoRows ?? []) as Array<{ article_id: string }>).map((r) => r.article_id))];
+    if (geoIds.length === 0) return NextResponse.json({ articles: [], totalCount: 0, totalPages: 0 });
+    query = query.in("id", geoIds);
+  }
+  if (country) query = query.contains("article_countries", [country]);
+  if (city)    query = query.contains("article_cities",    [city]);
 
   const { data: articles, count, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -92,20 +92,28 @@ export default async function ArticlesPage({
     );
   }
 
-  if (continent) {
-    const regions = [...new Set(
-      Object.entries(REGION_MAP)
-        .filter(([, r]) => getContinent(r) === continent)
-        .map(([, r]) => r),
-    )];
-    if (regions.length > 0) articlesQuery = articlesQuery.in("geo_region", regions);
+  // Geo filters resolved via article_geo_addresses
+  if (continent || region || hospital) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let geoQ = (supabase as any).from("article_geo_addresses").select("article_id");
+    if (continent) {
+      const regions = [...new Set(
+        Object.entries(REGION_MAP)
+          .filter(([, r]) => getContinent(r) === continent)
+          .map(([, r]) => r),
+      )];
+      if (regions.length > 0) geoQ = geoQ.in("region", regions);
+    }
+    if (region)   geoQ = geoQ.eq("region",      region);
+    if (hospital) geoQ = geoQ.eq("institution", hospital);
+    const { data: geoRows } = await geoQ;
+    const geoIds = [...new Set(((geoRows ?? []) as Array<{ article_id: string }>).map((r) => r.article_id))];
+    articlesQuery = articlesQuery.in("id", geoIds.length > 0 ? geoIds : ["00000000-0000-0000-0000-000000000000"]);
   }
-  if (region)     articlesQuery = articlesQuery.eq("geo_region",         region);
   if (country)    articlesQuery = articlesQuery.contains("article_countries", [country]);
   if (city)       articlesQuery = articlesQuery.contains("article_cities",    [city]);
-  if (hospital)   articlesQuery = articlesQuery.eq("geo_institution",     hospital);
   if (geo_search) articlesQuery = articlesQuery.or(
-    `article_countries.cs.{${geo_search}},article_cities.cs.{${geo_search}},geo_institution.ilike.%${geo_search}%`,
+    `article_countries.cs.{${geo_search}},article_cities.cs.{${geo_search}}`,
   );
 
   const [
@@ -117,10 +125,11 @@ export default async function ArticlesPage({
     articlesQuery,
     supabase.from("saved_articles").select("article_id, project_id").eq("user_id", user.id),
     supabase.from("projects").select("id, name").eq("user_id", user.id).order("created_at", { ascending: false }),
-    supabase.from("articles")
-      .select("geo_region, article_countries, article_cities, geo_institution")
-      .eq("status", "approved")
-      .not("geo_region", "is", null),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from("article_geo_addresses")
+      .select("article_id, region, country, city, institution")
+      .not("region", "is", null),
   ]);
 
   const totalPages = Math.ceil((totalCount ?? 0) / PAGE_SIZE);
@@ -134,12 +143,12 @@ export default async function ArticlesPage({
     if (row.article_id) savedMap[row.article_id] = row.project_id ?? null;
   }
 
-  // Build cascading geo maps from location rows
+  // Build cascading geo maps from article_geo_addresses rows
   type LocationRow = {
-    geo_region:        string | null;
-    article_countries: string[] | null;
-    article_cities:    string[] | null;
-    geo_institution:   string | null;
+    region:      string | null;
+    country:     string | null;
+    city:        string | null;
+    institution: string | null;
   };
   const locationData = (locationRows ?? []) as unknown as LocationRow[];
 
@@ -149,17 +158,19 @@ export default async function ArticlesPage({
   const cityToInstitutions:  Record<string, Set<string>> = {};
 
   for (const row of locationData) {
-    const reg = row.geo_region;
+    const reg = row.region;
     if (!reg) continue;
     allRegions.add(reg);
     if (!regionToCountries[reg]) regionToCountries[reg] = new Set();
-    for (const c of row.article_countries ?? []) {
-      regionToCountries[reg].add(c);
-      if (!countryToCities[c]) countryToCities[c] = new Set();
-      for (const ci of row.article_cities ?? []) {
-        countryToCities[c].add(ci);
+    const cty = row.country;
+    if (cty) {
+      regionToCountries[reg].add(cty);
+      if (!countryToCities[cty]) countryToCities[cty] = new Set();
+      const ci = row.city;
+      if (ci) {
+        countryToCities[cty].add(ci);
         if (!cityToInstitutions[ci]) cityToInstitutions[ci] = new Set();
-        if (row.geo_institution) cityToInstitutions[ci].add(row.geo_institution);
+        if (row.institution) cityToInstitutions[ci].add(row.institution);
       }
     }
   }

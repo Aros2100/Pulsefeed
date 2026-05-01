@@ -91,11 +91,20 @@ export async function GET(request: NextRequest) {
   if (article_type)  query = query.eq("article_type", article_type);
   if (pub_date_from) query = query.gte("pubmed_indexed_at", pub_date_from);
   if (pub_date_to)   query = query.lte("pubmed_indexed_at", pub_date_to);
-  if (geo_continent) query = query.eq("geo_continent", geo_continent);
-  if (geo_region)    query = query.eq("geo_region", geo_region);
-  if (geo_country)   query = query.eq("geo_country", geo_country);
-  if (geo_state)     query = query.eq("geo_state", geo_state);
-  if (geo_city)      query = query.eq("geo_city", geo_city);
+  // Geo filters: resolve article IDs from article_geo_addresses
+  if (geo_continent || geo_region || geo_country || geo_state || geo_city) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let geoQ = (supabase as any).from("article_geo_addresses").select("article_id");
+    if (geo_continent) geoQ = geoQ.eq("continent", geo_continent);
+    if (geo_region)    geoQ = geoQ.eq("region",    geo_region);
+    if (geo_country)   geoQ = geoQ.eq("country",   geo_country);
+    if (geo_state)     geoQ = geoQ.eq("state",      geo_state);
+    if (geo_city)      geoQ = geoQ.eq("city",        geo_city);
+    const { data: geoRows } = await geoQ;
+    const geoIds = [...new Set(((geoRows ?? []) as Array<{ article_id: string }>).map((r) => r.article_id))];
+    if (geoIds.length === 0) return NextResponse.json({ ok: true, rows: [], total: 0 });
+    query = query.in("id", geoIds);
+  }
 
   const { data: rows, count, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
