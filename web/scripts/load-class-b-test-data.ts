@@ -37,7 +37,7 @@ async function main() {
 
   const candidates: Array<{ pubmed_id: string; affiliation: string }> = [];
   let offset = 0;
-  const FETCH_BATCH = 2000;
+  const FETCH_BATCH = 1000; // PostgREST default max per request
 
   while (candidates.length < LIMIT) {
     const { data, error } = await db
