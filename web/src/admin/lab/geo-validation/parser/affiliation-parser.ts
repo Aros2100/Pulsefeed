@@ -164,6 +164,10 @@ function isGeoSegment(seg: string, cityNames: Set<string>): boolean {
  */
 function isAddressFragment(segment: string): boolean {
   const s = segment.trim();
+  // Bare street number (1–4 digits): "2", "17", "100" — never a valid institution name.
+  // Handles fragments like "2, boulevard Sainte-Anne, 83800 Toulon cedex 9" where
+  // the trailing chain removal needs to reach the street number.
+  if (/^\d{1,4}$/.test(s)) return true;
   // A1: Room/suite code — digit followed immediately by letters/digits, no spaces
   //     "1R203", "2A14", "3F" — but NOT research-unit IDs like "UMR5287" (starts with letter)
   if (/^\d[A-Z0-9]{1,7}$/.test(s)) return true;
@@ -520,28 +524,10 @@ function parseSingleAddress(
       // Must be checked before the generic zipCountryMatch so the city name is
       // extracted cleanly (not left as "Toulon Cedex 9" which city-lookup may miss).
       const cedexMatch = seg.match(
-        /^(?:\d{3,6}\s+)?([A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F\-'\s]+?)\s+[Cc]é?dex\b.*$/i
+        /^(?:\d{3,6}\s+)?([A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F\-'\s]+?)\s+[Cc][eé]?dex\b.*$/i
       );
       if (cedexMatch) {
         segments[i] = cedexMatch[1].trim();
-        // Also strip any preceding street segments that belong to the same
-        // address block: a street name (isAddressFragment) and/or a bare
-        // street number (/^\d+$/) immediately before the Cedex segment.
-        // e.g. "2, boulevard Sainte-Anne, 83800 Toulon Cedex 9"
-        //       → remove "boulevard Sainte-Anne" (address fragment)
-        //       → remove "2" (bare street number)
-        const toRemove: number[] = [];
-        let check = i - 1;
-        if (check >= 0 && isAddressFragment(segments[check])) {
-          toRemove.push(check--);
-        }
-        if (check >= 0 && /^\d+$/.test(segments[check])) {
-          toRemove.push(check);
-        }
-        // Splice highest index first to preserve lower indices
-        for (const idx of toRemove.sort((a, b) => b - a)) {
-          segments.splice(idx, 1);
-        }
       } else {
         const zipCountryMatch = seg.match(/^(\d{3,6})\s+(.+)$/);
         if (zipCountryMatch) segments[i] = zipCountryMatch[2].trim();
@@ -583,6 +569,9 @@ function parseSingleAddress(
   // Bug-2 fix: when a US state name is the last segment (no explicit "USA"),
   // capture it here so Step 2 can set state even without a following state token.
   let stateFromStep1: string | null = null;
+  // When Step 1's lookupCity pops the segment (setting country), the city name
+  // is saved here so Step 3 can use it as a fallback when no segments remain.
+  let cityFromStep1: string | null = null;
 
   {
     let lastSeg = segments[segments.length - 1].replace(/\.+$/, "").trim();
@@ -611,8 +600,9 @@ function parseSingleAddress(
       if (cityMatch) {
         country = cityMatch.country;
         if (country === "United States") isUS = true;
+        cityFromStep1 = cityMatch.city; // fallback if Step 3 finds no remaining segments
         segments.pop();
-        // city captured later
+        // city captured later (Step 3 picks it up from remaining segments, or uses cityFromStep1)
       } else {
         const lowerLast = lastSeg.toLowerCase();
         const found = CANONICAL_COUNTRIES.find((c) => lowerLast.includes(c.toLowerCase()));
@@ -741,6 +731,12 @@ function parseSingleAddress(
 
   if (city === null && institutionFallbackCity) {
     city = institutionFallbackCity;
+  }
+
+  // Step 1 city fallback: when lookupCity matched the last segment in Step 1 and popped it
+  // (leaving no segments for Step 3 to scan), use the saved city name.
+  if (city === null && cityFromStep1) {
+    city = cityFromStep1;
   }
 
   // Bug 1 fix (Round 5): remove trailing address-fragment chains.
@@ -998,6 +994,9 @@ export async function parseAffiliation(raw: string | null): Promise<ParsedAffili
   // "; user@host.edu") which would otherwise trigger the multi-address guard below.
   text = text.replace(/\.\s*Electronic\s+address:.*$/i, "").trim();
   text = text.replace(/\s*[-–—;]?\s*[\w.+-]+@[\w.-]+\.\w+\s*\.?$/, "").trim();
+  // Normalize fused tokens: "Hospital;Dept" → "Hospital; Dept", "BrisbaneQLD" → "Brisbane QLD"
+  text = text.replace(/;([^\s])/g, '; $1');
+  text = text.replace(/([a-zà-ÿ])([A-Z])/g, '$1 $2');
 
   // Klasse A/C rule: any remaining semicolon = multi-address string → reject.
   if (text.includes(";")) return null;
@@ -1063,6 +1062,9 @@ export async function parseAffiliationWithTrace(
   text = text.replace(/\([A-Z]{1,3}(?:,\s*[A-Z]{1,3})+\)/g, "").trim();
   text = text.replace(/\.\s*Electronic\s+address:.*$/i, "").trim();
   text = text.replace(/\s*[-–—;]?\s*[\w.+-]+@[\w.-]+\.\w+\s*\.?$/, "").trim();
+  // Normalize fused tokens: "Hospital;Dept" → "Hospital; Dept", "BrisbaneQLD" → "Brisbane QLD"
+  text = text.replace(/;([^\s])/g, '; $1');
+  text = text.replace(/([a-zà-ÿ])([A-Z])/g, '$1 $2');
 
   const allTrace: string[] = [
     `input=${JSON.stringify(raw)}`,

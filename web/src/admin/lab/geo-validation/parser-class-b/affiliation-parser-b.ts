@@ -39,6 +39,11 @@ function preProcess(raw: string): string {
   text = text.replace(/\([A-Z]{1,3}(?:,\s*[A-Z]{1,3})+\)/g, "").trim();
   text = text.replace(/\.\s*Electronic\s+address:.*$/i, "").trim();
   text = text.replace(/\s*[-–—;]?\s*[\w.+-]+@[\w.-]+\.\w+\s*\.?$/, "").trim();
+  // Strip trailing "; and." — these are Klasse A strings with a hanging conjunction
+  text = text.replace(/\s*;\s*and\.?\s*$/i, "").trim();
+  // Normalize fused tokens: "Hospital;Dept" → "Hospital; Dept", "BrisbaneQLD" → "Brisbane QLD"
+  text = text.replace(/;([^\s])/g, '; $1');
+  text = text.replace(/([a-zà-ÿ])([A-Z])/g, '$1 $2');
   return text;
 }
 
