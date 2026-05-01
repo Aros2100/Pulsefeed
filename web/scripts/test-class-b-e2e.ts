@@ -194,7 +194,6 @@ async function runAuthorLinkerMirror(articleId: string, authors: unknown): Promi
     enriched_at:               geoResult.enriched_state_source ? now : null,
     enriched_state_source:     geoResult.enriched_state_source,
     class_b_address_count:     geoResult.geo_class === "B" ? geoResult.class_b_addresses?.length ?? null : null,
-    class_b_parser_version:    geoResult.geo_class === "B" ? geoResult.parser_version : null,
     updated_at:                now,
   }, { onConflict: "article_id" });
 }
@@ -203,7 +202,7 @@ async function runAuthorLinkerMirror(articleId: string, authors: unknown): Promi
 
 async function verifyParserWrite(articleId: string, expectedClass: "A" | "B"): Promise<PhaseResult> {
   const { data: art } = await db.from("articles").select("geo_class, geo_country").eq("id", articleId).maybeSingle();
-  const { data: meta } = await db.from("article_geo_metadata").select("geo_class, parser_processed_at, parser_version, class_b_address_count, class_b_parser_version").eq("article_id", articleId).maybeSingle();
+  const { data: meta } = await db.from("article_geo_metadata").select("parser_processed_at, parser_version, class_b_address_count").eq("article_id", articleId).maybeSingle();
   const { data: addrs } = await db.from("article_geo_addresses").select("position, state, state_source, region, continent").eq("article_id", articleId).order("position");
 
   if (art?.geo_class !== expectedClass) {
@@ -224,8 +223,8 @@ async function verifyParserWrite(articleId: string, expectedClass: "A" | "B"): P
     if (meta.class_b_address_count !== rows.length) {
       return { name: "Author-linker", pass: false, detail: `metadata count mismatch: ${meta.class_b_address_count} vs ${rows.length}` };
     }
-    if (meta.class_b_parser_version !== GEO_PARSER_B_VERSION) {
-      return { name: "Author-linker", pass: false, detail: `expected class_b_parser_version=${GEO_PARSER_B_VERSION}` };
+    if (meta.parser_version !== GEO_PARSER_B_VERSION) {
+      return { name: "Author-linker", pass: false, detail: `expected parser_version=${GEO_PARSER_B_VERSION}` };
     }
     return { name: "Author-linker", pass: true, detail: `${rows.length} rows, ${parserStateRows} parser-state` };
   }
@@ -301,7 +300,7 @@ async function verifyRender(articleId: string, expectedClass: "A" | "B"): Promis
   // Mirror page.tsx data-fetch
   const [art, meta, addrs] = await Promise.all([
     db.from("articles").select("geo_class, geo_country, geo_city, geo_state, geo_institution").eq("id", articleId).maybeSingle(),
-    db.from("article_geo_metadata").select("geo_class, class_b_address_count, class_b_ai_prompt_version, class_b_ai_processed_at").eq("article_id", articleId).maybeSingle(),
+    db.from("article_geo_metadata").select("class_b_address_count, ai_prompt_version, ai_processed_at").eq("article_id", articleId).maybeSingle(),
     db.from("article_geo_addresses").select("id, position, city, state, country, region, continent, institution, confidence, state_source, ai_action").eq("article_id", articleId).order("position"),
   ]);
 

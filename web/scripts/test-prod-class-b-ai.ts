@@ -110,13 +110,12 @@ async function main() {
         state_source:          addr.state ? "parser" : null,
       })));
 
-      // Sørg for article_geo_metadata har geo_class='B' og parser_processed_at
+      // Sørg for article_geo_metadata har parser_processed_at
       await db.from("article_geo_metadata").upsert({
         article_id:           article.id,
-        geo_class:            "B",
         parser_processed_at:  new Date().toISOString(),
+        parser_version:       geoResult.parser_version,
         class_b_address_count: geoResult.class_b_addresses.length,
-        class_b_parser_version: geoResult.parser_version,
         updated_at:           new Date().toISOString(),
       }, { onConflict: "article_id" });
 
