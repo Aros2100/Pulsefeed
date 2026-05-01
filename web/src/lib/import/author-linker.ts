@@ -152,29 +152,12 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const db = admin as any;
 
-                // 1. Write all geo fields to articles (3+3+overflow + class).
-                //    For Klasse B: all flat geo_* fields stay null (per-row data lives in article_geo_addresses).
+                // 1. Write geo_class to articles. All flat geo_* fields stay null — data lives in article_geo_addresses.
                 await db.from("articles").update({
-                  geo_class:                 geoResult.geo_class,
-                  geo_city:                  geoResult.geo_city,
-                  geo_country:               geoResult.geo_country,
-                  geo_state:                 geoResult.geo_state,
-                  geo_region:                geoResult.geo_region,
-                  geo_continent:             geoResult.geo_continent,
-                  geo_institution:           geoResult.geo_institution,
-                  geo_institution2:          geoResult.geo_institution2,
-                  geo_institution3:          geoResult.geo_institution3,
-                  geo_institutions_overflow: geoResult.geo_institutions_overflow,
-                  geo_department:            geoResult.geo_department,
-                  geo_department2:           geoResult.geo_department2,
-                  geo_department3:           geoResult.geo_department3,
-                  geo_departments_overflow:  geoResult.geo_departments_overflow,
-                  geo_source:                geoResult.geo_source,
-                  geo_defined_at:            now,
-                  geo_parser_confidence:     geoResult.parser_confidence,
+                  geo_class: geoResult.geo_class,
                 }).eq("id", article.id);
 
-                // 1b. Klasse A: write position=1 row to article_geo_addresses (flat fields kept for backward compat)
+                // 1b. Klasse A: write position=1 row to article_geo_addresses
                 if (geoResult.geo_class === "A" && geoResult.geo_country) {
                   await db.from("article_geo_addresses").delete().eq("article_id", article.id);
                   await db.from("article_geo_addresses").insert({
