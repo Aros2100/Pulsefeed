@@ -8,6 +8,7 @@ import { notifyFollowedAuthorPublications } from "@/lib/notifications/followedAu
 import { fetchWorksByDois, type OpenAlexWork } from "@/lib/openalex/client";
 import { determineArticleGeo } from "@/lib/import/author-import/find-or-create";
 import { getRegion, getContinent } from "@/lib/geo/country-map";
+import { enrichArticleAddresses } from "@/lib/geo/v2/address-enrichment";
 import pLimit from "p-limit";
 
 const BATCH_SIZE = 250;
@@ -197,6 +198,8 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
                     state_source:          addr.state ? "parser" : null,
                   }));
                   await db.from("article_geo_addresses").insert(insertRows);
+                  // Enrich missing states via geo_cities lookup
+                  await enrichArticleAddresses(article.id);
                 }
 
                 // 2. Upsert parser metadata to article_geo_metadata
