@@ -70,32 +70,32 @@ export async function GET() {
   }
 
   // ── Article location coverage ─────────────────────────────────────────────
+  // Uses DISTINCT article_id counts so Class B articles (N address rows each)
+  // are counted once. not_parsed = geo_class='C'.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = admin as any;
   const [
-    { count: art_with_country },
-    { count: art_with_region },
-    { count: art_with_city },
-    { count: art_with_state },
-    { count: art_not_parsed },
-    { count: art_has_country_no_state },
-    { count: art_has_country_no_city },
+    { data: coverageRaw },
     { data: artSuspectCityData },
     { data: distinctRegionsData },
   ] = await Promise.all([
-    db.from("article_geo_addresses").select("*", { count: "exact", head: true }).not("country", "is", null),
-    db.from("article_geo_addresses").select("*", { count: "exact", head: true }).not("region",  "is", null),
-    db.from("article_geo_addresses").select("*", { count: "exact", head: true }).not("city",    "is", null),
-    db.from("article_geo_addresses").select("*", { count: "exact", head: true }).not("state",   "is", null),
-    db.from("articles").select("*", { count: "exact", head: true }).is("geo_defined_at", null),
-    db.from("article_geo_addresses").select("*", { count: "exact", head: true }).not("country", "is", null).is("state", null),
-    db.from("article_geo_addresses").select("*", { count: "exact", head: true }).not("country", "is", null).is("city",  null),
+    db.rpc("get_article_location_coverage"),
     db.rpc("count_article_suspect_city_values"),
     db.rpc("count_distinct_geo_regions"),
   ]);
-  const totalArt         = total_articles ?? 0;
-  const art_suspect_city = (artSuspectCityData  as number) ?? 0;
-  const distinct_regions = (distinctRegionsData as number) ?? 0;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cov = (coverageRaw as any) ?? {};
+  const totalArt                = total_articles        ?? 0;
+  const art_with_region         = Number(cov.with_region)           || 0;
+  const art_with_country        = Number(cov.with_country)          || 0;
+  const art_with_state          = Number(cov.with_state)            || 0;
+  const art_with_city           = Number(cov.with_city)             || 0;
+  const art_has_country_no_state = Number(cov.has_country_no_state) || 0;
+  const art_has_country_no_city  = Number(cov.has_country_no_city)  || 0;
+  const art_not_parsed          = Number(cov.not_parsed)            || 0;
+  const art_suspect_city        = (artSuspectCityData  as number)   ?? 0;
+  const distinct_regions        = (distinctRegionsData as number)   ?? 0;
 
 
 
