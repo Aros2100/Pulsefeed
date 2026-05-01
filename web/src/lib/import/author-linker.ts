@@ -174,7 +174,32 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
                   geo_parser_confidence:     geoResult.parser_confidence,
                 }).eq("id", article.id);
 
-                // 1b. Klasse B: replace per-row data in article_geo_addresses with region/continent enrichment
+                // 1b. Klasse A: write position=1 row to article_geo_addresses (flat fields kept for backward compat)
+                if (geoResult.geo_class === "A" && geoResult.geo_country) {
+                  await db.from("article_geo_addresses").delete().eq("article_id", article.id);
+                  await db.from("article_geo_addresses").insert({
+                    article_id:            article.id,
+                    position:              1,
+                    city:                  geoResult.geo_city,
+                    state:                 geoResult.geo_state,
+                    country:               geoResult.geo_country,
+                    region:                geoResult.geo_region,
+                    continent:             geoResult.geo_continent,
+                    institution:           geoResult.geo_institution,
+                    institution2:          geoResult.geo_institution2,
+                    institution3:          geoResult.geo_institution3,
+                    institutions_overflow: geoResult.geo_institutions_overflow ?? [],
+                    department:            geoResult.geo_department,
+                    department2:           geoResult.geo_department2,
+                    department3:           geoResult.geo_department3,
+                    departments_overflow:  geoResult.geo_departments_overflow ?? [],
+                    confidence:            geoResult.parser_confidence,
+                    state_source:          geoResult.geo_state ? "parser" : null,
+                  });
+                  await enrichArticleAddresses(article.id);
+                }
+
+                // 1c. Klasse B: replace per-row data in article_geo_addresses with region/continent enrichment
                 if (geoResult.geo_class === "B" && geoResult.class_b_addresses) {
                   await db.from("article_geo_addresses").delete().eq("article_id", article.id);
 
