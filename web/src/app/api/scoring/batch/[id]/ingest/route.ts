@@ -11,11 +11,21 @@ import { ingestArticleGeoClassABatchResults } from "@/lib/scoring/batch/article-
 import { ingestArticleGeoClassBBatchResults } from "@/lib/scoring/batch/article-geo-class-b-batch";
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireAdmin();
-  if (!auth.ok) return auth.response;
+  if (!process.env.CRON_SECRET) {
+    console.error("[ingest] CRON_SECRET not set");
+    return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+  }
+
+  const authHeader = request.headers.get("authorization");
+  const isCronCall = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+
+  if (!isCronCall) {
+    const auth = await requireAdmin();
+    if (!auth.ok) return auth.response;
+  }
 
   const { id } = await params;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -12,6 +12,7 @@ type BatchRow = {
   status: string;
   article_count: number;
   submitted_at: string;
+  ingested_at: string | null;
   stats: { scored?: number; approved?: number; rejected?: number; failed?: number } | null;
 };
 
@@ -60,6 +61,10 @@ export function BatchListClient({ initialBatches }: { initialBatches: BatchRow[]
             setBatches((prev) => prev.map((b) =>
               b.id === json.batch.id ? { ...b, ...json.batch } : b
             ));
+            if (json.batch.status === "ended" && !json.batch.ingested_at) {
+              fetch(`/api/scoring/batch/${json.batch.id}/ingest`, { method: "POST" })
+                .catch(() => {/* cron tager over hvis browser fejler */});
+            }
           }
         } catch { /* ignore */ }
       }

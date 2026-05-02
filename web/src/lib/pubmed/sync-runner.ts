@@ -13,6 +13,7 @@ import {
   type ArticleDetails,
 } from "@/lib/import/article-import/fetcher";
 import { saveRawXml } from "@/lib/import/article-import/raw-writer";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 // ── Config ─────────────────────────────────────────────────────────────────
 
@@ -106,9 +107,11 @@ interface DbArticle {
   article_number:    string | null;
   issn_electronic:   string | null;
   issn_print:        string | null;
-  coi_statement:     string | null;
-  grants:            unknown;
-  substances:        unknown;
+  coi_statement:       string | null;
+  grants:              unknown;
+  substances:          unknown;
+  pubmed_date:         string | null;
+  pubmed_modified_at:  string | null;
 }
 
 interface SyncLogEntry {
@@ -232,10 +235,9 @@ async function markPmidsResolved(db: AdminDb, pmids: string[]): Promise<void> {
 
 async function esearch(
   query: string,
-  mindate: string,
-  maxdate: string,
   retmax: number,
   apiKey: string,
+  dateOpts: { mindate?: string; maxdate?: string; reldate?: number },
 ): Promise<string[]> {
   // PubMed ESearch hard-caps retstart at 9998; attempting higher returns malformed JSON.
   const PUBMED_ESEARCH_MAX = 9998;
@@ -247,12 +249,21 @@ async function esearch(
       break;
     }
     const p = new URLSearchParams({
-      db: "pubmed", term: query,
-      datetype: "mdat", mindate, maxdate,
+      db: "pubmed",
+      term: query,
+      datetype: "mdat",
       retmax: String(Math.min(retmax - retstart, 10_000)),
       retstart: String(retstart),
       retmode: "json",
     });
+    if (dateOpts.reldate !== undefined) {
+      p.set("reldate", String(dateOpts.reldate));
+    } else if (dateOpts.mindate && dateOpts.maxdate) {
+      p.set("mindate", dateOpts.mindate);
+      p.set("maxdate", dateOpts.maxdate);
+    } else {
+      throw new Error("esearch requires either reldate or mindate+maxdate");
+    }
     if (apiKey) p.set("api_key", apiKey);
     const res = await fetch(`${BASE}/esearch.fcgi`, {
       method: "POST",
@@ -289,6 +300,7 @@ async function esearch(
 export interface SyncRunnerOpts {
   mindate?:                 string;
   maxdate?:                 string;
+  reldate?:                 number;
   esearchRetmax?:           number;
   includePreviousFailures?: boolean;
   retryFailuresOnly?:       boolean;
@@ -313,6 +325,10 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<SyncRunn
   const fromDate = opts.mindate ? new Date(opts.mindate) : new Date(today.getTime() - 7 * 86_400_000);
   const mindate  = fmtDate(fromDate);
   const maxdate  = fmtDate(toDate);
+  const dateOpts: { mindate?: string; maxdate?: string; reldate?: number } =
+    opts.reldate !== undefined
+      ? { reldate: opts.reldate }
+      : { mindate, maxdate };
 
   let matches: string[];
 
@@ -324,7 +340,10 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<SyncRunn
     matches = (data ?? []).map((r: { pubmed_id: string }) => r.pubmed_id);
     console.log(`[pubmed-sync] ${matches.length} fejlede PMIDs at retrye`);
   } else {
-    console.log(`[pubmed-sync] Period: ${mindate} → ${maxdate}, retmax: ${esearchRetmax}`);
+    const periodLabel = opts.reldate !== undefined
+      ? `reldate=${opts.reldate}`
+      : `${mindate} → ${maxdate}`;
+    console.log(`[pubmed-sync] Period: ${periodLabel}, retmax: ${esearchRetmax}`);
 
     // Step 1 — Fetch DB IDs
     const dbIds = new Set<string>();
@@ -352,8 +371,10 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<SyncRunn
 
     const { data: c2Sources, error: c2Err } = await db
       .from("circle_2_sources")
-      .select("type, value")
-      .eq("active", true);
+      .select("value")
+      .eq("active", true)
+      .eq("type", "affiliation")
+      .eq("specialty", ACTIVE_SPECIALTY);
     if (c2Err) throw c2Err;
 
     const c1c4Parts = (filters ?? []).map(f => `(${f.query_string})`);
@@ -370,7 +391,7 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<SyncRunn
     );
 
     // Step 3 — ESearch
-    const pubmedIds = await esearch(filterQuery, mindate, maxdate, esearchRetmax, apiKey);
+    const pubmedIds = await esearch(filterQuery, esearchRetmax, apiKey, dateOpts);
     console.log(`[pubmed-sync] ${pubmedIds.length} PMIDs fra PubMed`);
 
     // Step 4 — Cross-reference
@@ -405,7 +426,7 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<SyncRunn
       const batch = matches.slice(i, i + 1_000);
       const { data, error } = await db
         .from("articles")
-        .select("id, pubmed_id, title, abstract, mesh_terms, keywords, publication_types, authors, doi, pmc_id, language, journal_title, journal_abbr, published_year, published_date, date_completed, pubmed_indexed_at, volume, issue, article_number, issn_electronic, issn_print, coi_statement, grants, substances")
+        .select("id, pubmed_id, title, abstract, mesh_terms, keywords, publication_types, authors, doi, pmc_id, language, journal_title, journal_abbr, published_year, published_date, date_completed, pubmed_indexed_at, volume, issue, article_number, issn_electronic, issn_print, coi_statement, grants, substances, pubmed_date, pubmed_modified_at")
         .in("pubmed_id", batch);
       if (error) throw error;
       for (const row of data ?? []) dbMap.set(row.pubmed_id, row as DbArticle);
@@ -433,6 +454,17 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<SyncRunn
         const row = dbMap.get(pm.pubmedId);
         if (!row) continue;
 
+        // Skip articles where PubMed's dateRevised ≤ our last recorded mdat —
+        // we've already processed this version. NULL pubmed_modified_at means
+        // never synced, so we fall through normally.
+        if (
+          row.pubmed_modified_at &&
+          pm.dateRevised &&
+          pm.dateRevised <= row.pubmed_modified_at
+        ) {
+          continue;
+        }
+
         // Save raw XML — fire-and-forget
         const rawXml = rawXmlByPmid.get(pm.pubmedId);
         if (rawXml) {
@@ -445,11 +477,23 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<SyncRunn
         const update: Record<string, unknown> = { pubmed_synced_at: now };
         const changed: string[] = [];
 
-        // Helper to normalize values for comparison
+        // Stable JSON serialization that recursively sorts object keys.
+        // Used for comparing values that may differ only in key order
+        // (e.g. JSONB returned from PostgreSQL vs fresh JS objects).
+        const stableStringify = (v: unknown): string => {
+          if (v === null || typeof v !== "object") return JSON.stringify(v);
+          if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
+          const keys = Object.keys(v as Record<string, unknown>).sort();
+          const pairs = keys.map(
+            (k) => JSON.stringify(k) + ":" + stableStringify((v as Record<string, unknown>)[k])
+          );
+          return "{" + pairs.join(",") + "}";
+        };
+
         const norm = (v: unknown): string => {
           if (v == null) return "";
           if (typeof v === "string") return v.trim();
-          return JSON.stringify(v);
+          return stableStringify(v);
         };
 
         for (const [key, newVal] of Object.entries(fullUpdate)) {

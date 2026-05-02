@@ -13,12 +13,8 @@ export async function POST(request: NextRequest) {
 
   after(async () => {
     try {
-      const yesterday = new Date(Date.now() - 86_400_000);
-      const fmtDate = (d: Date) =>
-        `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
       await runPubmedSync({
-        mindate: fmtDate(yesterday),
-        maxdate: fmtDate(new Date()),
+        reldate: 7,
         esearchRetmax: 10_000,
       });
     } catch (e) {
