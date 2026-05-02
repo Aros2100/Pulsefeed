@@ -20,6 +20,8 @@ const TASKS = [
   { key: "article_type",   label: "Artikel type", color: "#D85A30" },
   { key: "condensation_text", label: "Kondensering tekst", color: "#7F77DD" },
   { key: "condensation_sari", label: "Kondensering SARI",  color: "#B077DD" },
+  { key: "article_geo_class_a", label: "Geo Class A", color: "#6B9E88", batchOnly: true },
+  { key: "article_geo_class_b", label: "Geo Class B", color: "#4A7A6A", batchOnly: true },
   { key: "geo",            label: "Geo",          color: "#888780" },
 ];
 
@@ -86,11 +88,12 @@ export default function CostChart({ today, week, month, all }: {
     { key: "all",   label: "Alt tid"     },
   ];
 
-  const totalDrift     = TASKS.reduce((s, t) => s + getDrift(rows, t.key).forbrug, 0);
+  const driftTasks     = TASKS.filter((t) => !t.batchOnly);
+  const totalDrift     = driftTasks.reduce((s, t) => s + getDrift(rows, t.key).forbrug, 0);
   const totalLab       = rows.filter((r) => r.is_lab).reduce((s, r) => s + Number(r.forbrug), 0);
   const totalBatch     = TASKS.reduce((s, t) => s + getBatch(rows, t.key).forbrug, 0);
   const totalForbrug   = totalDrift + totalLab + totalBatch;
-  const totalArtikler  = TASKS.reduce((s, t) => s + getDrift(rows, t.key).artikler, 0);
+  const totalArtikler  = driftTasks.reduce((s, t) => s + getDrift(rows, t.key).artikler, 0);
   const prisPerArtikler = totalArtikler > 0 ? totalDrift / totalArtikler : 0;
 
   return (
@@ -152,7 +155,7 @@ export default function CostChart({ today, week, month, all }: {
               </tr>
             </thead>
             <tbody>
-              {TASKS.map((task) => {
+              {driftTasks.map((task) => {
                 const d = getDrift(rows, task.key);
                 const ppa = d.artikler > 0 ? d.forbrug / d.artikler : null;
                 const ppk = d.kald > 0     ? d.forbrug / d.kald     : null;
@@ -177,8 +180,8 @@ export default function CostChart({ today, week, month, all }: {
                 <td style={tdTotal}>{fmt$(totalDrift)}</td>
                 <td style={tdTotal}>{totalArtikler > 0 ? nFmt(totalArtikler) : ""}</td>
                 <td style={tdTotal}>{totalArtikler > 0 ? fmt$(totalDrift / totalArtikler, 4) : ""}</td>
-                <td style={tdTotal}>{nFmt(TASKS.reduce((s, t) => s + getDrift(rows, t.key).kald, 0))}</td>
-                <td style={tdTotal}>{TASKS.reduce((s, t) => s + getDrift(rows, t.key).kald, 0) > 0 ? fmt$(totalDrift / TASKS.reduce((s, t) => s + getDrift(rows, t.key).kald, 0), 4) : ""}</td>
+                <td style={tdTotal}>{nFmt(driftTasks.reduce((s, t) => s + getDrift(rows, t.key).kald, 0))}</td>
+                <td style={tdTotal}>{driftTasks.reduce((s, t) => s + getDrift(rows, t.key).kald, 0) > 0 ? fmt$(totalDrift / driftTasks.reduce((s, t) => s + getDrift(rows, t.key).kald, 0), 4) : ""}</td>
               </tr>
             </tbody>
           </table>
@@ -245,7 +248,7 @@ export default function CostChart({ today, week, month, all }: {
               </tr>
             </thead>
             <tbody>
-              {TASKS.filter((t) => t.key !== "geo").map((task) => {
+              {TASKS.filter((t) => t.key !== "geo" && !t.batchOnly).map((task) => {
                 const analyse    = getLab(rows, task.key, "analyse");
                 const forbedring = getLab(rows, task.key, "prompt-forbedring");
                 const simulering = getLab(rows, task.key, "simulering");
@@ -268,9 +271,9 @@ export default function CostChart({ today, week, month, all }: {
               <tr>
                 <td style={tdTotalL}>Total</td>
                 <td style={tdTotal}>{fmt$(totalLab)}</td>
-                <td style={tdTotal}>{fmt$(TASKS.filter(t => t.key !== "geo").reduce((s, t) => s + getLab(rows, t.key, "analyse"), 0))}</td>
-                <td style={tdTotal}>{fmt$(TASKS.filter(t => t.key !== "geo").reduce((s, t) => s + getLab(rows, t.key, "prompt-forbedring"), 0))}</td>
-                <td style={tdTotal}>{fmt$(TASKS.filter(t => t.key !== "geo").reduce((s, t) => s + getLab(rows, t.key, "simulering"), 0))}</td>
+                <td style={tdTotal}>{fmt$(TASKS.filter(t => t.key !== "geo" && !t.batchOnly).reduce((s, t) => s + getLab(rows, t.key, "analyse"), 0))}</td>
+                <td style={tdTotal}>{fmt$(TASKS.filter(t => t.key !== "geo" && !t.batchOnly).reduce((s, t) => s + getLab(rows, t.key, "prompt-forbedring"), 0))}</td>
+                <td style={tdTotal}>{fmt$(TASKS.filter(t => t.key !== "geo" && !t.batchOnly).reduce((s, t) => s + getLab(rows, t.key, "simulering"), 0))}</td>
               </tr>
             </tbody>
           </table>
