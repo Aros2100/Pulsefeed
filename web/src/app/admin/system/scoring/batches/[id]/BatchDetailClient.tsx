@@ -26,18 +26,21 @@ export function BatchDetailClient({
   status,
   ingestedAt,
   stats,
+  articleCount,
 }: {
   id: string;
   module: string;
   status: string;
   ingestedAt: string | null;
   stats: Stats | null;
+  articleCount: number;
 }) {
   const router = useRouter();
-  const [polling, setPolling]   = useState(false);
-  const [ingesting, setIngesting] = useState(false);
-  const [error, setError]         = useState<string | null>(null);
-  const [liveStats, setLiveStats] = useState<Stats | null>(stats);
+  const [polling, setPolling]       = useState(false);
+  const [ingesting, setIngesting]   = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+  const [liveStats, setLiveStats]   = useState<Stats | null>(stats);
   const [liveStatus, setLiveStatus] = useState(status);
 
   async function handlePoll() {
@@ -74,7 +77,31 @@ export function BatchDetailClient({
     }
   }
 
+  async function handleCancel() {
+    const confirmed = window.confirm(
+      `Cancel batch ${id.slice(0, 8)}?\n\n` +
+      `Module: ${module}\n` +
+      `Articles: ${articleCount}\n\n` +
+      `This action cannot be undone. The batch will not be ingested.`
+    );
+    if (!confirmed) return;
+    setCancelling(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/scoring/batch/${id}/cancel`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok || !json.ok) { setError(json.error ?? `HTTP ${res.status}`); return; }
+      setLiveStatus("cancelled");
+      router.refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   const canIngest = liveStatus === "ended" && !ingestedAt;
+  const canCancel = liveStatus === "submitted" || liveStatus === "in_progress";
 
   return (
     <div>
@@ -105,6 +132,22 @@ export function BatchDetailClient({
               style={{ ...btnBase, background: ingesting ? "#e5e7eb" : "#E83B2A", color: ingesting ? "#9ca3af" : "#fff", cursor: ingesting ? "not-allowed" : "pointer" }}
             >
               {ingesting ? "Ingesting…" : "Ingest results"}
+            </button>
+          )}
+
+          {canCancel && (
+            <button
+              onClick={handleCancel}
+              disabled={cancelling}
+              style={{
+                ...btnBase,
+                background: "#fff",
+                color: cancelling ? "#9ca3af" : "#b91c1c",
+                border: cancelling ? "1px solid #e5e7eb" : "1px solid #b91c1c",
+                cursor: cancelling ? "not-allowed" : "pointer",
+              }}
+            >
+              {cancelling ? "Cancelling…" : "Cancel batch"}
             </button>
           )}
 

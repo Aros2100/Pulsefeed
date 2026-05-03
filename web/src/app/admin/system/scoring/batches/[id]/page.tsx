@@ -142,6 +142,7 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
           status={batch.status}
           ingestedAt={batch.ingested_at}
           stats={batch.stats}
+          articleCount={batch.article_count}
         />
 
       </div>
