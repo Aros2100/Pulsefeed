@@ -17,13 +17,18 @@ interface EditionArticle {
   sort_order: number;
   is_global: boolean;
   global_sort_order: number | null;
-  comment: string | null;
+  newsletter_headline: string | null;
+  newsletter_subheadline: string | null;
 }
 
 interface ArticleDetail {
   id: string;
   title: string;
   article_type: string | null;
+  abstract: string | null;
+  short_resume: string | null;
+  subspecialty: string[] | null;
+  pubmed_id: string | null;
   sari_subject: string | null;
   sari_action: string | null;
   sari_result: string | null;
@@ -31,14 +36,17 @@ interface ArticleDetail {
 }
 
 interface ArticleItem {
-  editionId: string; // newsletter_edition_articles.id
+  editionId: string;
   articleId: string;
   title: string;
+  article_type: string | null;
+  abstract: string | null;
+  short_resume: string | null;
   sari_subject: string | null;
   sari_action: string | null;
   sari_result: string | null;
   sari_implication: string | null;
-  subspecialty?: string;
+  promptSubspecialty: string;
 }
 
 interface Props {
@@ -59,6 +67,16 @@ const textareaStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
+const fieldLabelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: "10px",
+  fontWeight: 700,
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  color: "#94a3b8",
+  marginBottom: "5px",
+};
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function NewsletterAiClient({ edition, subspecialties, editionArticles, articleDetails }: Props) {
@@ -75,42 +93,58 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
       .flatMap((ea) => {
         const detail = detailMap.get(ea.article_id);
         if (!detail) return [];
-        return [{ editionId: ea.id, articleId: ea.article_id, title: detail.title,
+        const promptSubspecialty =
+          (detail.subspecialty && detail.subspecialty.length > 0)
+            ? detail.subspecialty[0]
+            : "Neurosurgery";
+        return [{
+          editionId: ea.id, articleId: ea.article_id,
+          title: detail.title, article_type: detail.article_type,
+          abstract: detail.abstract, short_resume: detail.short_resume,
           sari_subject: detail.sari_subject, sari_action: detail.sari_action,
-          sari_result: detail.sari_result, sari_implication: detail.sari_implication }];
+          sari_result: detail.sari_result, sari_implication: detail.sari_implication,
+          promptSubspecialty,
+        }];
       });
   }, [editionArticles, detailMap]);
 
   // Lead article (sort_order=0) per subspecialty, in subspecialty sort_order
   const leadItems = useMemo((): ArticleItem[] => {
     const subOrder = new Map(subspecialties.map((s) => [s.name, s.sort_order]));
-    const leads: ArticleItem[] = [];
     const bySubspecialty: Record<string, EditionArticle[]> = {};
     for (const ea of editionArticles) {
       if (!bySubspecialty[ea.subspecialty]) bySubspecialty[ea.subspecialty] = [];
       bySubspecialty[ea.subspecialty].push(ea);
     }
-    const subNames = Object.keys(bySubspecialty).sort(
-      (a, b) => (subOrder.get(a) ?? 999) - (subOrder.get(b) ?? 999)
-    );
-    for (const sub of subNames) {
-      const sorted = bySubspecialty[sub].sort((a, b) => a.sort_order - b.sort_order);
-      const lead = sorted[0];
-      const detail = detailMap.get(lead.article_id);
-      if (!detail) continue;
-      leads.push({ editionId: lead.id, articleId: lead.article_id, title: detail.title,
-        sari_subject: detail.sari_subject, sari_action: detail.sari_action,
-        sari_result: detail.sari_result, sari_implication: detail.sari_implication,
-        subspecialty: sub });
-    }
-    return leads;
+    return Object.keys(bySubspecialty)
+      .sort((a, b) => (subOrder.get(a) ?? 999) - (subOrder.get(b) ?? 999))
+      .flatMap((sub) => {
+        const lead = bySubspecialty[sub].sort((a, b) => a.sort_order - b.sort_order)[0];
+        const detail = detailMap.get(lead.article_id);
+        if (!detail) return [];
+        return [{
+          editionId: lead.id, articleId: lead.article_id,
+          title: detail.title, article_type: detail.article_type,
+          abstract: detail.abstract, short_resume: detail.short_resume,
+          sari_subject: detail.sari_subject, sari_action: detail.sari_action,
+          sari_result: detail.sari_result, sari_implication: detail.sari_implication,
+          promptSubspecialty: sub,
+        }];
+      });
   }, [editionArticles, subspecialties, detailMap]);
 
-  // texts: keyed by newsletter_edition_articles.id
-  const [texts, setTexts] = useState<Record<string, string>>(() => {
+  const [headlines, setHeadlines] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
     for (const ea of editionArticles) {
-      if (ea.comment) init[ea.id] = ea.comment;
+      if (ea.newsletter_headline) init[ea.id] = ea.newsletter_headline;
+    }
+    return init;
+  });
+
+  const [subheadlines, setSubheadlines] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const ea of editionArticles) {
+      if (ea.newsletter_subheadline) init[ea.id] = ea.newsletter_subheadline;
     }
     return init;
   });
@@ -120,28 +154,45 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
   const [saveError, setSaveError] = useState<string | null>(null);
 
   async function generate(editionArticleId: string, item: ArticleItem) {
-    if (!item.sari_subject || !item.sari_action || !item.sari_result || !item.sari_implication) {
-      alert("This article has no SARI summary yet.");
+    const hasContent = !!(
+      (item.sari_subject && item.sari_action && item.sari_result && item.sari_implication) ||
+      item.abstract
+    );
+    if (!hasContent) {
+      alert("This article has no SARI summary or abstract — cannot generate.");
       return;
     }
+
+    const existingHeadline = headlines[editionArticleId]?.trim();
+    const existingSubhead  = subheadlines[editionArticleId]?.trim();
+    if (existingHeadline || existingSubhead) {
+      const ok = confirm("Headline or subheadline has content. Regenerating will replace both fields. Continue?");
+      if (!ok) return;
+    }
+
     setGenerating((prev) => ({ ...prev, [editionArticleId]: true }));
     try {
-      const res = await fetch("/api/admin/newsletter/generate-text", {
+      const res = await fetch("/api/admin/newsletter/generate-headlines", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          type: "article",
+          title:        item.title,
+          article_type: item.article_type,
+          subspecialty: item.promptSubspecialty,
           sari: {
             subject:     item.sari_subject,
             action:      item.sari_action,
             result:      item.sari_result,
             implication: item.sari_implication,
           },
+          abstract:     item.abstract,
+          short_resume: item.short_resume,
         }),
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-      setTexts((prev) => ({ ...prev, [editionArticleId]: json.text }));
+      setHeadlines((prev)    => ({ ...prev, [editionArticleId]: json.headline }));
+      setSubheadlines((prev) => ({ ...prev, [editionArticleId]: json.subhead }));
     } catch (e) {
       alert(e instanceof Error ? e.message : "Generation failed");
     } finally {
@@ -153,7 +204,12 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
     setSaving(true);
     setSaveError(null);
     try {
-      const updates = Object.entries(texts).map(([id, comment]) => ({ id, comment }));
+      const ids = new Set([...Object.keys(headlines), ...Object.keys(subheadlines)]);
+      const updates = Array.from(ids).map((id) => ({
+        id,
+        newsletter_headline:    headlines[id] ?? null,
+        newsletter_subheadline: subheadlines[id] ?? null,
+      }));
       if (updates.length === 0) return;
       const res = await fetch("/api/admin/newsletter/edition-article", {
         method: "PATCH",
@@ -245,9 +301,11 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
               <ArticleCard
                 key={item.editionId}
                 item={item}
-                text={texts[item.editionId] ?? ""}
+                headline={headlines[item.editionId] ?? ""}
+                subheadline={subheadlines[item.editionId] ?? ""}
                 generating={!!generating[item.editionId]}
-                onChange={(v) => setTexts((prev) => ({ ...prev, [item.editionId]: v }))}
+                onChangeHeadline={(v) => setHeadlines((prev) => ({ ...prev, [item.editionId]: v }))}
+                onChangeSubheadline={(v) => setSubheadlines((prev) => ({ ...prev, [item.editionId]: v }))}
                 onGenerate={() => generate(item.editionId, item)}
               />
             ))}
@@ -267,9 +325,11 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
               <ArticleCard
                 key={item.editionId}
                 item={item}
-                text={texts[item.editionId] ?? ""}
+                headline={headlines[item.editionId] ?? ""}
+                subheadline={subheadlines[item.editionId] ?? ""}
                 generating={!!generating[item.editionId]}
-                onChange={(v) => setTexts((prev) => ({ ...prev, [item.editionId]: v }))}
+                onChangeHeadline={(v) => setHeadlines((prev) => ({ ...prev, [item.editionId]: v }))}
+                onChangeSubheadline={(v) => setSubheadlines((prev) => ({ ...prev, [item.editionId]: v }))}
                 onGenerate={() => generate(item.editionId, item)}
               />
             ))}
@@ -290,18 +350,25 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
 
 function ArticleCard({
   item,
-  text,
+  headline,
+  subheadline,
   generating,
-  onChange,
+  onChangeHeadline,
+  onChangeSubheadline,
   onGenerate,
 }: {
   item: ArticleItem;
-  text: string;
+  headline: string;
+  subheadline: string;
   generating: boolean;
-  onChange: (v: string) => void;
+  onChangeHeadline: (v: string) => void;
+  onChangeSubheadline: (v: string) => void;
   onGenerate: () => void;
 }) {
-  const hasSari = !!(item.sari_subject && item.sari_action && item.sari_result && item.sari_implication);
+  const hasContent = !!(
+    (item.sari_subject && item.sari_action && item.sari_result && item.sari_implication) ||
+    item.abstract
+  );
 
   return (
     <div style={{
@@ -319,26 +386,24 @@ function ArticleCard({
         display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px",
       }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          {item.subspecialty && (
-            <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#94a3b8", marginBottom: "3px" }}>
-              {item.subspecialty}
-            </div>
-          )}
+          <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#94a3b8", marginBottom: "3px" }}>
+            {item.promptSubspecialty}
+          </div>
           <div style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a", lineHeight: 1.4 }}>
             {item.title}
           </div>
         </div>
         <button
           onClick={onGenerate}
-          disabled={generating || !hasSari}
-          title={!hasSari ? "No SARI summary available" : undefined}
+          disabled={generating || !hasContent}
+          title={!hasContent ? "No SARI summary or abstract available" : undefined}
           style={{
             fontSize: "12px", fontWeight: 600, fontFamily: "inherit",
             background: generating ? "#f0f2f5" : "#1a1a1a",
             color: generating ? "#94a3b8" : "#fff",
             border: "none", borderRadius: "6px", padding: "5px 12px",
-            cursor: (generating || !hasSari) ? "default" : "pointer",
-            opacity: !hasSari && !generating ? 0.4 : 1,
+            cursor: (generating || !hasContent) ? "default" : "pointer",
+            opacity: !hasContent && !generating ? 0.4 : 1,
             whiteSpace: "nowrap", flexShrink: 0,
           }}
         >
@@ -346,15 +411,28 @@ function ArticleCard({
         </button>
       </div>
 
-      {/* Textarea */}
-      <div style={{ padding: "14px 16px" }}>
-        <textarea
-          value={text}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="One-sentence summary for this article…"
-          rows={2}
-          style={textareaStyle}
-        />
+      {/* Two textareas */}
+      <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+        <div>
+          <label style={fieldLabelStyle}>Headline</label>
+          <textarea
+            value={headline}
+            onChange={(e) => onChangeHeadline(e.target.value)}
+            placeholder="Newsletter headline (4–10 words)…"
+            rows={1}
+            style={textareaStyle}
+          />
+        </div>
+        <div>
+          <label style={fieldLabelStyle}>Subheadline</label>
+          <textarea
+            value={subheadline}
+            onChange={(e) => onChangeSubheadline(e.target.value)}
+            placeholder="1–2 sentence editorial angle (max 30 words)…"
+            rows={2}
+            style={textareaStyle}
+          />
+        </div>
       </div>
     </div>
   );

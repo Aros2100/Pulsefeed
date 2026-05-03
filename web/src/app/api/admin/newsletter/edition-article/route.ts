@@ -9,11 +9,12 @@ const deleteSchema = z.object({
 
 const patchSchema = z.object({
   updates: z.array(z.object({
-    id:                z.string().uuid(),
-    sort_order:        z.number().int().min(0).optional(),
-    is_global:         z.boolean().optional(),
-    global_sort_order: z.number().int().min(0).nullable().optional(),
-    comment:           z.string().optional(),
+    id:                    z.string().uuid(),
+    sort_order:            z.number().int().min(0).optional(),
+    is_global:             z.boolean().optional(),
+    global_sort_order:     z.number().int().min(0).nullable().optional(),
+    newsletter_headline:   z.string().nullable().optional(),
+    newsletter_subheadline: z.string().nullable().optional(),
   })).min(1),
 });
 
@@ -57,12 +58,15 @@ export async function PATCH(request: NextRequest) {
 
   const errors: string[] = [];
   await Promise.all(
-    result.data.updates.map(async ({ id, sort_order, is_global, global_sort_order, comment }) => {
+    result.data.updates.map(async ({ id, sort_order, is_global, global_sort_order, newsletter_headline, newsletter_subheadline }) => {
+      const cleanStr = (v: string | null | undefined) =>
+        v == null || v.trim() === "" ? null : v.trim();
       const patch: Record<string, unknown> = {};
-      if (sort_order        !== undefined) patch.sort_order        = sort_order;
-      if (is_global         !== undefined) patch.is_global         = is_global;
-      if (global_sort_order !== undefined) patch.global_sort_order = global_sort_order ?? null;
-      if (comment           !== undefined) patch.comment           = comment;
+      if (sort_order             !== undefined) patch.sort_order             = sort_order;
+      if (is_global              !== undefined) patch.is_global              = is_global;
+      if (global_sort_order      !== undefined) patch.global_sort_order      = global_sort_order ?? null;
+      if (newsletter_headline    !== undefined) patch.newsletter_headline    = cleanStr(newsletter_headline);
+      if (newsletter_subheadline !== undefined) patch.newsletter_subheadline = cleanStr(newsletter_subheadline);
       const { error } = await admin
         .from("newsletter_edition_articles")
         .update(patch)
