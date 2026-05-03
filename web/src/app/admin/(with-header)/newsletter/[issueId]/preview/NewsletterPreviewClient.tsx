@@ -1,108 +1,44 @@
 "use client";
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import TestSendButton from "./TestSendButton";
-import { renderNewsletterHtml, type Article, type Section } from "@/lib/newsletter/render";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface Subspecialty { id: string; name: string; sort_order: number }
-interface EditionArticle { id: string; article_id: string; subspecialty: string; sort_order: number; is_global: boolean }
-interface ArticleDetail { id: string; title: string; article_type: string | null; journal_abbr: string | null; pubmed_id: string }
-interface FirstAuthor { article_id: string; authors: { display_name: string | null; country: string | null } }
 
 interface Props {
-  edition: { id: string; week_number: number; year: number; status: string; content: Record<string, unknown> | null };
-  subspecialties: Subspecialty[];
-  editionArticles: EditionArticle[];
-  articleDetails: ArticleDetail[];
-  firstAuthors: FirstAuthor[];
-  firstName: string;
-  pubmedTotal: number;
-  pubmedBySubspecialty: Record<string, number>;
+  editionId: string;
+  weekNumber: number;
+  year: number;
+  saturdayLabel: string;
 }
 
-const ARTICLES_PER_SUB: Record<number, number> = { 1: 5, 2: 4, 3: 3 };
-
-// ── Component ─────────────────────────────────────────────────────────────────
-
-export default function NewsletterPreviewClient({ edition, subspecialties, editionArticles, articleDetails, firstAuthors, firstName, pubmedTotal, pubmedBySubspecialty }: Props) {
+export default function NewsletterPreviewClient({ editionId, weekNumber, year, saturdayLabel }: Props) {
   const router = useRouter();
   const [subCount, setSubCount] = useState<1 | 2 | 3>(2);
+  const [html, setHtml] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const content = edition.content as Record<string, unknown> | null;
-  const globalIntro = typeof content?.global_intro === "string" ? content.global_intro : "";
-  const subspecialtyComments = (content?.subspecialty_comments ?? {}) as Record<string, string>;
+  const fetchHtml = useCallback(async (preset: number) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/newsletter/${editionId}/preview-html?subPreset=${preset}`);
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error((json as { error?: string }).error ?? `HTTP ${res.status}`);
+      }
+      const text = await res.text();
+      setHtml(text);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Preview failed");
+    } finally {
+      setLoading(false);
+    }
+  }, [editionId]);
 
-  const detailMap = useMemo(() => new Map(articleDetails.map((a) => [a.id, a])), [articleDetails]);
-  const authorMap = useMemo(() => new Map(firstAuthors.map((r) => [r.article_id, r.authors])), [firstAuthors]);
-
-  // Saturday label for header
-  const satLabel = useMemo(() => {
-    const jan4 = new Date(Date.UTC(edition.year, 0, 4));
-    const dayOfWeek = jan4.getUTCDay() || 7;
-    const monday = new Date(jan4);
-    monday.setUTCDate(jan4.getUTCDate() - (dayOfWeek - 1) + (edition.week_number - 1) * 7);
-    const sat = new Date(monday);
-    sat.setUTCDate(monday.getUTCDate() + 5);
-    return sat.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-  }, [edition.week_number, edition.year]);
-
-  // Topbar label includes weekday
-  const saturdayLabel = useMemo(() => {
-    const jan4 = new Date(Date.UTC(edition.year, 0, 4));
-    const dayOfWeek = jan4.getUTCDay() || 7;
-    const monday = new Date(jan4);
-    monday.setUTCDate(jan4.getUTCDate() - (dayOfWeek - 1) + (edition.week_number - 1) * 7);
-    const sat = new Date(monday);
-    sat.setUTCDate(monday.getUTCDate() + 5);
-    return sat.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-  }, [edition.week_number, edition.year]);
-
-  function toArticle(ea: EditionArticle): Article | null {
-    const d = detailMap.get(ea.article_id);
-    if (!d) return null;
-    const author = authorMap.get(ea.article_id);
-    const lastName = author?.display_name ? author.display_name.split(" ").pop() ?? null : null;
-    return { title: d.title, article_type: d.article_type, journal_abbr: d.journal_abbr, pubmed_id: d.pubmed_id, authorLastName: lastName, country: author?.country ?? null };
-  }
-
-  const limit = ARTICLES_PER_SUB[subCount];
-
-  const { sections, globalArticles } = useMemo(() => {
-    const withArticles = new Set(editionArticles.map((ea) => ea.subspecialty));
-    const activeSubs = subspecialties
-      .filter((s) => withArticles.has(s.name))
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .slice(0, subCount);
-
-    const sections: Section[] = activeSubs.map((sub) => ({
-      name: sub.name,
-      comment: subspecialtyComments[sub.name] ?? "",
-      articles: editionArticles
-        .filter((ea) => ea.subspecialty === sub.name)
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .slice(0, limit)
-        .map(toArticle)
-        .filter((a): a is Article => a !== null),
-    }));
-
-    const globalArticles = editionArticles
-      .filter((ea) => ea.is_global)
-      .map(toArticle)
-      .filter((a): a is Article => a !== null);
-
-    return { sections, globalArticles };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editionArticles, subspecialties, subCount, limit, detailMap, authorMap, subspecialtyComments]);
-
-  const html = useMemo(() =>
-    renderNewsletterHtml({ weekNumber: edition.week_number, year: edition.year, satLabel, firstName, pubmedTotal, pubmedBySubspecialty, globalIntro, sections, globalArticles }),
-    [edition.week_number, edition.year, satLabel, firstName, pubmedTotal, pubmedBySubspecialty, globalIntro, sections, globalArticles]
-  );
+  useEffect(() => { fetchHtml(subCount); }, [subCount, fetchHtml]);
 
   const handleIframeLoad = useCallback(() => {
     const iframe = iframeRef.current;
@@ -117,11 +53,11 @@ export default function NewsletterPreviewClient({ edition, subspecialties, editi
       const res = await fetch("/api/admin/newsletter/status", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: edition.id, status: "approved" }),
+        body: JSON.stringify({ id: editionId, status: "approved" }),
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "Failed");
-      router.push(`/admin/newsletter/${edition.id}/send`);
+      router.push(`/admin/newsletter/${editionId}/send`);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Approve failed");
       setApproving(false);
@@ -139,17 +75,17 @@ export default function NewsletterPreviewClient({ edition, subspecialties, editi
         boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
       }}>
         <Link
-          href={`/admin/newsletter/${edition.id}/sub-headlines`}
+          href={`/admin/newsletter/${editionId}/sub-headlines`}
           style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none", whiteSpace: "nowrap" }}
         >
           ← Sub-headlines
         </Link>
         <span style={{ color: "#dde3ed" }}>·</span>
         <span style={{ fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap" }}>
-          Week {edition.week_number} · Neurosurgery · {saturdayLabel}
+          Week {weekNumber} · {year} · {saturdayLabel}
         </span>
 
-        {/* Subscriber selector */}
+        {/* Subscriber preset selector */}
         <div style={{ display: "flex", alignItems: "center", gap: "4px", marginLeft: "8px" }}>
           {([1, 2, 3] as const).map((n) => (
             <button
@@ -170,7 +106,7 @@ export default function NewsletterPreviewClient({ edition, subspecialties, editi
         </div>
 
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "10px" }}>
-          <TestSendButton editionId={edition.id} />
+          <TestSendButton editionId={editionId} />
           <button
             onClick={approve}
             disabled={approving}
@@ -186,22 +122,32 @@ export default function NewsletterPreviewClient({ edition, subspecialties, editi
         </div>
       </div>
 
-      {/* ── Email preview (iframe) ─────────────────────────────────────────── */}
+      {/* ── Email preview ────────────────────────────────────────────────────── */}
       <div style={{ padding: "32px 24px 80px" }}>
-        <div style={{
-          maxWidth: "620px", margin: "0 auto",
-          borderRadius: "4px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-          overflow: "hidden",
-          background: "#fff",
-        }}>
-          <iframe
-            ref={iframeRef}
-            srcDoc={html}
-            style={{ width: "100%", border: "none", display: "block", minHeight: "600px" }}
-            onLoad={handleIframeLoad}
-          />
-        </div>
+        {error ? (
+          <div style={{ maxWidth: "620px", margin: "0 auto", padding: "24px", background: "#fff5f5", border: "1px solid #fecaca", borderRadius: "8px", fontSize: "13px", color: "#b91c1c" }}>
+            {error}
+          </div>
+        ) : loading ? (
+          <div style={{ maxWidth: "620px", margin: "0 auto", padding: "48px", textAlign: "center", fontSize: "13px", color: "#94a3b8" }}>
+            Loading preview…
+          </div>
+        ) : (
+          <div style={{
+            maxWidth: "620px", margin: "0 auto",
+            borderRadius: "4px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+            overflow: "hidden",
+            background: "#fff",
+          }}>
+            <iframe
+              ref={iframeRef}
+              srcDoc={html}
+              style={{ width: "100%", border: "none", display: "block", minHeight: "600px" }}
+              onLoad={handleIframeLoad}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
