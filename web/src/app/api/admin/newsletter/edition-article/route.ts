@@ -9,9 +9,10 @@ const deleteSchema = z.object({
 
 const patchSchema = z.object({
   updates: z.array(z.object({
-    id:         z.string().uuid(),
-    sort_order: z.number().int().min(0),
-    is_global:  z.boolean(),
+    id:                z.string().uuid(),
+    sort_order:        z.number().int().min(0),
+    is_global:         z.boolean(),
+    global_sort_order: z.number().int().min(0).nullable().optional(),
   })).min(1),
 });
 
@@ -55,10 +56,10 @@ export async function PATCH(request: NextRequest) {
 
   const errors: string[] = [];
   await Promise.all(
-    result.data.updates.map(async ({ id, sort_order, is_global }) => {
+    result.data.updates.map(async ({ id, sort_order, is_global, global_sort_order }) => {
       const { error } = await admin
         .from("newsletter_edition_articles")
-        .update({ sort_order, is_global })
+        .update({ sort_order, is_global, global_sort_order: global_sort_order ?? null })
         .eq("id", id);
       if (error) errors.push(error.message);
     })

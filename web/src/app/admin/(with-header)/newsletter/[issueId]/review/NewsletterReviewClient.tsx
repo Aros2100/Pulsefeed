@@ -16,6 +16,7 @@ interface EditionArticle {
   subspecialty: string;
   sort_order: number;
   is_global: boolean;
+  global_sort_order: number | null;
 }
 
 interface ArticleDetail {
@@ -35,6 +36,7 @@ interface SectionItem {
   pubmed_indexed_at: string | null;
   article_type: string | null;
   is_global: boolean;
+  global_sort_order: number | null;
 }
 
 interface Props {
@@ -71,6 +73,7 @@ function initSections(
       pubmed_indexed_at: detail.pubmed_indexed_at,
       article_type: detail.article_type,
       is_global: ea.is_global,
+      global_sort_order: ea.global_sort_order,
     });
   }
 
@@ -81,17 +84,25 @@ const MAX_GLOBAL = 3;
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+function initGlobalOrder(editionArticles: EditionArticle[]): string[] {
+  return editionArticles
+    .filter((ea) => ea.is_global)
+    .sort((a, b) => (a.global_sort_order ?? 0) - (b.global_sort_order ?? 0))
+    .map((ea) => ea.id);
+}
+
 export default function NewsletterReviewClient({ edition, subspecialties, editionArticles, articleDetails }: Props) {
   const [sections, setSections] = useState<Record<string, SectionItem[]>>(() =>
     initSections(editionArticles, articleDetails)
   );
+  // globalOrder: ordered array of newsletter_edition_articles.id for global items
+  const [globalOrder, setGlobalOrder] = useState<string[]>(() =>
+    initGlobalOrder(editionArticles)
+  );
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const globalCount = useMemo(
-    () => Object.values(sections).flat().filter((item) => item.is_global).length,
-    [sections]
-  );
+  const globalCount = globalOrder.length;
 
   // Display order: named subspecialties by sort_order, then "No subspecialty"
   const sectionOrder = useMemo(() => {
@@ -112,35 +123,48 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
     });
   }
 
-  function toggleGlobal(itemId: string) {
-    setSections((prev) => {
-      const allItems = Object.values(prev).flat();
-      const target = allItems.find((item) => item.id === itemId);
-      if (!target) return prev;
+  function moveGlobal(index: number, direction: "up" | "down") {
+    setGlobalOrder((prev) => {
+      const arr = [...prev];
+      const swapIndex = direction === "up" ? index - 1 : index + 1;
+      if (swapIndex < 0 || swapIndex >= arr.length) return prev;
+      [arr[index], arr[swapIndex]] = [arr[swapIndex], arr[index]];
+      return arr;
+    });
+  }
 
-      // Toggle off if already global
-      if (target.is_global) {
+  function toggleGlobal(itemId: string) {
+    const allItems = Object.values(sections).flat();
+    const target = allItems.find((item) => item.id === itemId);
+    if (!target) return;
+
+    if (target.is_global) {
+      // Toggle off — remove from globalOrder and clear flag in sections
+      setGlobalOrder((prev) => prev.filter((id) => id !== itemId));
+      setSections((prev) => {
         const updated: Record<string, SectionItem[]> = {};
         for (const [sub, items] of Object.entries(prev)) {
           updated[sub] = items.map((item) =>
-            item.id === itemId ? { ...item, is_global: false } : item
+            item.id === itemId ? { ...item, is_global: false, global_sort_order: null } : item
           );
         }
         return updated;
-      }
-
-      // No effect if max reached
-      if (globalCount >= MAX_GLOBAL) return prev;
-
-      // Toggle on
-      const updated: Record<string, SectionItem[]> = {};
-      for (const [sub, items] of Object.entries(prev)) {
-        updated[sub] = items.map((item) =>
-          item.id === itemId ? { ...item, is_global: true } : item
-        );
-      }
-      return updated;
-    });
+      });
+    } else {
+      if (globalCount >= MAX_GLOBAL) return;
+      // Toggle on — append to globalOrder, assign sort order in sections
+      setGlobalOrder((prev) => [...prev, itemId]);
+      setSections((prev) => {
+        const nextOrder = globalOrder.length; // will be appended at this index
+        const updated: Record<string, SectionItem[]> = {};
+        for (const [sub, items] of Object.entries(prev)) {
+          updated[sub] = items.map((item) =>
+            item.id === itemId ? { ...item, is_global: true, global_sort_order: nextOrder } : item
+          );
+        }
+        return updated;
+      });
+    }
   }
 
   async function removeArticle(subspecialty: string, itemId: string) {
@@ -161,8 +185,14 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
     setSaving(true);
     setSaveError(null);
     try {
+      const globalIndexMap = new Map(globalOrder.map((id, idx) => [id, idx]));
       const updates = Object.values(sections).flatMap((items) =>
-        items.map((item, idx) => ({ id: item.id, sort_order: idx, is_global: item.is_global }))
+        items.map((item, idx) => ({
+          id: item.id,
+          sort_order: idx,
+          is_global: item.is_global,
+          global_sort_order: item.is_global ? (globalIndexMap.get(item.id) ?? null) : null,
+        }))
       );
 
       if (updates.length > 0) {
@@ -250,6 +280,107 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
 
       {/* ── Body ────────────────────────────────────────────────────────────── */}
       <div style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 24px 80px" }}>
+
+          {/* ── Global articles section ─────────────────────────────────────── */}
+        {globalOrder.length > 0 && (() => {
+          const itemMap = new Map(Object.values(sections).flat().map((i) => [i.id, i]));
+          return (
+            <div style={{ marginBottom: "40px" }}>
+              <div style={{
+                display: "flex", alignItems: "baseline", gap: "8px",
+                marginBottom: "12px", paddingBottom: "8px",
+                borderBottom: "2px solid #059669",
+              }}>
+                <span style={{ fontSize: "15px", fontWeight: 700, color: "#059669" }}>Global articles</span>
+                <span style={{ fontSize: "13px", color: "#94a3b8" }}>
+                  ({globalOrder.length}/{MAX_GLOBAL})
+                </span>
+              </div>
+              {globalOrder.map((itemId, idx) => {
+                const item = itemMap.get(itemId);
+                if (!item) return null;
+                return (
+                  <div
+                    key={itemId}
+                    style={{
+                      display: "flex", alignItems: "flex-start", gap: "12px",
+                      padding: "12px 14px", marginBottom: "6px",
+                      background: "#f0fdf4",
+                      border: "1px solid #86efac",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    {/* Up / down */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "3px", flexShrink: 0, paddingTop: "2px" }}>
+                      <button
+                        onClick={() => moveGlobal(idx, "up")}
+                        disabled={idx === 0}
+                        style={{
+                          fontSize: "11px", background: "none", border: "1px solid #e2e8f0",
+                          borderRadius: "4px", padding: "2px 6px",
+                          cursor: idx === 0 ? "default" : "pointer",
+                          color: idx === 0 ? "#d1d5db" : "#5a6a85",
+                          borderColor: idx === 0 ? "#f0f0f0" : "#e2e8f0",
+                          lineHeight: 1, fontFamily: "inherit",
+                        }}
+                      >↑</button>
+                      <button
+                        onClick={() => moveGlobal(idx, "down")}
+                        disabled={idx === globalOrder.length - 1}
+                        style={{
+                          fontSize: "11px", background: "none", border: "1px solid #e2e8f0",
+                          borderRadius: "4px", padding: "2px 6px",
+                          cursor: idx === globalOrder.length - 1 ? "default" : "pointer",
+                          color: idx === globalOrder.length - 1 ? "#d1d5db" : "#5a6a85",
+                          borderColor: idx === globalOrder.length - 1 ? "#f0f0f0" : "#e2e8f0",
+                          lineHeight: 1, fontFamily: "inherit",
+                        }}
+                      >↓</button>
+                    </div>
+                    {/* Article info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "14px", fontWeight: 600, lineHeight: 1.45, color: "#1a1a1a", marginBottom: "5px" }}>
+                        {item.title}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        {(item.journal_abbr || item.pubmed_indexed_at) && (
+                          <span style={{ fontSize: "12px", color: "#94a3b8" }}>
+                            {[item.journal_abbr, fmtShortDate(item.pubmed_indexed_at)].filter(Boolean).join(" · ")}
+                          </span>
+                        )}
+                        {item.article_type && (
+                          <span style={{
+                            fontSize: "10px", padding: "1px 6px", borderRadius: "8px",
+                            background: "#f0f2f5", color: "#5a6a85", fontWeight: 600,
+                          }}>
+                            {item.article_type}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {/* Remove from global */}
+                    <button
+                      onClick={() => toggleGlobal(itemId)}
+                      title="Remove from global"
+                      style={{
+                        fontSize: "11px", fontWeight: 600, fontFamily: "inherit",
+                        padding: "3px 8px", borderRadius: "5px",
+                        border: "1px solid #86efac",
+                        background: "#dcfce7",
+                        color: "#15803d",
+                        cursor: "pointer",
+                        lineHeight: 1.4,
+                        flexShrink: 0,
+                      }}
+                    >
+                      Global ✓
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* Subspecialty sections */}
         {sectionOrder.length === 0 ? (

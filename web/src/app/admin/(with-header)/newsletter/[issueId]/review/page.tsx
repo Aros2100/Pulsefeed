@@ -32,7 +32,7 @@ export default async function NewsletterReviewPage({ params }: { params: Promise
 
   const { data: editionArticles } = await admin
     .from("newsletter_edition_articles")
-    .select("id, article_id, subspecialty, sort_order, is_global")
+    .select("id, article_id, subspecialty, sort_order, is_global, global_sort_order")
     .eq("edition_id", issueId)
     .order("sort_order");
 
