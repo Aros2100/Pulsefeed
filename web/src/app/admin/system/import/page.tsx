@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ReparseAuthorGeoButton } from "./_components/ReparseAuthorGeoButton";
-import { ParseArticleLocationsButton } from "./_components/ParseArticleLocationsButton";
 import { NextCronRun } from "./_components/NextCronRun";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
@@ -519,7 +518,6 @@ export default async function ImportDashboardPage() {
 
           <div style={{ padding: "12px 24px", borderTop: "1px solid #eef0f4", display: "flex", gap: "16px", flexWrap: "wrap" }}>
             <ReparseAuthorGeoButton />
-            <ParseArticleLocationsButton />
           </div>
 
           <div style={{ padding: "20px 24px", display: "flex", gap: "12px", flexWrap: "wrap" }}>

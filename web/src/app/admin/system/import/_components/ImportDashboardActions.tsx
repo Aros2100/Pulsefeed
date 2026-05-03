@@ -119,13 +119,7 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
   const ifLastWithCount = useRef<number | null>(null);
 
   // ── Geo-location state ──────────────────────────────────────────────────────
-  const [geoState,  setGeoState]  = useState<ActionState>("idle");
   const [geoStats,  setGeoStats]  = useState<GeoStats | null>(null);
-  const geoPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // ── Re-parse state ─────────────────────────────────────────────────────────
-  const [reparseState, setReparseState] = useState<ActionState>("idle");
-  const reparsePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Backfill states state ─────────────────────────────────────────────────
   const [backfillStatesState, setBackfillStatesState] = useState<ActionState>("idle");
@@ -217,60 +211,13 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
     } catch { return null; }
   }, []);
 
-  function stopGeoPolling() {
-    if (geoPollRef.current) { clearInterval(geoPollRef.current); geoPollRef.current = null; }
-  }
-
-  function startGeoPolling() {
-    stopGeoPolling();
-    let stableCount = 0;
-    let lastRemaining: number | null = null;
-    geoPollRef.current = setInterval(async () => {
-      const data = await fetchGeoStats();
-      if (!data) return;
-      if (data.ai_remaining === 0) {
-        stopGeoPolling(); setGeoState("done"); return;
-      }
-      if (data.ai_remaining === lastRemaining) {
-        stableCount++;
-        if (stableCount >= 2) { stopGeoPolling(); setGeoState("done"); }
-      } else {
-        stableCount = 0;
-        lastRemaining = data.ai_remaining;
-      }
-    }, 5000);
-  }
-
-  // ── Re-parse helpers ────────────────────────────────────────────────────────
-
-  function stopReparsePolling() {
-    if (reparsePollRef.current) { clearInterval(reparsePollRef.current); reparsePollRef.current = null; }
-  }
-
-  function startReparsePolling() {
-    stopReparsePolling();
-    let stableCount = 0;
-    let lastUnparsed: number | null = null;
-    reparsePollRef.current = setInterval(async () => {
-      const data = await fetchGeoStats();
-      if (!data) return;
-      if (data.unparsed === lastUnparsed) {
-        stableCount++;
-        if (stableCount >= 2) { stopReparsePolling(); setReparseState("done"); }
-      } else {
-        stableCount = 0;
-        lastUnparsed = data.unparsed;
-      }
-    }, 3000);
-  }
-
   // ── Mount effects ────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (subset === "citations")     { void fetchCitStats(); }
     if (subset === "impact-factor") { void fetchIFStats(); }
     if (subset === "geo")           { void fetchGeoStats(); }
-    return () => { stopCitPolling(); stopIFPolling(); stopGeoPolling(); stopReparsePolling(); };
+    return () => { stopCitPolling(); stopIFPolling(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subset]);
 
@@ -335,26 +282,6 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
       ifLastWithCount.current = current?.hasIF ?? null;
       startIFPolling();
     } catch { setIfState("error"); }
-  }
-
-  async function triggerGeo() {
-    setGeoState("loading");
-    try {
-      const res  = await fetch("/api/admin/geo/ai-parse", { method: "POST" });
-      const json = (await res.json()) as { ok: boolean };
-      if (!json.ok) { setGeoState("error"); return; }
-      startGeoPolling();
-    } catch { setGeoState("error"); }
-  }
-
-  async function triggerReparse() {
-    setReparseState("loading");
-    try {
-      const res  = await fetch("/api/admin/geo/run-parse", { method: "POST" });
-      const json = (await res.json()) as { ok: boolean };
-      if (!json.ok) { setReparseState("error"); return; }
-      startReparsePolling();
-    } catch { setReparseState("error"); }
   }
 
   async function triggerBackfillStates() {
@@ -456,8 +383,6 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
     const s = geoStats;
     const pct = s?.pct ?? 0;
     const barColor = pct >= 80 ? "#15803d" : pct >= 40 ? "#d97706" : "#E83B2A";
-    const running = geoState === "loading";
-    const noRemaining = (s?.ai_remaining ?? 0) === 0;
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -531,40 +456,6 @@ export default function ImportDashboardActions({ specialtySlugs, subset }: Props
 
         {/* Buttons */}
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-          {(() => {
-            const reparseRunning = reparseState === "loading";
-            const noUnparsed = (s?.unparsed ?? 0) === 0;
-            return (
-              <button
-                onClick={() => { void triggerReparse(); }}
-                disabled={reparseRunning || noUnparsed}
-                style={{
-                  padding: "8px 16px", borderRadius: "7px", border: "none",
-                  fontFamily: "inherit", fontSize: "13px", fontWeight: 600,
-                  cursor: reparseRunning || noUnparsed ? "not-allowed" : "pointer",
-                  background: reparseRunning ? "#f1f3f7" : reparseState === "done" ? "#f0fdf4" : noUnparsed ? "#e5e7eb" : "#E83B2A",
-                  color:      reparseRunning ? "#9ca3af" : reparseState === "done" ? "#15803d" : noUnparsed ? "#9ca3af" : "#fff",
-                  transition: "background 0.15s, color 0.15s",
-                }}
-              >
-                {reparseRunning ? `Kører re-parse… (${n(s?.unparsed)} tilbage)` : reparseState === "done" ? "Re-parse færdig ✓" : noUnparsed ? "Ingen at parse" : "Kør re-parse"}
-              </button>
-            );
-          })()}
-          <button
-            onClick={() => { void triggerGeo(); }}
-            disabled={running || noRemaining}
-            style={{
-              padding: "8px 16px", borderRadius: "7px", border: "none",
-              fontFamily: "inherit", fontSize: "13px", fontWeight: 600,
-              cursor: running || noRemaining ? "not-allowed" : "pointer",
-              background: running ? "#f1f3f7" : noRemaining ? "#e5e7eb" : "#1a1a1a",
-              color:      running ? "#9ca3af" : noRemaining ? "#9ca3af" : "#fff",
-              transition: "background 0.15s, color 0.15s",
-            }}
-          >
-            {running ? `Kører AI… (${n(s?.ai_remaining)} remaining)` : noRemaining ? "Ingen afventer AI" : "Kør AI-parse"}
-          </button>
           {(() => {
             const bfRunning = backfillStatesState === "loading";
             return (
