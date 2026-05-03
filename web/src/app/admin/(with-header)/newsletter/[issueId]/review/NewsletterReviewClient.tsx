@@ -249,7 +249,7 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
             Save →
           </button>
           <Link
-            href={`/admin/newsletter/${edition.id}/intro-texts`}
+            href={`/admin/newsletter/${edition.id}/sub-headlines`}
             style={{
               fontSize: "13px", fontWeight: 600,
               background: "#059669", color: "#fff",
@@ -257,7 +257,7 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
               textDecoration: "none", whiteSpace: "nowrap",
             }}
           >
-            Intro texts →
+            Sub-headlines →
           </Link>
         </div>
       </div>

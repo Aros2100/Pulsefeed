@@ -139,10 +139,10 @@ export default function NewsletterPreviewClient({ edition, subspecialties, editi
         boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
       }}>
         <Link
-          href={`/admin/newsletter/${edition.id}/intro-texts`}
+          href={`/admin/newsletter/${edition.id}/sub-headlines`}
           style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none", whiteSpace: "nowrap" }}
         >
-          ← Intro texts
+          ← Sub-headlines
         </Link>
         <span style={{ color: "#dde3ed" }}>·</span>
         <span style={{ fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap" }}>

@@ -47,7 +47,7 @@ function weekSaturday(week: number, year: number): string {
   });
 }
 
-type Step = "selection" | "review" | "intro-texts" | "preview";
+type Step = "selection" | "review" | "sub-headlines" | "preview";
 
 interface StepState {
   selectionDone: boolean;
@@ -69,7 +69,7 @@ function getStepState(edition: Edition): StepState {
   // Review done: at least 1 global article marked
   const reviewDone = edition.globalCount >= 1;
 
-  // Intro texts done: global_intro filled AND all subspecialties with articles have a comment
+  // Sub-headlines done: global_intro filled AND all subspecialties with articles have a comment
   const globalIntro = typeof content.global_intro === "string" && content.global_intro.trim() !== "";
   const subspecialtyComments = (content.subspecialty_comments ?? {}) as Record<string, string>;
   const introDone =
@@ -85,7 +85,7 @@ function getStepState(edition: Edition): StepState {
 
   let nextStep: Step = "selection";
   if (selectionDone && reviewDone && introDone) nextStep = "preview";
-  else if (selectionDone && reviewDone) nextStep = "intro-texts";
+  else if (selectionDone && reviewDone) nextStep = "sub-headlines";
   else if (selectionDone) nextStep = "review";
   else nextStep = "selection";
 
@@ -101,7 +101,7 @@ function getStepState(edition: Edition): StepState {
 const STEPS: { key: Step | "send"; label: string }[] = [
   { key: "selection",   label: "Selection" },
   { key: "review",      label: "Review" },
-  { key: "intro-texts", label: "Intro texts" },
+  { key: "sub-headlines", label: "Sub-headlines" },
   { key: "preview",     label: "Preview" },
   { key: "send",        label: "Send" },
 ];
@@ -136,7 +136,7 @@ function ProgressTracker({ edition }: { edition: Edition }) {
   const stepDone: Record<Step | "send", boolean> = {
     selection:     selectionDone,
     review:        reviewDone,
-    "intro-texts": introTextsDone,
+    "sub-headlines": introTextsDone,
     preview:       allDone,
     send:          sendDone,
   };
