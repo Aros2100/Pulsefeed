@@ -3,5 +3,6 @@
     {
       "path": "/api/cron/nightly-check",
       "schedule": "0 6 * * *"
+    }
   ]
 }
