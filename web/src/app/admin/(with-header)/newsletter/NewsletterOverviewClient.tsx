@@ -66,8 +66,8 @@ function getStepState(edition: Edition): StepState {
     Object.keys(edition.articlesBySubspecialty).length >= edition.activeSubspecialtyCount &&
     Object.values(edition.articlesBySubspecialty).every((n) => n >= 5);
 
-  // Review done: globalCount === 3
-  const reviewDone = edition.globalCount === 3;
+  // Review done: at least 1 global article marked
+  const reviewDone = edition.globalCount >= 1;
 
   // Intro texts done: global_intro filled AND all subspecialties with articles have a comment
   const globalIntro = typeof content.global_intro === "string" && content.global_intro.trim() !== "";

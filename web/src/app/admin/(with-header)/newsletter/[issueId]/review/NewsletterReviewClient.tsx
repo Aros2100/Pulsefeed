@@ -80,8 +80,6 @@ function initSections(
   return grouped;
 }
 
-const MAX_GLOBAL = 3;
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 function initGlobalOrder(editionArticles: EditionArticle[]): string[] {
@@ -151,7 +149,6 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
         return updated;
       });
     } else {
-      if (globalCount >= MAX_GLOBAL) return;
       // Toggle on — append to globalOrder, assign sort order in sections
       setGlobalOrder((prev) => [...prev, itemId]);
       setSections((prev) => {
@@ -236,11 +233,8 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
           Week {edition.week_number} · {edition.year}
         </span>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
-          <span style={{
-            fontSize: "12px", fontWeight: 600,
-            color: globalCount === MAX_GLOBAL ? "#059669" : "#94a3b8",
-          }}>
-            {globalCount}/{MAX_GLOBAL} global
+          <span style={{ fontSize: "12px", fontWeight: 600, color: globalCount > 0 ? "#059669" : "#94a3b8" }}>
+            {globalCount} global
           </span>
           {saving && <span style={{ fontSize: "12px", color: "#94a3b8" }}>Saving…</span>}
           <button
@@ -293,7 +287,7 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
               }}>
                 <span style={{ fontSize: "15px", fontWeight: 700, color: "#059669" }}>Global articles</span>
                 <span style={{ fontSize: "13px", color: "#94a3b8" }}>
-                  ({globalOrder.length}/{MAX_GLOBAL})
+                  ({globalOrder.length})
                 </span>
               </div>
               {globalOrder.map((itemId, idx) => {
@@ -479,16 +473,14 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
                     <button
                       onClick={() => toggleGlobal(item.id)}
-                      disabled={!item.is_global && globalCount >= MAX_GLOBAL}
-                      title={item.is_global ? "Remove from global" : globalCount >= MAX_GLOBAL ? "Max 3 global articles" : "Mark as global"}
+                      title={item.is_global ? "Remove from global" : "Mark as global"}
                       style={{
                         fontSize: "11px", fontWeight: 600, fontFamily: "inherit",
                         padding: "3px 8px", borderRadius: "5px",
                         border: item.is_global ? "1px solid #86efac" : "1px solid #e2e8f0",
                         background: item.is_global ? "#dcfce7" : "none",
                         color: item.is_global ? "#15803d" : "#94a3b8",
-                        cursor: (!item.is_global && globalCount >= MAX_GLOBAL) ? "default" : "pointer",
-                        opacity: (!item.is_global && globalCount >= MAX_GLOBAL) ? 0.4 : 1,
+                        cursor: "pointer",
                         transition: "all 0.15s",
                         lineHeight: 1.4,
                       }}
