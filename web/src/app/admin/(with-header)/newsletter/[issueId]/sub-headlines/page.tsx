@@ -17,7 +17,7 @@ export default async function NewsletterIntroTextsPage({ params }: { params: Pro
 
   const { data: edition, error: editionError } = await admin
     .from("newsletter_editions")
-    .select("id, week_number, year, status, content")
+    .select("id, week_number, year, status, content, and_finally_article_id, and_finally_headline, and_finally_subheadline")
     .eq("id", issueId)
     .single();
 
@@ -48,12 +48,23 @@ export default async function NewsletterIntroTextsPage({ params }: { params: Pro
     articleDetails = data ?? [];
   }
 
+  let andFinallyArticle = null;
+  if (edition.and_finally_article_id) {
+    const { data } = await admin
+      .from("articles")
+      .select("id, title, article_type, abstract, short_resume, subspecialty, pubmed_id, sari_subject, sari_action, sari_result, sari_implication")
+      .eq("id", edition.and_finally_article_id)
+      .single();
+    andFinallyArticle = data ?? null;
+  }
+
   return (
     <NewsletterAiClient
       edition={edition}
       subspecialties={subspecialties ?? []}
       editionArticles={editionArticles ?? []}
       articleDetails={articleDetails}
+      andFinallyArticle={andFinallyArticle}
     />
   );
 }

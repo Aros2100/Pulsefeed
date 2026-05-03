@@ -39,11 +39,21 @@ interface SectionItem {
   global_sort_order: number | null;
 }
 
+interface PoolArticle {
+  id: string;
+  title: string;
+  article_type: string | null;
+  journal_title: string | null;
+  pubmed_indexed_at: string | null;
+}
+
 interface Props {
-  edition: { id: string; week_number: number; year: number; status: string; content: Record<string, unknown> | null };
+  edition: { id: string; week_number: number; year: number; status: string; content: Record<string, unknown> | null; and_finally_article_id: string | null };
   subspecialties: Subspecialty[];
   editionArticles: EditionArticle[];
   articleDetails: ArticleDetail[];
+  andFinallyPool: PoolArticle[];
+  andFinallySelected: PoolArticle | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -89,7 +99,7 @@ function initGlobalOrder(editionArticles: EditionArticle[]): string[] {
     .map((ea) => ea.id);
 }
 
-export default function NewsletterReviewClient({ edition, subspecialties, editionArticles, articleDetails }: Props) {
+export default function NewsletterReviewClient({ edition, subspecialties, editionArticles, articleDetails, andFinallyPool, andFinallySelected }: Props) {
   const [sections, setSections] = useState<Record<string, SectionItem[]>>(() =>
     initSections(editionArticles, articleDetails)
   );
@@ -99,6 +109,10 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
   );
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // And finally state
+  const [andFinallyId, setAndFinallyId] = useState<string | null>(edition.and_finally_article_id);
+  const [andFinallyChanging, setAndFinallyChanging] = useState(false);
 
   const globalCount = globalOrder.length;
 
@@ -372,6 +386,86 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
                   </div>
                 );
               })}
+            </div>
+          );
+        })()}
+
+        {/* ── And finally section ─────────────────────────────────────────── */}
+        {(() => {
+          const currentArticle = andFinallyId
+            ? (andFinallyId === andFinallySelected?.id ? andFinallySelected : andFinallyPool.find((p) => p.id === andFinallyId) ?? andFinallySelected)
+            : null;
+
+          async function pickAndFinally(articleId: string | null) {
+            setAndFinallyChanging(true);
+            try {
+              const res = await fetch(`/api/admin/newsletter/${edition.id}/and-finally`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ article_id: articleId }),
+              });
+              const json = await res.json();
+              if (json.ok) setAndFinallyId(json.and_finally_article_id);
+              else alert(json.error ?? "Failed to update And finally");
+            } catch { alert("Failed to update And finally"); }
+            finally { setAndFinallyChanging(false); }
+          }
+
+          return (
+            <div style={{ marginBottom: "32px" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "12px", paddingBottom: "8px", borderBottom: "2px solid #1a1a1a" }}>
+                <span style={{ fontSize: "15px", fontWeight: 700, color: "#1a1a1a" }}>And finally</span>
+              </div>
+              {currentArticle ? (
+                <div style={{ background: "#fff", border: "1px solid #dde3ed", borderRadius: "8px", padding: "12px 14px" }}>
+                  <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "4px", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.05em" }}>
+                    {[currentArticle.article_type, currentArticle.journal_title].filter(Boolean).join(" · ")}
+                  </div>
+                  <div style={{ fontSize: "14px", fontWeight: 600, color: "#1a1a1a", marginBottom: "10px" }}>{currentArticle.title}</div>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <select
+                      disabled={andFinallyChanging}
+                      onChange={(e) => { if (e.target.value) pickAndFinally(e.target.value === "__remove__" ? null : e.target.value); }}
+                      value=""
+                      style={{ fontSize: "12px", fontFamily: "inherit", padding: "4px 8px", borderRadius: "5px", border: "1px solid #e2e8f0", cursor: "pointer" }}
+                    >
+                      <option value="" disabled>Change…</option>
+                      <option value="__remove__">— Remove —</option>
+                      {andFinallyPool.map((p) => (
+                        <option key={p.id} value={p.id}>{p.title} · {p.article_type ?? "—"} · {p.journal_title ?? "—"}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => pickAndFinally(null)}
+                      disabled={andFinallyChanging}
+                      style={{ fontSize: "12px", fontFamily: "inherit", padding: "4px 10px", borderRadius: "5px", border: "1px solid #e2e8f0", background: "none", color: "#b91c1c", cursor: "pointer" }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : andFinallyPool.length > 0 ? (
+                <div style={{ background: "#fff", border: "1px solid #dde3ed", borderRadius: "8px", padding: "12px 14px" }}>
+                  <div style={{ fontSize: "13px", color: "#94a3b8", marginBottom: "10px" }}>No article selected. The section will be skipped in the email.</div>
+                  <select
+                    disabled={andFinallyChanging}
+                    onChange={(e) => { if (e.target.value) pickAndFinally(e.target.value); }}
+                    value=""
+                    style={{ fontSize: "12px", fontFamily: "inherit", padding: "4px 8px", borderRadius: "5px", border: "1px solid #e2e8f0", cursor: "pointer" }}
+                  >
+                    <option value="" disabled>Pick from pool…</option>
+                    {andFinallyPool.map((p) => (
+                      <option key={p.id} value={p.id}>{p.title} · {p.article_type ?? "—"} · {p.journal_title ?? "—"}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div style={{ background: "#fff", border: "1px solid #dde3ed", borderRadius: "8px", padding: "12px 14px" }}>
+                  <div style={{ fontSize: "13px", color: "#94a3b8" }}>
+                    Pool is empty. The section will be skipped in this email. Mark candidates from article stamkort to populate the pool.
+                  </div>
+                </div>
+              )}
             </div>
           );
         })()}

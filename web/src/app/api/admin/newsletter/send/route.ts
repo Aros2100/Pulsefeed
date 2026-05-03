@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
   // Fetch edition
   const { data: edition, error: editionError } = await admin
     .from("newsletter_editions")
-    .select("id, week_number, year, status, content")
+    .select("id, week_number, year, status, content, and_finally_article_id")
     .eq("id", editionId)
     .single();
 
@@ -204,6 +204,17 @@ export async function POST(request: NextRequest) {
     .from("newsletter_editions")
     .update({ status: "sent" })
     .eq("id", editionId);
+
+  // Mark And finally article as used (only on successful send)
+  if (sent > 0 && edition.and_finally_article_id) {
+    await admin
+      .from("articles")
+      .update({
+        and_finally_used_in_edition_id: edition.id,
+        and_finally_candidate: false,
+      })
+      .eq("id", edition.and_finally_article_id);
+  }
 
   return NextResponse.json({ ok: true, sent });
 }

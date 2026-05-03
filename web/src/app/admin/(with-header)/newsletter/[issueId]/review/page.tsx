@@ -17,7 +17,7 @@ export default async function NewsletterReviewPage({ params }: { params: Promise
 
   const { data: edition, error: editionError } = await admin
     .from("newsletter_editions")
-    .select("id, week_number, year, status, content")
+    .select("id, week_number, year, status, content, and_finally_article_id")
     .eq("id", issueId)
     .single();
 
@@ -48,12 +48,35 @@ export default async function NewsletterReviewPage({ params }: { params: Promise
     articleDetails = data ?? [];
   }
 
+  // Fetch And finally pool + current selection in parallel
+  const [
+    { data: andFinallyPool },
+    andFinallySelected,
+  ] = await Promise.all([
+    admin
+      .from("articles")
+      .select("id, title, article_type, journal_title, pubmed_indexed_at")
+      .eq("and_finally_candidate", true)
+      .is("and_finally_used_in_edition_id", null)
+      .order("pubmed_indexed_at", { ascending: true, nullsFirst: false }),
+    edition.and_finally_article_id
+      ? admin
+          .from("articles")
+          .select("id, title, article_type, journal_title")
+          .eq("id", edition.and_finally_article_id)
+          .single()
+          .then((r: { data: unknown }) => r.data)
+      : Promise.resolve(null),
+  ]);
+
   return (
     <NewsletterReviewClient
       edition={edition}
       subspecialties={subspecialties ?? []}
       editionArticles={editionArticles ?? []}
       articleDetails={articleDetails}
+      andFinallyPool={andFinallyPool ?? []}
+      andFinallySelected={andFinallySelected ?? null}
     />
   );
 }

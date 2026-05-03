@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
+import { autoSelectAndFinally } from "@/lib/newsletter/and-finally";
 
 const postSchema = z.object({
   week_number: z.number().int().min(1).max(53),
@@ -58,6 +59,11 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (insertError) return NextResponse.json({ ok: false, error: insertError.message }, { status: 500 });
+
+  // Auto-select oldest unused And finally candidate (best-effort; edition is valid even if none found)
+  await autoSelectAndFinally(admin, edition.id as string).catch((e) =>
+    console.error("[edition/create] autoSelectAndFinally failed:", e)
+  );
 
   return NextResponse.json({ ok: true, id: edition.id as string });
 }

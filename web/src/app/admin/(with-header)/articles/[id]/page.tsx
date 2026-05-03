@@ -11,6 +11,7 @@ import ArticleNoteTab from "./ArticleNoteTab";
 import { getSubspecialties } from "@/lib/lab/classification-options";
 import { getArticleTypes } from "@/lib/lab/article-type-options";
 import GeoCard from "./GeoCard";
+import AndFinallyToggle from "./AndFinallyToggle";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -525,6 +526,19 @@ export default async function AdminArticleLogPage({
 
   const article = articleResult.data;
   if (!article) notFound();
+
+  // Fetch And finally edition info if article has been used
+  const usedEditionId = (article as Record<string, unknown>).and_finally_used_in_edition_id as string | null;
+  let andFinallyEdition: { week_number: number; year: number } | null = null;
+  if (usedEditionId) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: edData } = await (admin as any)
+      .from("newsletter_editions")
+      .select("week_number, year")
+      .eq("id", usedEditionId)
+      .single();
+    andFinallyEdition = edData ?? null;
+  }
 
   const specialtyRow = specialtyResult.data as {
     specialty: string;
@@ -1472,12 +1486,20 @@ export default async function AdminArticleLogPage({
           <h1 style={{ fontSize: "16px", fontWeight: 700, lineHeight: 1.4, margin: 0 }}>
             {a.title}
           </h1>
-          {raw.retracted === true && (
-            <div style={{ marginTop: "12px", display: "inline-flex", alignItems: "center", gap: "6px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "6px", padding: "6px 12px" }}>
-              <span style={{ fontSize: "13px", fontWeight: 700, color: "#b91c1c" }}>⚠ RETRACTED</span>
-              <span style={{ fontSize: "12px", color: "#ef4444" }}>This article has been retracted from PubMed</span>
-            </div>
-          )}
+          <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+            <AndFinallyToggle
+              articleId={id}
+              initialCandidate={!!(raw.and_finally_candidate)}
+              isUsed={!!usedEditionId}
+              usedInEdition={andFinallyEdition}
+            />
+            {raw.retracted === true && (
+              <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "6px", padding: "6px 12px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: "#b91c1c" }}>⚠ RETRACTED</span>
+                <span style={{ fontSize: "12px", color: "#ef4444" }}>This article has been retracted from PubMed</span>
+              </div>
+            )}
+          </div>
         </div>
 
       </div>

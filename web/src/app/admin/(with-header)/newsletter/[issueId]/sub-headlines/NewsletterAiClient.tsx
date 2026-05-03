@@ -50,10 +50,17 @@ interface ArticleItem {
 }
 
 interface Props {
-  edition: { id: string; week_number: number; year: number; status: string; content: Record<string, unknown> | null };
+  edition: {
+    id: string; week_number: number; year: number; status: string;
+    content: Record<string, unknown> | null;
+    and_finally_article_id: string | null;
+    and_finally_headline: string | null;
+    and_finally_subheadline: string | null;
+  };
   subspecialties: Subspecialty[];
   editionArticles: EditionArticle[];
   articleDetails: ArticleDetail[];
+  andFinallyArticle: ArticleDetail | null;
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -79,7 +86,7 @@ const fieldLabelStyle: React.CSSProperties = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function NewsletterAiClient({ edition, subspecialties, editionArticles, articleDetails }: Props) {
+export default function NewsletterAiClient({ edition, subspecialties, editionArticles, articleDetails, andFinallyArticle }: Props) {
   const detailMap = useMemo(
     () => new Map(articleDetails.map((a) => [a.id, a])),
     [articleDetails]
@@ -149,6 +156,9 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
     return init;
   });
 
+  const [andFinallyHeadline, setAndFinallyHeadline] = useState(edition.and_finally_headline ?? "");
+  const [andFinallySubheadline, setAndFinallySubheadline] = useState(edition.and_finally_subheadline ?? "");
+
   const [generating, setGenerating] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -205,19 +215,38 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
     setSaveError(null);
     try {
       const ids = new Set([...Object.keys(headlines), ...Object.keys(subheadlines)]);
-      const updates = Array.from(ids).map((id) => ({
+      const editionArticleUpdates = Array.from(ids).map((id) => ({
         id,
         newsletter_headline:    headlines[id] ?? null,
         newsletter_subheadline: subheadlines[id] ?? null,
       }));
-      if (updates.length === 0) return;
-      const res = await fetch("/api/admin/newsletter/edition-article", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ updates }),
-      });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+
+      const saves: Promise<Response>[] = [];
+
+      if (editionArticleUpdates.length > 0) {
+        saves.push(fetch("/api/admin/newsletter/edition-article", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ updates: editionArticleUpdates }),
+        }));
+      }
+
+      if (andFinallyArticle) {
+        saves.push(fetch(`/api/admin/newsletter/${edition.id}/and-finally-text`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            headline:    andFinallyHeadline || null,
+            subheadline: andFinallySubheadline || null,
+          }),
+        }));
+      }
+
+      const results = await Promise.all(saves);
+      for (const res of results) {
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      }
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -336,7 +365,62 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
           </div>
         )}
 
-        {globalItems.length === 0 && leadItems.length === 0 && (
+        {/* And finally */}
+        {andFinallyArticle && (
+          <div style={{ marginTop: "36px" }}>
+            <div style={{
+              fontSize: "11px", fontWeight: 700, letterSpacing: "0.07em",
+              textTransform: "uppercase", color: "#1a1a1a", marginBottom: "14px",
+            }}>
+              And finally
+            </div>
+            <div style={{ background: "#fff", border: "1px solid #dde3ed", borderRadius: "10px", marginBottom: "14px", overflow: "hidden" }}>
+              <div style={{ background: "#f8f9fb", borderBottom: "1px solid #dde3ed", padding: "10px 16px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a", lineHeight: 1.4 }}>
+                    {andFinallyArticle.title}
+                  </div>
+                </div>
+                <button
+                  disabled
+                  title="And finally has its own prompt — coming soon. Edit fields manually for now."
+                  style={{
+                    fontSize: "12px", fontWeight: 600, fontFamily: "inherit",
+                    background: "#f0f2f5", color: "#94a3b8",
+                    border: "none", borderRadius: "6px", padding: "5px 12px",
+                    cursor: "default", whiteSpace: "nowrap", flexShrink: 0,
+                  }}
+                >
+                  Generate
+                </button>
+              </div>
+              <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div>
+                  <label style={fieldLabelStyle}>Headline</label>
+                  <textarea
+                    value={andFinallyHeadline}
+                    onChange={(e) => setAndFinallyHeadline(e.target.value)}
+                    placeholder="Newsletter headline (4–10 words)…"
+                    rows={1}
+                    style={textareaStyle}
+                  />
+                </div>
+                <div>
+                  <label style={fieldLabelStyle}>Subheadline</label>
+                  <textarea
+                    value={andFinallySubheadline}
+                    onChange={(e) => setAndFinallySubheadline(e.target.value)}
+                    placeholder="1–2 sentence editorial angle (max 30 words)…"
+                    rows={2}
+                    style={textareaStyle}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {globalItems.length === 0 && leadItems.length === 0 && !andFinallyArticle && (
           <div style={{ textAlign: "center", padding: "48px 0", color: "#94a3b8", fontSize: "14px" }}>
             No articles selected yet.
           </div>
