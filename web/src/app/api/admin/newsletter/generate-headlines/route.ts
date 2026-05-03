@@ -17,7 +17,7 @@ const schema = z.object({
   short_resume: z.string().nullable().optional(),
 });
 
-const SYSTEM_PROMPT = `# Newsletter Headline + Subheadline Generation Prompt
+const SYSTEM_PROMPT = `# Newsletter Headline + Subheadline Generation Prompt (v2 — 20-word subhead ceiling)
 
 ## Purpose
 
@@ -29,7 +29,7 @@ Generate a paired **headline** and **subheadline** for medical research articles
 A short newspaper-style title (4–10 words). Names the topic, hints at significance, leaves the reader curious. **Does not reveal the finding or the conclusion.**
 
 ### Subheadline
-A 1–2 sentence editorial angle (max 30 words). Tells the reader why the article matters in clinical terms. Active voice, calibrated to the article's evidence level — never overselling.
+A 1–2 sentence editorial angle (max 20 words). Tells the reader why the article matters in clinical terms. Active voice, calibrated to the article's evidence level — never overselling.
 
 ## Critical principles
 
@@ -59,7 +59,7 @@ A 1–2 sentence editorial angle (max 30 words). Tells the reader why the articl
 
 ## Subheadline rules
 
-1. **Length: 1–2 sentences, max 30 words total.**
+1. **Length: 1–2 sentences, max 20 words total.** This is a hard ceiling.
 2. **Active voice. Direct. No hedging unless the evidence requires it.**
 3. **Calibrate to article type — this is non-negotiable:**
     - **Case (n ≤ 5):** Use cautious language. "In two cases...", "A salvage option worth knowing.", "Proof-of-concept for..." — never "shows" or "proves"
@@ -68,7 +68,7 @@ A 1–2 sentence editorial angle (max 30 words). Tells the reader why the articl
     - **Meta-analysis:** Strongest authority. "Endoscopic approaches halved length of stay across 4,200 patients." — quote the key finding directly
     - **Guideline/consensus:** State the practical change. "Standardizes middle meningeal artery embolization as first-line in eligible patients."
     - **Review:** Name the synthesis. "Maps where next-generation biological therapeutics currently stand."
-4. **One concrete fact is better than three abstract claims.** "Median OS reached 31.4 months — the longest in any phase III GBM population to date." beats "Promising survival outcomes."
+4. **One concrete fact is better than three abstract claims.** Cut every word that does not earn its place. With a 20-word ceiling, every modifier must justify itself.
 5. **Avoid restating the headline.** If the headline says "Awake craniotomy in low-grade glioma", the subheadline must not begin with "Awake craniotomy in low-grade glioma..."
 6. **No filler openers** ("This study shows...", "Researchers found that...", "A new paper reports..."). Get straight to the point.
 7. **One number is fine, two is the maximum.** Numbers should be the most clinically meaningful ones, not just whatever is in the abstract.
@@ -109,7 +109,7 @@ No explanation, no quotation marks, no other formatting. Nothing before HEADLINE
 
 \`\`\`
 HEADLINE: A consensus on chronic subdural hematoma
-SUBHEAD: The 2024 Copenhagen iCORIC/DACSUHS symposium consolidates recommendations for chronic subdural hematoma management — the kind of statement that anchors practice for years.
+SUBHEAD: The 2024 Copenhagen iCORIC/DACSUHS symposium consolidates recommendations likely to anchor practice for years.
 \`\`\`
 
 **Example 2 — Non-interventional study**
@@ -119,7 +119,7 @@ SUBHEAD: The 2024 Copenhagen iCORIC/DACSUHS symposium consolidates recommendatio
 
 \`\`\`
 HEADLINE: Adjacent segment disease after laminectomy without fusion
-SUBHEAD: A risk factor analysis identifying which patients face the highest reoperation risk after laminectomy for lumbar spinal stenosis.
+SUBHEAD: A risk factor analysis identifying which patients face the highest reoperation risk after laminectomy.
 \`\`\`
 
 **Example 3 — Non-interventional study (CONDOR consortium)**
@@ -159,7 +159,7 @@ SUBHEAD: Where next-generation biological therapeutics currently stand, and wher
 
 \`\`\`
 HEADLINE: Early brain biopsy in cryptogenic neurological disease
-SUBHEAD: Earlier biopsy improves functional outcome in patients with disease of unknown etiology — an argument for a more aggressive diagnostic approach.
+SUBHEAD: Earlier biopsy improves functional outcome — an argument for a more aggressive diagnostic approach.
 \`\`\`
 
 **Example 7 — Case (n=2)**
@@ -169,7 +169,7 @@ SUBHEAD: Earlier biopsy improves functional outcome in patients with disease of 
 
 \`\`\`
 HEADLINE: Surgical resection in super-refractory status epilepticus
-SUBHEAD: In two cases, emergency resection of the epileptogenic zone terminated seizures when medical management had failed — a salvage option for patients with structural lesions.
+SUBHEAD: In two cases, emergency resection terminated seizures when medical management had failed — a salvage option.
 \`\`\`
 
 **Example 8 — Intervention study (RCT)**
@@ -179,7 +179,7 @@ SUBHEAD: In two cases, emergency resection of the epileptogenic zone terminated 
 
 \`\`\`
 HEADLINE: Thrombectomy beyond 24 hours in FVH-DWI mismatch
-SUBHEAD: Thrombectomy beyond twenty-four hours improved functional independence at ninety days in selected basilar occlusions, with no excess symptomatic ICH.
+SUBHEAD: Late thrombectomy improved functional independence at ninety days, with no excess symptomatic ICH.
 \`\`\`
 
 **Example 9 — Non-interventional study (registry)**
@@ -189,7 +189,7 @@ SUBHEAD: Thrombectomy beyond twenty-four hours improved functional independence 
 
 \`\`\`
 HEADLINE: Thromboprophylaxis timing in acute spinal cord injury
-SUBHEAD: A registry analysis of nearly 16,000 patients suggests early thromboprophylaxis within 48 hours reduces VTE without increasing bleeding events.
+SUBHEAD: A 16,000-patient registry suggests thromboprophylaxis within 48 hours reduces VTE without increasing bleeding.
 \`\`\`
 
 **Example 10 — Tech**
@@ -199,7 +199,7 @@ SUBHEAD: A registry analysis of nearly 16,000 patients suggests early thrombopro
 
 \`\`\`
 HEADLINE: Automated tracking of brain metastasis progression
-SUBHEAD: An AI-assisted longitudinal assessment tool reduces inter-observer variability and improves earlier detection of disease progression.
+SUBHEAD: An AI-assisted longitudinal tool reduces inter-observer variability and improves earlier detection of progression.
 \`\`\`
 
 ## Common mistakes to avoid
@@ -212,7 +212,7 @@ SUBHEAD: An AI-assisted longitudinal assessment tool reduces inter-observer vari
 
 4. **Headline reveals the finding:** "Early biopsy improves outcomes" → wrong (this is a takeaway). "Early brain biopsy in cryptogenic neurological disease" → right (names the topic).
 
-5. **Subhead is more than two sentences:** Stop. The subhead is for clinicians scanning their inbox. If it takes more than two sentences, you are writing the article, not the angle.
+5. **Subhead is more than two sentences or exceeds 20 words:** Stop. The subhead is for clinicians scanning their inbox. If you cannot say it in 20 words, you have not yet found the angle.
 
 6. **Both elements use the same verbs:** If the headline uses "consensus", the subhead should not lead with "consensus". Find variation.
 
