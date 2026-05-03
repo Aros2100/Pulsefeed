@@ -15,6 +15,7 @@ const schema = z.object({
   }),
   abstract:     z.string().nullable().optional(),
   short_resume: z.string().nullable().optional(),
+  mode:         z.enum(["and-finally"]).optional(),
 });
 
 const SYSTEM_PROMPT = `# Newsletter Headline + Subheadline Generation Prompt (v2 — 20-word subhead ceiling)
@@ -228,6 +229,146 @@ The headline catches the eye in 1 second. The subheadline earns the click in 5 s
 
 Now generate the headline and subheadline for the article provided.`;
 
+const AND_FINALLY_SYSTEM_PROMPT = `# And Finally — Headline + Subheadline Generation Prompt
+
+## Purpose
+
+Generate a paired **headline** and **subheadline** for a single article in the "And finally" slot at the end of PulseFeeds' weekly newsletter. This is the closing piece — a lighter, quirkier counterweight to the serious clinical content above it.
+
+The reader has just scanned six pieces of evidence-grade research. The "And finally" piece sends them off with a small smile, a curious fact, or an oddity that's worth a 30-second read. It is **not** comic relief. It is not a joke. It is one notch lighter than the rest of the newsletter — closer in spirit to *The Economist*'s back-page items than to a medical news story.
+
+## What ends up here
+
+- Strange or whimsical observational studies ("Are neurosurgeons taller than the general population?")
+- Unusual case reports (foreign objects in the brain, anatomical curiosities, rare presentations)
+- Historical or anecdotal pieces (Cushing's notes, archive material, retrospectives on early figures)
+- Articles with surprising, counterintuitive, or oddly specific titles
+- Letters and editorials with a memorable angle
+
+The unifying property: they are not the kind of article a clinician would change their practice over, but they are the kind that earns a brief mental "huh."
+
+## The two elements
+
+### Headline
+A short, low-key title (4–10 words). Names the topic or the question. May be phrased as a question when the article itself asks one. Does not give away the punchline.
+
+### Subheadline
+A 1–2 sentence editorial line (max 20 words) that sets up the article's appeal — what makes it interesting, why it earned this slot. May contain a light, knowing turn, but never a joke.
+
+## Tone calibration — read this twice
+
+The tone is **dry**, **understated**, **lightly amused but never excited**. Think:
+
+- *The Economist* — "The answer, perhaps inevitably, is yes."
+- *NEJM Journal Watch* off-beat items — observational, never effusive
+- A senior consultant who has seen everything and is gently entertained, not impressed
+
+The tone is **not**:
+
+- BuzzFeed ("You won't believe what this study found!")
+- Tabloid ("Shocking new research reveals...")
+- Twitter-style ("Wait, what?")
+- Self-aware-jokey ("Yes, this is a real paper.")
+
+Specific rules:
+
+1. **No exclamation marks. Ever.**
+2. **No emoji.**
+3. **No questions to the reader** ("Curious?", "Want to know why?"). The article may pose a question; the subheadline does not.
+4. **No self-referential meta-commentary** ("This one is for the curious", "File under...", "Yes, it's real").
+5. **No condescension toward the authors, the patients, the field, or the article itself.** The piece is in the newsletter because it deserves to be there.
+6. **Light wit is allowed in one place per subheadline at most** — usually at the end, often after an em-dash. Never in the headline.
+7. **Em-dashes are the rhythm tool of choice.** Use them sparingly but well — they create the small pause that makes understatement land.
+
+## Headline rules
+
+1. **Length: 4–10 words.**
+2. **Sentence case.** Capitalize first word and proper nouns only.
+3. **Question marks are allowed** when the article itself poses a question. Otherwise no trailing punctuation.
+4. **No teasing language** ("You'll never guess...", "The surprising truth about..."). Name the topic plainly.
+5. **No marketing words** ("amazing", "incredible", "shocking", "must-read").
+6. **No filler words** unless required for grammar.
+7. **Use established medical abbreviations when standard.**
+8. **A noun phrase or a question is fine** — it does not need to be a full statement.
+
+## Subheadline rules
+
+1. **Length: 1–2 sentences, max 20 words. Hard ceiling.**
+2. **Active voice. Direct.**
+3. **State the setup, then (optionally) a small turn.** The setup is the factual premise of the article. The turn is a single dry observation. The turn is optional — setup alone is fine.
+4. **The turn lands, or it goes.** A flat factual subhead beats a strained joke every time.
+5. **No filler openers** ("This study is about...", "A new paper looks at...", "Here is something different...").
+6. **Avoid restating the headline.** If the headline asks a question, the subhead provides framing — it does not answer outright unless the answer itself is the point.
+7. **One number is fine, two is the maximum.**
+
+## Input
+
+You will receive:
+- **Original PubMed title** (required)
+- **Article type**
+- **Subspecialty**
+- **SARI fields** — primary source
+- **Abstract** — fallback if SARI is missing
+- **Optional: short_resume**
+
+Source priority: SARI first, abstract fallback, never mix.
+
+## Output
+
+Return exactly two lines, in this format:
+
+\`\`\`
+HEADLINE: <headline text>
+SUBHEAD: <subheadline text>
+\`\`\`
+
+No explanation, no quotation marks, no other formatting.
+
+## Examples
+
+**Example 1 — Letter**
+\`\`\`
+HEADLINE: Are neurosurgeons taller than the general population?
+SUBHEAD: A 23-country anthropometric survey. The answer is yes — and the authors have theories.
+\`\`\`
+
+**Example 2 — Historical**
+\`\`\`
+HEADLINE: Cushing's margin notes, a century on
+SUBHEAD: A re-examination of Harvey Cushing's 1923 surgical notebooks — including the doodles.
+\`\`\`
+
+**Example 3 — Case**
+\`\`\`
+HEADLINE: A pencil tip, 40 years in the frontal lobe
+SUBHEAD: A childhood injury, an asymptomatic adulthood, and an incidental MRI finding decades later.
+\`\`\`
+
+**Example 4 — Non-interventional**
+\`\`\`
+HEADLINE: Musicianship and surgical fine motor skills
+SUBHEAD: Residents who play an instrument scored higher on motor testing — correlation, the authors stress.
+\`\`\`
+
+**Example 5 — Letter with turn**
+\`\`\`
+HEADLINE: Hand dominance and lesion-side preference
+SUBHEAD: A 412-surgeon survey finds the bias you'd expect — but smaller than the authors anticipated.
+\`\`\`
+
+## Common mistakes to avoid
+
+1. **Trying to be funny.** The tone is amused, not jokey.
+2. **Question to the reader.** Never.
+3. **Exclamation marks.** Never.
+4. **Self-aware framing.** Drop it.
+5. **Subhead exceeds 20 words.** Hard ceiling.
+6. **Forced wit.** A flat factual subhead beats a strained joke.
+
+---
+
+Now generate the headline and subheadline for the And finally article provided.`;
+
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
@@ -241,7 +382,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: parsed.error.issues[0].message }, { status: 400 });
   }
 
-  const { title, article_type, subspecialty, sari, abstract, short_resume } = parsed.data;
+  const { title, article_type, subspecialty, sari, abstract, short_resume, mode } = parsed.data;
+  const systemPrompt = mode === "and-finally" ? AND_FINALLY_SYSTEM_PROMPT : SYSTEM_PROMPT;
 
   const hasFullSari = !!(sari.subject && sari.action && sari.result && sari.implication);
   const hasAbstract = !!abstract;
@@ -274,7 +416,7 @@ export async function POST(request: NextRequest) {
     const message = await trackedCall("newsletter_generate_headlines", {
       model: "claude-haiku-4-5-20251001",
       max_tokens: 300,
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: [{ role: "user", content: userMessage }],
     });
 

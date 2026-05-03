@@ -382,16 +382,59 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
                   </div>
                 </div>
                 <button
-                  disabled
-                  title="And finally has its own prompt — coming soon. Edit fields manually for now."
+                  onClick={async () => {
+                    const hasContent = !!(
+                      (andFinallyArticle.sari_subject && andFinallyArticle.sari_action &&
+                       andFinallyArticle.sari_result && andFinallyArticle.sari_implication) ||
+                      andFinallyArticle.abstract
+                    );
+                    if (!hasContent) { alert("No SARI summary or abstract — cannot generate."); return; }
+                    const existingH = andFinallyHeadline.trim();
+                    const existingSub = andFinallySubheadline.trim();
+                    if (existingH || existingSub) {
+                      if (!confirm("Regenerating will replace both fields. Continue?")) return;
+                    }
+                    setGenerating((prev) => ({ ...prev, __and_finally__: true }));
+                    try {
+                      const res = await fetch("/api/admin/newsletter/generate-headlines", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          mode: "and-finally",
+                          title: andFinallyArticle.title,
+                          article_type: andFinallyArticle.article_type,
+                          subspecialty: andFinallyArticle.subspecialty?.[0] ?? "Neurosurgery",
+                          sari: {
+                            subject:     andFinallyArticle.sari_subject,
+                            action:      andFinallyArticle.sari_action,
+                            result:      andFinallyArticle.sari_result,
+                            implication: andFinallyArticle.sari_implication,
+                          },
+                          abstract:     andFinallyArticle.abstract,
+                          short_resume: andFinallyArticle.short_resume,
+                        }),
+                      });
+                      const json = await res.json();
+                      if (!json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+                      setAndFinallyHeadline(json.headline);
+                      setAndFinallySubheadline(json.subhead);
+                    } catch (e) {
+                      alert(e instanceof Error ? e.message : "Generation failed");
+                    } finally {
+                      setGenerating((prev) => ({ ...prev, __and_finally__: false }));
+                    }
+                  }}
+                  disabled={!!generating["__and_finally__"]}
                   style={{
                     fontSize: "12px", fontWeight: 600, fontFamily: "inherit",
-                    background: "#f0f2f5", color: "#94a3b8",
+                    background: generating["__and_finally__"] ? "#f0f2f5" : "#1a1a1a",
+                    color: generating["__and_finally__"] ? "#94a3b8" : "#fff",
                     border: "none", borderRadius: "6px", padding: "5px 12px",
-                    cursor: "default", whiteSpace: "nowrap", flexShrink: 0,
+                    cursor: generating["__and_finally__"] ? "default" : "pointer",
+                    whiteSpace: "nowrap", flexShrink: 0,
                   }}
                 >
-                  Generate
+                  {generating["__and_finally__"] ? "Generating…" : "Generate"}
                 </button>
               </div>
               <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: "10px" }}>
