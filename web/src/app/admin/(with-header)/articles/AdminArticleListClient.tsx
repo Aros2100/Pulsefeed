@@ -92,6 +92,7 @@ interface Filters {
   suspect_city:   boolean;
   no_subspecialty: boolean;
   specialty_excluded: boolean;
+  no_abstract: boolean;
   sort_by: SortField;
   sort_dir: "asc" | "desc";
   page: number;
@@ -183,6 +184,7 @@ function filtersFromParams(sp: URLSearchParams): Filters {
     suspect_city:     sp.get("suspect_city")     === "true",
     no_subspecialty:   sp.get("no_subspecialty")   === "true",
     specialty_excluded: sp.get("specialty_excluded") === "true",
+    no_abstract:       sp.get("no_abstract")       === "true",
     sort_by:         (SORT_FIELDS as readonly string[]).includes(sortBy) ? sortBy as SortField : "imported_at",
     sort_dir:        sortDir === "asc" ? "asc" : "desc",
     page:            Math.max(1, parseInt(sp.get("page") ?? "1", 10)),
@@ -210,6 +212,7 @@ function filtersToParams(f: Filters): URLSearchParams {
   if (f.suspect_city)     p.set("suspect_city",     "true");
   if (f.no_subspecialty)   p.set("no_subspecialty",   "true");
   if (f.specialty_excluded) p.set("specialty_excluded", "true");
+  if (f.no_abstract)       p.set("no_abstract",       "true");
   if (f.sort_by !== "imported_at") p.set("sort_by", f.sort_by);
   if (f.sort_dir !== "desc")       p.set("sort_dir", f.sort_dir);
   if (f.page > 1)                  p.set("page", String(f.page));
@@ -220,7 +223,7 @@ function filtersToParams(f: Filters): URLSearchParams {
 const EMPTY_FILTERS: Filters = {
   search: "", mesh_term: "", specialty: ACTIVE_SPECIALTY, subspecialty: "", article_type: "",
   geo_continent: "", geo_region: "", geo_country: "", geo_state: "", geo_city: "",
-  no_region: false, no_country: false, no_state: false, no_city: false, not_parsed: false, suspect_city: false, no_subspecialty: false, specialty_excluded: false,
+  no_region: false, no_country: false, no_state: false, no_city: false, not_parsed: false, suspect_city: false, no_subspecialty: false, specialty_excluded: false, no_abstract: false,
   sort_by: "imported_at", sort_dir: "desc", page: 1,
   period: null,
 };
@@ -381,7 +384,7 @@ export default function AdminArticleListClient({
   }
 
   const hasActiveFilters = !!(
-    filters.subspecialty || filters.no_subspecialty || filters.specialty_excluded || filters.article_type || filters.search ||
+    filters.subspecialty || filters.no_subspecialty || filters.specialty_excluded || filters.no_abstract || filters.article_type || filters.search ||
     filters.mesh_term || filters.geo_continent || filters.geo_region || filters.geo_country || filters.geo_state ||
     filters.geo_city
   );
@@ -529,6 +532,24 @@ export default function AdminArticleListClient({
               { value: "Unclassified",             label: "Unclassified" },
             ]}
           />
+        </div>
+
+        <div style={{ borderTop: "1px solid var(--color-background-secondary)" }} />
+
+        {/* Content */}
+        <div>
+          <div style={sectionLabel}>Content</div>
+          <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={filters.no_abstract}
+              onChange={(e) => setFilter("no_abstract", e.target.checked)}
+              style={{ accentColor: "var(--pf-red)", cursor: "pointer" }}
+            />
+            <span style={{ fontSize: "11px", color: filters.no_abstract ? "var(--pf-red)" : "var(--color-text-secondary)", fontWeight: filters.no_abstract ? 700 : 400 }}>
+              No abstract
+            </span>
+          </label>
         </div>
 
         {hasActiveFilters && (

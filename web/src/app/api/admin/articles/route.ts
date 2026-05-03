@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
   const geo_city         = params.get("geo_city");
   const no_subspecialty  = params.get("no_subspecialty")  === "true";
   const specialty_excluded = params.get("specialty_excluded") === "true";
+  const no_abstract      = params.get("no_abstract")      === "true";
 
   const from = (page - 1) * limit;
   const to   = from + limit - 1;
@@ -93,6 +94,7 @@ export async function GET(request: NextRequest) {
   }
   if (subspecialty)     query = query.contains("subspecialty", [subspecialty]);
   if (no_subspecialty)  query = query.is("subspecialty", null);
+  if (no_abstract)      query = query.or("abstract.is.null,abstract.eq.");
   if (article_type)  query = query.eq("article_type", article_type);
   if (pub_date_from) query = query.gte("pubmed_indexed_at", pub_date_from);
   if (pub_date_to)   query = query.lte("pubmed_indexed_at", pub_date_to);
