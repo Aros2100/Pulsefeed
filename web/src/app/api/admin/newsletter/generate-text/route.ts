@@ -3,14 +3,33 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { trackedCall } from "@/lib/ai/tracked-client";
 
-const schema = z.object({
-  type:         z.enum(["global", "subspecialty"]),
-  subspecialty: z.string().optional(),
-  articles:     z.array(z.object({
-    title:        z.string(),
-    article_type: z.string().nullable(),
-  })).min(1),
-});
+const schema = z.discriminatedUnion("type", [
+  z.object({
+    type:         z.literal("global"),
+    subspecialty: z.string().optional(),
+    articles:     z.array(z.object({
+      title:        z.string(),
+      article_type: z.string().nullable(),
+    })).min(1),
+  }),
+  z.object({
+    type:         z.literal("subspecialty"),
+    subspecialty: z.string().optional(),
+    articles:     z.array(z.object({
+      title:        z.string(),
+      article_type: z.string().nullable(),
+    })).min(1),
+  }),
+  z.object({
+    type: z.literal("article"),
+    sari: z.object({
+      subject:     z.string(),
+      action:      z.string(),
+      result:      z.string(),
+      implication: z.string(),
+    }),
+  }),
+]);
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
@@ -25,20 +44,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: parsed.error.issues[0].message }, { status: 400 });
   }
 
-  const { type, subspecialty, articles } = parsed.data;
+  const { type } = parsed.data;
 
-  const articleList = articles
-    .map((a) => `- ${a.title}${a.article_type ? ` · ${a.article_type}` : ""}`)
-    .join("\n");
+  let prompt: string;
+  let maxTokens: number;
 
-  const prompt = type === "global"
-    ? `Write exactly 2 short sentences. Each sentence maximum 20 words. Stop after the second sentence. Write the two sentences as a single paragraph with no line breaks between them.\n\nYou are the editor of PulseFeed — a weekly medical newsletter for neurosurgeons. Write a short intro in English that highlights what makes these three articles worth reading this week. The articles will appear at the bottom of the newsletter — write the intro so it creates anticipation for them. Write in a confident, collegial tone — as one neurosurgeon briefing another. Return only the text, nothing else.\n\nArticles:\n${articleList}`
-    : `Write exactly 2 short sentences. Each sentence maximum 20 words. Stop after the second sentence. Write the two sentences as a single paragraph with no line breaks between them.\n\nYou are the editor of PulseFeed — a weekly medical newsletter for neurosurgeons. Write a short comment in English about this week's articles within ${subspecialty ?? "this subspecialty"}. Highlight what is noteworthy. Be direct and precise — no filler phrases. Return only the text, nothing else.\n\nArticles:\n${articleList}`;
+  if (type === "article") {
+    const { sari } = parsed.data;
+    prompt = `You are the editor of PulseFeed — a weekly medical newsletter for neurosurgeons. Based on this article's structured summary, write a single punchy sentence in English that captures why this finding matters clinically. Write in a confident, collegial tone. No filler phrases. Return only the sentence, nothing else.\n\nSubject: ${sari.subject}\nAction: ${sari.action}\nResult: ${sari.result}\nImplication: ${sari.implication}`;
+    maxTokens = 80;
+  } else {
+    const { subspecialty, articles } = parsed.data;
+    const articleList = articles
+      .map((a) => `- ${a.title}${a.article_type ? ` · ${a.article_type}` : ""}`)
+      .join("\n");
+    prompt = type === "global"
+      ? `Write exactly 2 short sentences. Each sentence maximum 20 words. Stop after the second sentence. Write the two sentences as a single paragraph with no line breaks between them.\n\nYou are the editor of PulseFeed — a weekly medical newsletter for neurosurgeons. Write a short intro in English that highlights what makes these three articles worth reading this week. The articles will appear at the bottom of the newsletter — write the intro so it creates anticipation for them. Write in a confident, collegial tone — as one neurosurgeon briefing another. Return only the text, nothing else.\n\nArticles:\n${articleList}`
+      : `Write exactly 2 short sentences. Each sentence maximum 20 words. Stop after the second sentence. Write the two sentences as a single paragraph with no line breaks between them.\n\nYou are the editor of PulseFeed — a weekly medical newsletter for neurosurgeons. Write a short comment in English about this week's articles within ${subspecialty ?? "this subspecialty"}. Highlight what is noteworthy. Be direct and precise — no filler phrases. Return only the text, nothing else.\n\nArticles:\n${articleList}`;
+    maxTokens = 120;
+  }
 
   try {
     const message = await trackedCall("newsletter_generate_text", {
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 120,
+      max_tokens: maxTokens,
       messages: [{ role: "user", content: prompt }],
     });
 

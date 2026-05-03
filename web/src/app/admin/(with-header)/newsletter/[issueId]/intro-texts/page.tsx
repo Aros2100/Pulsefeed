@@ -32,7 +32,7 @@ export default async function NewsletterIntroTextsPage({ params }: { params: Pro
 
   const { data: editionArticles } = await admin
     .from("newsletter_edition_articles")
-    .select("id, article_id, subspecialty, sort_order, is_global")
+    .select("id, article_id, subspecialty, sort_order, is_global, global_sort_order, comment")
     .eq("edition_id", issueId)
     .order("sort_order");
 
@@ -43,7 +43,7 @@ export default async function NewsletterIntroTextsPage({ params }: { params: Pro
   if (articleIds.length > 0) {
     const { data } = await admin
       .from("articles")
-      .select("id, title, article_type")
+      .select("id, title, article_type, sari_subject, sari_action, sari_result, sari_implication")
       .in("id", articleIds);
     articleDetails = data ?? [];
   }
