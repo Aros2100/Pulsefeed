@@ -78,6 +78,23 @@ const CITY_ALIASES: Record<string, string> = {
   // Chinese city with apostrophe variant (covered by apostrophe normalization
   // in normalizeCityKey, but alias kept as belt-and-suspenders)
   "yanan":         "yan'an",       // no-apostrophe variant
+
+  // Belgian cities — English exonyms (ascii_name = local name, no help here)
+  "antwerp":       "antwerpen",
+  "ghent":         "gent",
+  "bruges":        "brugge",
+  "louvain":       "leuven",       // French name for Leuven
+
+  // Moroccan cities — spelling variants
+  "fez":           "fes",          // DB ascii_name: "Fes" (from "Fès")
+  "marrakesh":     "marrakech",
+  "marrakech":     "marrakech",    // ensure direct form also works
+  "meknes":        "meknes",       // "Meknès" → ascii "Meknes"
+
+  // Moroccan cities — additional variants
+  "casablanca":    "casablanca",   // usually works; explicit for robustness
+  "tangier":       "tanger",       // DB: "Tanger" (ascii_name: "Tanger")
+  "tangiers":      "tanger",
 };
 
 // ── Cache loader ──────────────────────────────────────────────────────────────
@@ -103,7 +120,7 @@ export async function getCityCache(): Promise<CityCache> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (admin as any)
       .from("geo_cities")
-      .select("name, country, state")
+      .select("name, ascii_name, country, state")
       .gte("population", 5000)
       .not("name", "is", null)
       .not("country", "is", null)
@@ -112,36 +129,37 @@ export async function getCityCache(): Promise<CityCache> {
 
     if (error) throw new Error(`Failed to load city cache: ${error.message}`);
 
-    const batch = (data ?? []) as Array<{ name: string; country: string; state: string | null }>;
+    const batch = (data ?? []) as Array<{ name: string; ascii_name: string | null; country: string; state: string | null }>;
     if (batch.length === 0) break;
 
     for (const row of batch) {
-      // normalizeCityKey normalizes apostrophes AND diacritics, ensuring that
-      // DB names with curly apostrophes (e.g. "Yan'an" U+2019) produce the same
-      // cache key as lookup calls with straight apostrophes.
-      const rawKey = row.name.trim().toLowerCase();
-      const key = normalizeCityKey(row.name.trim()); // apostrophe-normalized + unaccented
+      // Build three keys per city:
+      //   rawKey  — original lowercase (preserves special chars like curly apostrophes)
+      //   key     — normalizeCityKey(name): apostrophe-normalized + NFD-unaccented
+      //   asciiKey — normalizeCityKey(ascii_name): GeoNames' pre-computed ASCII
+      //              transliteration, handles non-decomposable chars like ł→l, ą→a.
+      //              This is the main fix for Polish, Czech, etc. cities.
+      const rawKey  = row.name.trim().toLowerCase();
+      const key     = normalizeCityKey(row.name.trim());
+      const asciiKey = row.ascii_name ? normalizeCityKey(row.ascii_name.trim()) : null;
       const country = lookupCountry(row.country) ?? row.country;
-      const state = row.state?.trim() || null;
+      const state   = row.state?.trim() || null;
+
+      // Collect distinct keys to index (dedup inline)
+      const keysToIndex = [...new Set([rawKey, key, ...(asciiKey ? [asciiKey] : [])])];
 
       // ── names + countryMap ──────────────────────────────────────────────────
-      // Add both the original-lowercase key and the fully-normalized key.
-      for (const k of [rawKey, key]) {
+      for (const k of keysToIndex) {
         names.add(k);
         if (!countryMap.has(k)) countryMap.set(k, country);
       }
 
-      // ── stateMap (population-ordered: first entry wins) ───────────────────
+      // ── stateMap + countryStateMap (population-ordered: first entry wins) ──
       if (state) {
-        if (!stateMap.has(key)) stateMap.set(key, state);
-        if (rawKey !== key && !stateMap.has(rawKey)) stateMap.set(rawKey, state);
-
-        // Country-specific state map — key: "normCity::country"
-        const countryKey = `${key}::${country}`;
-        if (!countryStateMap.has(countryKey)) countryStateMap.set(countryKey, state);
-        if (rawKey !== key) {
-          const rawCountryKey = `${rawKey}::${country}`;
-          if (!countryStateMap.has(rawCountryKey)) countryStateMap.set(rawCountryKey, state);
+        for (const k of keysToIndex) {
+          if (!stateMap.has(k)) stateMap.set(k, state);
+          const ck = `${k}::${country}`;
+          if (!countryStateMap.has(ck)) countryStateMap.set(ck, state);
         }
       }
     }
