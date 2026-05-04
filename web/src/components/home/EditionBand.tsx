@@ -13,87 +13,117 @@ export interface EditionData {
   total_picks: number;
 }
 
-function fmtShort(iso: string | null): string {
+const DAYS = ["SUNDAY","MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY"];
+const MONTHS_SHORT = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+function fmtMastheadDate(iso: string | null): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" }).toUpperCase();
+  const d = new Date(iso);
+  return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 export function EditionBand({ edition }: { edition: EditionData }) {
   const router = useRouter();
-  const pubmedUrl = edition.lead_pubmed_id
-    ? `https://pubmed.ncbi.nlm.nih.gov/${edition.lead_pubmed_id}/`
-    : null;
+
+  const subheadline = edition.lead_subheadline || null;
 
   return (
-      <div
-        onClick={() => router.push(`/editions/${edition.id}`)}
-        style={{
+    <div
+      onClick={() => router.push(`/editions/${edition.id}`)}
+      style={{
         background: "#F5F1E8",
-        border: "0.5px solid #E5DCC8",
+        border: "0.5px solid rgba(0,0,0,0.06)",
         borderRadius: "12px",
-        padding: "1.25rem 1.75rem",
-        marginBottom: "0.75rem",
-        display: "flex",
-        alignItems: "flex-start",
-        gap: "2rem",
+        marginBottom: "1.5rem",
         cursor: "pointer",
-      }}>
-        {/* Left: eyebrow + title + subtitle */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em",
-            textTransform: "uppercase", color: "#94a3b8", marginBottom: "10px",
-          }}>
-            Issue {edition.week_number} · Editors pick · {fmtShort(edition.published_at)}
-          </div>
-          <div style={{
-            fontFamily: "Georgia, serif",
-            fontSize: "18px", lineHeight: 1.35, color: "#1a1a1a", fontWeight: 400,
-            marginBottom: (edition.lead_subheadline || edition.lead_sari_subject) ? "8px" : 0,
-          }}>
-            {pubmedUrl ? (
-              <a
-                href={pubmedUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                style={{ color: "#1a1a1a", textDecoration: "none" }}
-              >
-                {edition.lead_title ?? "This week&apos;s edition"}
-              </a>
-            ) : (edition.lead_title ?? "This week's edition")}
-          </div>
-          {edition.lead_subheadline ? (
-            <div style={{ fontSize: "13px", color: "#64748b", lineHeight: 1.5, marginTop: "6px" }}>
-              {edition.lead_subheadline}
-            </div>
-          ) : edition.lead_sari_subject ? (
-            <div style={{
-              fontSize: "12px", color: "#64748b", lineHeight: 1.5,
-              display: "-webkit-box", WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical", overflow: "hidden",
-            }}>
-              {edition.lead_sari_subject}
-            </div>
-          ) : null}
-        </div>
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {/* Red rule — full-height left edge */}
+      <div style={{
+        position: "absolute", left: 0, top: 0, bottom: 0,
+        width: "3px", background: "#D94A43",
+      }} />
 
-        {/* Right: picks + CTA */}
-        <div style={{
-          flexShrink: 0, textAlign: "right",
-          display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "10px",
-          paddingTop: "2px",
-        }}>
-          <div style={{ fontSize: "11px", color: "#94a3b8", whiteSpace: "nowrap" }}>
-            {edition.total_picks} editors picks
-          </div>
+      {/* Masthead strip */}
+      <div style={{
+        padding: "14px 1.75rem 12px",
+        borderBottom: "0.5px solid rgba(0,0,0,0.08)",
+        display: "flex", alignItems: "baseline", justifyContent: "space-between",
+      }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "14px" }}>
           <span style={{
-            fontSize: "12px", fontWeight: 500, color: "#1a1a1a",
-            textDecoration: "underline", whiteSpace: "nowrap",
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontStyle: "italic", fontSize: "14px", fontWeight: 400, color: "#D94A43",
           }}>
-            Open this week's edition →
+            The Edition
+          </span>
+          <span style={{
+            fontSize: "10px", letterSpacing: "0.12em", color: "#94a3b8",
+            textTransform: "uppercase",
+          }}>
+            № {edition.week_number} · {fmtMastheadDate(edition.published_at)}
           </span>
         </div>
+        <span style={{
+          fontSize: "10px", letterSpacing: "0.08em", color: "#94a3b8",
+          textTransform: "uppercase",
+        }}>
+          {edition.total_picks} editors picks this week
+        </span>
       </div>
+
+      {/* Main content */}
+      <div style={{
+        padding: "1.5rem 1.75rem 1.75rem",
+        display: "grid", gridTemplateColumns: "1fr auto", gap: "32px", alignItems: "center",
+      }}>
+        {/* Left: eyebrow + title + subheadline */}
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            fontSize: "10px", fontWeight: 500, letterSpacing: "0.1em",
+            textTransform: "uppercase", color: "#D94A43", marginBottom: "10px",
+          }}>
+            Lead · Editors pick
+          </div>
+
+          <div style={{
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontSize: "26px", lineHeight: 1.25, letterSpacing: "-0.01em",
+            color: "#1a1a1a", fontWeight: 400,
+            marginBottom: subheadline ? "10px" : 0,
+          }}>
+            {edition.lead_title ?? "This week's edition"}
+          </div>
+
+          {subheadline && (
+            <div style={{
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontStyle: "italic", fontSize: "15px", lineHeight: 1.45,
+              color: "#475569",
+            }}>
+              {subheadline}
+            </div>
+          )}
+        </div>
+
+        {/* Right: CTA button */}
+        <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); router.push(`/editions/${edition.id}`); }}
+            style={{
+              background: "#D94A43", color: "#fff", border: "none",
+              padding: "11px 22px", borderRadius: "6px",
+              fontSize: "12px", fontWeight: 500, letterSpacing: "0.04em",
+              whiteSpace: "nowrap", cursor: "pointer", fontFamily: "inherit",
+              boxShadow: "0 1px 2px rgba(217,74,67,0.2)",
+            }}
+          >
+            Open this week&apos;s edition →
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

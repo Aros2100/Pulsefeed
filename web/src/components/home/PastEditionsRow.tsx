@@ -1,18 +1,24 @@
+"use client";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { EditionData } from "./EditionBand";
 
-function fmtShort(iso: string | null): string {
+const MONTHS_SHORT = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+function fmtCardDate(iso: string | null): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" }).toUpperCase();
+  const d = new Date(iso);
+  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
 }
 
 export function PastEditionsRow({
   editions,
-  latestEditionId,
+  latestEditionId: _latestEditionId,
 }: {
   editions: EditionData[];
   latestEditionId: string;
 }) {
+  const router = useRouter();
   if (editions.length === 0) return null;
 
   return (
@@ -20,18 +26,23 @@ export function PastEditionsRow({
       {/* Header */}
       <div style={{
         display: "flex", alignItems: "baseline", justifyContent: "space-between",
-        marginBottom: "10px",
+        padding: "0 4px", marginBottom: "0.75rem",
       }}>
-        <div style={{
-          fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em",
-          textTransform: "uppercase", color: "#94a3b8",
-        }}>
-          Past editions
+        <div style={{ display: "flex", alignItems: "baseline", gap: "14px" }}>
+          <span style={{
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontStyle: "italic", fontSize: "13px", fontWeight: 400, color: "#1a1a1a",
+          }}>
+            From the archive
+          </span>
+          <span style={{
+            fontSize: "9px", letterSpacing: "0.12em", color: "#94a3b8",
+            textTransform: "uppercase",
+          }}>
+            Past editions
+          </span>
         </div>
-        <Link href="/editions" style={{
-          fontSize: "11px", color: "#64748b", textDecoration: "underline",
-          fontWeight: 500,
-        }}>
+        <Link href="/editions" style={{ fontSize: "11px", color: "#64748b", cursor: "pointer", textDecoration: "none" }}>
           All editions →
         </Link>
       </div>
@@ -40,43 +51,62 @@ export function PastEditionsRow({
       <div style={{
         display: "grid",
         gridTemplateColumns: `repeat(${editions.length}, 1fr)`,
-        gap: "12px",
+        gap: "14px",
       }}>
         {editions.map((e) => (
-          <Link
+          <div
             key={e.id}
-            href={`/editions/${e.id}`}
-            style={{ textDecoration: "none", color: "inherit" }}
-          >
-            <div style={{
-              background: "#fff",
-              border: "0.5px solid #e5e9f0",
-              borderRadius: "12px",
-              padding: "1rem 1.1rem",
+            onClick={() => router.push(`/editions/${e.id}`)}
+            style={{
+              background: "#FAF7F0",
+              border: "0.5px solid rgba(0,0,0,0.06)",
+              borderRadius: "8px",
+              padding: "1rem 1.1rem 1.1rem",
               cursor: "pointer",
-              height: "100%",
               boxSizing: "border-box",
+            }}
+          >
+            {/* Top row: № N + date */}
+            <div style={{
+              display: "flex", alignItems: "baseline", justifyContent: "space-between",
+              paddingBottom: "8px",
+              borderBottom: "0.5px solid rgba(0,0,0,0.08)",
+              marginBottom: "10px",
             }}>
-              <div style={{
-                fontSize: "10px", fontWeight: 700, letterSpacing: "0.07em",
-                textTransform: "uppercase", color: "#94a3b8", marginBottom: "8px",
+              <span style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontStyle: "italic", fontSize: "13px", color: "#D94A43", fontWeight: 400,
               }}>
-                Issue {e.week_number} · {fmtShort(e.published_at)}
-              </div>
-              <div style={{
-                fontFamily: "Georgia, serif",
-                fontSize: "14px", lineHeight: 1.4, color: "#1a1a1a", fontWeight: 400,
-                marginBottom: "10px",
-                display: "-webkit-box", WebkitLineClamp: 3,
-                WebkitBoxOrient: "vertical", overflow: "hidden",
+                № {e.week_number}
+              </span>
+              <span style={{
+                fontSize: "9px", letterSpacing: "0.08em", color: "#94a3b8",
+                textTransform: "uppercase",
               }}>
-                {e.lead_title ?? "—"}
-              </div>
-              <div style={{ fontSize: "10px", color: "#94a3b8" }}>
-                {e.total_picks} editors picks
-              </div>
+                {fmtCardDate(e.published_at)}
+              </span>
             </div>
-          </Link>
+
+            {/* Lead title */}
+            <div style={{
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontSize: "14px", lineHeight: 1.35, color: "#1a1a1a", fontWeight: 400,
+              marginBottom: "12px",
+              minHeight: "56px",
+              display: "-webkit-box", WebkitLineClamp: 3,
+              WebkitBoxOrient: "vertical", overflow: "hidden",
+            }}>
+              {e.lead_title ?? "—"}
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              fontSize: "10px", letterSpacing: "0.04em", color: "#94a3b8",
+              textTransform: "uppercase",
+            }}>
+              {e.total_picks} editors picks
+            </div>
+          </div>
         ))}
       </div>
     </div>
