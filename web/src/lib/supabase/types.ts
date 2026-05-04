@@ -21,6 +21,7 @@ export type Database = {
           completion_tokens: number
           cost_usd: number | null
           id: string
+          is_batch: boolean
           model_key: string
           prompt_tokens: number
           task: string | null
@@ -32,6 +33,7 @@ export type Database = {
           completion_tokens: number
           cost_usd?: number | null
           id?: string
+          is_batch?: boolean
           model_key: string
           prompt_tokens: number
           task?: string | null
@@ -43,6 +45,7 @@ export type Database = {
           completion_tokens?: number
           cost_usd?: number | null
           id?: string
+          is_batch?: boolean
           model_key?: string
           prompt_tokens?: number
           task?: string | null
@@ -132,6 +135,302 @@ export type Database = {
           },
         ]
       }
+      article_geo_addresses: {
+        Row: {
+          ai_action: string | null
+          ai_changes: string[] | null
+          ai_processed_at: string | null
+          article_id: string
+          city: string | null
+          confidence: string | null
+          continent: string | null
+          country: string | null
+          created_at: string
+          department: string | null
+          department2: string | null
+          department3: string | null
+          departments_overflow: string[]
+          id: string
+          institution: string | null
+          institution2: string | null
+          institution3: string | null
+          institutions_overflow: string[]
+          position: number
+          region: string | null
+          state: string | null
+          state_source: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_action?: string | null
+          ai_changes?: string[] | null
+          ai_processed_at?: string | null
+          article_id: string
+          city?: string | null
+          confidence?: string | null
+          continent?: string | null
+          country?: string | null
+          created_at?: string
+          department?: string | null
+          department2?: string | null
+          department3?: string | null
+          departments_overflow?: string[]
+          id?: string
+          institution?: string | null
+          institution2?: string | null
+          institution3?: string | null
+          institutions_overflow?: string[]
+          position: number
+          region?: string | null
+          state?: string | null
+          state_source?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_action?: string | null
+          ai_changes?: string[] | null
+          ai_processed_at?: string | null
+          article_id?: string
+          city?: string | null
+          confidence?: string | null
+          continent?: string | null
+          country?: string | null
+          created_at?: string
+          department?: string | null
+          department2?: string | null
+          department3?: string | null
+          departments_overflow?: string[]
+          id?: string
+          institution?: string | null
+          institution2?: string | null
+          institution3?: string | null
+          institutions_overflow?: string[]
+          position?: number
+          region?: string | null
+          state?: string | null
+          state_source?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_geo_addresses_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_geo_metadata: {
+        Row: {
+          ai_changes: string[] | null
+          ai_model: string | null
+          ai_processed_at: string | null
+          ai_prompt_version: string | null
+          article_id: string
+          class_b_address_count: number | null
+          created_at: string | null
+          enriched_at: string | null
+          enriched_state_source: string | null
+          geo_confidence: string | null
+          parser_processed_at: string | null
+          parser_version: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ai_changes?: string[] | null
+          ai_model?: string | null
+          ai_processed_at?: string | null
+          ai_prompt_version?: string | null
+          article_id: string
+          class_b_address_count?: number | null
+          created_at?: string | null
+          enriched_at?: string | null
+          enriched_state_source?: string | null
+          geo_confidence?: string | null
+          parser_processed_at?: string | null
+          parser_version?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ai_changes?: string[] | null
+          ai_model?: string | null
+          ai_processed_at?: string | null
+          ai_prompt_version?: string | null
+          article_id?: string
+          class_b_address_count?: number | null
+          created_at?: string | null
+          enriched_at?: string | null
+          enriched_state_source?: string | null
+          geo_confidence?: string | null
+          parser_processed_at?: string | null
+          parser_version?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_geo_metadata_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: true
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_geo_pre_v2_snapshot: {
+        Row: {
+          ai_location_attempted: boolean | null
+          article_id: string
+          geo_city: string | null
+          geo_continent: string | null
+          geo_country: string | null
+          geo_defined_at: string | null
+          geo_department: string | null
+          geo_institution: string | null
+          geo_parser_confidence: string | null
+          geo_region: string | null
+          geo_source: string | null
+          geo_state: string | null
+          pubmed_id: string | null
+          snapshot_taken_at: string | null
+        }
+        Insert: {
+          ai_location_attempted?: boolean | null
+          article_id: string
+          geo_city?: string | null
+          geo_continent?: string | null
+          geo_country?: string | null
+          geo_defined_at?: string | null
+          geo_department?: string | null
+          geo_institution?: string | null
+          geo_parser_confidence?: string | null
+          geo_region?: string | null
+          geo_source?: string | null
+          geo_state?: string | null
+          pubmed_id?: string | null
+          snapshot_taken_at?: string | null
+        }
+        Update: {
+          ai_location_attempted?: boolean | null
+          article_id?: string
+          geo_city?: string | null
+          geo_continent?: string | null
+          geo_country?: string | null
+          geo_defined_at?: string | null
+          geo_department?: string | null
+          geo_institution?: string | null
+          geo_parser_confidence?: string | null
+          geo_region?: string | null
+          geo_source?: string | null
+          geo_state?: string | null
+          pubmed_id?: string | null
+          snapshot_taken_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_geo_pre_v2_snapshot_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: true
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_pubmed_diffs: {
+        Row: {
+          article_id: string
+          category: string | null
+          db_value: string | null
+          detected_at: string
+          field: string
+          id: string
+          raw_id: string
+          resolution: string
+          resolved_at: string | null
+          resolved_by: string | null
+          xml_value: string | null
+        }
+        Insert: {
+          article_id: string
+          category?: string | null
+          db_value?: string | null
+          detected_at?: string
+          field: string
+          id?: string
+          raw_id: string
+          resolution?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          xml_value?: string | null
+        }
+        Update: {
+          article_id?: string
+          category?: string | null
+          db_value?: string | null
+          detected_at?: string
+          field?: string
+          id?: string
+          raw_id?: string
+          resolution?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          xml_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_pubmed_diffs_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "article_pubmed_diffs_raw_id_fkey"
+            columns: ["raw_id"]
+            isOneToOne: false
+            referencedRelation: "article_pubmed_raw"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_pubmed_raw: {
+        Row: {
+          article_id: string
+          fetch_source: string
+          fetched_at: string
+          id: string
+          pubmed_id: string
+          raw_xml: string
+          raw_xml_hash: string
+        }
+        Insert: {
+          article_id: string
+          fetch_source: string
+          fetched_at?: string
+          id?: string
+          pubmed_id: string
+          raw_xml: string
+          raw_xml_hash: string
+        }
+        Update: {
+          article_id?: string
+          fetch_source?: string
+          fetched_at?: string
+          id?: string
+          pubmed_id?: string
+          raw_xml?: string
+          raw_xml_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_pubmed_raw_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       article_specialties: {
         Row: {
           article_id: string
@@ -209,6 +508,7 @@ export type Database = {
           code: number
           created_at: string
           id: string
+          is_editorial_excluded_from_scoring: boolean
           is_study_type: boolean
           name: string
           sort_order: number
@@ -219,6 +519,7 @@ export type Database = {
           code: number
           created_at?: string
           id?: string
+          is_editorial_excluded_from_scoring?: boolean
           is_study_type?: boolean
           name: string
           sort_order: number
@@ -229,6 +530,7 @@ export type Database = {
           code?: number
           created_at?: string
           id?: string
+          is_editorial_excluded_from_scoring?: boolean
           is_study_type?: boolean
           name?: string
           sort_order?: number
@@ -241,10 +543,9 @@ export type Database = {
           abstract: string | null
           admin_note: string | null
           ai_decision: string | null
-          ai_location_attempted: boolean | null
+          and_finally_candidate: boolean
+          and_finally_used_in_edition_id: string | null
           approval_method: string | null
-          article_cities: string[] | null
-          article_countries: string[] | null
           article_number: string | null
           article_type: string | null
           article_type_ai: string | null
@@ -272,21 +573,7 @@ export type Database = {
           enriched_at: string | null
           full_text_available: boolean | null
           fwci: number | null
-          geo_city: string | null
           geo_class: string | null
-          geo_continent: string | null
-          geo_country: string | null
-          geo_department: string | null
-          geo_department2: string | null
-          geo_department3: string | null
-          geo_departments_overflow: string[] | null
-          geo_institution: string | null
-          geo_institution2: string | null
-          geo_institution3: string | null
-          geo_institutions_overflow: string[] | null
-          geo_region: string | null
-          geo_source: string | null
-          geo_state: string | null
           grants: Json
           id: string
           impact_factor: number | null
@@ -304,8 +591,6 @@ export type Database = {
           journal_title: string | null
           keywords: string[] | null
           language: string | null
-          geo_defined_at: string | null
-          geo_parser_confidence: string | null
           long_resume: string | null
           mesh_terms: Json
           mesh_terms_text: string | null
@@ -320,11 +605,14 @@ export type Database = {
           pubmed_id: string
           pubmed_indexed_at: string | null
           pubmed_modified_at: string | null
+          pubmed_raw_latest_at: string | null
           pubmed_synced_at: string | null
           retracted: boolean
           sample_size: number | null
           sari_action: string | null
+          sari_condensed_at: string | null
           sari_implication: string | null
+          sari_model_version: string | null
           sari_result: string | null
           sari_subject: string | null
           short_headline: string | null
@@ -342,6 +630,8 @@ export type Database = {
           subspecialty_reason: string | null
           subspecialty_scored_at: string | null
           substances: Json
+          text_condensed_at: string | null
+          text_model_version: string | null
           time_to_read: number | null
           title: string
           trial_registration: string | null
@@ -352,10 +642,9 @@ export type Database = {
           abstract?: string | null
           admin_note?: string | null
           ai_decision?: string | null
-          ai_location_attempted?: boolean | null
+          and_finally_candidate?: boolean
+          and_finally_used_in_edition_id?: string | null
           approval_method?: string | null
-          article_cities?: string[] | null
-          article_countries?: string[] | null
           article_number?: string | null
           article_type?: string | null
           article_type_ai?: string | null
@@ -383,21 +672,7 @@ export type Database = {
           enriched_at?: string | null
           full_text_available?: boolean | null
           fwci?: number | null
-          geo_city?: string | null
           geo_class?: string | null
-          geo_continent?: string | null
-          geo_country?: string | null
-          geo_department?: string | null
-          geo_department2?: string | null
-          geo_department3?: string | null
-          geo_departments_overflow?: string[] | null
-          geo_institution?: string | null
-          geo_institution2?: string | null
-          geo_institution3?: string | null
-          geo_institutions_overflow?: string[] | null
-          geo_region?: string | null
-          geo_source?: string | null
-          geo_state?: string | null
           grants?: Json
           id?: string
           impact_factor?: number | null
@@ -415,8 +690,6 @@ export type Database = {
           journal_title?: string | null
           keywords?: string[] | null
           language?: string | null
-          geo_defined_at?: string | null
-          geo_parser_confidence?: string | null
           long_resume?: string | null
           mesh_terms?: Json
           mesh_terms_text?: string | null
@@ -431,11 +704,14 @@ export type Database = {
           pubmed_id: string
           pubmed_indexed_at?: string | null
           pubmed_modified_at?: string | null
+          pubmed_raw_latest_at?: string | null
           pubmed_synced_at?: string | null
           retracted?: boolean
           sample_size?: number | null
           sari_action?: string | null
+          sari_condensed_at?: string | null
           sari_implication?: string | null
+          sari_model_version?: string | null
           sari_result?: string | null
           sari_subject?: string | null
           short_headline?: string | null
@@ -453,6 +729,8 @@ export type Database = {
           subspecialty_reason?: string | null
           subspecialty_scored_at?: string | null
           substances?: Json
+          text_condensed_at?: string | null
+          text_model_version?: string | null
           time_to_read?: number | null
           title: string
           trial_registration?: string | null
@@ -463,10 +741,9 @@ export type Database = {
           abstract?: string | null
           admin_note?: string | null
           ai_decision?: string | null
-          ai_location_attempted?: boolean | null
+          and_finally_candidate?: boolean
+          and_finally_used_in_edition_id?: string | null
           approval_method?: string | null
-          article_cities?: string[] | null
-          article_countries?: string[] | null
           article_number?: string | null
           article_type?: string | null
           article_type_ai?: string | null
@@ -494,21 +771,7 @@ export type Database = {
           enriched_at?: string | null
           full_text_available?: boolean | null
           fwci?: number | null
-          geo_city?: string | null
           geo_class?: string | null
-          geo_continent?: string | null
-          geo_country?: string | null
-          geo_department?: string | null
-          geo_department2?: string | null
-          geo_department3?: string | null
-          geo_departments_overflow?: string[] | null
-          geo_institution?: string | null
-          geo_institution2?: string | null
-          geo_institution3?: string | null
-          geo_institutions_overflow?: string[] | null
-          geo_region?: string | null
-          geo_source?: string | null
-          geo_state?: string | null
           grants?: Json
           id?: string
           impact_factor?: number | null
@@ -526,8 +789,6 @@ export type Database = {
           journal_title?: string | null
           keywords?: string[] | null
           language?: string | null
-          geo_defined_at?: string | null
-          geo_parser_confidence?: string | null
           long_resume?: string | null
           mesh_terms?: Json
           mesh_terms_text?: string | null
@@ -542,11 +803,14 @@ export type Database = {
           pubmed_id?: string
           pubmed_indexed_at?: string | null
           pubmed_modified_at?: string | null
+          pubmed_raw_latest_at?: string | null
           pubmed_synced_at?: string | null
           retracted?: boolean
           sample_size?: number | null
           sari_action?: string | null
+          sari_condensed_at?: string | null
           sari_implication?: string | null
+          sari_model_version?: string | null
           sari_result?: string | null
           sari_subject?: string | null
           short_headline?: string | null
@@ -564,6 +828,8 @@ export type Database = {
           subspecialty_reason?: string | null
           subspecialty_scored_at?: string | null
           substances?: Json
+          text_condensed_at?: string | null
+          text_model_version?: string | null
           time_to_read?: number | null
           title?: string
           trial_registration?: string | null
@@ -571,6 +837,13 @@ export type Database = {
           volume?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "articles_and_finally_used_in_edition_id_fkey"
+            columns: ["and_finally_used_in_edition_id"]
+            isOneToOne: false
+            referencedRelation: "newsletter_editions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "articles_source_id_fkey"
             columns: ["source_id"]
@@ -1029,6 +1302,203 @@ export type Database = {
         }
         Relationships: []
       }
+      geo_addresses_lab: {
+        Row: {
+          ai_action: string | null
+          ai_changes: string[] | null
+          ai_city: string | null
+          ai_confidence: string | null
+          ai_country: string | null
+          ai_department: string | null
+          ai_department2: string | null
+          ai_department3: string | null
+          ai_departments_overflow: string[] | null
+          ai_institution: string | null
+          ai_institution2: string | null
+          ai_institution3: string | null
+          ai_institutions_overflow: string[] | null
+          ai_processed_at: string | null
+          ai_state: string | null
+          city: string | null
+          confidence: string | null
+          country: string | null
+          created_at: string | null
+          department: string | null
+          department2: string | null
+          department3: string | null
+          departments_overflow: string[] | null
+          id: string
+          institution: string | null
+          institution2: string | null
+          institution3: string | null
+          institutions_overflow: string[] | null
+          position: number
+          pubmed_id: string
+          state: string | null
+        }
+        Insert: {
+          ai_action?: string | null
+          ai_changes?: string[] | null
+          ai_city?: string | null
+          ai_confidence?: string | null
+          ai_country?: string | null
+          ai_department?: string | null
+          ai_department2?: string | null
+          ai_department3?: string | null
+          ai_departments_overflow?: string[] | null
+          ai_institution?: string | null
+          ai_institution2?: string | null
+          ai_institution3?: string | null
+          ai_institutions_overflow?: string[] | null
+          ai_processed_at?: string | null
+          ai_state?: string | null
+          city?: string | null
+          confidence?: string | null
+          country?: string | null
+          created_at?: string | null
+          department?: string | null
+          department2?: string | null
+          department3?: string | null
+          departments_overflow?: string[] | null
+          id?: string
+          institution?: string | null
+          institution2?: string | null
+          institution3?: string | null
+          institutions_overflow?: string[] | null
+          position: number
+          pubmed_id: string
+          state?: string | null
+        }
+        Update: {
+          ai_action?: string | null
+          ai_changes?: string[] | null
+          ai_city?: string | null
+          ai_confidence?: string | null
+          ai_country?: string | null
+          ai_department?: string | null
+          ai_department2?: string | null
+          ai_department3?: string | null
+          ai_departments_overflow?: string[] | null
+          ai_institution?: string | null
+          ai_institution2?: string | null
+          ai_institution3?: string | null
+          ai_institutions_overflow?: string[] | null
+          ai_processed_at?: string | null
+          ai_state?: string | null
+          city?: string | null
+          confidence?: string | null
+          country?: string | null
+          created_at?: string | null
+          department?: string | null
+          department2?: string | null
+          department3?: string | null
+          departments_overflow?: string[] | null
+          id?: string
+          institution?: string | null
+          institution2?: string | null
+          institution3?: string | null
+          institutions_overflow?: string[] | null
+          position?: number
+          pubmed_id?: string
+          state?: string | null
+        }
+        Relationships: []
+      }
+      geo_backfill_preview: {
+        Row: {
+          article_id: string
+          created_at: string
+          had_openalex_cached: boolean
+          id: string
+          new_geo_city: string | null
+          new_geo_continent: string | null
+          new_geo_country: string | null
+          new_geo_department: string | null
+          new_geo_institution: string | null
+          new_geo_parser_confidence: string | null
+          new_geo_region: string | null
+          new_geo_source: string | null
+          new_geo_state: string | null
+          old_geo_city: string | null
+          old_geo_continent: string | null
+          old_geo_country: string | null
+          old_geo_department: string | null
+          old_geo_institution: string | null
+          old_geo_parser_confidence: string | null
+          old_geo_region: string | null
+          old_geo_state: string | null
+          openalex_fetched: boolean
+          parser_fallback_used: boolean
+          ror_lookup_attempted: boolean
+          ror_lookup_succeeded: boolean
+          run_id: string
+        }
+        Insert: {
+          article_id: string
+          created_at?: string
+          had_openalex_cached: boolean
+          id?: string
+          new_geo_city?: string | null
+          new_geo_continent?: string | null
+          new_geo_country?: string | null
+          new_geo_department?: string | null
+          new_geo_institution?: string | null
+          new_geo_parser_confidence?: string | null
+          new_geo_region?: string | null
+          new_geo_source?: string | null
+          new_geo_state?: string | null
+          old_geo_city?: string | null
+          old_geo_continent?: string | null
+          old_geo_country?: string | null
+          old_geo_department?: string | null
+          old_geo_institution?: string | null
+          old_geo_parser_confidence?: string | null
+          old_geo_region?: string | null
+          old_geo_state?: string | null
+          openalex_fetched: boolean
+          parser_fallback_used: boolean
+          ror_lookup_attempted: boolean
+          ror_lookup_succeeded: boolean
+          run_id: string
+        }
+        Update: {
+          article_id?: string
+          created_at?: string
+          had_openalex_cached?: boolean
+          id?: string
+          new_geo_city?: string | null
+          new_geo_continent?: string | null
+          new_geo_country?: string | null
+          new_geo_department?: string | null
+          new_geo_institution?: string | null
+          new_geo_parser_confidence?: string | null
+          new_geo_region?: string | null
+          new_geo_source?: string | null
+          new_geo_state?: string | null
+          old_geo_city?: string | null
+          old_geo_continent?: string | null
+          old_geo_country?: string | null
+          old_geo_department?: string | null
+          old_geo_institution?: string | null
+          old_geo_parser_confidence?: string | null
+          old_geo_region?: string | null
+          old_geo_state?: string | null
+          openalex_fetched?: boolean
+          parser_fallback_used?: boolean
+          ror_lookup_attempted?: boolean
+          ror_lookup_succeeded?: boolean
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "geo_backfill_preview_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       geo_cities: {
         Row: {
           admin1_code: string | null
@@ -1095,6 +1565,119 @@ export type Database = {
         }
         Relationships: []
       }
+      geo_dryrun_results: {
+        Row: {
+          article_id: string
+          changed_city: boolean
+          changed_country: boolean
+          changed_department: boolean
+          changed_institution: boolean
+          changed_state: boolean
+          created_at: string
+          id: string
+          input_affiliation: string | null
+          new_geo_city: string | null
+          new_geo_continent: string | null
+          new_geo_country: string | null
+          new_geo_department: string | null
+          new_geo_institution: string | null
+          new_geo_parser_confidence: string | null
+          new_geo_region: string | null
+          new_geo_source: string | null
+          new_geo_state: string | null
+          old_geo_city: string | null
+          old_geo_continent: string | null
+          old_geo_country: string | null
+          old_geo_department: string | null
+          old_geo_institution: string | null
+          old_geo_parser_confidence: string | null
+          old_geo_region: string | null
+          old_geo_source: string | null
+          old_geo_state: string | null
+          parse_error: string | null
+          pubmed_id: string | null
+          run_id: string
+          run_name: string
+          run_started_at: string
+        }
+        Insert: {
+          article_id: string
+          changed_city: boolean
+          changed_country: boolean
+          changed_department: boolean
+          changed_institution: boolean
+          changed_state: boolean
+          created_at?: string
+          id?: string
+          input_affiliation?: string | null
+          new_geo_city?: string | null
+          new_geo_continent?: string | null
+          new_geo_country?: string | null
+          new_geo_department?: string | null
+          new_geo_institution?: string | null
+          new_geo_parser_confidence?: string | null
+          new_geo_region?: string | null
+          new_geo_source?: string | null
+          new_geo_state?: string | null
+          old_geo_city?: string | null
+          old_geo_continent?: string | null
+          old_geo_country?: string | null
+          old_geo_department?: string | null
+          old_geo_institution?: string | null
+          old_geo_parser_confidence?: string | null
+          old_geo_region?: string | null
+          old_geo_source?: string | null
+          old_geo_state?: string | null
+          parse_error?: string | null
+          pubmed_id?: string | null
+          run_id: string
+          run_name: string
+          run_started_at?: string
+        }
+        Update: {
+          article_id?: string
+          changed_city?: boolean
+          changed_country?: boolean
+          changed_department?: boolean
+          changed_institution?: boolean
+          changed_state?: boolean
+          created_at?: string
+          id?: string
+          input_affiliation?: string | null
+          new_geo_city?: string | null
+          new_geo_continent?: string | null
+          new_geo_country?: string | null
+          new_geo_department?: string | null
+          new_geo_institution?: string | null
+          new_geo_parser_confidence?: string | null
+          new_geo_region?: string | null
+          new_geo_source?: string | null
+          new_geo_state?: string | null
+          old_geo_city?: string | null
+          old_geo_continent?: string | null
+          old_geo_country?: string | null
+          old_geo_department?: string | null
+          old_geo_institution?: string | null
+          old_geo_parser_confidence?: string | null
+          old_geo_region?: string | null
+          old_geo_source?: string | null
+          old_geo_state?: string | null
+          parse_error?: string | null
+          pubmed_id?: string | null
+          run_id?: string
+          run_name?: string
+          run_started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "geo_dryrun_results_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       geo_institution_overrides: {
         Row: {
           city: string | null
@@ -1119,6 +1702,582 @@ export type Database = {
           id?: string
           institution?: string | null
           raw_segment?: string
+        }
+        Relationships: []
+      }
+      geo_migration_log: {
+        Row: {
+          article_id: string
+          batch_number: number
+          changed_city: boolean
+          changed_country: boolean
+          changed_department: boolean
+          changed_institution: boolean
+          changed_state: boolean
+          created_at: string
+          id: string
+          input_affiliation: string | null
+          new_geo_city: string | null
+          new_geo_continent: string | null
+          new_geo_country: string | null
+          new_geo_department: string | null
+          new_geo_institution: string | null
+          new_geo_parser_confidence: string | null
+          new_geo_region: string | null
+          new_geo_source: string | null
+          new_geo_state: string | null
+          old_geo_city: string | null
+          old_geo_continent: string | null
+          old_geo_country: string | null
+          old_geo_department: string | null
+          old_geo_institution: string | null
+          old_geo_region: string | null
+          old_geo_state: string | null
+          parse_error: string | null
+          protection_rules_fired: string[]
+          pubmed_id: string | null
+          raw_geo_city: string | null
+          raw_geo_country: string | null
+          raw_geo_department: string | null
+          raw_geo_institution: string | null
+          raw_geo_state: string | null
+          run_id: string
+          run_name: string
+          run_started_at: string
+        }
+        Insert: {
+          article_id: string
+          batch_number?: number
+          changed_city: boolean
+          changed_country: boolean
+          changed_department: boolean
+          changed_institution: boolean
+          changed_state: boolean
+          created_at?: string
+          id?: string
+          input_affiliation?: string | null
+          new_geo_city?: string | null
+          new_geo_continent?: string | null
+          new_geo_country?: string | null
+          new_geo_department?: string | null
+          new_geo_institution?: string | null
+          new_geo_parser_confidence?: string | null
+          new_geo_region?: string | null
+          new_geo_source?: string | null
+          new_geo_state?: string | null
+          old_geo_city?: string | null
+          old_geo_continent?: string | null
+          old_geo_country?: string | null
+          old_geo_department?: string | null
+          old_geo_institution?: string | null
+          old_geo_region?: string | null
+          old_geo_state?: string | null
+          parse_error?: string | null
+          protection_rules_fired?: string[]
+          pubmed_id?: string | null
+          raw_geo_city?: string | null
+          raw_geo_country?: string | null
+          raw_geo_department?: string | null
+          raw_geo_institution?: string | null
+          raw_geo_state?: string | null
+          run_id: string
+          run_name: string
+          run_started_at?: string
+        }
+        Update: {
+          article_id?: string
+          batch_number?: number
+          changed_city?: boolean
+          changed_country?: boolean
+          changed_department?: boolean
+          changed_institution?: boolean
+          changed_state?: boolean
+          created_at?: string
+          id?: string
+          input_affiliation?: string | null
+          new_geo_city?: string | null
+          new_geo_continent?: string | null
+          new_geo_country?: string | null
+          new_geo_department?: string | null
+          new_geo_institution?: string | null
+          new_geo_parser_confidence?: string | null
+          new_geo_region?: string | null
+          new_geo_source?: string | null
+          new_geo_state?: string | null
+          old_geo_city?: string | null
+          old_geo_continent?: string | null
+          old_geo_country?: string | null
+          old_geo_department?: string | null
+          old_geo_institution?: string | null
+          old_geo_region?: string | null
+          old_geo_state?: string | null
+          parse_error?: string | null
+          protection_rules_fired?: string[]
+          pubmed_id?: string | null
+          raw_geo_city?: string | null
+          raw_geo_country?: string | null
+          raw_geo_department?: string | null
+          raw_geo_institution?: string | null
+          raw_geo_state?: string | null
+          run_id?: string
+          run_name?: string
+          run_started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "geo_migration_log_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      geo_parser_b_run_1000: {
+        Row: {
+          affiliation: string
+          created_at: string | null
+          id: string
+          num_addresses: number | null
+          parser_error: string | null
+          parser_run_at: string | null
+          parser_status: string | null
+          pubmed_id: string
+        }
+        Insert: {
+          affiliation: string
+          created_at?: string | null
+          id?: string
+          num_addresses?: number | null
+          parser_error?: string | null
+          parser_run_at?: string | null
+          parser_status?: string | null
+          pubmed_id: string
+        }
+        Update: {
+          affiliation?: string
+          created_at?: string | null
+          id?: string
+          num_addresses?: number | null
+          parser_error?: string | null
+          parser_run_at?: string | null
+          parser_status?: string | null
+          pubmed_id?: string
+        }
+        Relationships: []
+      }
+      geo_parser_run_1000: {
+        Row: {
+          affiliation: string | null
+          after_captured_at: string | null
+          after_city: string | null
+          after_continent: string | null
+          after_country: string | null
+          after_department: string | null
+          after_geo_source: string | null
+          after_institution: string | null
+          after_parser_confidence: string | null
+          after_region: string | null
+          after_state: string | null
+          ai_changes: string[] | null
+          ai_city: string | null
+          ai_confidence: string | null
+          ai_country: string | null
+          ai_department: string | null
+          ai_department2: string | null
+          ai_department3: string | null
+          ai_departments_overflow: string[] | null
+          ai_institution: string | null
+          ai_institution2: string | null
+          ai_institution3: string | null
+          ai_institutions_overflow: string[] | null
+          ai_model: string | null
+          ai_processed_at: string | null
+          ai_state: string | null
+          article_id: string
+          before_captured_at: string
+          enriched_at: string | null
+          enriched_state: string | null
+          enriched_state_source: string | null
+          flagged_at: string | null
+          id: string
+          institution_likely_fragment: boolean | null
+          institution_split_bug: boolean | null
+          lab_b_ai_changes: string[] | null
+          lab_b_ai_city: string | null
+          lab_b_ai_confidence: string | null
+          lab_b_ai_country: string | null
+          lab_b_ai_department: string | null
+          lab_b_ai_department2: string | null
+          lab_b_ai_department3: string | null
+          lab_b_ai_departments_overflow: string[] | null
+          lab_b_ai_institution: string | null
+          lab_b_ai_institution2: string | null
+          lab_b_ai_institution3: string | null
+          lab_b_ai_institutions_overflow: string[] | null
+          lab_b_ai_processed_at: string | null
+          lab_b_ai_state: string | null
+          lab_b_city: string | null
+          lab_b_class: string | null
+          lab_b_confidence: string | null
+          lab_b_country: string | null
+          lab_b_department: string | null
+          lab_b_department2: string | null
+          lab_b_department3: string | null
+          lab_b_departments_overflow: string[] | null
+          lab_b_institution: string | null
+          lab_b_institution2: string | null
+          lab_b_institution3: string | null
+          lab_b_institutions_overflow: string[] | null
+          lab_b_num_addresses: number | null
+          lab_b_state: string | null
+          lab_city: string | null
+          lab_class: string | null
+          lab_confidence: string | null
+          lab_country: string | null
+          lab_department: string | null
+          lab_department2: string | null
+          lab_department3: string | null
+          lab_departments_overflow: string[] | null
+          lab_institution: string | null
+          lab_institution2: string | null
+          lab_institution3: string | null
+          lab_institutions_overflow: string[] | null
+          lab_state: string | null
+          pubmed_id: string | null
+        }
+        Insert: {
+          affiliation?: string | null
+          after_captured_at?: string | null
+          after_city?: string | null
+          after_continent?: string | null
+          after_country?: string | null
+          after_department?: string | null
+          after_geo_source?: string | null
+          after_institution?: string | null
+          after_parser_confidence?: string | null
+          after_region?: string | null
+          after_state?: string | null
+          ai_changes?: string[] | null
+          ai_city?: string | null
+          ai_confidence?: string | null
+          ai_country?: string | null
+          ai_department?: string | null
+          ai_department2?: string | null
+          ai_department3?: string | null
+          ai_departments_overflow?: string[] | null
+          ai_institution?: string | null
+          ai_institution2?: string | null
+          ai_institution3?: string | null
+          ai_institutions_overflow?: string[] | null
+          ai_model?: string | null
+          ai_processed_at?: string | null
+          ai_state?: string | null
+          article_id: string
+          before_captured_at?: string
+          enriched_at?: string | null
+          enriched_state?: string | null
+          enriched_state_source?: string | null
+          flagged_at?: string | null
+          id?: string
+          institution_likely_fragment?: boolean | null
+          institution_split_bug?: boolean | null
+          lab_b_ai_changes?: string[] | null
+          lab_b_ai_city?: string | null
+          lab_b_ai_confidence?: string | null
+          lab_b_ai_country?: string | null
+          lab_b_ai_department?: string | null
+          lab_b_ai_department2?: string | null
+          lab_b_ai_department3?: string | null
+          lab_b_ai_departments_overflow?: string[] | null
+          lab_b_ai_institution?: string | null
+          lab_b_ai_institution2?: string | null
+          lab_b_ai_institution3?: string | null
+          lab_b_ai_institutions_overflow?: string[] | null
+          lab_b_ai_processed_at?: string | null
+          lab_b_ai_state?: string | null
+          lab_b_city?: string | null
+          lab_b_class?: string | null
+          lab_b_confidence?: string | null
+          lab_b_country?: string | null
+          lab_b_department?: string | null
+          lab_b_department2?: string | null
+          lab_b_department3?: string | null
+          lab_b_departments_overflow?: string[] | null
+          lab_b_institution?: string | null
+          lab_b_institution2?: string | null
+          lab_b_institution3?: string | null
+          lab_b_institutions_overflow?: string[] | null
+          lab_b_num_addresses?: number | null
+          lab_b_state?: string | null
+          lab_city?: string | null
+          lab_class?: string | null
+          lab_confidence?: string | null
+          lab_country?: string | null
+          lab_department?: string | null
+          lab_department2?: string | null
+          lab_department3?: string | null
+          lab_departments_overflow?: string[] | null
+          lab_institution?: string | null
+          lab_institution2?: string | null
+          lab_institution3?: string | null
+          lab_institutions_overflow?: string[] | null
+          lab_state?: string | null
+          pubmed_id?: string | null
+        }
+        Update: {
+          affiliation?: string | null
+          after_captured_at?: string | null
+          after_city?: string | null
+          after_continent?: string | null
+          after_country?: string | null
+          after_department?: string | null
+          after_geo_source?: string | null
+          after_institution?: string | null
+          after_parser_confidence?: string | null
+          after_region?: string | null
+          after_state?: string | null
+          ai_changes?: string[] | null
+          ai_city?: string | null
+          ai_confidence?: string | null
+          ai_country?: string | null
+          ai_department?: string | null
+          ai_department2?: string | null
+          ai_department3?: string | null
+          ai_departments_overflow?: string[] | null
+          ai_institution?: string | null
+          ai_institution2?: string | null
+          ai_institution3?: string | null
+          ai_institutions_overflow?: string[] | null
+          ai_model?: string | null
+          ai_processed_at?: string | null
+          ai_state?: string | null
+          article_id?: string
+          before_captured_at?: string
+          enriched_at?: string | null
+          enriched_state?: string | null
+          enriched_state_source?: string | null
+          flagged_at?: string | null
+          id?: string
+          institution_likely_fragment?: boolean | null
+          institution_split_bug?: boolean | null
+          lab_b_ai_changes?: string[] | null
+          lab_b_ai_city?: string | null
+          lab_b_ai_confidence?: string | null
+          lab_b_ai_country?: string | null
+          lab_b_ai_department?: string | null
+          lab_b_ai_department2?: string | null
+          lab_b_ai_department3?: string | null
+          lab_b_ai_departments_overflow?: string[] | null
+          lab_b_ai_institution?: string | null
+          lab_b_ai_institution2?: string | null
+          lab_b_ai_institution3?: string | null
+          lab_b_ai_institutions_overflow?: string[] | null
+          lab_b_ai_processed_at?: string | null
+          lab_b_ai_state?: string | null
+          lab_b_city?: string | null
+          lab_b_class?: string | null
+          lab_b_confidence?: string | null
+          lab_b_country?: string | null
+          lab_b_department?: string | null
+          lab_b_department2?: string | null
+          lab_b_department3?: string | null
+          lab_b_departments_overflow?: string[] | null
+          lab_b_institution?: string | null
+          lab_b_institution2?: string | null
+          lab_b_institution3?: string | null
+          lab_b_institutions_overflow?: string[] | null
+          lab_b_num_addresses?: number | null
+          lab_b_state?: string | null
+          lab_city?: string | null
+          lab_class?: string | null
+          lab_confidence?: string | null
+          lab_country?: string | null
+          lab_department?: string | null
+          lab_department2?: string | null
+          lab_department3?: string | null
+          lab_departments_overflow?: string[] | null
+          lab_institution?: string | null
+          lab_institution2?: string | null
+          lab_institution3?: string | null
+          lab_institutions_overflow?: string[] | null
+          lab_state?: string | null
+          pubmed_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "geo_parser_run_1000_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      geo_snapshot_100: {
+        Row: {
+          affiliation: string | null
+          after_captured_at: string | null
+          after_city: string | null
+          after_continent: string | null
+          after_country: string | null
+          after_department: string | null
+          after_geo_source: string | null
+          after_institution: string | null
+          after_parser_confidence: string | null
+          after_region: string | null
+          after_state: string | null
+          article_id: string
+          before_captured_at: string
+          before_city: string | null
+          before_continent: string | null
+          before_country: string | null
+          before_department: string | null
+          before_geo_source: string | null
+          before_institution: string | null
+          before_region: string | null
+          before_state: string | null
+          id: string
+          pubmed_id: string | null
+        }
+        Insert: {
+          affiliation?: string | null
+          after_captured_at?: string | null
+          after_city?: string | null
+          after_continent?: string | null
+          after_country?: string | null
+          after_department?: string | null
+          after_geo_source?: string | null
+          after_institution?: string | null
+          after_parser_confidence?: string | null
+          after_region?: string | null
+          after_state?: string | null
+          article_id: string
+          before_captured_at?: string
+          before_city?: string | null
+          before_continent?: string | null
+          before_country?: string | null
+          before_department?: string | null
+          before_geo_source?: string | null
+          before_institution?: string | null
+          before_region?: string | null
+          before_state?: string | null
+          id?: string
+          pubmed_id?: string | null
+        }
+        Update: {
+          affiliation?: string | null
+          after_captured_at?: string | null
+          after_city?: string | null
+          after_continent?: string | null
+          after_country?: string | null
+          after_department?: string | null
+          after_geo_source?: string | null
+          after_institution?: string | null
+          after_parser_confidence?: string | null
+          after_region?: string | null
+          after_state?: string | null
+          article_id?: string
+          before_captured_at?: string
+          before_city?: string | null
+          before_continent?: string | null
+          before_country?: string | null
+          before_department?: string | null
+          before_geo_source?: string | null
+          before_institution?: string | null
+          before_region?: string | null
+          before_state?: string | null
+          id?: string
+          pubmed_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "geo_snapshot_100_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      geo_validation_results: {
+        Row: {
+          affiliation: string
+          bucket: string
+          id: string
+          notes: string | null
+          out_of_scope: boolean
+          pipeline_city: string | null
+          pipeline_country: string | null
+          pipeline_department: string | null
+          pipeline_institution: string | null
+          pipeline_source_per_field: Json
+          pipeline_state: string | null
+          pubmed_id: string
+          truth_city: string | null
+          truth_country: string | null
+          truth_department: string | null
+          truth_institution: string | null
+          truth_state: string | null
+          validated_at: string
+          validated_by: string
+          verdict_city: string
+          verdict_country: string
+          verdict_department: string
+          verdict_institution: string
+          verdict_state: string
+        }
+        Insert: {
+          affiliation: string
+          bucket: string
+          id?: string
+          notes?: string | null
+          out_of_scope?: boolean
+          pipeline_city?: string | null
+          pipeline_country?: string | null
+          pipeline_department?: string | null
+          pipeline_institution?: string | null
+          pipeline_source_per_field?: Json
+          pipeline_state?: string | null
+          pubmed_id: string
+          truth_city?: string | null
+          truth_country?: string | null
+          truth_department?: string | null
+          truth_institution?: string | null
+          truth_state?: string | null
+          validated_at?: string
+          validated_by: string
+          verdict_city: string
+          verdict_country: string
+          verdict_department: string
+          verdict_institution: string
+          verdict_state: string
+        }
+        Update: {
+          affiliation?: string
+          bucket?: string
+          id?: string
+          notes?: string | null
+          out_of_scope?: boolean
+          pipeline_city?: string | null
+          pipeline_country?: string | null
+          pipeline_department?: string | null
+          pipeline_institution?: string | null
+          pipeline_source_per_field?: Json
+          pipeline_state?: string | null
+          pubmed_id?: string
+          truth_city?: string | null
+          truth_country?: string | null
+          truth_department?: string | null
+          truth_institution?: string | null
+          truth_state?: string | null
+          validated_at?: string
+          validated_by?: string
+          verdict_city?: string
+          verdict_country?: string
+          verdict_department?: string
+          verdict_institution?: string
+          verdict_state?: string
         }
         Relationships: []
       }
@@ -1429,8 +2588,11 @@ export type Database = {
           created_at: string
           edition_id: string
           featured: boolean
+          global_sort_order: number | null
           id: string
           is_global: boolean
+          newsletter_headline: string | null
+          newsletter_subheadline: string | null
           sort_order: number
           subspecialty: string
         }
@@ -1439,8 +2601,11 @@ export type Database = {
           created_at?: string
           edition_id: string
           featured?: boolean
+          global_sort_order?: number | null
           id?: string
           is_global?: boolean
+          newsletter_headline?: string | null
+          newsletter_subheadline?: string | null
           sort_order?: number
           subspecialty: string
         }
@@ -1449,8 +2614,11 @@ export type Database = {
           created_at?: string
           edition_id?: string
           featured?: boolean
+          global_sort_order?: number | null
           id?: string
           is_global?: boolean
+          newsletter_headline?: string | null
+          newsletter_subheadline?: string | null
           sort_order?: number
           subspecialty?: string
         }
@@ -1473,6 +2641,9 @@ export type Database = {
       }
       newsletter_editions: {
         Row: {
+          and_finally_article_id: string | null
+          and_finally_headline: string | null
+          and_finally_subheadline: string | null
           content: Json
           created_at: string
           created_by: string | null
@@ -1484,6 +2655,9 @@ export type Database = {
           year: number
         }
         Insert: {
+          and_finally_article_id?: string | null
+          and_finally_headline?: string | null
+          and_finally_subheadline?: string | null
           content: Json
           created_at?: string
           created_by?: string | null
@@ -1495,6 +2669,9 @@ export type Database = {
           year: number
         }
         Update: {
+          and_finally_article_id?: string | null
+          and_finally_headline?: string | null
+          and_finally_subheadline?: string | null
           content?: Json
           created_at?: string
           created_by?: string | null
@@ -1504,6 +2681,50 @@ export type Database = {
           status?: string
           week_number?: number
           year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "newsletter_editions_and_finally_article_id_fkey"
+            columns: ["and_finally_article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      newsletter_feature_promos: {
+        Row: {
+          active: boolean
+          created_at: string
+          cta_text: string
+          cta_url: string
+          description: string
+          headline: string
+          id: string
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          cta_text: string
+          cta_url: string
+          description: string
+          headline: string
+          id?: string
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          cta_text?: string
+          cta_url?: string
+          description?: string
+          headline?: string
+          id?: string
+          label?: string
+          sort_order?: number
         }
         Relationships: []
       }
@@ -1770,6 +2991,36 @@ export type Database = {
           query_string?: string
           specialty?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      pubmed_sync_failures: {
+        Row: {
+          attempts: number
+          first_failed_at: string
+          last_error: string | null
+          last_failed_at: string
+          pubmed_id: string
+          resolved_at: string | null
+          run_started_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          first_failed_at?: string
+          last_error?: string | null
+          last_failed_at?: string
+          pubmed_id: string
+          resolved_at?: string | null
+          run_started_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          first_failed_at?: string
+          last_error?: string | null
+          last_failed_at?: string
+          pubmed_id?: string
+          resolved_at?: string | null
+          run_started_at?: string | null
         }
         Relationships: []
       }
@@ -2463,6 +3714,11 @@ export type Database = {
     Functions: {
       compute_author_scores: { Args: never; Returns: undefined }
       count_affiliation_too_long: { Args: never; Returns: number }
+      count_article_geo_class_a_unscored: { Args: never; Returns: number }
+      count_article_geo_class_b_unscored: {
+        Args: { p_specialty?: string }
+        Returns: number
+      }
       count_article_suspect_city_values: { Args: never; Returns: number }
       count_article_type_not_validated: { Args: never; Returns: number }
       count_article_type_pending: { Args: never; Returns: number }
@@ -2575,6 +3831,7 @@ export type Database = {
         Args: { p_specialty: string }
         Returns: number
       }
+      count_sari_unscored: { Args: { p_specialty?: string }; Returns: number }
       count_scored_not_validated: {
         Args: { p_specialty: string }
         Returns: number
@@ -2680,6 +3937,42 @@ export type Database = {
           task: string
         }[]
       }
+      get_article_geo_class_a_candidates: {
+        Args: { p_edat_from?: string; p_edat_to?: string; p_limit?: number }
+        Returns: {
+          addr_row_id: string
+          affiliation_raw: string
+          city: string
+          confidence: string
+          continent: string
+          country: string
+          department: string
+          department2: string
+          department3: string
+          departments_overflow: string[]
+          geo_class: string
+          geo_confidence: string
+          id: string
+          institution: string
+          institution2: string
+          institution3: string
+          institutions_overflow: string[]
+          pubmed_id: string
+          region: string
+          state: string
+        }[]
+      }
+      get_article_geo_class_b_candidates: {
+        Args: {
+          p_edat_from?: string
+          p_edat_to?: string
+          p_limit?: number
+          p_specialty?: string
+        }
+        Returns: {
+          article_id: string
+        }[]
+      }
       get_article_geo_options: { Args: never; Returns: Json }
       get_article_ids_by_specialty: {
         Args: { p_specialty: string; p_specialty_match?: string }
@@ -2779,6 +4072,7 @@ export type Database = {
           id: string
         }[]
       }
+      get_article_location_coverage: { Args: never; Returns: Json }
       get_article_type_candidates: {
         Args: { p_limit?: number; p_offset?: number; p_specialty: string }
         Returns: {
@@ -2948,7 +4242,6 @@ export type Database = {
           abstract: string
           authors: Json
           bottom_line: string
-          condensed_model_version: string
           id: string
           journal_abbr: string
           journal_title: string
@@ -2961,17 +4254,7 @@ export type Database = {
           sari_subject: string
           short_headline: string
           short_resume: string
-          title: string
-        }[]
-      }
-      get_condensation_unscored_articles: {
-        Args: { p_limit?: number; p_specialty: string }
-        Returns: {
-          abstract: string
-          bottom_line: string
-          id: string
-          short_headline: string
-          short_resume: string
+          text_model_version: string
           title: string
         }[]
       }
@@ -2980,6 +4263,7 @@ export type Database = {
         Returns: {
           artikler: number
           forbrug: number
+          is_batch: boolean
           is_lab: boolean
           kald: number
           lab_step: string
@@ -3000,15 +4284,6 @@ export type Database = {
       }
       get_geo_articles: {
         Args: { p_city?: string; p_since?: string }
-        Returns: {
-          id: string
-          journal_abbr: string
-          published_date: string
-          title: string
-        }[]
-      }
-      get_geo_articles_week: {
-        Args: { p_city: string; p_since: string }
         Returns: {
           id: string
           journal_abbr: string
@@ -3101,6 +4376,14 @@ export type Database = {
           state: string
         }[]
       }
+      get_geo_validation_progress: {
+        Args: never
+        Returns: {
+          bucket: string
+          total: number
+          validated: number
+        }[]
+      }
       get_kpi_geo_hierarchy: {
         Args: {
           p_city?: string
@@ -3171,12 +4454,32 @@ export type Database = {
           volume: string
         }[]
       }
+      get_next_geo_validation_article: {
+        Args: { p_bucket: string }
+        Returns: {
+          affiliation: string
+          after_city: string
+          after_country: string
+          after_department: string
+          after_institution: string
+          after_state: string
+          ai_city: string
+          ai_country: string
+          ai_department: string
+          ai_fields: string[]
+          ai_institution: string
+          ai_needed: string
+          ai_state: string
+          enriched_state: string
+          enriched_state_source: string
+          pubmed_id: string
+        }[]
+      }
       get_sari_not_validated_articles: {
         Args: { p_limit?: number; p_specialty: string }
         Returns: {
           abstract: string
           authors: Json
-          condensed_model_version: string
           id: string
           journal_abbr: string
           journal_title: string
@@ -3185,8 +4488,22 @@ export type Database = {
           sample_size: number
           sari_action: string
           sari_implication: string
+          sari_model_version: string
           sari_result: string
           sari_subject: string
+          title: string
+        }[]
+      }
+      get_sari_unscored_articles: {
+        Args: {
+          p_edat_from?: string
+          p_edat_to?: string
+          p_limit?: number
+          p_specialty: string
+        }
+        Returns: {
+          abstract: string
+          id: string
           title: string
         }[]
       }
@@ -3267,6 +4584,8 @@ export type Database = {
           p_edat_from?: string
           p_edat_to?: string
           p_limit?: number
+          p_mode?: string
+          p_since?: string
           p_specialty: string
         }
         Returns: {
@@ -3354,28 +4673,19 @@ export type Database = {
           total_pending: number
         }[]
       }
-      get_text_unscored_articles:
-        | {
-            Args: { p_limit?: number; p_specialty: string }
-            Returns: {
-              abstract: string
-              id: string
-              title: string
-            }[]
-          }
-        | {
-            Args: {
-              p_edat_from?: string
-              p_edat_to?: string
-              p_limit?: number
-              p_specialty: string
-            }
-            Returns: {
-              abstract: string
-              id: string
-              title: string
-            }[]
-          }
+      get_text_unscored_articles: {
+        Args: {
+          p_edat_from?: string
+          p_edat_to?: string
+          p_limit?: number
+          p_specialty: string
+        }
+        Returns: {
+          abstract: string
+          id: string
+          title: string
+        }[]
+      }
       get_top_subspecialties: {
         Args: { p_limit?: number }
         Returns: {
@@ -3414,6 +4724,20 @@ export type Database = {
       }
       normalize_author_geo_city: { Args: never; Returns: number }
       normalize_geo_city: { Args: never; Returns: number }
+      pubmed_sync_failures_retry_candidates: {
+        Args: never
+        Returns: {
+          pubmed_id: string
+        }[]
+      }
+      pubmed_sync_failures_summary: {
+        Args: never
+        Returns: {
+          oldest_failure: string
+          recent_failures: Json
+          total_unresolved: number
+        }[]
+      }
       pubmed_sync_log_runs: {
         Args: never
         Returns: {
@@ -3608,4 +4932,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
