@@ -32,7 +32,11 @@ function unaccent(s: string): string {
 }
 
 export function normalizeCityKey(city: string): string {
-  return unaccent(city.toLowerCase());
+  // Normalize apostrophe/quote variants → straight apostrophe before unaccent.
+  // Covers: curly quotes U+2018/2019, modifier letter apostrophe U+02BC/02BB,
+  // backtick U+0060, acute accent U+00B4.
+  const apostropheNorm = city.replace(/[‘’ʼʻ`´]/g, "'");
+  return unaccent(apostropheNorm.toLowerCase());
 }
 
 // ── City aliases ──────────────────────────────────────────────────────────────
@@ -62,6 +66,18 @@ const CITY_ALIASES: Record<string, string> = {
   "saint paul":    "st. paul",
   "st paul":       "st. paul",
   "saint john":    "st. john's",  // DB: "St. John's"
+
+  // Egyptian cities — alternative spellings in affiliations
+  "minia":         "minya",        // DB: "Minya" (El-Minia / Minya)
+  "el minia":      "minya",
+  "el-minia":      "minya",
+
+  // Argentine cities — affiliations often use short form
+  "tucuman":       "san miguel de tucuman", // DB: "San Miguel de Tucumán"
+
+  // Chinese city with apostrophe variant (covered by apostrophe normalization
+  // in normalizeCityKey, but alias kept as belt-and-suspenders)
+  "yanan":         "yan'an",       // no-apostrophe variant
 };
 
 // ── Cache loader ──────────────────────────────────────────────────────────────
