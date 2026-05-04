@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
-  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://pulsefeeds.com";
+  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://app.pulsefeeds.com";
 
   // Fetch edition (for week info + and_finally finalization)
   const { data: edition, error: editionError } = await admin

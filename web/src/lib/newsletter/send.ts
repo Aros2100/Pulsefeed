@@ -88,7 +88,7 @@ export async function buildRenderParams(
   trackingPixelUrl: string | null,
   options?: { previewSubNames?: string[] }
 ): Promise<RenderParams | { error: string }> {
-  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://pulsefeeds.com";
+  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://app.pulsefeeds.com";
 
   // Load edition
   const { data: edition, error: editionErr } = await admin
@@ -296,7 +296,7 @@ export async function sendNewsletter(
 ): Promise<{ ok: true; sendId: string } | { ok: false; error: string }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
-  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://pulsefeeds.com";
+  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://app.pulsefeeds.com";
 
   const [{ data: { user }, error: userErr }, { data: sendRow, error: insertErr }] = await Promise.all([
     admin.auth.admin.getUserById(userId),

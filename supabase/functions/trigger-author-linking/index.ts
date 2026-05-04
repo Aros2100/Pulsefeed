@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const APP_URL = "https://pulsefeed-eta.vercel.app";
+const APP_URL = "https://app.pulsefeeds.com";
 const ROUTE   = "/api/admin/author-linking/start";
 
 Deno.serve(async (_req: Request) => {
