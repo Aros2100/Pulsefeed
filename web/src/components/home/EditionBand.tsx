@@ -1,4 +1,5 @@
-import Link from "next/link";
+"use client";
+import { useRouter } from "next/navigation";
 
 export interface EditionData {
   id: string;
@@ -17,16 +18,15 @@ function fmtShort(iso: string | null): string {
 }
 
 export function EditionBand({ edition }: { edition: EditionData }) {
+  const router = useRouter();
   const pubmedUrl = edition.lead_pubmed_id
     ? `https://pubmed.ncbi.nlm.nih.gov/${edition.lead_pubmed_id}/`
     : null;
 
   return (
-    <Link
-      href={`/editions/${edition.id}`}
-      style={{ textDecoration: "none", color: "inherit", display: "block" }}
-    >
-      <div style={{
+      <div
+        onClick={() => router.push(`/editions/${edition.id}`)}
+        style={{
         background: "#F5F1E8",
         border: "0.5px solid #E5DCC8",
         borderRadius: "12px",
@@ -58,7 +58,7 @@ export function EditionBand({ edition }: { edition: EditionData }) {
                 onClick={(e) => e.stopPropagation()}
                 style={{ color: "#1a1a1a", textDecoration: "none" }}
               >
-                {edition.lead_title ?? "This week's edition"}
+                {edition.lead_title ?? "This week&apos;s edition"}
               </a>
             ) : (edition.lead_title ?? "This week's edition")}
           </div>
@@ -90,6 +90,5 @@ export function EditionBand({ edition }: { edition: EditionData }) {
           </span>
         </div>
       </div>
-    </Link>
   );
 }
