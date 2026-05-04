@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 const DELAY_MS = 500;
 const RETRY_DELAY_MS = 5_000;
 const MAX_RETRIES = 3;
-const OPENALEX_MAILTO = "digest@pulsefeed.dk";
+const OPENALEX_MAILTO = "hello@pulsefeeds.com";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));

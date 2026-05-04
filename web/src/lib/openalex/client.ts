@@ -43,7 +43,7 @@ function apiKey(): string | null {
 }
 
 function mailto(): string {
-  return process.env.OPENALEX_EMAIL ?? "info@pulsefeed.dk";
+  return process.env.OPENALEX_EMAIL ?? "hello@pulsefeeds.com";
 }
 
 function stripPrefix(url: string, prefix: string): string {

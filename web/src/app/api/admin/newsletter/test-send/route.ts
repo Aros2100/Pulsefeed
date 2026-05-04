@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
   const { error: emailErr } = await resend.emails.send({
     from:    FROM,
     to:      email,
+    replyTo: "hello@pulsefeeds.com",
     subject: `[TEST] PulseFeeds Issue ${edition.week_number} · ${edition.year}`,
     html,
   });

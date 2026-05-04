@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Resend } from "resend";
 
-const FROM = "PulseFeed Alerts <alerts@pulsefeed.dk>";
+const FROM = "PulseFeeds Alerts <alerts@pulsefeeds.com>";
 const STALE_HOURS = 26;
 
 function isStale(ts: string | null): boolean {

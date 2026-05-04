@@ -27,7 +27,7 @@ export type AuthorGeo = {
 };
 
 const OPENALEX_BASE = "https://api.openalex.org";
-const OPENALEX_MAILTO = "digest@pulsefeed.dk";
+const OPENALEX_MAILTO = "hello@pulsefeeds.com";
 
 export function normalizeOrcid(orcid: string): string {
   return orcid.replace(/^https?:\/\/orcid\.org\//, "").trim();

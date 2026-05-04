@@ -328,7 +328,7 @@ export async function sendNewsletter(
   const from = overrides?.from ?? FROM;
 
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const { error: emailErr } = await resend.emails.send({ from, to: user.email, subject, html });
+  const { error: emailErr } = await resend.emails.send({ from, to: user.email, subject, html, replyTo: "hello@pulsefeeds.com" });
 
   if (emailErr) {
     await admin.from("newsletter_sends").delete().eq("id", (sendRow as { id: string }).id);

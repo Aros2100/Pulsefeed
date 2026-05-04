@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const FROM = process.env.NEWSLETTER_FROM_EMAIL ?? "PulseFeed <notifications@pulsefeed.dk>";
+const FROM = process.env.NEWSLETTER_FROM_EMAIL ?? "PulseFeeds <notifications@pulsefeeds.com>";
 
 export interface NotificationPayload {
   userId:   string;

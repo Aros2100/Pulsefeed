@@ -65,7 +65,7 @@ export default function NewsletterSendClient({ edition, recipientCount }: Props)
 
   const defaultSat = useMemo(() => weekSaturdayIso(edition.week_number, edition.year), [edition.week_number, edition.year]);
 
-  const [from, setFrom] = useState("PulseFeed <newsletter@pulsefeed.dk>");
+  const [from, setFrom] = useState("PulseFeeds <newsletter@pulsefeeds.com>");
   const [subject, setSubject] = useState(`PulseFeed · Week ${edition.week_number} · ${edition.year}`);
   const [scheduledAt, setScheduledAt] = useState(defaultSat);
   const [sending, setSending] = useState(false);
