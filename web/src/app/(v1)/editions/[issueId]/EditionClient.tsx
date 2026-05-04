@@ -98,7 +98,7 @@ export function EditionClient({
           currentView={view}
         />
 
-        <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "16px", alignItems: "flex-start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: "16px", alignItems: "flex-start" }}>
           <EditionSidebar
             specialtyPickCount={specialtyPickCount}
             subspecialties={subspecialties}

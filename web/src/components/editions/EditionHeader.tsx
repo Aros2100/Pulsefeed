@@ -41,8 +41,11 @@ export function EditionHeader({
 
   return (
     <div style={{
-      borderBottom: "0.5px solid #e5e9f0",
-      paddingBottom: "1rem", marginBottom: "1.25rem",
+      background: "#fff",
+      border: "0.5px solid #e5e9f0",
+      borderRadius: "12px",
+      padding: "1.5rem 1.75rem",
+      marginBottom: "1rem",
       display: "flex", alignItems: "center", justifyContent: "space-between",
     }}>
       {/* Left: arrows + title */}

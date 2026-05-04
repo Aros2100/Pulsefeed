@@ -66,7 +66,13 @@ export function EditionDetail({
       : allArticles.filter(a => a.article_type === typeFilter);
 
   return (
-    <div style={{ flex: 1, minWidth: 0 }}>
+    <div style={{
+      flex: 1, minWidth: 0,
+      background: "#fff",
+      border: "0.5px solid #e5e9f0",
+      borderRadius: "12px",
+      padding: "1.5rem 1.75rem",
+    }}>
       {/* Block header */}
       <div style={{
         borderBottom: "0.5px solid #e5e9f0",

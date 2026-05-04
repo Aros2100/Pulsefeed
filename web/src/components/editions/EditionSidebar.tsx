@@ -61,7 +61,7 @@ export function EditionSidebar({
           cursor: "pointer", fontFamily: "inherit",
           transition: "background 0.1s",
         }}
-        onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = "#f8fafc"; }}
+        onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,0,0,0.03)"; }}
         onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
       >
         <span style={{
@@ -91,11 +91,11 @@ export function EditionSidebar({
 
   return (
     <div style={{
-      width: "200px", flexShrink: 0,
+      width: "220px", flexShrink: 0,
       background: "#fff",
       borderRadius: "12px",
-      border: "1px solid #e5e9f0",
-      padding: "8px 4px",
+      border: "0.5px solid #e5e9f0",
+      padding: "12px 4px",
       alignSelf: "flex-start",
     }}>
       <SectionEyebrow label="Specialty" />
