@@ -5,110 +5,9 @@ import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { EditionBand, type EditionData } from "@/components/home/EditionBand";
 import { PastEditionsRow } from "@/components/home/PastEditionsRow";
 import { FreshFromFeed, type FreshArticle } from "@/components/home/FreshFromFeed";
+import { Hero, type HeroData } from "@/components/home/Hero";
 
-function getWeekNum(iso: string): number {
-  const d = new Date(iso);
-  const jan4 = new Date(d.getFullYear(), 0, 4);
-  const startOfWeek1 = new Date(jan4);
-  startOfWeek1.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
-  return Math.round((d.getTime() - startOfWeek1.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
-}
-
-// ── ActivityWidget ─────────────────────────────────────────────────────────
-
-function ActivityWidget({
-  weeklyCount, monthlyCount, yearlyCount, weekStarts,
-  userSubs, subWeekCounts, shortNameMap, greeting, firstName, weekNumber, year,
-}: {
-  weeklyCount: number; monthlyCount: number; yearlyCount: number;
-  weekStarts: string[];
-  userSubs: string[];
-  subWeekCounts: { subspecialty: string; week_start: string; article_count: number }[];
-  shortNameMap: Record<string, string>;
-  greeting: string; firstName: string; weekNumber: number; year: number;
-}) {
-  const getWk = (iso: string) => {
-    const d = new Date(iso);
-    const jan4 = new Date(d.getFullYear(), 0, 4);
-    const s = new Date(jan4);
-    s.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
-    return Math.round((d.getTime() - s.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
-  };
-
-  const lookup: Record<string, Record<string, number>> = {};
-  for (const row of subWeekCounts) {
-    if (!lookup[row.subspecialty]) lookup[row.subspecialty] = {};
-    lookup[row.subspecialty][row.week_start] = row.article_count;
-  }
-  const globalMax = Math.max(1, ...userSubs.flatMap(sub => weekStarts.map(ws => lookup[sub]?.[ws] ?? 0)));
-  const divider = <div style={{ width: "1px", background: "#f0f2f5", flexShrink: 0, alignSelf: "stretch" }} />;
-
-  return (
-    <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "22px 28px" }}>
-      <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
-        <div style={{ flex: "1", display: "flex", flexDirection: "column", justifyContent: "center", paddingRight: "18px" }}>
-          <div style={{ fontSize: "18px", fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{greeting}, {firstName}</div>
-          <div style={{ fontSize: "12px", color: "#888", marginTop: "4px" }}>Week {weekNumber}, {year}</div>
-        </div>
-        {divider}
-        <div style={{ flex: "0.9", display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 18px" }}>
-          <div style={{ fontSize: "9.5px", fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#b0b6bf" }}>New articles in</div>
-          <div style={{ fontSize: "13px", fontWeight: 700, color: "#E83B2A" }}>Neurosurgery</div>
-          <div style={{ fontSize: "38px", fontWeight: 800, lineHeight: 1, color: "#1a1a1a", marginTop: "6px" }}>{weeklyCount}</div>
-          <div style={{ fontSize: "9.5px", fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#E83B2A", marginTop: "4px" }}>So far this week</div>
-        </div>
-        {divider}
-        <div style={{ flex: "0.9", display: "flex", flexDirection: "column", justifyContent: "center", gap: "12px", padding: "0 18px" }}>
-          <div>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: "#888", marginBottom: "2px" }}>This month</div>
-            <div style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1, color: "#1a1a1a" }}>{(monthlyCount as number | null)?.toLocaleString()}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: "#888", marginBottom: "2px" }}>This year</div>
-            <div style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1, color: "#1a1a1a" }}>{(yearlyCount as number | null)?.toLocaleString()}</div>
-          </div>
-        </div>
-        {divider}
-        {userSubs.length > 0 && (
-          <div style={{ flex: "1.6", display: "flex", flexDirection: "column", justifyContent: "center", paddingLeft: "18px" }}>
-            <div style={{ fontSize: "9.5px", fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#b0b6bf", marginBottom: "10px" }}>Your subspecialties</div>
-            <div style={{ display: "grid", gridTemplateColumns: `95px repeat(${weekStarts.length}, 1fr)`, gap: "5px" }}>
-              <div />
-              {weekStarts.map((ws, i) => (
-                <div key={ws} style={{ fontSize: "9.5px", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", textAlign: "center", paddingBottom: "4px", color: i === weekStarts.length - 1 ? "#E83B2A" : "#b0b6bf" }}>
-                  W{getWk(ws)}
-                </div>
-              ))}
-            </div>
-            {userSubs.map((sub) => {
-              const counts = weekStarts.map(ws => lookup[sub]?.[ws] ?? 0);
-              return (
-                <div key={sub} style={{ display: "grid", gridTemplateColumns: `95px repeat(${weekStarts.length}, 1fr)`, gap: "5px", marginBottom: "4px" }}>
-                  <div style={{ fontSize: "12px", fontWeight: 600, color: "#444", display: "flex", alignItems: "flex-end", paddingBottom: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {shortNameMap[sub] ?? sub}
-                  </div>
-                  {counts.map((count, i) => {
-                    const isCurrent = i === counts.length - 1;
-                    return (
-                      <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
-                        <div style={{ width: "100%", height: "40px", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-                          <div style={{ width: "100%", borderRadius: "2px", minHeight: count > 0 ? "3px" : "0", height: `${Math.round((count / globalMax) * 100)}%`, background: isCurrent ? "#E83B2A" : "#f0f2f5" }} />
-                        </div>
-                        <div style={{ fontSize: "10px", fontWeight: isCurrent ? 700 : 600, color: isCurrent ? "#E83B2A" : "#888", textAlign: "center" }}>{count}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── ArticleTypeMatrix ──────────────────────────────────────────────────────
+// ── ArticleTypeMatrix (unchanged) ─────────────────────────────────────────
 
 const ARTICLE_TYPE_ORDER = [
   "Meta-analysis", "Review", "Intervention study", "Non-interventional study",
@@ -189,7 +88,7 @@ function ArticleTypeMatrix({ userSubs, shortNameMap, matrixRows }: {
   );
 }
 
-// ── Data helpers ────────────────────────────────────────────────────────────
+// ── Edition data fetching (unchanged) ─────────────────────────────────────
 
 async function fetchEditions(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -208,7 +107,6 @@ async function fetchEditions(
 
   const editionIds = (editions as { id: string }[]).map(e => e.id);
 
-  // Lead articles per edition (is_global=true, lowest global_sort_order)
   const { data: leadRows } = await admin
     .from("newsletter_edition_articles")
     .select("edition_id, article_id, global_sort_order, sort_order, newsletter_subheadline")
@@ -216,7 +114,6 @@ async function fetchEditions(
     .eq("is_global", true)
     .order("global_sort_order", { ascending: true, nullsFirst: false });
 
-  // Pick lowest global_sort_order per edition (stores article_id + subheadline)
   const leadByEdition: Record<string, { article_id: string; newsletter_subheadline: string | null }> = {};
   for (const row of ((leadRows ?? []) as { edition_id: string; article_id: string; global_sort_order: number | null; sort_order: number; newsletter_subheadline: string | null }[])) {
     if (!leadByEdition[row.edition_id]) {
@@ -237,7 +134,6 @@ async function fetchEditions(
     );
   }
 
-  // Counts per edition
   const { data: countRows } = await admin
     .from("newsletter_edition_articles")
     .select("edition_id")
@@ -291,25 +187,11 @@ export default async function HomeV1() {
   ) : null;
 
   const now = new Date();
-  const daysFromMonday = now.getDay() === 0 ? 6 : now.getDay() - 1;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - daysFromMonday);
-  const startOfWeekIso = monday.toISOString().slice(0, 10);
   const todayIso = now.toISOString().slice(0, 10);
   const yesterdayIso = new Date(now.getTime() - 86_400_000).toISOString().slice(0, 10);
-  const currentWeekNumber = getWeekNum(startOfWeekIso);
-  const currentYear = now.getFullYear();
-
-  const weekStarts: string[] = [];
-  for (let i = 4; i >= 0; i--) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() - i * 7);
-    weekStarts.push(d.toISOString().slice(0, 10));
-  }
-
+  const last7Start = new Date(now.getTime() - 7 * 86_400_000).toISOString();
+  const last14Start = new Date(now.getTime() - 14 * 86_400_000).toISOString();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 86_400_000).toISOString().slice(0, 10);
-  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-  const firstOfYear  = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = supabase as any;
@@ -317,23 +199,24 @@ export default async function HomeV1() {
   const [
     { data: profile },
     { data: subsRows },
-    { data: weeklyCount },
-    { data: monthlyCount },
-    { data: yearlyCount },
     { data: todayFeed },
     editions,
+    // Rolling 14-day window: all articles for specialty (articles table is specialty-scoped)
+    { data: recentArticles },
   ] = await Promise.all([
     supabase.from("users").select("name, subspecialties").eq("id", user.id).single(),
     admin.from("subspecialties").select("name, short_name").eq("specialty", ACTIVE_SPECIALTY).eq("active", true),
-    admin.rpc("count_articles_this_week", { week_start: startOfWeekIso, week_end: todayIso }),
-    admin.rpc("count_articles_in_range", { p_from: firstOfMonth, p_to: todayIso }),
-    admin.rpc("count_articles_in_range", { p_from: firstOfYear,  p_to: todayIso }),
     admin.from("articles")
       .select("id, title, pubmed_id, journal_abbr, pubmed_indexed_at")
       .gte("pubmed_indexed_at", todayIso)
       .order("pubmed_indexed_at", { ascending: false })
       .limit(5),
     fetchEditions(admin),
+    // Fetch recent articles with subspecialty for hero computation
+    admin.from("articles")
+      .select("id, pubmed_indexed_at, subspecialty")
+      .gte("pubmed_indexed_at", last14Start)
+      .order("pubmed_indexed_at", { ascending: false }),
   ]);
 
   const firstName = profile?.name?.split(" ")[0] ?? "there";
@@ -345,7 +228,50 @@ export default async function HomeV1() {
   );
   const userSubs = userSubspecialties.filter(s => s.toLowerCase() !== "neurosurgery");
 
-  // Fresh feed: today or yesterday fallback
+  // ── Hero data computation ────────────────────────────────────────────────
+  type ArticleRow = { id: string; pubmed_indexed_at: string | null; subspecialty: unknown };
+  const allRecent = (recentArticles ?? []) as ArticleRow[];
+  const last7StartDate = new Date(last7Start);
+
+  const totalLast7 = allRecent.filter(a => a.pubmed_indexed_at && new Date(a.pubmed_indexed_at) >= last7StartDate).length;
+  const totalPrev7  = allRecent.filter(a => a.pubmed_indexed_at && new Date(a.pubmed_indexed_at) < last7StartDate).length;
+  const deltaPct = totalPrev7 > 0 ? Math.round((totalLast7 - totalPrev7) / totalPrev7 * 100) : 0;
+
+  const heroSubspecialties: HeroData["subspecialties"] = userSubs.map(subName => {
+    const last7 = allRecent.filter(a =>
+      a.pubmed_indexed_at &&
+      new Date(a.pubmed_indexed_at) >= last7StartDate &&
+      Array.isArray(a.subspecialty) && (a.subspecialty as string[]).includes(subName)
+    ).length;
+    const prev7 = allRecent.filter(a =>
+      a.pubmed_indexed_at &&
+      new Date(a.pubmed_indexed_at) < last7StartDate &&
+      Array.isArray(a.subspecialty) && (a.subspecialty as string[]).includes(subName)
+    ).length;
+    return {
+      name: subName,
+      last7Days: last7,
+      previousDays: prev7,
+      deltaAbs: last7 - prev7,
+    };
+  });
+
+  const hour = now.getHours();
+  const timeOfDay: HeroData["timeOfDay"] = hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
+
+  const heroData: HeroData = {
+    firstName,
+    timeOfDay,
+    total: {
+      last7Days: totalLast7,
+      previousDays: totalPrev7,
+      deltaPct,
+      perDay: Math.round(totalLast7 / 7),
+    },
+    subspecialties: heroSubspecialties,
+  };
+
+  // ── Fresh feed ────────────────────────────────────────────────────────────
   let freshArticles = (todayFeed ?? []) as FreshArticle[];
   let feedLabel: "Today" | "Yesterday" = "Today";
   let feedTotal = freshArticles.length;
@@ -363,16 +289,7 @@ export default async function HomeV1() {
     feedTotal = freshArticles.length;
   }
 
-  // Subspecialty activity widget data
-  let subWeekCounts: { subspecialty: string; week_start: string; article_count: number }[] = [];
-  if (userSubs.length > 0) {
-    const { data } = await admin.rpc("count_subspecialties_by_weeks", {
-      p_subspecialties: userSubs,
-      p_week_starts: weekStarts,
-    });
-    subWeekCounts = data ?? [];
-  }
-
+  // ── ArticleTypeMatrix ─────────────────────────────────────────────────────
   let matrixRows: { subspecialty: string; article_type: string; article_count: number }[] = [];
   if (userSubs.length > 0) {
     const { data } = await admin.rpc("get_article_type_matrix", {
@@ -382,9 +299,6 @@ export default async function HomeV1() {
     matrixRows = data ?? [];
   }
 
-  const hour = now.getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-
   const currentEdition = editions[0] ?? null;
   const pastEditions = editions.slice(1);
 
@@ -392,21 +306,9 @@ export default async function HomeV1() {
     <>
       {previewBanner}
 
-      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 16px" }}>
-        {/* 1. Hero band */}
-        <ActivityWidget
-          weeklyCount={weeklyCount ?? 0}
-          monthlyCount={monthlyCount ?? 0}
-          yearlyCount={yearlyCount ?? 0}
-          weekStarts={weekStarts}
-          userSubs={userSubs}
-          subWeekCounts={subWeekCounts}
-          shortNameMap={shortNameMap}
-          greeting={greeting}
-          firstName={firstName}
-          weekNumber={currentWeekNumber}
-          year={currentYear}
-        />
+      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 0" }}>
+        {/* 1. Hero — volume-first */}
+        <Hero data={heroData} />
       </div>
 
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "0 24px 0" }}>
