@@ -149,15 +149,14 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const db = admin as any;
 
-                // Klasse D: alle forfattere har tomme affiliations — intet at parse.
+                // Klasse D: 1. forfatter har tom affiliations — parser læser kun authors[0].
                 // Sættes FØR A/B/C-detection så vi ikke kalder parseren på tom input.
-                const allEmptyAffiliations = authors.every((a) =>
-                  !a.affiliations ||
-                  a.affiliations.length === 0 ||
-                  a.affiliations.every((af: string) => !af?.trim())
-                );
+                const firstAuthor = authors[0];
+                const firstAuthorEmptyAffiliation =
+                  (!firstAuthor.affiliations || firstAuthor.affiliations.length === 0 ||
+                   firstAuthor.affiliations.every((af: string) => !af?.trim()));
 
-                if (allEmptyAffiliations) {
+                if (firstAuthorEmptyAffiliation) {
                   await db.from("articles").update({ geo_class: "D" }).eq("id", article.id);
                   await db.from("article_geo_metadata").upsert({
                     article_id:          article.id,
