@@ -116,14 +116,16 @@ export async function getCityCache(): Promise<CityCache> {
     if (batch.length === 0) break;
 
     for (const row of batch) {
+      // normalizeCityKey normalizes apostrophes AND diacritics, ensuring that
+      // DB names with curly apostrophes (e.g. "Yan'an" U+2019) produce the same
+      // cache key as lookup calls with straight apostrophes.
       const rawKey = row.name.trim().toLowerCase();
-      const key = unaccent(rawKey);
-      const unaccentedRaw = unaccent(rawKey);   // same as key; kept for clarity
+      const key = normalizeCityKey(row.name.trim()); // apostrophe-normalized + unaccented
       const country = lookupCountry(row.country) ?? row.country;
       const state = row.state?.trim() || null;
 
       // ── names + countryMap ──────────────────────────────────────────────────
-      // Add both the accented key and the unaccented key for city lookup.
+      // Add both the original-lowercase key and the fully-normalized key.
       for (const k of [rawKey, key]) {
         names.add(k);
         if (!countryMap.has(k)) countryMap.set(k, country);
