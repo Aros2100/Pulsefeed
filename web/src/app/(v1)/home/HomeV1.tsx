@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import type { NewsletterArticle, NewsletterContent } from "@/lib/newsletter/send";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-
+import { EditionBand, type EditionData } from "@/components/home/EditionBand";
+import { PastEditionsRow } from "@/components/home/PastEditionsRow";
+import { FreshFromFeed, type FreshArticle } from "@/components/home/FreshFromFeed";
 
 function getWeekNum(iso: string): number {
   const d = new Date(iso);
@@ -13,115 +14,25 @@ function getWeekNum(iso: string): number {
   return Math.round((d.getTime() - startOfWeek1.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
 }
 
-function formatDate(d: string | null): string {
-  if (!d) return "";
-  try {
-    return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-  } catch { return ""; }
-}
-
-function ArticleBadge({ type }: { type: string }) {
-  return (
-    <span style={{
-      display: "inline-block",
-      fontSize: "11px",
-      fontWeight: 600,
-      color: "#E83B2A",
-      background: "#fef2f2",
-      borderRadius: "4px",
-      padding: "2px 7px",
-      letterSpacing: "0.02em",
-    }}>
-      {type}
-    </span>
-  );
-}
-
-function ArticleCard({ article }: { article: NewsletterArticle }) {
-  const pubmedUrl = article.pubmed_id
-    ? `https://pubmed.ncbi.nlm.nih.gov/${article.pubmed_id}/`
-    : null;
-
-  const meta = [article.journal_abbr, formatDate(article.published_date)]
-    .filter(Boolean)
-    .join(" · ");
-
-  return (
-    <div style={{
-      background: "#fff",
-      borderRadius: "10px",
-      border: "1px solid #e5e9f0",
-      padding: "18px 20px",
-      marginBottom: "10px",
-    }}>
-      <div style={{ fontSize: "15px", fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "6px" }}>
-        {pubmedUrl ? (
-          <a href={pubmedUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1a1a1a", textDecoration: "none" }}>
-            {article.title}
-          </a>
-        ) : article.title}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: article.short_resume ? "10px" : 0 }}>
-        {article.article_type && <ArticleBadge type={article.article_type} />}
-        {meta && <span style={{ fontSize: "12px", color: "#888" }}>{meta}</span>}
-      </div>
-      {article.short_resume && (
-        <div style={{ fontSize: "13px", color: "#555", lineHeight: 1.65 }}>
-          {article.short_resume}
-        </div>
-      )}
-      {pubmedUrl && (
-        <div style={{ marginTop: "10px" }}>
-          <a href={pubmedUrl} target="_blank" rel="noopener noreferrer"
-            style={{ fontSize: "12px", color: "#E83B2A", fontWeight: 600, textDecoration: "none" }}>
-            Read on PubMed →
-          </a>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      fontSize: "11px",
-      fontWeight: 700,
-      letterSpacing: "0.08em",
-      textTransform: "uppercase",
-      color: "#E83B2A",
-      borderBottom: "2px solid #E83B2A",
-      paddingBottom: "8px",
-      marginBottom: "14px",
-    }}>
-      {children}
-    </div>
-  );
-}
+// ── ActivityWidget ─────────────────────────────────────────────────────────
 
 function ActivityWidget({
-  weeklyCount,
-  monthlyCount,
-  yearlyCount,
-  weekStarts,
-  userSubs,
-  subWeekCounts,
-  shortNameMap,
+  weeklyCount, monthlyCount, yearlyCount, weekStarts,
+  userSubs, subWeekCounts, shortNameMap, greeting, firstName, weekNumber, year,
 }: {
-  weeklyCount: number;
-  monthlyCount: number;
-  yearlyCount: number;
+  weeklyCount: number; monthlyCount: number; yearlyCount: number;
   weekStarts: string[];
   userSubs: string[];
   subWeekCounts: { subspecialty: string; week_start: string; article_count: number }[];
   shortNameMap: Record<string, string>;
+  greeting: string; firstName: string; weekNumber: number; year: number;
 }) {
-  const getWeekNum = (iso: string) => {
+  const getWk = (iso: string) => {
     const d = new Date(iso);
     const jan4 = new Date(d.getFullYear(), 0, 4);
-    const startOfWeek1 = new Date(jan4);
-    startOfWeek1.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
-    return Math.round((d.getTime() - startOfWeek1.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+    const s = new Date(jan4);
+    s.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+    return Math.round((d.getTime() - s.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
   };
 
   const lookup: Record<string, Record<string, number>> = {};
@@ -129,72 +40,64 @@ function ActivityWidget({
     if (!lookup[row.subspecialty]) lookup[row.subspecialty] = {};
     lookup[row.subspecialty][row.week_start] = row.article_count;
   }
+  const globalMax = Math.max(1, ...userSubs.flatMap(sub => weekStarts.map(ws => lookup[sub]?.[ws] ?? 0)));
+  const divider = <div style={{ width: "1px", background: "#f0f2f5", flexShrink: 0, alignSelf: "stretch" }} />;
 
   return (
-    <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "24px 28px" }}>
+    <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "22px 28px" }}>
       <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
-
-        {/* Left: this week */}
-        <div style={{ flex: "0 0 180px", display: "flex", flexDirection: "column", justifyContent: "center", paddingRight: "28px" }}>
-          <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#bbb", marginBottom: "4px" }}>New articles in</div>
-          <div style={{ fontSize: "13px", fontWeight: 700, color: "#E83B2A", marginBottom: "20px" }}>Neurosurgery</div>
-          <div style={{ fontSize: "11px", color: "#aaa", marginBottom: "6px" }}>This week</div>
-          <div style={{ fontSize: "52px", fontWeight: 800, color: "#1a1a1a", lineHeight: 1 }}>{weeklyCount}</div>
-          <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#E83B2A", marginTop: "3px" }}>so far</div>
+        <div style={{ flex: "1", display: "flex", flexDirection: "column", justifyContent: "center", paddingRight: "18px" }}>
+          <div style={{ fontSize: "18px", fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{greeting}, {firstName}</div>
+          <div style={{ fontSize: "12px", color: "#888", marginTop: "4px" }}>Week {weekNumber}, {year}</div>
         </div>
-
-        <div style={{ width: "1px", background: "#f0f2f5", flexShrink: 0, margin: "0 28px", alignSelf: "stretch" }} />
-
-        {/* Middle: month + year */}
-        <div style={{ flex: "0 0 140px", display: "flex", flexDirection: "column", justifyContent: "center", gap: "20px" }}>
+        {divider}
+        <div style={{ flex: "0.9", display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 18px" }}>
+          <div style={{ fontSize: "9.5px", fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#b0b6bf" }}>New articles in</div>
+          <div style={{ fontSize: "13px", fontWeight: 700, color: "#E83B2A" }}>Neurosurgery</div>
+          <div style={{ fontSize: "38px", fontWeight: 800, lineHeight: 1, color: "#1a1a1a", marginTop: "6px" }}>{weeklyCount}</div>
+          <div style={{ fontSize: "9.5px", fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#E83B2A", marginTop: "4px" }}>So far this week</div>
+        </div>
+        {divider}
+        <div style={{ flex: "0.9", display: "flex", flexDirection: "column", justifyContent: "center", gap: "12px", padding: "0 18px" }}>
           <div>
-            <div style={{ fontSize: "11px", color: "#aaa", marginBottom: "4px" }}>This month</div>
-            <div style={{ fontSize: "32px", fontWeight: 800, color: "#1a1a1a", lineHeight: 1 }}>{(monthlyCount as number | null)?.toLocaleString()}</div>
+            <div style={{ fontSize: "10px", fontWeight: 600, color: "#888", marginBottom: "2px" }}>This month</div>
+            <div style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1, color: "#1a1a1a" }}>{(monthlyCount as number | null)?.toLocaleString()}</div>
           </div>
           <div>
-            <div style={{ fontSize: "11px", color: "#aaa", marginBottom: "4px" }}>This year</div>
-            <div style={{ fontSize: "32px", fontWeight: 800, color: "#1a1a1a", lineHeight: 1 }}>{(yearlyCount as number | null)?.toLocaleString()}</div>
+            <div style={{ fontSize: "10px", fontWeight: 600, color: "#888", marginBottom: "2px" }}>This year</div>
+            <div style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1, color: "#1a1a1a" }}>{(yearlyCount as number | null)?.toLocaleString()}</div>
           </div>
         </div>
-
-        <div style={{ width: "1px", background: "#f0f2f5", flexShrink: 0, margin: "0 28px", alignSelf: "stretch" }} />
-
-        {/* Right: subspecialty bars */}
+        {divider}
         {userSubs.length > 0 && (
-          <div style={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", marginBottom: "14px" }}>
-              <div style={{ flex: "0 0 150px", fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#bbb" }}>Your subspecialties</div>
-              <div style={{ display: "flex", gap: "4px" }}>
-                {weekStarts.map((ws, i) => (
-                  <div key={ws} style={{ width: "30px", textAlign: "center", fontSize: "9px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: i === weekStarts.length - 1 ? "#E83B2A" : "#ccc" }}>
-                    W{getWeekNum(ws)}
-                  </div>
-                ))}
-              </div>
+          <div style={{ flex: "1.6", display: "flex", flexDirection: "column", justifyContent: "center", paddingLeft: "18px" }}>
+            <div style={{ fontSize: "9.5px", fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#b0b6bf", marginBottom: "10px" }}>Your subspecialties</div>
+            <div style={{ display: "grid", gridTemplateColumns: `95px repeat(${weekStarts.length}, 1fr)`, gap: "5px" }}>
+              <div />
+              {weekStarts.map((ws, i) => (
+                <div key={ws} style={{ fontSize: "9.5px", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", textAlign: "center", paddingBottom: "4px", color: i === weekStarts.length - 1 ? "#E83B2A" : "#b0b6bf" }}>
+                  W{getWk(ws)}
+                </div>
+              ))}
             </div>
-
             {userSubs.map((sub) => {
               const counts = weekStarts.map(ws => lookup[sub]?.[ws] ?? 0);
-              const max = Math.max(...counts, 1);
               return (
-                <div key={sub} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
-                  <div style={{ flex: "0 0 150px", fontSize: "12px", fontWeight: 600, color: "#444", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <div key={sub} style={{ display: "grid", gridTemplateColumns: `95px repeat(${weekStarts.length}, 1fr)`, gap: "5px", marginBottom: "4px" }}>
+                  <div style={{ fontSize: "12px", fontWeight: 600, color: "#444", display: "flex", alignItems: "flex-end", paddingBottom: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {shortNameMap[sub] ?? sub}
                   </div>
-                  <div style={{ display: "flex", gap: "4px", alignItems: "flex-end" }}>
-                    {counts.map((count, i) => {
-                      const isCurrent = i === counts.length - 1;
-                      const heightPct = Math.round((count / max) * 100);
-                      return (
-                        <div key={i} style={{ width: "30px", display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
-                          <div style={{ width: "100%", height: "28px", display: "flex", alignItems: "flex-end" }}>
-                            <div style={{ width: "100%", borderRadius: "2px 2px 0 0", minHeight: "3px", height: `${heightPct}%`, background: isCurrent ? "#E83B2A" : "#e5e9f0", opacity: isCurrent ? 0.8 : 1 }} />
-                          </div>
-                          <div style={{ fontSize: "10px", fontWeight: 700, color: isCurrent ? "#E83B2A" : "#999", textAlign: "center" }}>{count}</div>
+                  {counts.map((count, i) => {
+                    const isCurrent = i === counts.length - 1;
+                    return (
+                      <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                        <div style={{ width: "100%", height: "40px", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+                          <div style={{ width: "100%", borderRadius: "2px", minHeight: count > 0 ? "3px" : "0", height: `${Math.round((count / globalMax) * 100)}%`, background: isCurrent ? "#E83B2A" : "#f0f2f5" }} />
                         </div>
-                      );
-                    })}
-                  </div>
+                        <div style={{ fontSize: "10px", fontWeight: isCurrent ? 700 : 600, color: isCurrent ? "#E83B2A" : "#888", textAlign: "center" }}>{count}</div>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
@@ -205,166 +108,7 @@ function ActivityWidget({
   );
 }
 
-function NewsletterSection({
-  edition,
-  prevEditions,
-}: {
-  edition: { week_number: number; year: number; content: { global_intro?: string } };
-  prevEditions: { id: string; week_number: number; year: number }[];
-}) {
-  return (
-    <div style={{ marginTop: "24px" }}>
-      <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888", marginBottom: "12px" }}>
-        Newsletter
-      </div>
-
-      {/* Hero */}
-      <div style={{
-        background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0",
-        padding: "20px 24px", marginBottom: "8px",
-        display: "flex", alignItems: "center", gap: "0",
-      }}>
-        <div style={{ flex: "2 1 0", minWidth: 0, paddingRight: "24px" }}>
-          <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#E83B2A", marginBottom: "6px" }}>
-            Week {edition.week_number}, {edition.year}
-          </div>
-          <div style={{ fontSize: "13px", color: "#444", lineHeight: 1.65 }}>
-            {edition.content.global_intro ?? ""}
-          </div>
-        </div>
-        <div style={{ width: "1px", alignSelf: "stretch", background: "#e5e9f0", flexShrink: 0 }} />
-        <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <a href="#" style={{
-            fontSize: "12px", fontWeight: 600, color: "#E83B2A",
-            border: "1.5px solid #E83B2A", borderRadius: "6px",
-            padding: "6px 16px", textDecoration: "none", whiteSpace: "nowrap",
-          }}>
-            Open →
-          </a>
-        </div>
-      </div>
-
-      {/* Previous editions */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
-        {prevEditions.length > 0 ? prevEditions.map((e) => (
-          <a key={e.id} href="#" style={{
-            background: "#fff", borderRadius: "10px", border: "1px solid #e5e9f0",
-            padding: "13px 18px", display: "flex", alignItems: "center",
-            justifyContent: "space-between", textDecoration: "none",
-          }}>
-            <span style={{ fontSize: "12px", fontWeight: 600, color: "#888" }}>
-              Week {e.week_number}, {e.year}
-            </span>
-            <span style={{ fontSize: "13px", color: "#E83B2A", fontWeight: 700 }}>→</span>
-          </a>
-        )) : [1, 2, 3].map((i) => (
-          <div key={i} style={{
-            background: "#fff", borderRadius: "10px", border: "1px solid #e5e9f0",
-            padding: "13px 18px", height: "46px",
-          }} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-type GlobalArticleRow = {
-  sort_order: number;
-  subspecialty: string | null;
-  articles: {
-    id: string;
-    title: string;
-    pubmed_id: string | null;
-    pubmed_indexed_at: string | null;
-    article_type: string | null;
-    journal_abbr: string | null;
-  } | null;
-};
-
-function TopArticlesWidget({ articles }: { articles: GlobalArticleRow[] }) {
-  const sorted = [...articles]
-    .filter(r => r.articles)
-    .sort((a, b) => {
-      const da = a.articles?.pubmed_indexed_at ?? "";
-      const db = b.articles?.pubmed_indexed_at ?? "";
-      return db.localeCompare(da);
-    });
-
-  if (sorted.length === 0) return null;
-
-  return (
-    <div style={{
-      background: "#fff",
-      borderRadius: "12px",
-      border: "1px solid #e5e9f0",
-      padding: "20px",
-      boxSizing: "border-box",
-      height: "100%",
-    }}>
-      <div style={{
-        fontSize: "11px",
-        fontWeight: 700,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-        color: "#E83B2A",
-        borderBottom: "2px solid #E83B2A",
-        paddingBottom: "8px",
-      }}>
-        Don&apos;t miss
-      </div>
-      <div style={{ fontSize: "11px", color: "#888", fontWeight: 400, marginTop: "3px", marginBottom: "14px" }}>
-        Editor&apos;s picks · last 30 days
-      </div>
-      <div style={{
-        maxHeight: "420px",
-        overflowY: "auto",
-        paddingRight: "4px",
-      }}>
-        {sorted.map((row, i) => {
-          const a = row.articles!;
-          const url = a.pubmed_id ? `https://pubmed.ncbi.nlm.nih.gov/${a.pubmed_id}/` : null;
-          return (
-            <div key={a.id} style={{
-              paddingBottom: "12px",
-              marginBottom: "12px",
-              borderBottom: i < sorted.length - 1 ? "1px solid #f0f2f5" : "none",
-            }}>
-              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "5px" }}>
-                {row.subspecialty && (
-                  <span style={{
-                    fontSize: "10px", fontWeight: 600, color: "#6b7280",
-                    background: "#f3f4f6", borderRadius: "4px", padding: "2px 6px",
-                  }}>
-                    {row.subspecialty}
-                  </span>
-                )}
-                {a.article_type && (
-                  <span style={{
-                    fontSize: "10px", fontWeight: 600, color: "#E83B2A",
-                    background: "#fef2f2", borderRadius: "4px", padding: "2px 6px",
-                  }}>
-                    {a.article_type}
-                  </span>
-                )}
-              </div>
-              <div style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a", lineHeight: 1.45, marginBottom: "5px" }}>
-                {url ? (
-                  <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "#1a1a1a", textDecoration: "none" }}>
-                    {a.title}
-                  </a>
-                ) : a.title}
-              </div>
-              <div style={{ fontSize: "11px", color: "#aaa" }}>
-                {[a.journal_abbr, a.pubmed_indexed_at ? new Date(a.pubmed_indexed_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : null]
-                  .filter(Boolean).join(" · ")}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+// ── ArticleTypeMatrix ──────────────────────────────────────────────────────
 
 const ARTICLE_TYPE_ORDER = [
   "Meta-analysis", "Review", "Intervention study", "Non-interventional study",
@@ -372,45 +116,39 @@ const ARTICLE_TYPE_ORDER = [
   "Administration", "Letters & Notices",
 ];
 
-function ArticleTypeMatrix({
-  userSubs,
-  shortNameMap,
-  matrixRows,
-}: {
+const ARTICLE_TYPE_DISPLAY: Record<string, string> = {
+  "Non-interventional study": "Non-interventional",
+  "Surgical Technique": "Surgical technique",
+  "Case": "Case report",
+};
+
+const ARTICLE_TYPE_TOOLTIP: Record<string, string> = {
+  "Meta-analysis": "Pooled quantitative analysis of multiple studies",
+  "Review": "Narrative reviews and literature overviews",
+  "Intervention study": "RCTs and other interventional trials",
+  "Non-interventional study": "Observational research — cohort, registry, cross-sectional",
+  "Basic study": "Laboratory, animal, or mechanistic research",
+  "Case": "Case reports and case series",
+  "Guideline": "Clinical practice guidelines and consensus statements",
+  "Surgical Technique": "Step-by-step descriptions of operative procedures",
+  "Tech": "New devices, implants, or technology evaluations",
+  "Administration": "Health economics, policy, and organizational research",
+  "Letters & Notices": "Correspondence, editorials, and brief communications",
+};
+
+function ArticleTypeMatrix({ userSubs, shortNameMap, matrixRows }: {
   userSubs: string[];
   shortNameMap: Record<string, string>;
   matrixRows: { subspecialty: string; article_type: string; article_count: number }[];
 }) {
   if (userSubs.length === 0) return null;
-
   const lookup: Record<string, Record<string, number>> = {};
   for (const row of matrixRows) {
     if (!lookup[row.subspecialty]) lookup[row.subspecialty] = {};
     lookup[row.subspecialty][row.article_type] = row.article_count;
   }
-
-  const ARTICLE_TYPE_TOOLTIP: Record<string, string> = {
-    "Meta-analysis": "Pooled quantitative analysis of multiple studies",
-    "Review": "Narrative reviews and literature overviews",
-    "Intervention study": "RCTs and other interventional trials",
-    "Non-interventional study": "Observational research — cohort, registry, cross-sectional",
-    "Basic study": "Laboratory, animal, or mechanistic research",
-    "Case": "Case reports and case series",
-    "Guideline": "Clinical practice guidelines and consensus statements",
-    "Surgical Technique": "Step-by-step descriptions of operative procedures",
-    "Tech": "New devices, implants, or technology evaluations",
-    "Administration": "Health economics, policy, and organizational research",
-    "Letters & Notices": "Correspondence, editorials, and brief communications",
-  };
-
-  const ARTICLE_TYPE_DISPLAY: Record<string, string> = {
-    "Non-interventional study": "Non-interventional",
-    "Surgical Technique": "Surgical technique",
-    "Case": "Case report",
-  };
-
   return (
-    <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "20px 24px", height: "100%" }}>
+    <div style={{ background: "#fff", borderRadius: "12px", border: "1px solid #e5e9f0", padding: "20px 24px" }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: "6px" }}>
         <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#888" }}>Introducing article types</div>
         <div style={{ fontSize: "11px", color: "#bbb" }}>Last 30 days</div>
@@ -418,7 +156,6 @@ function ArticleTypeMatrix({
       <div style={{ fontSize: "12px", color: "#888", marginBottom: "16px", lineHeight: 1.5 }}>
         We classify every article into <span style={{ fontWeight: 600, color: "#444" }}>one of 11 types</span> — here&apos;s what&apos;s published in your subspecialties.
       </div>
-
       <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
         <thead>
           <tr>
@@ -433,19 +170,13 @@ function ArticleTypeMatrix({
         <tbody>
           {ARTICLE_TYPE_ORDER.map((type) => (
             <tr key={type} style={{ borderBottom: "1px solid #f8f9fb" }}>
-              <td style={{ fontSize: "12px", fontWeight: 500, color: "#555", padding: "6px 6px 6px 0", textAlign: "left" }}
-                title={ARTICLE_TYPE_TOOLTIP[type]}>
+              <td style={{ fontSize: "12px", fontWeight: 500, color: "#555", padding: "6px 6px 6px 0" }} title={ARTICLE_TYPE_TOOLTIP[type]}>
                 {ARTICLE_TYPE_DISPLAY[type] ?? type}
               </td>
               {userSubs.map(sub => {
                 const n = lookup[sub]?.[type] ?? 0;
                 return (
-                  <td key={sub} style={{
-                    fontSize: "12px", fontWeight: 500, textAlign: "center", padding: "6px",
-                    color: n === 0 ? "#ddd" : "#444",
-                    background: n === 0 ? "transparent" : "#fdf0ef",
-                    borderRadius: "4px",
-                  }}>
+                  <td key={sub} style={{ fontSize: "12px", fontWeight: 500, textAlign: "center", padding: "6px", color: n === 0 ? "#ddd" : "#444", background: n === 0 ? "transparent" : "#fdf0ef", borderRadius: "4px" }}>
                     {n === 0 ? "—" : n}
                   </td>
                 );
@@ -457,6 +188,83 @@ function ArticleTypeMatrix({
     </div>
   );
 }
+
+// ── Data helpers ────────────────────────────────────────────────────────────
+
+async function fetchEditions(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any
+): Promise<EditionData[]> {
+  const { data: editions } = await admin
+    .from("newsletter_editions")
+    .select("id, week_number, year, published_at:created_at")
+    .eq("specialty", ACTIVE_SPECIALTY)
+    .in("status", ["approved", "sent"])
+    .order("year", { ascending: false })
+    .order("week_number", { ascending: false })
+    .limit(4);
+
+  if (!editions || editions.length === 0) return [];
+
+  const editionIds = (editions as { id: string }[]).map(e => e.id);
+
+  // Lead articles per edition (is_global=true, lowest global_sort_order)
+  const { data: leadRows } = await admin
+    .from("newsletter_edition_articles")
+    .select("edition_id, article_id, global_sort_order, sort_order")
+    .in("edition_id", editionIds)
+    .eq("is_global", true)
+    .order("global_sort_order", { ascending: true, nullsFirst: false });
+
+  // Pick lowest global_sort_order per edition
+  const leadByEdition: Record<string, string> = {};
+  for (const row of ((leadRows ?? []) as { edition_id: string; article_id: string; global_sort_order: number | null; sort_order: number }[])) {
+    if (!leadByEdition[row.edition_id]) {
+      leadByEdition[row.edition_id] = row.article_id;
+    }
+  }
+
+  const leadArticleIds = [...new Set(Object.values(leadByEdition))];
+  let articleMap: Record<string, { title: string; pubmed_id: string | null; sari_subject: string | null }> = {};
+  if (leadArticleIds.length > 0) {
+    const { data: articles } = await admin
+      .from("articles")
+      .select("id, title, pubmed_id, sari_subject")
+      .in("id", leadArticleIds);
+    articleMap = Object.fromEntries(
+      ((articles ?? []) as { id: string; title: string; pubmed_id: string | null; sari_subject: string | null }[])
+        .map(a => [a.id, a])
+    );
+  }
+
+  // Counts per edition
+  const { data: countRows } = await admin
+    .from("newsletter_edition_articles")
+    .select("edition_id")
+    .in("edition_id", editionIds);
+
+  const countByEdition: Record<string, number> = {};
+  for (const row of ((countRows ?? []) as { edition_id: string }[])) {
+    countByEdition[row.edition_id] = (countByEdition[row.edition_id] ?? 0) + 1;
+  }
+
+  return (editions as { id: string; week_number: number; year: number; published_at: string | null }[]).map(e => {
+    const leadId = leadByEdition[e.id];
+    const lead = leadId ? articleMap[leadId] : null;
+    return {
+      id: e.id,
+      week_number: e.week_number,
+      year: e.year,
+      published_at: e.published_at,
+      lead_title: lead?.title ?? null,
+      lead_pubmed_id: lead?.pubmed_id ?? null,
+      lead_sari_subject: lead?.sari_subject ?? null,
+      total_picks: countByEdition[e.id] ?? 0,
+    };
+  });
+}
+
+// ── Page ────────────────────────────────────────────────────────────────────
 
 export default async function HomeV1() {
   const supabase = await createClient();
@@ -473,12 +281,9 @@ export default async function HomeV1() {
     <div style={{
       background: previewVersion === "v2" ? "#fee2e2" : "#fef3c7",
       borderBottom: `1px solid ${previewVersion === "v2" ? "#f87171" : "#f59e0b"}`,
-      padding: "6px 16px",
-      fontSize: "12px",
-      fontWeight: 600,
+      padding: "6px 16px", fontSize: "12px", fontWeight: 600,
       color: previewVersion === "v2" ? "#991b1b" : "#92400e",
-      textAlign: "center",
-      letterSpacing: "0.03em",
+      textAlign: "center", letterSpacing: "0.03em",
     }}>
       DEV PREVIEW — {previewVersion.toUpperCase()}
     </div>
@@ -490,192 +295,104 @@ export default async function HomeV1() {
   monday.setDate(now.getDate() - daysFromMonday);
   const startOfWeekIso = monday.toISOString().slice(0, 10);
   const todayIso = now.toISOString().slice(0, 10);
+  const yesterdayIso = new Date(now.getTime() - 86_400_000).toISOString().slice(0, 10);
   const currentWeekNumber = getWeekNum(startOfWeekIso);
-  const currentYear = new Date().getFullYear();
+  const currentYear = now.getFullYear();
 
-  // 4 historiske uger (mandag-datoer)
   const weekStarts: string[] = [];
-  for (let i = 7; i >= 0; i--) {
+  for (let i = 4; i >= 0; i--) {
     const d = new Date(monday);
     d.setDate(monday.getDate() - i * 7);
     weekStarts.push(d.toISOString().slice(0, 10));
   }
 
-  const [{ data: profile }, { data: editionRaw }, { data: subsRows }, { data: weeklyCount }] = await Promise.all([
-    supabase
-      .from("users")
-      .select("name, subspecialties")
-      .eq("id", user.id)
-      .single(),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any)
-      .from("newsletter_editions")
-      .select("id, week_number, year, content")
-      .eq("status", "approved")
-      .order("year", { ascending: false })
-      .order("week_number", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any)
-      .from("subspecialties")
-      .select("name, short_name")
-      .eq("specialty", ACTIVE_SPECIALTY)
-      .eq("active", true),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any).rpc("count_articles_this_week", {
-      week_start: startOfWeekIso,
-      week_end: todayIso,
-    }),
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 86_400_000).toISOString().slice(0, 10);
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  const firstOfYear  = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = supabase as any;
+
+  const [
+    { data: profile },
+    { data: subsRows },
+    { data: weeklyCount },
+    { data: monthlyCount },
+    { data: yearlyCount },
+    { data: todayFeed },
+    editions,
+  ] = await Promise.all([
+    supabase.from("users").select("name, subspecialties").eq("id", user.id).single(),
+    admin.from("subspecialties").select("name, short_name").eq("specialty", ACTIVE_SPECIALTY).eq("active", true),
+    admin.rpc("count_articles_this_week", { week_start: startOfWeekIso, week_end: todayIso }),
+    admin.rpc("count_articles_in_range", { p_from: firstOfMonth, p_to: todayIso }),
+    admin.rpc("count_articles_in_range", { p_from: firstOfYear,  p_to: todayIso }),
+    admin.from("articles")
+      .select("id, title, pubmed_id, journal_abbr, pubmed_indexed_at")
+      .gte("pubmed_indexed_at", todayIso)
+      .order("pubmed_indexed_at", { ascending: false })
+      .limit(5),
+    fetchEditions(admin),
   ]);
-  const edition = editionRaw as { id: string; week_number: number; year: number; content: NewsletterContent } | null;
 
   const firstName = profile?.name?.split(" ")[0] ?? "there";
   const userSubspecialties: string[] = Array.isArray(profile?.subspecialties)
-    ? (profile.subspecialties as string[])
+    ? (profile.subspecialties as unknown[]).filter((s): s is string => typeof s === "string")
     : [];
   const shortNameMap: Record<string, string> = Object.fromEntries(
-    ((subsRows ?? []) as { name: string; short_name: string | null }[])
-      .map((r) => [r.name, r.short_name ?? r.name])
+    ((subsRows ?? []) as { name: string; short_name: string | null }[]).map(r => [r.name, r.short_name ?? r.name])
   );
   const userSubs = userSubspecialties.filter(s => s.toLowerCase() !== "neurosurgery");
 
-  // Case A — no published edition yet
-  if (!edition) {
-    return (
-      <>
-        {previewBanner}
-        <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 40px" }}>
-          <div style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a" }}>
-            Welcome, {firstName}
-          </div>
-        </div>
-      </>
-    );
-  }
+  // Fresh feed: today or yesterday fallback
+  let freshArticles = (todayFeed ?? []) as FreshArticle[];
+  let feedLabel: "Today" | "Yesterday" = "Today";
+  let feedTotal = freshArticles.length;
 
-  // Fetch global articles — last 30 days across all approved editions
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const thirtyDaysAgoIso = thirtyDaysAgo.toISOString().slice(0, 10);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: globalRows } = await (supabase as any)
-    .from("newsletter_edition_articles")
-    .select("sort_order, subspecialty, article_id, edition_id")
-    .eq("is_global", true)
-    .in("edition_id",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (await (supabase as any)
-        .from("newsletter_editions")
-        .select("id")
-        .eq("status", "approved")
-        .gte("created_at", thirtyDaysAgoIso)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .then((r: any) => (r.data ?? []).map((e: any) => e.id))
-      )
-    );
-
-  let globalArticles: GlobalArticleRow[] = [];
-  if (globalRows && globalRows.length > 0) {
-    const articleIds = (globalRows as { article_id: string }[]).map(r => r.article_id);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: articleRows } = await (supabase as any)
+  if (freshArticles.length === 0) {
+    const { data: yesterdayFeed } = await admin
       .from("articles")
-      .select("id, title, pubmed_id, pubmed_indexed_at, article_type, journal_abbr")
-      .in("id", articleIds);
-
-    if (articleRows) {
-      const articleMap = Object.fromEntries(
-        (articleRows as NonNullable<GlobalArticleRow["articles"]>[]).map(a => [a.id, a])
-      );
-      globalArticles = (globalRows as { sort_order: number; subspecialty: string | null; article_id: string }[])
-        .map(r => ({
-          sort_order: r.sort_order,
-          subspecialty: r.subspecialty,
-          articles: articleMap[r.article_id] ?? null,
-        }))
-        .filter(r => r.articles !== null)
-        .sort((a, b) => {
-          const da = a.articles?.pubmed_indexed_at ?? "";
-          const db = b.articles?.pubmed_indexed_at ?? "";
-          return db.localeCompare(da);
-        });
-    }
+      .select("id, title, pubmed_id, journal_abbr, pubmed_indexed_at")
+      .gte("pubmed_indexed_at", yesterdayIso)
+      .lt("pubmed_indexed_at", todayIso)
+      .order("pubmed_indexed_at", { ascending: false })
+      .limit(5);
+    freshArticles = (yesterdayFeed ?? []) as FreshArticle[];
+    feedLabel = "Yesterday";
+    feedTotal = freshArticles.length;
   }
 
-  // Fetch subspecialty counts for activity widget
+  // Subspecialty activity widget data
   let subWeekCounts: { subspecialty: string; week_start: string; article_count: number }[] = [];
   if (userSubs.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (supabase as any).rpc("count_subspecialties_by_weeks", {
+    const { data } = await admin.rpc("count_subspecialties_by_weeks", {
       p_subspecialties: userSubs,
       p_week_starts: weekStarts,
     });
     subWeekCounts = data ?? [];
   }
 
-  const now2 = new Date();
-  const firstOfMonth = new Date(now2.getFullYear(), now2.getMonth(), 1).toISOString().slice(0, 10);
-  const firstOfYear  = new Date(now2.getFullYear(), 0, 1).toISOString().slice(0, 10);
-  const todayIso2    = now2.toISOString().slice(0, 10);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [{ data: monthlyCount }, { data: yearlyCount }] = await Promise.all([
-    (supabase as any).rpc("count_articles_in_range", { p_from: firstOfMonth, p_to: todayIso2 }),
-    (supabase as any).rpc("count_articles_in_range", { p_from: firstOfYear,  p_to: todayIso2 }),
-  ]);
-
   let matrixRows: { subspecialty: string; article_type: string; article_count: number }[] = [];
   if (userSubs.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (supabase as any).rpc("get_article_type_matrix", {
+    const { data } = await admin.rpc("get_article_type_matrix", {
       p_subspecialties: userSubs,
-      p_from_date: thirtyDaysAgoIso,
+      p_from_date: thirtyDaysAgo,
     });
     matrixRows = data ?? [];
   }
 
-  // Hent 3 tidligere approved editions
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: prevEditionsRaw } = await (supabase as any)
-    .from("newsletter_editions")
-    .select("id, week_number, year")
-    .eq("status", "approved")
-    .order("year", { ascending: false })
-    .order("week_number", { ascending: false })
-    .range(1, 4);
-
-  const prevEditions = (prevEditionsRaw ?? []) as { id: string; week_number: number; year: number }[];
-
-  // Case B — edition exists
-  const content = edition.content as NewsletterContent;
-  const hour = new Date().getHours();
+  const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  // Filter subspecialty sections to only those the user has selected
-  const visibleSubspecialties = userSubspecialties.length > 0
-    ? (content.subspecialties ?? []).filter((s) =>
-        userSubspecialties.some((u) => u.toLowerCase() === s.name.toLowerCase())
-      )
-    : (content.subspecialties ?? []);
-
-  const hasContent =
-    (content.general?.length ?? 0) > 0 ||
-    visibleSubspecialties.some((s) => s.articles.length > 0);
+  const currentEdition = editions[0] ?? null;
+  const pastEditions = editions.slice(1);
 
   return (
     <>
       {previewBanner}
 
-      {/* Header — fri tekst */}
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 16px" }}>
-        <div style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a" }}>{greeting}, {firstName}</div>
-        <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>Week {currentWeekNumber}, {currentYear}</div>
-      </div>
-
-      {/* KPI banner — fuld bredde */}
-      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "0 24px 16px" }}>
+        {/* 1. Hero band */}
         <ActivityWidget
           weeklyCount={weeklyCount ?? 0}
           monthlyCount={monthlyCount ?? 0}
@@ -684,52 +401,42 @@ export default async function HomeV1() {
           userSubs={userSubs}
           subWeekCounts={subWeekCounts}
           shortNameMap={shortNameMap}
+          greeting={greeting}
+          firstName={firstName}
+          weekNumber={currentWeekNumber}
+          year={currentYear}
         />
       </div>
 
-      {/* Midterste lag — article type matrix venstre, don't miss højre */}
-      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "0 24px 16px", display: "flex", gap: "24px", alignItems: "stretch" }}>
-        <div style={{ flex: "1 1 0", minWidth: 0 }}>
-          <ArticleTypeMatrix
-            userSubs={userSubs}
-            shortNameMap={shortNameMap}
-            matrixRows={matrixRows}
+      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "0 24px 0" }}>
+        {/* 2. Edition band (cream) */}
+        {currentEdition && <EditionBand edition={currentEdition} />}
+
+        {/* 3. Past editions row */}
+        {pastEditions.length > 0 && (
+          <PastEditionsRow
+            editions={pastEditions}
+            latestEditionId={currentEdition?.id ?? ""}
           />
-        </div>
-        <div style={{ flex: "1 1 0", minWidth: 0 }}>
-          <TopArticlesWidget articles={globalArticles} />
-        </div>
-      </div>
-
-      {/* Newsletter — fuld bredde */}
-      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "0 24px 80px" }}>
-        <NewsletterSection edition={{ ...edition, content: edition.content as { global_intro?: string } }} prevEditions={prevEditions} />
-      </div>
-
-      {/* Newsletter-artikler — smal container */}
-      <div style={{ maxWidth: "620px", margin: "0 auto", padding: "0 24px 80px" }}>
-
-        {/* General section first */}
-        {(content.general?.length ?? 0) > 0 && (
-          <div style={{ marginBottom: "32px", marginTop: "28px" }}>
-            <SectionHeading>General</SectionHeading>
-            {content.general.map((a) => (
-              <ArticleCard key={a.id} article={a} />
-            ))}
-          </div>
         )}
 
-        {/* Subspecialty sections matching user's selection */}
-        {visibleSubspecialties
-          .filter((s) => s.articles.length > 0)
-          .map((s, i) => (
-            <div key={s.name} style={{ marginBottom: "32px", marginTop: i === 0 && (content.general?.length ?? 0) === 0 ? "28px" : 0 }}>
-              <SectionHeading>{s.name}</SectionHeading>
-              {s.articles.map((a) => (
-                <ArticleCard key={a.id} article={a} />
-              ))}
-            </div>
-          ))}
+        {/* 4. Fresh from the feed */}
+        <FreshFromFeed
+          articles={freshArticles}
+          totalToday={feedTotal}
+          label={feedLabel}
+        />
+
+        {/* 5. Article type landscape */}
+        {userSubs.length > 0 && (
+          <div style={{ marginBottom: "80px" }}>
+            <ArticleTypeMatrix
+              userSubs={userSubs}
+              shortNameMap={shortNameMap}
+              matrixRows={matrixRows}
+            />
+          </div>
+        )}
       </div>
     </>
   );
