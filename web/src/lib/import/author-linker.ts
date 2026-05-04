@@ -145,12 +145,29 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
                 .maybeSingle();
 
               if (!existingMeta?.parser_processed_at) {
-                const firstOaAuthorship = oaWork?.authorships[0] ?? null;
-                const geoResult = await determineArticleGeo(admin, authors[0], firstOaAuthorship);
-
                 const now = new Date().toISOString();
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const db = admin as any;
+
+                // Klasse D: alle forfattere har tomme affiliations — intet at parse.
+                // Sættes FØR A/B/C-detection så vi ikke kalder parseren på tom input.
+                const allEmptyAffiliations = authors.every((a) =>
+                  !a.affiliations ||
+                  a.affiliations.length === 0 ||
+                  a.affiliations.every((af: string) => !af?.trim())
+                );
+
+                if (allEmptyAffiliations) {
+                  await db.from("articles").update({ geo_class: "D" }).eq("id", article.id);
+                  await db.from("article_geo_metadata").upsert({
+                    article_id:          article.id,
+                    parser_processed_at: now,
+                    updated_at:          now,
+                  }, { onConflict: "article_id" });
+                } else {
+
+                const firstOaAuthorship = oaWork?.authorships[0] ?? null;
+                const geoResult = await determineArticleGeo(admin, authors[0], firstOaAuthorship);
 
                 // 1. Write geo_class to articles. All flat geo_* fields stay null — data lives in article_geo_addresses.
                 await db.from("articles").update({
@@ -235,6 +252,8 @@ export async function runAuthorLinking(logId: string, importLogId?: string): Pro
                 if (geoResult.geo_class === "A" && geoResult.geo_country) {
                   logGeoUpdatedEvent(article.id, geoResult.geo_source ?? "parser", null, geoNext, geoResult.parser_confidence);
                 }
+
+                } // end else (not Class D)
               }
 
               if (rejectedAuthors.length > 0) {

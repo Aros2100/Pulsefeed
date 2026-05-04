@@ -152,7 +152,14 @@ function classBadgeLabel(cls: string | null): string {
   if (cls === "A") return "Class A";
   if (cls === "B") return "Class B";
   if (cls === "C") return "Class C";
+  if (cls === "D") return "Class D";
   return cls ?? "Unknown";
+}
+
+function emptyStateMessage(geoClass: string | null): string {
+  if (geoClass === "C") return "Affiliation present but parser could not extract location data.";
+  if (geoClass === "D") return "No affiliation data available from PubMed.";
+  return "Article has not been parsed yet.";
 }
 
 // ── Address row (shared by A and B) ──────────────────────────────────────────
@@ -404,7 +411,7 @@ export default function GeoCard(props: GeoCardProps) {
 
           {!hasRows ? (
             <p style={{ margin: 0, fontSize: "13px", color: "#9ca3af", fontStyle: "italic" }}>
-              Location data not available — article has not been parsed with the new geo pipeline yet.
+              {emptyStateMessage(props.geoClass)}
             </p>
           ) : isClassB ? (
             /* Klasse B: list of address cards */
