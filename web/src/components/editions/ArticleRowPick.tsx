@@ -36,7 +36,7 @@ export function ArticleRowPick({ article, isLast }: { article: EditionArticle; i
         </div>
       )}
       <div style={{ fontSize: "11px", color: "#94a3b8" }}>
-        {[article.journal_abbr, fmtDate(article.pubmed_indexed_at)].filter(Boolean).join(" · ")}
+        {[article.journal_abbr, fmtDate(article.pubmed_indexed_at), article.article_type].filter(Boolean).join(" · ")}
       </div>
     </div>
   );
