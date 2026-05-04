@@ -473,7 +473,17 @@ function parseSingleAddress(
   // mid-phrase token, not a sentence/segment boundary.
   text = text.replace(
     new RegExp(`(?:^|(?<=,\\s*))(${CANONICAL_COUNTRIES.map(escapeRegExp).join("|")})\\s+(?!City\\b)(?=[A-Z])`, "g"),
-    "$1; "
+    (match: string, countryName: string, offset: number, str: string): string => {
+      // Option A: if the same country appears again as a standalone comma/semicolon-separated
+      // segment later in the string, the current occurrence is part of an institution name
+      // ("Iran University of Medical Sciences, Tehran, Iran") — do NOT insert semicolon.
+      const afterMatch = str.slice(offset + countryName.length);
+      const standaloneRe = new RegExp(
+        `(?:[,;])\\s*${escapeRegExp(countryName)}(?:\\s*[,;.]|\\s*$)`, "i"
+      );
+      if (standaloneRe.test(afterMatch)) return match;
+      return `${countryName}; `;
+    }
   );
   text = text.replace(/\.\s*Electronic address:.*$/i, "").trim();
   text = text.replace(/Electronic address:.*$/i, "").trim();
