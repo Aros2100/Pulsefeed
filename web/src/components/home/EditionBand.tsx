@@ -9,6 +9,7 @@ export interface EditionData {
   lead_title: string | null;
   lead_pubmed_id: string | null;
   lead_sari_subject: string | null;
+  lead_subheadline: string | null;
   total_picks: number;
 }
 
@@ -48,7 +49,7 @@ export function EditionBand({ edition }: { edition: EditionData }) {
           <div style={{
             fontFamily: "Georgia, serif",
             fontSize: "18px", lineHeight: 1.35, color: "#1a1a1a", fontWeight: 400,
-            marginBottom: edition.lead_sari_subject ? "8px" : 0,
+            marginBottom: (edition.lead_subheadline || edition.lead_sari_subject) ? "8px" : 0,
           }}>
             {pubmedUrl ? (
               <a
@@ -62,7 +63,11 @@ export function EditionBand({ edition }: { edition: EditionData }) {
               </a>
             ) : (edition.lead_title ?? "This week's edition")}
           </div>
-          {edition.lead_sari_subject && (
+          {edition.lead_subheadline ? (
+            <div style={{ fontSize: "13px", color: "#64748b", lineHeight: 1.5, marginTop: "6px" }}>
+              {edition.lead_subheadline}
+            </div>
+          ) : edition.lead_sari_subject ? (
             <div style={{
               fontSize: "12px", color: "#64748b", lineHeight: 1.5,
               display: "-webkit-box", WebkitLineClamp: 2,
@@ -70,7 +75,7 @@ export function EditionBand({ edition }: { edition: EditionData }) {
             }}>
               {edition.lead_sari_subject}
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Right: picks + CTA */}

@@ -211,20 +211,20 @@ async function fetchEditions(
   // Lead articles per edition (is_global=true, lowest global_sort_order)
   const { data: leadRows } = await admin
     .from("newsletter_edition_articles")
-    .select("edition_id, article_id, global_sort_order, sort_order")
+    .select("edition_id, article_id, global_sort_order, sort_order, newsletter_subheadline")
     .in("edition_id", editionIds)
     .eq("is_global", true)
     .order("global_sort_order", { ascending: true, nullsFirst: false });
 
-  // Pick lowest global_sort_order per edition
-  const leadByEdition: Record<string, string> = {};
-  for (const row of ((leadRows ?? []) as { edition_id: string; article_id: string; global_sort_order: number | null; sort_order: number }[])) {
+  // Pick lowest global_sort_order per edition (stores article_id + subheadline)
+  const leadByEdition: Record<string, { article_id: string; newsletter_subheadline: string | null }> = {};
+  for (const row of ((leadRows ?? []) as { edition_id: string; article_id: string; global_sort_order: number | null; sort_order: number; newsletter_subheadline: string | null }[])) {
     if (!leadByEdition[row.edition_id]) {
-      leadByEdition[row.edition_id] = row.article_id;
+      leadByEdition[row.edition_id] = { article_id: row.article_id, newsletter_subheadline: row.newsletter_subheadline };
     }
   }
 
-  const leadArticleIds = [...new Set(Object.values(leadByEdition))];
+  const leadArticleIds = [...new Set(Object.values(leadByEdition).map(l => l.article_id))];
   let articleMap: Record<string, { title: string; pubmed_id: string | null; sari_subject: string | null }> = {};
   if (leadArticleIds.length > 0) {
     const { data: articles } = await admin
@@ -249,8 +249,8 @@ async function fetchEditions(
   }
 
   return (editions as { id: string; week_number: number; year: number; published_at: string | null }[]).map(e => {
-    const leadId = leadByEdition[e.id];
-    const lead = leadId ? articleMap[leadId] : null;
+    const leadEntry = leadByEdition[e.id];
+    const lead = leadEntry ? articleMap[leadEntry.article_id] : null;
     return {
       id: e.id,
       week_number: e.week_number,
@@ -259,6 +259,7 @@ async function fetchEditions(
       lead_title: lead?.title ?? null,
       lead_pubmed_id: lead?.pubmed_id ?? null,
       lead_sari_subject: lead?.sari_subject ?? null,
+      lead_subheadline: leadEntry?.newsletter_subheadline ?? null,
       total_picks: countByEdition[e.id] ?? 0,
     };
   });
