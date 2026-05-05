@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { logArticleEvent, type EventActor, type EventSource } from "@/lib/article-events";
 
 const insertSchema = z.object({
   edition_id:   z.string().uuid(),
@@ -39,6 +40,13 @@ export async function POST(request: NextRequest) {
     .insert({ edition_id, article_id, subspecialty, sort_order });
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  void logArticleEvent(article_id, "newsletter_selected", {
+    actor:       `user:${auth.userId}` as EventActor,
+    source:      "manual" as EventSource,
+    edition_id,
+    subspecialty,
+    sort_order,
+  });
   return NextResponse.json({ ok: true });
 }
 
