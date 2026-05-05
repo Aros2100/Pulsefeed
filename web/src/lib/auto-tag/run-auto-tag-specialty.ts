@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { logArticleEvent } from "@/lib/article-events";
+import { logArticleEvent, type EventActor, type EventSource } from "@/lib/article-events";
 
 export async function runAutoTagSpecialty(specialty: string): Promise<{ approved: number }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,8 +46,11 @@ export async function runAutoTagSpecialty(specialty: string): Promise<{ approved
       await Promise.all(
         articleIds.map((id: string) =>
           logArticleEvent(id, "auto_tagged", {
-            specialty,
-            method: "single_term",
+            actor:         "system:cron-auto-tag-specialty" as EventActor,
+            source:        "cron" as EventSource,
+            module:        "specialty",
+            method:        "single_term",
+            result:        specialty,
             matched_terms: articles.find((a: { article_id: string }) => a.article_id === id)?.matched_terms ?? [],
           })
         )
