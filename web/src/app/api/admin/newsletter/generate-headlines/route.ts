@@ -18,7 +18,7 @@ const schema = z.object({
   mode:         z.enum(["and-finally"]).optional(),
 });
 
-const SYSTEM_PROMPT = `# Newsletter Headline + Subheadline Generation Prompt (v3 — conversational full sentences)
+const SYSTEM_PROMPT = `# Newsletter Headline + Subheadline Generation Prompt (v4 — no abbreviations in subhead, numerals)
 
 ## Purpose
 
@@ -51,7 +51,7 @@ A 1–2 sentence editorial angle (max 20 words). Tells the reader why the articl
 8. **Match article type framing:**
     - Guideline/consensus → "A consensus on...", "Updated guidelines for..."
     - Meta-analysis → name the comparison: "X versus Y in Z"
-    - Intervention study → name the intervention: "TTFields plus temozolomide in MGMT-methylated GBM"
+    - Intervention study → name the intervention: "Temozolomide in MGMT-methylated GBM"
     - Non-interventional → name the question: "Adjacent segment disease after laminectomy"
     - Review → name the topic: "Growth factors in peripheral nerve regeneration"
     - Case → name the technique or scenario: "Surgical resection in super-refractory status epilepticus"
@@ -61,17 +61,19 @@ A 1–2 sentence editorial angle (max 20 words). Tells the reader why the articl
 1. **Length: 1–2 sentences, max 20 words total.** This is a hard ceiling.
 2. **Write in one clean, flowing sentence unless two are clearly better. Prefer rhythm and readability over packing in detail.**
 3. **Active voice. Direct. No hedging unless the evidence requires it.**
-4. **Calibrate to article type — this is non-negotiable:**
+4. **Do not use abbreviations. Spell out all terms unless they are universally standard medical abbreviations.**
+5. **Calibrate to article type — this is non-negotiable:**
     - **Case (n ≤ 5):** Use cautious language. "In two cases...", "A salvage option worth knowing.", "Proof-of-concept for..." — never "shows" or "proves"
     - **Non-interventional study:** Describe what was found, not what is true. "Identifies risk factors.", "Suggests earlier intervention may improve outcomes." — use "suggests", "indicates", "describes"
     - **Intervention study/RCT:** Can speak more strongly. "Extended-window thrombectomy improved functional independence at ninety days." — but still don't extrapolate beyond the trial population
     - **Meta-analysis:** Strongest authority. "Endoscopic approaches halved length of stay across 4,200 patients." — quote the key finding directly
     - **Guideline/consensus:** State the practical change. "Standardizes middle meningeal artery embolization as first-line in eligible patients."
     - **Review:** Name the synthesis. "Maps where next-generation biological therapeutics currently stand."
-5. **One concrete fact is better than three abstract claims.** Keep it concise, but prioritize natural phrasing over extreme compression.
-6. **Avoid restating the headline.** If the headline says "Awake craniotomy in low-grade glioma", the subheadline must not begin with "Awake craniotomy in low-grade glioma..."
-7. **Filler openers are optional** ("This study shows...", "Researchers found that...", "A new paper reports...").
-8. **One number is fine, two is the maximum.** Numbers should be the most clinically meaningful ones, not just whatever is in the abstract.
+6. **One concrete fact is better than three abstract claims.** Keep it concise, but prioritize natural phrasing over extreme compression.
+7. **Avoid restating the headline.** If the headline says "Awake craniotomy in low-grade glioma", the subheadline must not begin with "Awake craniotomy in low-grade glioma..."
+8. **Filler openers are optional** ("This study shows...", "Researchers found that...", "A new paper reports...").
+9. **One number is fine, two is the maximum.** Numbers should be the most clinically meaningful ones, not just whatever is in the abstract.
+10. **Use numerals for all numbers (e.g., 64%, 30 days). Never spell out numbers.**
 
 ## Input
 
@@ -85,7 +87,7 @@ You will receive:
 
 ### Source priority
 
-1. **If SARI fields are populated:** build the subheadline from \`sari_result\` and \`sari_implication\` and \`sari_subject\` and \`sari_action\`. Not all the SARI fields are required for a good subheadline. The language MUST be conversational with full sentences. Telegraphic style and too info-condensed sentences are forbidden.
+1. **If SARI fields are populated:** build the subheadline from \`sari_result\` and \`sari_implication\` and \`sari_subject\` and \`sari_action\`. Not all the SARI fields are required for a good subheadline. The language MUST be conversational with full sentences. Telegraphic style and too info condensed sentences are forbidden.
 2. **If SARI fields are missing:** extract the primary finding from the abstract. Choose the result the authors emphasize in the conclusion or first paragraph, not exploratory or secondary findings.
 3. **Never mix sources for the same subheadline.** If using SARI, stay in SARI. If falling back to abstract, ignore SARI even if partially populated.
 
@@ -172,27 +174,17 @@ HEADLINE: Surgical resection in super-refractory status epilepticus
 SUBHEAD: Two cases of emergency surgery resection terminated seizures when medical management had failed — a salvage option.
 \`\`\`
 
-**Example 8 — Intervention study (RCT)**
-- Original: "Endovascular Thrombectomy Versus Medical Management in Patients Presenting Beyond 24 Hours of Last Known Well and with FLAIR Vascular Hyperintensities-DWI Mismatch."
-- Type: Intervention study
-- Subspecialty: Vascular and Endovascular Neurosurgery
-
-\`\`\`
-HEADLINE: Thrombectomy beyond 24 hours
-SUBHEAD: Late thrombectomy improved functional independence at ninety days in patients with FLAIR Vascular Hyperintensities-DWI Mismatch.
-\`\`\`
-
-**Example 9 — Non-interventional study (registry)**
+**Example 8 — Non-interventional study (registry)**
 - Original: "Timing of Thromboprophylaxis in Acute Spinal Cord Injury Patients: A TQIP Study in 15,960 Patients."
 - Type: Non-interventional study
 - Subspecialty: Spine surgery
 
 \`\`\`
 HEADLINE: Thromboprophylaxis timing in acute spinal cord injury
-SUBHEAD: A 16,000-patient registry study suggests thromboprophylaxis within 48 hours reduces Venous thromboembolism without increasing bleeding.
+SUBHEAD: A 16,000-patient registry study suggests thromboprophylaxis within 48 hours reduces venous thromboembolism without increasing bleeding.
 \`\`\`
 
-**Example 10 — Tech**
+**Example 9 — Tech**
 - Original: "Automatic longitudinal assessment of brain metastases improves detection of disease progression."
 - Type: Tech
 - Subspecialty: Neurosurgical oncology and Radiosurgery
