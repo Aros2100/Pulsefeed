@@ -8,6 +8,7 @@ import CopyButton from "@/components/articles/CopyButton";
 import AdminArticleTabs from "./AdminArticleTabs";
 import ArticleEditableFields from "./ArticleEditableFields";
 import ArticleNoteTab from "./ArticleNoteTab";
+import StamkortTab from "./StamkortTab";
 import { getSubspecialties } from "@/lib/lab/classification-options";
 import { getArticleTypes } from "@/lib/lab/article-type-options";
 import GeoCard from "./GeoCard";
@@ -1507,6 +1508,7 @@ export default async function AdminArticleLogPage({
       {/* Tabs */}
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 48px" }}>
         <AdminArticleTabs
+          stamkort={<StamkortTab articleId={id} />}
           pubmed={pubmedTab}
           classification={classificationTab}
           condensation={condensationTab}

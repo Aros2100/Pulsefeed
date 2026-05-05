@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 interface Props {
+  stamkort:       React.ReactNode;
   pubmed:         React.ReactNode;
   classification: React.ReactNode;
   condensation:   React.ReactNode;
@@ -14,10 +15,10 @@ interface Props {
   note:           React.ReactNode;
 }
 
-type Tab = "pubmed" | "classification" | "condensation" | "scoring" | "location" | "import_" | "log" | "bibliometrics" | "note";
+type Tab = "stamkort" | "pubmed" | "classification" | "condensation" | "scoring" | "location" | "import_" | "log" | "bibliometrics" | "note";
 
-export default function AdminArticleTabs({ pubmed, classification, condensation, scoring, location, import_, log, bibliometrics, note }: Props) {
-  const [tab, setTab] = useState<Tab>("pubmed");
+export default function AdminArticleTabs({ stamkort, pubmed, classification, condensation, scoring, location, import_, log, bibliometrics, note }: Props) {
+  const [tab, setTab] = useState<Tab>("stamkort");
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
     padding: "8px 18px",
@@ -39,6 +40,7 @@ export default function AdminArticleTabs({ pubmed, classification, condensation,
     <div>
       {/* Tab bar */}
       <div style={{ display: "flex", borderBottom: "1px solid #dde3ed", marginBottom: "20px" }}>
+        <button style={tabStyle(tab === "stamkort")}       onClick={() => setTab("stamkort")}>Stamkort</button>
         <button style={tabStyle(tab === "pubmed")}         onClick={() => setTab("pubmed")}>PubMed</button>
         <button style={tabStyle(tab === "classification")} onClick={() => setTab("classification")}>Classification</button>
         <button style={tabStyle(tab === "condensation")}   onClick={() => setTab("condensation")}>Condensation</button>
@@ -50,6 +52,7 @@ export default function AdminArticleTabs({ pubmed, classification, condensation,
         <button style={tabStyle(tab === "note")}           onClick={() => setTab("note")}>Note</button>
       </div>
 
+      {tab === "stamkort"       && stamkort}
       {tab === "pubmed"         && pubmed}
       {tab === "classification" && classification}
       {tab === "condensation"   && condensation}
