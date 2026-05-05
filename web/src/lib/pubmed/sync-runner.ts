@@ -6,6 +6,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logArticleEvent, type EventActor, type EventSource } from "@/lib/article-events";
 import {
   splitPubmedArticles,
   parseArticleFragment,
@@ -544,6 +545,14 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<SyncRunn
             fields_changed:     changed.length > 0 ? changed : null,
             pubmed_modified_at: pm.dateRevised ?? null,
           });
+          if (changed.length > 0) {
+            void logArticleEvent(row.id, "pubmed_synced", {
+              actor:              "system:pubmed-sync" as EventActor,
+              source:             "sync" as EventSource,
+              fields_changed:     changed,
+              pubmed_modified_at: pm.dateRevised ?? null,
+            });
+          }
         } else {
           console.error(`[pubmed-sync] update fejl for ${pm.pubmedId}: ${updateErr.message}`);
         }
