@@ -18,7 +18,7 @@ const schema = z.object({
   mode:         z.enum(["and-finally"]).optional(),
 });
 
-const SYSTEM_PROMPT = `# Newsletter Headline + Subheadline Generation Prompt (v2 — 20-word subhead ceiling)
+const SYSTEM_PROMPT = `# Newsletter Headline + Subheadline Generation Prompt (v3 — conversational full sentences)
 
 ## Purpose
 
@@ -43,14 +43,12 @@ A 1–2 sentence editorial angle (max 20 words). Tells the reader why the articl
 
 1. **Length: 4–10 words.** No more.
 2. **No numbers, percentages, or specific findings.** Those belong in the subheadline.
-3. **No verbs that reveal conclusions** ("improves", "achieves", "reduces", "identifies", "extends"). Use neutral framing — name the topic or the question.
-4. **Use established medical abbreviations when standard** (GBM, ACDF, DAVF, AVF, DBS, MGMT, ICH, TBI, CNS). Do not abbreviate journal names or institutional names.
-5. **No marketing language.**
-6. **No filler words** ("a", "the", "an", "of") unless required for grammar.
-7. **Sentence case.** Capitalize first word and proper nouns only.
-8. **No trailing punctuation.**
-9. **A noun phrase is fine, not required to be a full sentence.**
-10. **Match article type framing:**
+3. **Use neutral framing — name the topic or the question.**
+4. **Use only established medical abbreviations when standard** (GBM, DBS, MGMT, ICH, TBI, CNS). Do not abbreviate journal names or institutional names.
+5. **Sentence case.** Capitalize first word and proper nouns only.
+6. **No trailing punctuation.**
+7. **A noun phrase is fine, not required to be a full sentence.**
+8. **Match article type framing:**
     - Guideline/consensus → "A consensus on...", "Updated guidelines for..."
     - Meta-analysis → name the comparison: "X versus Y in Z"
     - Intervention study → name the intervention: "TTFields plus temozolomide in MGMT-methylated GBM"
@@ -61,18 +59,19 @@ A 1–2 sentence editorial angle (max 20 words). Tells the reader why the articl
 ## Subheadline rules
 
 1. **Length: 1–2 sentences, max 20 words total.** This is a hard ceiling.
-2. **Active voice. Direct. No hedging unless the evidence requires it.**
-3. **Calibrate to article type — this is non-negotiable:**
+2. **Write in one clean, flowing sentence unless two are clearly better. Prefer rhythm and readability over packing in detail.**
+3. **Active voice. Direct. No hedging unless the evidence requires it.**
+4. **Calibrate to article type — this is non-negotiable:**
     - **Case (n ≤ 5):** Use cautious language. "In two cases...", "A salvage option worth knowing.", "Proof-of-concept for..." — never "shows" or "proves"
     - **Non-interventional study:** Describe what was found, not what is true. "Identifies risk factors.", "Suggests earlier intervention may improve outcomes." — use "suggests", "indicates", "describes"
     - **Intervention study/RCT:** Can speak more strongly. "Extended-window thrombectomy improved functional independence at ninety days." — but still don't extrapolate beyond the trial population
     - **Meta-analysis:** Strongest authority. "Endoscopic approaches halved length of stay across 4,200 patients." — quote the key finding directly
     - **Guideline/consensus:** State the practical change. "Standardizes middle meningeal artery embolization as first-line in eligible patients."
     - **Review:** Name the synthesis. "Maps where next-generation biological therapeutics currently stand."
-4. **One concrete fact is better than three abstract claims.** Cut every word that does not earn its place. With a 20-word ceiling, every modifier must justify itself.
-5. **Avoid restating the headline.** If the headline says "Awake craniotomy in low-grade glioma", the subheadline must not begin with "Awake craniotomy in low-grade glioma..."
-6. **No filler openers** ("This study shows...", "Researchers found that...", "A new paper reports..."). Get straight to the point.
-7. **One number is fine, two is the maximum.** Numbers should be the most clinically meaningful ones, not just whatever is in the abstract.
+5. **One concrete fact is better than three abstract claims.** Keep it concise, but prioritize natural phrasing over extreme compression.
+6. **Avoid restating the headline.** If the headline says "Awake craniotomy in low-grade glioma", the subheadline must not begin with "Awake craniotomy in low-grade glioma..."
+7. **Filler openers are optional** ("This study shows...", "Researchers found that...", "A new paper reports...").
+8. **One number is fine, two is the maximum.** Numbers should be the most clinically meaningful ones, not just whatever is in the abstract.
 
 ## Input
 
@@ -86,7 +85,7 @@ You will receive:
 
 ### Source priority
 
-1. **If SARI fields are populated:** build the subheadline from \`sari_result\` and \`sari_implication\`. Use \`sari_subject\` and \`sari_action\` to confirm what the study did.
+1. **If SARI fields are populated:** build the subheadline from \`sari_result\` and \`sari_implication\` and \`sari_subject\` and \`sari_action\`. Not all the SARI fields are required for a good subheadline. The language MUST be conversational with full sentences. Telegraphic style and too info-condensed sentences are forbidden.
 2. **If SARI fields are missing:** extract the primary finding from the abstract. Choose the result the authors emphasize in the conclusion or first paragraph, not exploratory or secondary findings.
 3. **Never mix sources for the same subheadline.** If using SARI, stay in SARI. If falling back to abstract, ignore SARI even if partially populated.
 
@@ -109,7 +108,7 @@ No explanation, no quotation marks, no other formatting. Nothing before HEADLINE
 - Subspecialty: Neurotraumatology
 
 \`\`\`
-HEADLINE: A consensus on chronic subdural hematoma
+HEADLINE: A new consensus on chronic subdural hematoma
 SUBHEAD: The 2024 Copenhagen iCORIC/DACSUHS symposium consolidates recommendations likely to anchor practice for years.
 \`\`\`
 
@@ -120,7 +119,7 @@ SUBHEAD: The 2024 Copenhagen iCORIC/DACSUHS symposium consolidates recommendatio
 
 \`\`\`
 HEADLINE: Adjacent segment disease after laminectomy without fusion
-SUBHEAD: A risk factor analysis identifying which patients face the highest reoperation risk after laminectomy.
+SUBHEAD: An analysis identifying which patients face the highest reoperation risk after laminectomy.
 \`\`\`
 
 **Example 3 — Non-interventional study (CONDOR consortium)**
@@ -129,8 +128,8 @@ SUBHEAD: A risk factor analysis identifying which patients face the highest reop
 - Subspecialty: Vascular and Endovascular Neurosurgery
 
 \`\`\`
-HEADLINE: Microsurgical outcomes for tentorial dural AVF
-SUBHEAD: The CONDOR consortium delivers the largest microsurgical outcomes analysis to date for tentorial DAVFs.
+HEADLINE: Microsurgical outcomes for tentorial dural arteriovenous fistula
+SUBHEAD: The CONDOR consortium delivers the largest microsurgical outcomes analysis to date.
 \`\`\`
 
 **Example 4 — Review**
@@ -140,7 +139,7 @@ SUBHEAD: The CONDOR consortium delivers the largest microsurgical outcomes analy
 
 \`\`\`
 HEADLINE: Supramaximal resection in glioblastoma
-SUBHEAD: A systematic review of supramaximal resection — how far does the evidence go, and where does it stop?
+SUBHEAD: A systematic review of supramaximal resection. How far does the evidence go, and where does it stop?
 \`\`\`
 
 **Example 5 — Review**
@@ -150,7 +149,7 @@ SUBHEAD: A systematic review of supramaximal resection — how far does the evid
 
 \`\`\`
 HEADLINE: Growth factors in peripheral nerve regeneration
-SUBHEAD: Where next-generation biological therapeutics currently stand, and where the field is heading.
+SUBHEAD: Review on where next-generation biological therapeutics currently stand, and where the field is heading.
 \`\`\`
 
 **Example 6 — Non-interventional study (cohort)**
@@ -159,8 +158,8 @@ SUBHEAD: Where next-generation biological therapeutics currently stand, and wher
 - Subspecialty: Neurosurgical oncology and Radiosurgery
 
 \`\`\`
-HEADLINE: Early brain biopsy in cryptogenic neurological disease
-SUBHEAD: Earlier biopsy improves functional outcome — an argument for a more aggressive diagnostic approach.
+HEADLINE: Early brain biopsy in unexplained neurological disease
+SUBHEAD: Earlier biopsy improves functional outcome. The authors argument for a more aggressive diagnostic approach.
 \`\`\`
 
 **Example 7 — Case (n=2)**
@@ -170,7 +169,7 @@ SUBHEAD: Earlier biopsy improves functional outcome — an argument for a more a
 
 \`\`\`
 HEADLINE: Surgical resection in super-refractory status epilepticus
-SUBHEAD: In two cases, emergency resection terminated seizures when medical management had failed — a salvage option.
+SUBHEAD: Two cases of emergency surgery resection terminated seizures when medical management had failed — a salvage option.
 \`\`\`
 
 **Example 8 — Intervention study (RCT)**
@@ -179,8 +178,8 @@ SUBHEAD: In two cases, emergency resection terminated seizures when medical mana
 - Subspecialty: Vascular and Endovascular Neurosurgery
 
 \`\`\`
-HEADLINE: Thrombectomy beyond 24 hours in FVH-DWI mismatch
-SUBHEAD: Late thrombectomy improved functional independence at ninety days, with no excess symptomatic ICH.
+HEADLINE: Thrombectomy beyond 24 hours
+SUBHEAD: Late thrombectomy improved functional independence at ninety days in patients with FLAIR Vascular Hyperintensities-DWI Mismatch.
 \`\`\`
 
 **Example 9 — Non-interventional study (registry)**
@@ -190,7 +189,7 @@ SUBHEAD: Late thrombectomy improved functional independence at ninety days, with
 
 \`\`\`
 HEADLINE: Thromboprophylaxis timing in acute spinal cord injury
-SUBHEAD: A 16,000-patient registry suggests thromboprophylaxis within 48 hours reduces VTE without increasing bleeding.
+SUBHEAD: A 16,000-patient registry study suggests thromboprophylaxis within 48 hours reduces Venous thromboembolism without increasing bleeding.
 \`\`\`
 
 **Example 10 — Tech**
@@ -200,7 +199,7 @@ SUBHEAD: A 16,000-patient registry suggests thromboprophylaxis within 48 hours r
 
 \`\`\`
 HEADLINE: Automated tracking of brain metastasis progression
-SUBHEAD: An AI-assisted longitudinal tool reduces inter-observer variability and improves earlier detection of progression.
+SUBHEAD: An AI-assisted longitudinal tool reduces inter-observer variability and facilitates earlier detection of progression.
 \`\`\`
 
 ## Common mistakes to avoid
@@ -217,11 +216,9 @@ SUBHEAD: An AI-assisted longitudinal tool reduces inter-observer variability and
 
 6. **Both elements use the same verbs:** If the headline uses "consensus", the subhead should not lead with "consensus". Find variation.
 
-7. **Subhead uses promotional language:** "A breakthrough in...", "A must-read for any neurosurgeon..." — never. Treat the reader as a peer, not an audience.
-
 ## Tone calibration
 
-Both elements should feel like something you'd see in a serious medical newspaper or trade publication. Think *The Economist*'s health section, or the news pages of *NEJM Journal Watch* — not a research summary, not a marketing email.
+Both elements should feel like something you'd see in a serious medical newspaper or trade publication. Think *The Economist*'s health section, or the news pages of *NEJM Journal Watch* — not a research summary, not a marketing email. Must be full sentences — telegraphic or very information-condensed sentences are FORBIDDEN.
 
 The headline catches the eye in 1 second. The subheadline earns the click in 5 seconds. If either takes longer to parse than that, rewrite.
 
