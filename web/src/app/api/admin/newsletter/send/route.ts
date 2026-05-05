@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { buildRenderParams, isoWeekSaturday } from "@/lib/newsletter/send";
 import { renderNewsletterHtml } from "@/lib/newsletter/render";
+import { logArticleEvent, type EventActor, type EventSource } from "@/lib/article-events";
 
 const schema = z.object({
   editionId: z.string().min(1),
@@ -90,12 +91,41 @@ export async function POST(request: NextRequest) {
   // Mark edition as sent
   await admin.from("newsletter_editions").update({ status: "sent" }).eq("id", editionId);
 
-  // Mark And finally article as used (only on successful send)
-  if (sent > 0 && edition.and_finally_article_id) {
-    await admin
-      .from("articles")
-      .update({ and_finally_used_in_edition_id: edition.id, and_finally_candidate: false })
-      .eq("id", edition.and_finally_article_id);
+  // Emit newsletter_sent per article (only if at least one recipient received the email)
+  if (sent > 0) {
+    const { data: editionArticles } = await admin
+      .from("newsletter_edition_articles")
+      .select("article_id, subspecialty")
+      .eq("edition_id", editionId);
+
+    const sentAt = new Date().toISOString();
+    const articleIds = new Set<string>();
+    for (const row of (editionArticles ?? []) as { article_id: string; subspecialty: string }[]) {
+      if (articleIds.has(row.article_id)) continue; // dedupe — same article may appear in multiple sections
+      articleIds.add(row.article_id);
+      void logArticleEvent(row.article_id, "newsletter_sent", {
+        actor:        `user:${auth.userId}` as EventActor,
+        source:       "manual" as EventSource,
+        edition_id:   editionId,
+        sent_at:      sentAt,
+        subspecialty: row.subspecialty,
+      });
+    }
+
+    // Mark And finally article as used and emit newsletter_sent for it
+    if (edition.and_finally_article_id) {
+      await admin
+        .from("articles")
+        .update({ and_finally_used_in_edition_id: edition.id, and_finally_candidate: false })
+        .eq("id", edition.and_finally_article_id);
+      void logArticleEvent(edition.and_finally_article_id, "newsletter_sent", {
+        actor:      `user:${auth.userId}` as EventActor,
+        source:     "manual" as EventSource,
+        edition_id: editionId,
+        sent_at:    sentAt,
+        slot:       "and_finally",
+      });
+    }
   }
 
   return NextResponse.json({ ok: true, sent });
