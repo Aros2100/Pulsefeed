@@ -8,7 +8,7 @@ import {
   parseCondensationSariResponse,
   type ActivePrompt,
 } from "@/lib/lab/scorer";
-import { logArticleEvent } from "@/lib/article-events";
+import { logScoringEvent, type EventActor, type EventSource } from "@/lib/article-events";
 import { recordBatchUsage } from "@/lib/ai/tracked-client";
 import { getBatchResults, type BatchRequest } from "./client";
 
@@ -123,8 +123,9 @@ export async function ingestCondensationSariBatchResults(
         continue;
       }
 
-      void logArticleEvent(article_id, "condensation_sari_scored", {
-        module:  "condensation_sari",
+      void logScoringEvent(article_id, "condensation_sari", {
+        actor:   "system:batch-condensation-sari" as EventActor,
+        source:  "batch" as EventSource,
         version: sari.version,
       });
 
