@@ -8,7 +8,7 @@ import {
   parseArticleTypeProdResponse,
   type ActivePrompt,
 } from "@/lib/lab/scorer";
-import { logArticleEvent } from "@/lib/article-events";
+import { logScoringEvent, type EventActor, type EventSource } from "@/lib/article-events";
 import { recordBatchUsage } from "@/lib/ai/tracked-client";
 import { getBatchResults, type BatchRequest } from "./client";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
@@ -120,10 +120,11 @@ export async function ingestArticleTypeBatchResults(
         continue;
       }
 
-      void logArticleEvent(article_id, "enriched", {
-        module:       "article_type",
-        article_type: cls.article_type,
-        version:      cls.version,
+      void logScoringEvent(article_id, "article_type", {
+        actor:   "system:batch-article-type" as EventActor,
+        source:  "batch" as EventSource,
+        version: cls.version,
+        result:  cls.article_type,
       });
 
       recordBatchUsage({
