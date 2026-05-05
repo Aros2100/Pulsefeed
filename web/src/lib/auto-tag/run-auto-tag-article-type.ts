@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-import { logArticleEvent } from "@/lib/article-events";
+import { logArticleEvent, type EventActor, type EventSource } from "@/lib/article-events";
 
 function normalize(s: string): string {
   return s.toLowerCase().replace(/,/g, "").trim();
@@ -102,9 +102,11 @@ export async function runAutoTagArticleType(): Promise<{ scored: number; skipped
         await Promise.all(
           (toApprove ?? []).map((a: { id: string; article_type_ai: string | null }) =>
             logArticleEvent(a.id, "auto_tagged", {
+              actor:  "system:cron-auto-tag-article-type" as EventActor,
+              source: "cron" as EventSource,
               module: "article_type",
               method: "deterministic",
-              article_type: a.article_type_ai,
+              result: a.article_type_ai,
             })
           )
         );
