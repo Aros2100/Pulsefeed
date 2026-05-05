@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { getActivePrompt, scoreArticle, type ActivePrompt } from "@/lib/lab/scorer";
-import { logArticleEvent } from "@/lib/article-events";
+import { logScoringEvent, type EventActor, type EventSource } from "@/lib/article-events";
 import { startScoringRun, finishScoringRun, failScoringRun } from "@/lib/scoring-runs";
 
 const CONCURRENCY  = 1;    // sequential to avoid bursting the 50 req/min limit
@@ -146,11 +146,11 @@ export async function POST(request: NextRequest) {
                   })
                   .eq("article_id", article.id)
                   .eq("specialty", specialty);
-                void logArticleEvent(article.id, "enriched", {
-                  specialty,
-                  module:   "specialty",
-                  decision: score.ai_decision,
-                  version:  score.version,
+                void logScoringEvent(article.id, "specialty", {
+                  actor:   `user:${auth.userId}` as EventActor,
+                  source:  "manual" as EventSource,
+                  version: score.version,
+                  result:  { decision: score.ai_decision, specialty },
                 });
               } catch (e) {
                 console.error(`[scoring/score-specialty] failed article ${article.id}:`, e);

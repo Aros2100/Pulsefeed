@@ -8,7 +8,7 @@ import {
   parseSpecialtyResponse,
   type ActivePrompt,
 } from "@/lib/lab/scorer";
-import { logArticleEvent } from "@/lib/article-events";
+import { logScoringEvent, type EventActor, type EventSource } from "@/lib/article-events";
 import { recordBatchUsage } from "@/lib/ai/tracked-client";
 import { submitBatch, getBatchResults, type BatchRequest } from "./client";
 
@@ -102,11 +102,11 @@ export async function ingestSpecialtyBatchResults(
         continue;
       }
 
-      void logArticleEvent(article_id, "enriched", {
-        specialty,
-        module:   "specialty",
-        decision: score.ai_decision,
-        version:  score.version,
+      void logScoringEvent(article_id, "specialty", {
+        actor:   "system:batch-specialty" as EventActor,
+        source:  "batch" as EventSource,
+        version: score.version,
+        result:  { decision: score.ai_decision, specialty },
       });
 
       recordBatchUsage({
