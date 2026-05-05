@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { getActivePrompt, scoreSubspecialty, type ActivePrompt, type SubspecialtyResult } from "@/lib/lab/scorer";
-import { logArticleEvent } from "@/lib/article-events";
+import { logScoringEvent, type EventActor, type EventSource } from "@/lib/article-events";
 import { startScoringRun, finishScoringRun, failScoringRun } from "@/lib/scoring-runs";
 
 const CONCURRENCY  = 1;
@@ -124,10 +124,11 @@ export async function POST(request: NextRequest) {
                   .eq("id", article.id);
                 if (error) throw new Error(error.message);
                 scored++;
-                void logArticleEvent(article.id, "enriched", {
-                  module:      "subspecialty",
-                  subspecialty: cls.subspecialty,
-                  version:     cls.version,
+                void logScoringEvent(article.id, "subspecialty", {
+                  actor:   `user:${auth.userId}` as EventActor,
+                  source:  "manual" as EventSource,
+                  version: cls.version,
+                  result:  cls.subspecialty,
                 });
               } catch (e) {
                 const status = (e as { status?: number })?.status;

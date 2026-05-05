@@ -8,7 +8,7 @@ import {
   parseSubspecialtyResponse,
   type ActivePrompt,
 } from "@/lib/lab/scorer";
-import { logArticleEvent } from "@/lib/article-events";
+import { logScoringEvent, type EventActor, type EventSource } from "@/lib/article-events";
 import { recordBatchUsage } from "@/lib/ai/tracked-client";
 import { getBatchResults, type BatchRequest } from "./client";
 
@@ -111,10 +111,11 @@ export async function ingestSubspecialtyBatchResults(
         continue;
       }
 
-      void logArticleEvent(article_id, "enriched", {
-        module:       "subspecialty",
-        subspecialty: cls.subspecialty,
-        version:      cls.version,
+      void logScoringEvent(article_id, "subspecialty", {
+        actor:   "system:batch-subspecialty" as EventActor,
+        source:  "batch" as EventSource,
+        version: cls.version,
+        result:  cls.subspecialty,
       });
 
       recordBatchUsage({
