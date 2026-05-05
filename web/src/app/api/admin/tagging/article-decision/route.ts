@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { logArticleEvent } from "@/lib/article-events";
+import { logArticleEvent, type EventActor, type EventSource } from "@/lib/article-events";
 import { z } from "zod";
 
 const schema = z.object({
@@ -54,10 +54,12 @@ export async function POST(request: NextRequest) {
   }
 
   await logArticleEvent(articleId, "auto_tagged", {
-    source: "mesh_single_tagging",
+    actor:         `user:${auth.userId}` as EventActor,
+    source:        "manual" as EventSource,
+    module:        "specialty",
+    method:        "mesh_single_tagging",
+    result:        specialty,
     decision,
-    specialty,
-    approved_by: auth.userId,
     matched_terms: matchedTerms,
   });
 
