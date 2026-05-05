@@ -113,6 +113,7 @@ interface DbArticle {
   substances:          unknown;
   pubmed_date:         string | null;
   pubmed_modified_at:  string | null;
+  retracted:           boolean | null;
 }
 
 interface SyncLogEntry {
@@ -427,7 +428,7 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<SyncRunn
       const batch = matches.slice(i, i + 1_000);
       const { data, error } = await db
         .from("articles")
-        .select("id, pubmed_id, title, abstract, mesh_terms, keywords, publication_types, authors, doi, pmc_id, language, journal_title, journal_abbr, published_year, published_date, date_completed, pubmed_indexed_at, volume, issue, article_number, issn_electronic, issn_print, coi_statement, grants, substances, pubmed_date, pubmed_modified_at")
+        .select("id, pubmed_id, title, abstract, mesh_terms, keywords, publication_types, authors, doi, pmc_id, language, journal_title, journal_abbr, published_year, published_date, date_completed, pubmed_indexed_at, volume, issue, article_number, issn_electronic, issn_print, coi_statement, grants, substances, pubmed_date, pubmed_modified_at, retracted")
         .in("pubmed_id", batch);
       if (error) throw error;
       for (const row of data ?? []) dbMap.set(row.pubmed_id, row as DbArticle);
@@ -551,6 +552,15 @@ export async function runPubmedSync(opts: SyncRunnerOpts = {}): Promise<SyncRunn
               source:             "sync" as EventSource,
               fields_changed:     changed,
               pubmed_modified_at: pm.dateRevised ?? null,
+            });
+          }
+          if (isRetracted && row.retracted !== true) {
+            void logArticleEvent(row.id, "retracted", {
+              actor:  "system:pubmed-sync" as EventActor,
+              source: "sync" as EventSource,
+              field:  "retracted",
+              from:   row.retracted ?? null,
+              to:     true,
             });
           }
         } else {
