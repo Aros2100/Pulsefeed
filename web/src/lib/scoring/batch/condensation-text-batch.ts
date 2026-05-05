@@ -8,7 +8,7 @@ import {
   parseCondensationTextResponse,
   type ActivePrompt,
 } from "@/lib/lab/scorer";
-import { logArticleEvent } from "@/lib/article-events";
+import { logScoringEvent, type EventActor, type EventSource } from "@/lib/article-events";
 import { recordBatchUsage } from "@/lib/ai/tracked-client";
 import { getBatchResults, type BatchRequest } from "./client";
 
@@ -95,8 +95,9 @@ export async function ingestCondensationTextBatchResults(
         continue;
       }
 
-      void logArticleEvent(article_id, "condensation_text_scored", {
-        module:  "condensation_text",
+      void logScoringEvent(article_id, "condensation_text", {
+        actor:   "system:batch-condensation-text" as EventActor,
+        source:  "batch" as EventSource,
         version: cls.version,
       });
 
