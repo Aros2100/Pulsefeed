@@ -7,6 +7,7 @@ import { lookupCountry, getRegion, getContinent } from "@/lib/geo/country-map";
 import { normalizeCountry } from "@/lib/geo/normalize";
 import { normalizeGeo } from "@/lib/geo/normalize-geo";
 import { logAuthorEvent } from "@/lib/author-events";
+import { logArticleEvent, type EventActor, type EventSource } from "@/lib/article-events";
 import { matchPubMedToOpenAlex } from "@/lib/openalex/match-authors";
 import type { OpenAlexWork, OpenAlexAuthorship } from "@/lib/openalex/client";
 import pLimit from "p-limit";
@@ -662,11 +663,30 @@ export async function linkAuthorsToArticle(
   }
 
   if (oaWork) {
+    // Fetch previous fwci for change detection before overwriting
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: prevRow } = await (admin as any)
+      .from("articles")
+      .select("fwci")
+      .eq("id", articleId)
+      .single();
+    const prevFwci: number | null = (prevRow as { fwci?: number | null } | null)?.fwci ?? null;
+    const newFwci: number | null = oaWork.fwci ?? null;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (admin as any).from("articles").update({
       openalex_work_id: oaWork.id,
       fwci: oaWork.fwci,
     }).eq("id", articleId);
+
+    if (newFwci !== prevFwci && !(newFwci === null && prevFwci === null)) {
+      void logArticleEvent(articleId, "fwci_updated", {
+        actor:  "system:author-import" as EventActor,
+        source: "import" as EventSource,
+        from:   prevFwci,
+        to:     newFwci,
+      });
+    }
   }
 
   return { new: newCount, duplicates: dupCount, rejected: rejectedCount };
