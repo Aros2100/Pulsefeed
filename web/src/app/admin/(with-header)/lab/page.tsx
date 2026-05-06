@@ -24,6 +24,14 @@ export default async function LabPage() {
 
   const modules = [
     {
+      title: "Craft Scoring",
+      description: "Score artikelhåndværk via pairwise comparisons og udvikl en scoring-prompt",
+      queue: 0,
+      href: "/admin/lab/value-scoring/craft",
+      color: "#E83B2A",
+      badge: "New",
+    },
+    {
       title: "Geo Validation",
       description: "Validate geo pipeline output on 1.000 test articles",
       queue: 0,
