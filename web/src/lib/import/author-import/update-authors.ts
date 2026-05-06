@@ -1,6 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { normalizeOrcid, findOrCreateAuthor } from "@/lib/import/author-import/find-or-create";
+import { normalizeOrcid, findOrCreateAuthor, determineArticleGeo } from "@/lib/import/author-import/find-or-create";
 import { normalizeAuthorName, decodeHtmlEntities, type Author } from "@/lib/import/article-import/fetcher";
+import { getRegion, getContinent } from "@/lib/geo/country-map";
+import { enrichArticleAddresses } from "@/lib/geo/v2/address-enrichment";
 import { logAuthorEvent } from "@/lib/author-events";
 import { logArticleEvent } from "@/lib/article-events";
 
@@ -136,6 +138,84 @@ function matchInOldArray(
   }
 
   return null;
+}
+
+// ── Geo re-parse after first-author affiliation change ───────────────────────
+
+async function reparseFirstAuthorGeo(
+  admin: AdminClient,
+  articleId: string,
+  firstAuthor: Author,
+): Promise<void> {
+  const geoResult = await determineArticleGeo(admin, firstAuthor, null);
+  const now = new Date().toISOString();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = admin as any;
+
+  await db.from("articles").update({ geo_class: geoResult.geo_class }).eq("id", articleId);
+
+  if (geoResult.geo_class === "A" && geoResult.geo_country) {
+    await db.from("article_geo_addresses").delete().eq("article_id", articleId).eq("position", 1);
+    await db.from("article_geo_addresses").insert({
+      article_id:            articleId,
+      position:              1,
+      city:                  geoResult.geo_city,
+      state:                 geoResult.geo_state,
+      country:               geoResult.geo_country,
+      region:                geoResult.geo_region,
+      continent:             geoResult.geo_continent,
+      institution:           geoResult.geo_institution,
+      institution2:          geoResult.geo_institution2,
+      institution3:          geoResult.geo_institution3,
+      institutions_overflow: geoResult.geo_institutions_overflow ?? [],
+      department:            geoResult.geo_department,
+      department2:           geoResult.geo_department2,
+      department3:           geoResult.geo_department3,
+      departments_overflow:  geoResult.geo_departments_overflow ?? [],
+      confidence:            geoResult.parser_confidence,
+      state_source:          geoResult.geo_state ? "parser" : null,
+      ai_processed_at:       null, // reset so geo-AI picks it up via existing candidate RPC
+    });
+    await enrichArticleAddresses(articleId);
+  }
+
+  if (geoResult.geo_class === "B" && geoResult.class_b_addresses) {
+    await db.from("article_geo_addresses").delete().eq("article_id", articleId);
+    const insertRows = geoResult.class_b_addresses.map((addr) => ({
+      article_id:            articleId,
+      position:              addr.position,
+      city:                  addr.city,
+      state:                 addr.state,
+      country:               addr.country,
+      region:                addr.country ? getRegion(addr.country) : null,
+      continent:             addr.country ? getContinent(addr.country) : null,
+      institution:           addr.institution,
+      institution2:          addr.institution2,
+      institution3:          addr.institution3,
+      institutions_overflow: addr.institutions_overflow,
+      department:            addr.department,
+      department2:           addr.department2,
+      department3:           addr.department3,
+      departments_overflow:  addr.departments_overflow,
+      confidence:            addr.confidence,
+      state_source:          addr.state ? "parser" : null,
+      ai_processed_at:       null, // reset so geo-AI picks it up via existing candidate RPC
+    }));
+    await db.from("article_geo_addresses").insert(insertRows);
+    await enrichArticleAddresses(articleId);
+  }
+
+  await db.from("article_geo_metadata").upsert({
+    article_id:            articleId,
+    geo_confidence:        geoResult.geo_confidence,
+    parser_processed_at:   now,
+    parser_version:        geoResult.parser_version,
+    enriched_at:           geoResult.enriched_state_source ? now : null,
+    enriched_state_source: geoResult.enriched_state_source,
+    class_b_address_count: geoResult.geo_class === "B" ? geoResult.class_b_addresses?.length ?? null : null,
+    updated_at:            now,
+  }, { onConflict: "article_id" });
 }
 
 // ── Core: processerer én artikel ────────────────────────────────────────────
@@ -340,6 +420,21 @@ export async function processArticleAuthorUpdate(
       });
 
       result.scenarioC++;
+    }
+
+    // ── Geo re-parse if position 0's affiliation changed ────────────────────
+    if (!dryRun && newAuthors.length > 0) {
+      const firstOldAff  = getPrimaryAffiliationString(oldEntries[0] ?? { affiliation: null, affiliations: null } as OldAuthorEntry) ?? "";
+      const firstNewAff  = newAuthors[0].affiliations[0] ?? "";
+      if (firstOldAff.trim() !== firstNewAff.trim()) {
+        try {
+          await reparseFirstAuthorGeo(admin, articleId, newAuthors[0]);
+          console.log(`[update-authors] geo re-parsed for article=${articleId}`);
+        } catch (e) {
+          // Non-fatal: author update continues even if geo re-parse fails
+          console.error(`[update-authors] geo re-parse failed for article=${articleId}:`, e);
+        }
+      }
     }
 
     // ── Afslut artiklen ──────────────────────────────────────────────────────
