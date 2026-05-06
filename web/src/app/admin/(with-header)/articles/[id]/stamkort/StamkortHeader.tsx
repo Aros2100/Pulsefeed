@@ -1,4 +1,4 @@
-import { COLORS, FONTS } from './tokens';
+import { COLORS, FONTS, countryToIso2 } from './tokens';
 
 interface Props {
   specialties: string[];
@@ -12,6 +12,7 @@ function specialtyLabel(slug: string) {
 }
 
 export default function StamkortHeader({ specialties, currentSpecialty, subspecialties, primaryCountry }: Props) {
+  const iso2        = countryToIso2(primaryCountry);
   const otherCount  = specialties.filter(s => s !== currentSpecialty).length;
   const displaySubs = subspecialties.slice(0, 3);
 
@@ -68,18 +69,19 @@ export default function StamkortHeader({ specialties, currentSpecialty, subspeci
           }}>
             #placeholder
           </span>
-          {primaryCountry && (
-            <span style={{
-              fontSize: '11px',
-              fontWeight: 600,
-              color: COLORS.slate600,
-              background: COLORS.slate100,
-              padding: '2px 8px',
-              borderRadius: '4px',
-              fontFamily: FONTS.sans,
-            }}>
-              {primaryCountry}
-            </span>
+          {iso2 && (
+            <span
+              className={`fi fi-${iso2}`}
+              title={primaryCountry ?? undefined}
+              style={{
+                width: '24px',
+                height: '18px',
+                borderRadius: '2px',
+                boxShadow: '0 0 0 1px rgba(0,0,0,0.08)',
+                display: 'inline-block',
+                flexShrink: 0,
+              }}
+            />
           )}
         </div>
 

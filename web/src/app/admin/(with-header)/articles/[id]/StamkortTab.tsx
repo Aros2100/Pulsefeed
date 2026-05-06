@@ -42,6 +42,55 @@ export default async function StamkortTab({ articleId }: Props) {
       .order('position', { ascending: true }),
   ]);
 
+  // Fetch lat/lng + country_code for primary address
+  type AddrRaw = { position: number; department: string | null; institution: string | null; city: string | null; state: string | null; country: string | null };
+  const primaryAddrRaw = ((addressesRes.data ?? [])[0] ?? null) as AddrRaw | null;
+
+  let geoCountryCode: string | null = null;
+  let geoLatitude:    number | null = null;
+  let geoLongitude:   number | null = null;
+
+  if (primaryAddrRaw?.city && primaryAddrRaw?.country) {
+    // Try exact name match first (fastest path), then ascii_name fallback (handles diacritics like Zürich → Zurich)
+    const base = admin
+      .from('geo_cities')
+      .select('latitude, longitude, country_code')
+      .ilike('country', primaryAddrRaw.country)
+      .order('population', { ascending: false })
+      .limit(1);
+
+    const { data: nameMatch } = await base.ilike('name', primaryAddrRaw.city).maybeSingle();
+    const cityRow = nameMatch ?? (
+      (await admin
+        .from('geo_cities')
+        .select('latitude, longitude, country_code')
+        .ilike('country', primaryAddrRaw.country)
+        .ilike('ascii_name', primaryAddrRaw.city)
+        .order('population', { ascending: false })
+        .limit(1)
+        .maybeSingle()).data
+    );
+
+    if (cityRow) {
+      geoCountryCode = cityRow.country_code?.toLowerCase() ?? null;
+      geoLatitude    = cityRow.latitude;
+      geoLongitude   = cityRow.longitude;
+    }
+  }
+
+  // Country-only fallback — if no city match but country is known, get country_code for map outline
+  if (!geoCountryCode && primaryAddrRaw?.country) {
+    const { data: countryRow } = await admin
+      .from('geo_cities')
+      .select('country_code')
+      .ilike('country', primaryAddrRaw.country)
+      .limit(1)
+      .maybeSingle();
+    if (countryRow) {
+      geoCountryCode = countryRow.country_code?.toLowerCase() ?? null;
+    }
+  }
+
   const raw = (articleRes.data ?? {}) as Record<string, unknown>;
 
   const matchedSpecialties = (specialtiesRes.data ?? []).map(r => r.specialty as string);
@@ -56,7 +105,6 @@ export default async function StamkortTab({ articleId }: Props) {
     };
   });
 
-  type AddrRaw = { position: number; department: string | null; institution: string | null; city: string | null; state: string | null; country: string | null };
   const addressRows: AddressRow[] = (addressesRes.data ?? []).map(r => {
     const a = r as unknown as AddrRaw;
     return {
@@ -99,6 +147,9 @@ export default async function StamkortTab({ articleId }: Props) {
           pubmedId={raw.pubmed_id as string | null}
           authors={authorRows}
           addresses={addressRows}
+          geoCountryCode={geoCountryCode}
+          geoLatitude={geoLatitude}
+          geoLongitude={geoLongitude}
         />
 
         <StamkortScoring scores={null} />

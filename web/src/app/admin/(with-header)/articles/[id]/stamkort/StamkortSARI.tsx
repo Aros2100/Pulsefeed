@@ -1,9 +1,9 @@
 import { COLORS, FONTS } from './tokens';
 
 interface Props {
-  subject:    string | null;
-  action:     string | null;
-  result:     string | null;
+  subject:     string | null;
+  action:      string | null;
+  result:      string | null;
   implication: string | null;
 }
 
@@ -17,6 +17,7 @@ function SariCell({ label, content }: CellProps) {
     <div style={{
       padding: '14px 16px',
       minHeight: '80px',
+      background: COLORS.slate50,
     }}>
       <div style={{
         fontSize: '10px',
@@ -43,7 +44,7 @@ function SariCell({ label, content }: CellProps) {
 
 export default function StamkortSARI({ subject, action, result, implication }: Props) {
   return (
-    <div style={{ background: '#fff', borderBottom: `1px solid ${COLORS.slate200}`, padding: '0 24px 16px' }}>
+    <div style={{ background: '#fff', padding: '0 24px 16px' }}>
       <div style={{
         border: `1px solid ${COLORS.slate200}`,
         borderRadius: '8px',
@@ -52,13 +53,13 @@ export default function StamkortSARI({ subject, action, result, implication }: P
         gridTemplateColumns: '1fr 1fr',
       }}>
         <div style={{ borderRight: `1px solid ${COLORS.slate200}`, borderBottom: `1px solid ${COLORS.slate200}` }}>
-          <SariCell label="Subject"    content={subject} />
+          <SariCell label="Subject"     content={subject} />
         </div>
         <div style={{ borderBottom: `1px solid ${COLORS.slate200}` }}>
-          <SariCell label="Action"     content={action} />
+          <SariCell label="Action"      content={action} />
         </div>
         <div style={{ borderRight: `1px solid ${COLORS.slate200}` }}>
-          <SariCell label="Result"     content={result} />
+          <SariCell label="Result"      content={result} />
         </div>
         <div>
           <SariCell label="Implication" content={implication} />

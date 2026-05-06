@@ -1,3 +1,4 @@
+import 'flag-icons/css/flag-icons.min.css';
 import Header from "@/components/Header";
 import AlertBanner from "@/components/AlertBanner";
 

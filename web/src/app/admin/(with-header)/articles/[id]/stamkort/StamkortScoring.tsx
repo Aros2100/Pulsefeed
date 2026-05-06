@@ -33,7 +33,7 @@ export default function StamkortScoring({ scores }: Props) {
   const isDummy = !scores;
 
   return (
-    <div style={{ background: '#fff', borderBottom: `1px solid ${COLORS.slate200}`, padding: '0 24px 16px' }}>
+    <div style={{ background: '#fff', padding: '0 24px 16px' }}>
       <div style={{
         background: COLORS.slate50,
         border: `1px solid ${COLORS.slate200}`,

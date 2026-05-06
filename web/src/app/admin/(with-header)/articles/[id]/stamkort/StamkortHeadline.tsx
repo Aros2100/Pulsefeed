@@ -19,14 +19,17 @@ function fmtPublished(iso: string | null): string | null {
 }
 
 interface Props {
-  articleType: string | null;
-  shortHeadline: string | null;
-  title: string | null;
-  journalTitle: string | null;
+  articleType:     string | null;
+  shortHeadline:   string | null;
+  title:           string | null;
+  journalTitle:    string | null;
   pubmedIndexedAt: string | null;
-  pubmedId: string | null;
-  authors: AuthorRow[];
-  addresses: AddressRow[];
+  pubmedId:        string | null;
+  authors:         AuthorRow[];
+  addresses:       AddressRow[];
+  geoCountryCode:  string | null;
+  geoLatitude:     number | null;
+  geoLongitude:    number | null;
 }
 
 export default function StamkortHeadline({
@@ -38,6 +41,9 @@ export default function StamkortHeadline({
   pubmedId,
   authors,
   addresses,
+  geoCountryCode,
+  geoLatitude,
+  geoLongitude,
 }: Props) {
   const [authorsOpen,   setAuthorsOpen]   = useState(false);
   const [addressesOpen, setAddressesOpen] = useState(false);
@@ -166,7 +172,11 @@ export default function StamkortHeadline({
           </div>
 
           <div style={{ flexShrink: 0 }}>
-            <LocationMap country={primaryAddress?.country ?? null} city={primaryAddress?.city ?? null} />
+            <LocationMap
+              countryCode={geoCountryCode}
+              latitude={geoLatitude}
+              longitude={geoLongitude}
+            />
           </div>
 
         </div>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 interface Props {
+  articleId:      string;
   stamkort:       React.ReactNode;
   pubmed:         React.ReactNode;
   classification: React.ReactNode;
@@ -17,7 +18,7 @@ interface Props {
 
 type Tab = "stamkort" | "pubmed" | "classification" | "condensation" | "scoring" | "location" | "import_" | "log" | "bibliometrics" | "note";
 
-export default function AdminArticleTabs({ stamkort, pubmed, classification, condensation, scoring, location, import_, log, bibliometrics, note }: Props) {
+export default function AdminArticleTabs({ articleId, stamkort, pubmed, classification, condensation, scoring, location, import_, log, bibliometrics, note }: Props) {
   const [tab, setTab] = useState<Tab>("stamkort");
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
@@ -39,7 +40,7 @@ export default function AdminArticleTabs({ stamkort, pubmed, classification, con
   return (
     <div>
       {/* Tab bar */}
-      <div style={{ display: "flex", borderBottom: "1px solid #dde3ed", marginBottom: "20px" }}>
+      <div style={{ display: "flex", borderBottom: "1px solid #dde3ed", marginBottom: "20px", alignItems: "flex-end" }}>
         <button style={tabStyle(tab === "stamkort")}       onClick={() => setTab("stamkort")}>Stamkort</button>
         <button style={tabStyle(tab === "pubmed")}         onClick={() => setTab("pubmed")}>PubMed</button>
         <button style={tabStyle(tab === "classification")} onClick={() => setTab("classification")}>Classification</button>
@@ -50,6 +51,20 @@ export default function AdminArticleTabs({ stamkort, pubmed, classification, con
         <button style={tabStyle(tab === "log")}            onClick={() => setTab("log")}>Log</button>
         <button style={tabStyle(tab === "bibliometrics")}  onClick={() => setTab("bibliometrics")}>Bibliometrics</button>
         <button style={tabStyle(tab === "note")}           onClick={() => setTab("note")}>Note</button>
+        <a
+          href={`/admin/articles/${articleId}/preview`}
+          style={{
+            marginLeft: "auto",
+            marginBottom: "8px",
+            fontSize: "12px",
+            fontWeight: 500,
+            color: "#D94A43",
+            textDecoration: "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          View as user →
+        </a>
       </div>
 
       {tab === "stamkort"       && stamkort}

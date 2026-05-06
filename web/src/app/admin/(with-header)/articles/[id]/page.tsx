@@ -1508,6 +1508,7 @@ export default async function AdminArticleLogPage({
       {/* Tabs */}
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 48px" }}>
         <AdminArticleTabs
+          articleId={id}
           stamkort={<StamkortTab articleId={id} />}
           pubmed={pubmedTab}
           classification={classificationTab}
