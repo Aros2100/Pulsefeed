@@ -37,7 +37,8 @@ export default async function LabPage() {
       queue: 0,
       href: "/admin/lab/geo-validation",
       color: "#15803d",
-      badge: "New",
+      badge: "Finished",
+      badgeColor: "#dc2626",
     },
     {
       title: "SARI Condensation",
@@ -45,7 +46,8 @@ export default async function LabPage() {
       queue: sariQueueCount,
       href: "/admin/lab/condensation-sari",
       color: "#059669",
-      badge: "New",
+      badge: "Finished",
+      badgeColor: "#dc2626",
     },
     {
       title: "Text Condensation",
