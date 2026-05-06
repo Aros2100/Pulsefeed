@@ -405,8 +405,8 @@ function ArticleCard({ article, chosen, onChoose, loading }: {
         <FieldRow label="Short headline" value={article.short_headline} />
         <FieldRow label="Short resume"   value={article.resume}         divider />
         <FieldRow label="Bottom line"    value={article.bottom_line}    divider />
-        <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "0 12px", borderTop: "1px solid #ebebeb", paddingTop: "14px", marginTop: "14px", alignItems: "start" }}>
-          <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#5a6a85", paddingTop: "2px" }}>SARI</div>
+        <div style={{ borderTop: "1px solid #ebebeb", paddingTop: "12px", marginTop: "12px" }}>
+          <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#5a6a85", marginBottom: "8px" }}>SARI</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", background: "#fafafa", borderRadius: "6px", padding: "12px" }}>
             <SariCell label="Subject"     value={article.sari?.subject     ?? null} />
             <SariCell label="Action"      value={article.sari?.action      ?? null} />
@@ -421,8 +421,8 @@ function ArticleCard({ article, chosen, onChoose, loading }: {
 
 function FieldRow({ label, value, divider }: { label: string; value: string | null; divider?: boolean }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "0 12px", alignItems: "start", borderTop: divider ? "1px solid #ebebeb" : "none", paddingTop: divider ? "12px" : 0, marginTop: divider ? "12px" : 0 }}>
-      <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#5a6a85", paddingTop: "2px" }}>{label}</div>
+    <div style={{ borderTop: divider ? "1px solid #ebebeb" : "none", paddingTop: divider ? "12px" : 0, marginTop: divider ? "12px" : 0 }}>
+      <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#5a6a85", marginBottom: "3px" }}>{label}</div>
       <div style={{ fontSize: "13px", color: value ? "#1a1a1a" : "#bbb", lineHeight: 1.55 }}>{value ?? "—"}</div>
     </div>
   );
