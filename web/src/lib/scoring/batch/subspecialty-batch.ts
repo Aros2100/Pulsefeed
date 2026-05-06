@@ -30,7 +30,7 @@ async function fetchCodeMap(specialty: string): Promise<Map<number, string>> {
 
 export async function prepareSubspecialtyBatch(
   specialty: string,
-  options: { limit?: number; edat_from?: string; edat_to?: string }
+  options: { limit?: number; edat_from?: string; edat_to?: string; mode?: "new" | "rescore"; since?: string }
 ): Promise<{
   activePrompt: ActivePrompt;
   articles: Article[];
@@ -43,9 +43,11 @@ export async function prepareSubspecialtyBatch(
   const admin = createAdminClient() as any;
   const { data, error } = await admin.rpc("get_subspecialty_unscored_articles", {
     p_specialty: specialty,
-    p_limit:     options.limit ?? 10000,
+    p_limit:     options.limit ?? (options.mode ? 500 : 50),
     p_edat_from: options.edat_from ?? null,
     p_edat_to:   options.edat_to   ?? null,
+    p_mode:      options.mode  ?? null,
+    p_since:     options.since ?? null,
   });
 
   if (error) throw new Error(`Failed to fetch unscored articles: ${error.message}`);
