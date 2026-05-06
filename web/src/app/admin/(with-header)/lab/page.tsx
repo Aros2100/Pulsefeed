@@ -30,6 +30,7 @@ export default async function LabPage() {
       href: "/admin/lab/value-scoring/craft",
       color: "#E83B2A",
       badge: "New",
+      badgeColor: "#15803d",
     },
     {
       title: "Geo Validation",
