@@ -58,6 +58,8 @@ export interface PrepareOptions {
   limit?:     number;
   edat_from?: string;
   edat_to?:   string;
+  mode?:      "new" | "rescore";
+  since?:     string;
 }
 
 export interface PreparedBatch {
@@ -183,9 +185,11 @@ export async function prepareArticleGeoClassABatch(
   const { data: rows, error: rowsErr } = await admin.rpc(
     "get_article_geo_class_a_candidates",
     {
-      p_limit:     options.limit     ?? 10000,
+      p_limit:     options.limit ?? (options.mode ? 500 : 10000),
       p_edat_from: options.edat_from ?? null,
       p_edat_to:   options.edat_to   ?? null,
+      p_mode:      options.mode  ?? null,
+      p_since:     options.since ?? null,
     }
   );
 
