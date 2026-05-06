@@ -47,6 +47,7 @@ interface ArticleItem {
   sari_result: string | null;
   sari_implication: string | null;
   promptSubspecialty: string;
+  isBackup?: boolean;
 }
 
 interface Props {
@@ -115,7 +116,9 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
       });
   }, [editionArticles, detailMap]);
 
-  // Lead article (sort_order=0) per subspecialty, in subspecialty sort_order
+  // Lead + optional backup per subspecialty, in subspecialty sort_order.
+  // Backup is shown only when the primary lead is also global (it will appear higher up
+  // in the email render, so the backup will be the visible sub-lead for those users).
   const leadItems = useMemo((): ArticleItem[] => {
     const subOrder = new Map(subspecialties.map((s) => [s.name, s.sort_order]));
     const bySubspecialty: Record<string, EditionArticle[]> = {};
@@ -123,20 +126,39 @@ export default function NewsletterAiClient({ edition, subspecialties, editionArt
       if (!bySubspecialty[ea.subspecialty]) bySubspecialty[ea.subspecialty] = [];
       bySubspecialty[ea.subspecialty].push(ea);
     }
+
+    const buildItem = (ea: EditionArticle, sub: string, isBackup: boolean): ArticleItem | null => {
+      const detail = detailMap.get(ea.article_id);
+      if (!detail) return null;
+      return {
+        editionId: ea.id, articleId: ea.article_id,
+        title: detail.title, article_type: detail.article_type,
+        abstract: detail.abstract, short_resume: detail.short_resume,
+        sari_subject: detail.sari_subject, sari_action: detail.sari_action,
+        sari_result: detail.sari_result, sari_implication: detail.sari_implication,
+        promptSubspecialty: sub,
+        isBackup,
+      };
+    };
+
     return Object.keys(bySubspecialty)
       .sort((a, b) => (subOrder.get(a) ?? 999) - (subOrder.get(b) ?? 999))
       .flatMap((sub) => {
-        const lead = bySubspecialty[sub].sort((a, b) => a.sort_order - b.sort_order)[0];
-        const detail = detailMap.get(lead.article_id);
-        if (!detail) return [];
-        return [{
-          editionId: lead.id, articleId: lead.article_id,
-          title: detail.title, article_type: detail.article_type,
-          abstract: detail.abstract, short_resume: detail.short_resume,
-          sari_subject: detail.sari_subject, sari_action: detail.sari_action,
-          sari_result: detail.sari_result, sari_implication: detail.sari_implication,
-          promptSubspecialty: sub,
-        }];
+        const sorted = bySubspecialty[sub].sort((a, b) => a.sort_order - b.sort_order);
+        const primary = sorted[0];
+        const backup  = sorted[1];
+        const items: ArticleItem[] = [];
+
+        const primaryItem = primary ? buildItem(primary, sub, false) : null;
+        if (primaryItem) items.push(primaryItem);
+
+        // Show backup only when primary is global — it will be the visible lead for sub users
+        if (primary?.is_global && backup) {
+          const backupItem = buildItem(backup, sub, true);
+          if (backupItem) items.push(backupItem);
+        }
+
+        return items;
       });
   }, [editionArticles, subspecialties, detailMap]);
 
@@ -492,6 +514,7 @@ function ArticleCard({
   onChangeSubheadline: (v: string) => void;
   onGenerate: () => void;
 }) {
+  const isBackup = item.isBackup ?? false;
   const hasContent = !!(
     (item.sari_subject && item.sari_action && item.sari_result && item.sari_implication) ||
     item.abstract
@@ -513,8 +536,16 @@ function ArticleCard({
         display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px",
       }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#94a3b8", marginBottom: "3px" }}>
-            {item.promptSubspecialty}
+          <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#94a3b8", marginBottom: "3px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>{item.promptSubspecialty}</span>
+            {isBackup && (
+              <span
+                title="Shown as the lead when #1 is also a global article"
+                style={{ color: "#94a3b8", letterSpacing: "0.06em" }}
+              >
+                · BACKUP LEAD
+              </span>
+            )}
           </div>
           <div style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a", lineHeight: 1.4 }}>
             {item.title}

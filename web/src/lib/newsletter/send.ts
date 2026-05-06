@@ -185,12 +185,26 @@ export async function buildRenderParams(
   const acrossLeads = globals.slice(1, 1 + nAcross).map(toRenderArticle);
   const acrossMoreCount = Math.max(0, globals.length - 1 - nAcross);
 
+  // Track pubmed_ids already shown as hero / across leads so subs can fall through
+  const shownPubmedIds = new Set<string>();
+  shownPubmedIds.add(globals[0].pubmed_id);
+  for (const a of acrossLeads) shownPubmedIds.add(a.pubmed_id);
+
   const subspecialtyBlocks: SubspecialtyBlock[] = orderedUserSubs.map((sub) => {
+    // Include ALL sub-tagged articles (globals or not), sorted by in-sub priority.
+    // Pick the first one not already shown above as hero / across lead.
     const subRows = articles
-      .filter((a) => !a.is_global && a.subspecialty === sub.name)
+      .filter((a) => a.subspecialty === sub.name)
       .sort((a, b) => a.sort_order - b.sort_order);
-    const lead = subRows[0] ? toRenderArticle(subRows[0]) : null;
-    const moreCount = lead ? subRows.length - 1 : 0;
+
+    const leadRow = subRows.find((a) => !shownPubmedIds.has(a.pubmed_id)) ?? null;
+    if (leadRow) shownPubmedIds.add(leadRow.pubmed_id);
+
+    const lead = leadRow ? toRenderArticle(leadRow) : null;
+    const moreCount = subRows.filter(
+      (a) => a !== leadRow && !shownPubmedIds.has(a.pubmed_id)
+    ).length;
+
     return {
       name:      sub.name,
       short_name: sub.short_name,
