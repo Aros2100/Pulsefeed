@@ -14,8 +14,7 @@ interface Props {
   qualificationFields: string[];
 }
 
-const ACCENT = "#7c3aed"; // purple for value-scoring
-const ACCENT_BG = "#f5f3ff";
+const ACCENT = "#E83B2A";
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
@@ -136,7 +135,7 @@ export default function SampleClient({
   }
 
   return (
-    <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f0f0f0", color: "#1a1a1a", minHeight: "100vh" }}>
+    <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
       <style>{`@media (max-width: 600px) { .sari-grid { grid-template-columns: 1fr !important; } }`}</style>
       <div style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
@@ -145,14 +144,9 @@ export default function SampleClient({
           <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: ACCENT, textTransform: "uppercase", fontWeight: 700, marginBottom: "4px" }}>
             The Lab · Value Scoring · Craft
           </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
-            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Sample Phase</h1>
-            <span style={{ fontSize: "11px", fontWeight: 700, color: ACCENT, background: ACCENT_BG, borderRadius: "6px", padding: "3px 10px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
-              Phase: Sample
-            </span>
-          </div>
+          <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Sample</h1>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>
-            Select 98 articles from prod to form the pairwise training set.
+            Select {totalTarget} articles from prod to form the pairwise training set.
           </p>
         </div>
 
@@ -230,7 +224,7 @@ export default function SampleClient({
                     cursor: generating ? "default" : "pointer",
                   }}
                 >
-                  {generating ? "Generating…" : "Generér sample"}
+                  {generating ? "Generating…" : "Generate sample"}
                 </button>
               )}
               {allTargetsMet && candidates.length > 0 && (
@@ -245,7 +239,7 @@ export default function SampleClient({
                     cursor: accepting ? "default" : "pointer",
                   }}
                 >
-                  {accepting ? "Accepterer…" : "Accepter sample →"}
+                  {accepting ? "Accepting…" : "Accept sample →"}
                 </button>
               )}
             </div>
@@ -255,7 +249,7 @@ export default function SampleClient({
         {/* Article groups */}
         {candidates.length === 0 && (
           <div style={{ textAlign: "center", padding: "48px 0", color: "#94a3b8", fontSize: "14px" }}>
-            No candidates yet. Click &ldquo;Generér sample&rdquo; to begin.
+            No candidates yet. Click &ldquo;Generate sample&rdquo; to begin.
           </div>
         )}
 
@@ -330,7 +324,7 @@ export default function SampleClient({
                               cursor: "pointer",
                             }}
                           >
-                            {isExpanded ? "Skjul" : "Vis detaljer"}
+                            {isExpanded ? "Hide" : "Show details"}
                           </button>
                           <button
                             onClick={() => reject(c.id, c.article_type)}
@@ -343,7 +337,7 @@ export default function SampleClient({
                               cursor: isReplacing ? "default" : "pointer",
                             }}
                           >
-                            {isReplacing ? "…" : "Afvis"}
+                            {isReplacing ? "…" : "Reject"}
                           </button>
                         </div>
                       </div>

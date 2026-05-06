@@ -25,7 +25,7 @@ export default async function LabPage() {
   const modules = [
     {
       title: "Craft Scoring",
-      description: "Score artikelhåndværk via pairwise comparisons og udvikl en scoring-prompt",
+      description: "Score article craft via pairwise comparisons and develop a scoring prompt",
       queue: 0,
       href: "/admin/lab/value-scoring/craft",
       color: "#E83B2A",

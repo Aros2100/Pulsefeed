@@ -17,8 +17,6 @@ const PHASE_HREFS: Partial<Record<Phase, string>> = {
   sample: "/admin/lab/value-scoring/craft/sample",
 };
 
-const ACCENT = "#E83B2A";
-
 export default async function CraftModulePage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
@@ -35,11 +33,11 @@ export default async function CraftModulePage() {
     return (
       <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", minHeight: "100vh" }}>
         <div style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px" }}>
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "32px", textAlign: "center" }}>
+          <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "32px", textAlign: "center" }}>
             <div style={{ fontSize: "14px", color: "#b91c1c" }}>
-              Module not found in lab_modules. Please ensure the craft value-scoring module is pre-created.
+              Module not found. Ensure the craft value-scoring module has been created in lab_modules.
             </div>
-            <Link href="/admin/lab" style={{ display: "inline-block", marginTop: "14px", fontSize: "13px", color: ACCENT }}>
+            <Link href="/admin/lab" style={{ display: "inline-block", marginTop: "14px", fontSize: "13px", color: "#E83B2A" }}>
               ← Back to Lab
             </Link>
           </div>
@@ -50,6 +48,8 @@ export default async function CraftModulePage() {
 
   const currentPhase = mod.phase as Phase;
   const currentIdx   = PHASES.indexOf(currentPhase);
+  const specialty    = (mod.specialty as string).charAt(0).toUpperCase() + (mod.specialty as string).slice(1);
+  const status       = (mod.status   as string).charAt(0).toUpperCase() + (mod.status   as string).slice(1);
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -57,149 +57,77 @@ export default async function CraftModulePage() {
 
         {/* Heading */}
         <div style={{ marginBottom: "36px" }}>
-          <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: ACCENT, textTransform: "uppercase", fontWeight: 700, marginBottom: "4px" }}>
+          <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
             The Lab · Value Scoring
           </div>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>Craft</h1>
-          <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>
-            Score artikelhåndværk via pairwise comparisons. Pairwise-data danner grundlag for en prompt der kan score nye artikler enkeltvis.
+          <p style={{ fontSize: "13px", color: "#888", margin: "0 0 4px" }}>
+            Score article craft via pairwise comparisons. Pairwise data forms the basis for a prompt that can score new articles individually.
+          </p>
+          <p style={{ fontSize: "12px", color: "#aaa", margin: 0 }}>
+            Value Scoring · Craft · {specialty} · {status}
           </p>
         </div>
 
-        {/* Module info card */}
-        <div style={{
-          background: "#fff",
-          border: "1px solid #e5e7eb",
-          borderRadius: "12px",
-          overflow: "hidden",
-          marginBottom: "20px",
-        }}>
-          <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
-            <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
-              Module info
-            </span>
-          </div>
-          <div style={{ padding: "20px 24px", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "20px" }}>
-            {[
-              { label: "Module type", value: "Value Scoring" },
-              { label: "Parameter",   value: "Craft" },
-              { label: "Specialty",   value: mod.specialty.charAt(0).toUpperCase() + mod.specialty.slice(1) },
-              { label: "Status",      value: (mod.status as string).charAt(0).toUpperCase() + (mod.status as string).slice(1) },
-            ].map(({ label, value }) => (
-              <div key={label}>
-                <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>
-                  {label}
-                </div>
-                <div style={{ fontSize: "15px", fontWeight: 600 }}>{value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Phase progression */}
-        <div style={{
-          background: "#fff",
-          border: "1px solid #e5e7eb",
-          borderRadius: "12px",
-          overflow: "hidden",
-        }}>
+        {/* Phase progression — single card, SectionCard style */}
+        <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", overflow: "hidden" }}>
           <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
             <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
               Phase progression
             </span>
           </div>
-          <div style={{ padding: "20px 24px" }}>
+          <div style={{ padding: "8px 0" }}>
+            {PHASES.map((phase, i) => {
+              const isDone   = i < currentIdx;
+              const isActive = i === currentIdx;
+              const href     = PHASE_HREFS[phase];
+              const isLast   = i === PHASES.length - 1;
 
-            {/* Progress track */}
-            <div style={{ display: "flex", alignItems: "center", marginBottom: "28px", gap: 0 }}>
-              {PHASES.map((phase, i) => {
-                const isDone    = i < currentIdx;
-                const isActive  = i === currentIdx;
-                const isFuture  = i > currentIdx;
-                const isLast    = i === PHASES.length - 1;
-                return (
-                  <div key={phase} style={{ display: "flex", alignItems: "center", flex: isLast ? undefined : 1 }}>
-                    <div style={{
-                      width: "28px", height: "28px", borderRadius: "50%", flexShrink: 0,
+              const row = (
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "12px 24px",
+                  borderBottom: isLast ? "none" : "1px solid #f5f5f5",
+                  opacity: !isActive && !isDone ? 0.45 : 1,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                    <span style={{
+                      width: "26px", height: "26px", borderRadius: "50%", flexShrink: 0,
                       display: "flex", alignItems: "center", justifyContent: "center",
                       fontSize: "11px", fontWeight: 700,
-                      background: isActive ? ACCENT : isDone ? "#059669" : "#e5e7eb",
+                      background: isActive ? "#E83B2A" : isDone ? "#059669" : "#e5e7eb",
                       color: (isActive || isDone) ? "#fff" : "#94a3b8",
-                      border: isActive ? `2px solid ${ACCENT}` : "none",
                     }}>
                       {isDone ? "✓" : i + 1}
-                    </div>
-                    <div style={{ fontSize: "11px", fontWeight: 400, color: isDone ? "#059669" : isActive ? "#1a1a1a" : "#94a3b8", marginLeft: "6px", whiteSpace: "nowrap" }}>
+                    </span>
+                    <span style={{ fontSize: "14px", fontWeight: isActive ? 500 : 400, color: isDone ? "#374151" : isActive ? "#1a1a1a" : "#94a3b8" }}>
                       {PHASE_LABELS[phase]}
-                    </div>
-                    {!isLast && (
-                      <div style={{ flex: 1, height: "1px", background: isDone ? "#059669" : "#e5e7eb", margin: "0 10px" }} />
-                    )}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-
-            {/* Phase cards */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {PHASES.map((phase, i) => {
-                const isDone   = i < currentIdx;
-                const isActive = i === currentIdx;
-                const href     = PHASE_HREFS[phase];
-
-                const card = (
-                  <div style={{
-                    border: "1px solid #e5e7eb",
-                    borderLeft: isActive ? `3px solid ${ACCENT}` : "1px solid #e5e7eb",
-                    borderRadius: "10px",
-                    padding: "14px 18px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    background: "#fff",
-                    opacity: !isActive && !isDone ? 0.5 : 1,
-                    cursor: isActive && href ? "pointer" : "default",
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                      <span style={{
-                        width: "24px", height: "24px", borderRadius: "50%", flexShrink: 0,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: "10px", fontWeight: 700,
-                        background: isActive ? ACCENT : isDone ? "#059669" : "#e5e7eb",
-                        color: (isActive || isDone) ? "#fff" : "#94a3b8",
-                      }}>
-                        {isDone ? "✓" : i + 1}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    {isDone && (
+                      <span style={{ fontSize: "11px", fontWeight: 600, color: "#059669", background: "#f0fdf4", borderRadius: "4px", padding: "2px 8px" }}>
+                        Done
                       </span>
-                      <div>
-                        <div style={{ fontSize: "13px", fontWeight: 500, color: isDone ? "#374151" : isActive ? "#1a1a1a" : "#94a3b8" }}>
-                          {PHASE_LABELS[phase]}
-                        </div>
-                        {isDone && (
-                          <div style={{ fontSize: "11px", color: "#059669", marginTop: "1px" }}>Færdig</div>
-                        )}
-                      </div>
-                    </div>
+                    )}
                     {isActive && href && (
-                      <span style={{ fontSize: "12px", color: ACCENT }}>
-                        Åbn {PHASE_LABELS[phase]} →
-                      </span>
+                      <span style={{ fontSize: "13px", color: "#E83B2A" }}>Open →</span>
                     )}
                     {isDone && href && (
-                      <span style={{ fontSize: "12px", color: "#94a3b8" }}>Se historik →</span>
+                      <span style={{ fontSize: "12px", color: "#94a3b8" }}>History →</span>
                     )}
                   </div>
-                );
+                </div>
+              );
 
-                return (isActive || isDone) && href ? (
-                  <Link key={phase} href={href} style={{ textDecoration: "none" }}>
-                    {card}
-                  </Link>
-                ) : (
-                  <div key={phase}>{card}</div>
-                );
-              })}
-            </div>
-
+              return (isActive || isDone) && href ? (
+                <Link key={phase} href={href} style={{ textDecoration: "none", display: "block" }}>
+                  {row}
+                </Link>
+              ) : (
+                <div key={phase}>{row}</div>
+              );
+            })}
           </div>
         </div>
 
