@@ -232,25 +232,17 @@ export default function PairwiseClient({
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
-      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "40px 24px 80px" }}>
+      <style>{`.article-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.10) !important; }`}</style>
+      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "20px 24px 80px" }}>
 
-        {/* Compact heading */}
-        <div style={{ marginBottom: "28px" }}>
-          <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: ACCENT, textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
-            The Lab · Value Scoring · Craft
+        {/* Status line only */}
+        {!complete && !sessionFull && pairId && (
+          <div style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "16px" }}>
+            Pair {pairPositionInSession} of {sessionSize} in current session
+            <span style={{ margin: "0 8px" }}>·</span>
+            {decidedTotal} of {totalPairs} total
           </div>
-          <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 4px" }}>Pairwise</h1>
-          <p style={{ fontSize: "13px", color: "#888", margin: "0 0 6px" }}>
-            Compare two articles and choose which has higher craft quality.
-          </p>
-          {!complete && pairId && (
-            <div style={{ fontSize: "12px", color: "#94a3b8" }}>
-              Pair {pairPositionInSession} of {sessionSize} in current session
-              <span style={{ margin: "0 8px" }}>·</span>
-              {decidedTotal} of {totalPairs} total
-            </div>
-          )}
-        </div>
+        )}
 
         {error && (
           <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", padding: "12px 16px", marginBottom: "20px", fontSize: "13px", color: "#b91c1c" }}>
@@ -295,14 +287,14 @@ export default function PairwiseClient({
         {/* Work area */}
         {!complete && !sessionFull && articleA && articleB && (
           <>
-            {/* Two article panes */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "20px" }}>
-              <ArticlePane article={articleA} side="A" chosen={winnerId === articleA.id} onChoose={() => setWinnerId(articleA.id)} loading={loading} />
-              <ArticlePane article={articleB} side="B" chosen={winnerId === articleB.id} onChoose={() => setWinnerId(articleB.id)} loading={loading} />
+            {/* Two article cards — clickable */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "16px" }}>
+              <ArticleCard article={articleA} chosen={winnerId === articleA.id} onChoose={() => setWinnerId(articleA.id)} loading={loading} />
+              <ArticleCard article={articleB} chosen={winnerId === articleB.id} onChoose={() => setWinnerId(articleB.id)} loading={loading} />
             </div>
 
-            {/* Input + navigation bar */}
-            <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "20px 24px" }}>
+            {/* Input + navigation — distinct background */}
+            <div style={{ background: "#eef0f4", borderRadius: "10px", padding: "20px 24px" }}>
 
               {/* Categories */}
               <div style={{ fontSize: "11px", color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, marginBottom: "10px" }}>
@@ -385,21 +377,26 @@ export default function PairwiseClient({
   );
 }
 
-// ── Article pane ──────────────────────────────────────────────────────────────
+// ── Article card — clickable, no header ──────────────────────────────────────
 
-function ArticlePane({ article, side, chosen, onChoose, loading }: {
-  article: Article; side: "A" | "B"; chosen: boolean; onChoose: () => void; loading: boolean;
+function ArticleCard({ article, chosen, onChoose, loading }: {
+  article: Article; chosen: boolean; onChoose: () => void; loading: boolean;
 }) {
   return (
-    <div style={{ background: "#fff", borderRadius: "10px", boxShadow: chosen ? `0 0 0 2px ${ACCENT}` : "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", overflow: "hidden", opacity: loading ? 0.6 : 1 }}>
-      <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
-          Article {side}
-        </span>
-        <button onClick={onChoose} disabled={loading} style={{ fontSize: "12px", fontWeight: 600, fontFamily: "inherit", padding: "5px 14px", background: chosen ? ACCENT : "#fff", color: chosen ? "#fff" : "#1a1a1a", border: chosen ? "none" : "1px solid #e5e7eb", borderRadius: "6px", cursor: loading ? "default" : "pointer" }}>
-          {chosen ? "✓ Chosen" : `Choose ${side}`}
-        </button>
-      </div>
+    <div
+      className="article-card"
+      onClick={loading ? undefined : onChoose}
+      style={{
+        background: chosen ? "#f0fdf4" : "#fff",
+        borderRadius: "10px",
+        border: chosen ? "2px solid #059669" : "1px solid #e5e7eb",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
+        overflow: "hidden",
+        opacity: loading ? 0.6 : 1,
+        cursor: loading ? "default" : "pointer",
+        transition: "border-color 0.1s, background 0.1s",
+      }}
+    >
       <div style={{ padding: "20px 24px" }}>
         <div style={{ fontSize: "14px", fontWeight: 600, lineHeight: 1.4, marginBottom: "6px" }}>{article.title}</div>
         <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "16px" }}>
