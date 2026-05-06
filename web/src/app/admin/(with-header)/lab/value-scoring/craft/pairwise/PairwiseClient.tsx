@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 interface Category { id: string; label: string; }
@@ -52,15 +52,24 @@ export default function PairwiseClient({
   const [winnerId,    setWinnerId]    = useState<string | null>(null);
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
   const [notes,       setNotes]       = useState("");
-  const [submitting,  setSubmitting]  = useState(false);
   const [showAddCat,  setShowAddCat]  = useState(false);
   const [newCatLabel, setNewCatLabel] = useState("");
+  const [saveStatus,  setSaveStatus]  = useState<"idle" | "saving" | "saved">("idle");
+
+  // Autosave refs
+  const isDecidedRef  = useRef(false);
+  const lastSavedRef  = useRef<string | null>(null); // prevents double-save of same state
+
+  // Keep ref in sync so autosave closure sees fresh value
+  isDecidedRef.current = isDecided;
 
   // ── Form clear ─────────────────────────────────────────────────────────────
   function clearForm() {
     setWinnerId(null);
     setSelectedCats(new Set());
     setNotes("");
+    setSaveStatus("idle");
+    lastSavedRef.current = null;
   }
 
   // ── Load next undecided pair ───────────────────────────────────────────────
@@ -164,46 +173,52 @@ export default function PairwiseClient({
     }
   }
 
-  const canPrev = currentIdx > 0;
-  const canNext = isDecided && !sessionFull;
+  const canPrev = currentIdx > 0 && !loading;
+  const canNext = !loading;
 
-  // ── Submit / edit ──────────────────────────────────────────────────────────
-  async function submit() {
+  // ── Autosave — fires when winner + at least one category are set ───────────
+  const selectedCatsKey = [...selectedCats].sort().join(",");
+
+  useEffect(() => {
     if (!pairId || !winnerId || selectedCats.size === 0) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      const url = isDecided
-        ? "/api/admin/lab/value-scoring/craft/pairwise/edit"
-        : "/api/admin/lab/value-scoring/craft/pairwise/submit";
-      const res  = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pairId, winnerId, categoryIds: [...selectedCats], notes: notes.trim() || undefined }),
-      });
-      const json = await res.json();
-      if (!json.ok) { setError(json.error ?? "Submission failed"); return; }
+    const stateKey = `${pairId}|${winnerId}|${selectedCatsKey}|${notes}`;
+    if (lastSavedRef.current === stateKey) return; // already saved this exact state
 
-      if (!isDecided) {
-        // New decision — advance to next pair
-        setDecidedTotal(d => d + 1);
-        setSessionDecidedSet(prev => new Set([...prev, pairId!]));
-        const newDecided = sessionDecidedSet.size + 1;
-        if (newDecided >= sessionSize) {
-          setSessionFull(true);
-        } else {
-          await loadNext();
+    setSaveStatus("saving");
+    const timer = setTimeout(async () => {
+      try {
+        const url = isDecidedRef.current
+          ? "/api/admin/lab/value-scoring/craft/pairwise/edit"
+          : "/api/admin/lab/value-scoring/craft/pairwise/submit";
+        const res  = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pairId, winnerId, categoryIds: [...selectedCats], notes: notes.trim() || undefined }),
+        });
+        const json = await res.json();
+        if (!json.ok) { setSaveStatus("idle"); return; }
+
+        lastSavedRef.current = stateKey;
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus(s => s === "saved" ? "idle" : s), 1500);
+
+        if (!isDecidedRef.current) {
+          setIsDecided(true);
+          setDecidedTotal(d => d + 1);
+          setSessionDecidedSet(prev => {
+            const next = new Set([...prev, pairId]);
+            if (next.size >= sessionSize) setSessionFull(true);
+            return next;
+          });
         }
-      } else {
-        // Edited existing — stay, mark decided (already was)
-        setIsDecided(true);
+      } catch {
+        setSaveStatus("idle");
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Submission failed");
-    } finally {
-      setSubmitting(false);
-    }
-  }
+    }, 450);
+
+    return () => { clearTimeout(timer); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pairId, winnerId, selectedCatsKey, notes]);
 
   // ── Add category ───────────────────────────────────────────────────────────
   async function addCategory() {
@@ -224,25 +239,13 @@ export default function PairwiseClient({
     setShowAddCat(false);
   }
 
-  const canSubmit = !!pairId && !!winnerId && selectedCats.size > 0 && !submitting;
-
-  // ── Status line values ─────────────────────────────────────────────────────
   const pairPositionInSession = currentIdx + 1; // 1-based
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
       <style>{`.article-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.10) !important; }`}</style>
-      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "20px 24px 80px" }}>
-
-        {/* Status line only */}
-        {!complete && !sessionFull && pairId && (
-          <div style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "16px" }}>
-            Pair {pairPositionInSession} of {sessionSize} in current session
-            <span style={{ margin: "0 8px" }}>·</span>
-            {decidedTotal} of {totalPairs} total
-          </div>
-        )}
+      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 0 80px" }}>
 
         {error && (
           <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", padding: "12px 16px", marginBottom: "20px", fontSize: "13px", color: "#b91c1c" }}>
@@ -252,19 +255,22 @@ export default function PairwiseClient({
 
         {/* All pairs complete */}
         {complete && (
-          <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "32px", textAlign: "center" }}>
-            <div style={{ fontSize: "16px", fontWeight: 600, marginBottom: "8px" }}>All pairs completed</div>
-            <p style={{ fontSize: "13px", color: "#888", marginBottom: "16px" }}>
-              Every pair in the current batch has a winner.
-            </p>
-            <Link href="/admin/lab/value-scoring/craft/ranking" style={{ display: "inline-block", padding: "8px 18px", background: ACCENT, color: "#fff", borderRadius: "8px", fontSize: "13px", fontWeight: 600, textDecoration: "none" }}>
-              View ranking →
-            </Link>
+          <div style={{ padding: "24px", textAlign: "center" }}>
+            <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "32px", display: "inline-block" }}>
+              <div style={{ fontSize: "16px", fontWeight: 600, marginBottom: "8px" }}>All pairs completed</div>
+              <p style={{ fontSize: "13px", color: "#888", marginBottom: "16px" }}>
+                Every pair in the current batch has a winner.
+              </p>
+              <Link href="/admin/lab/value-scoring/craft/ranking" style={{ display: "inline-block", padding: "8px 18px", background: ACCENT, color: "#fff", borderRadius: "8px", fontSize: "13px", fontWeight: 600, textDecoration: "none" }}>
+                View ranking →
+              </Link>
+            </div>
           </div>
         )}
 
         {/* Session complete */}
         {sessionFull && !complete && (
+          <div style={{ padding: "24px" }}>
           <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "32px", textAlign: "center" }}>
             <div style={{ fontSize: "16px", fontWeight: 600, color: "#059669", marginBottom: "8px" }}>
               Session complete ({sessionSize}/{sessionSize})
@@ -282,19 +288,29 @@ export default function PairwiseClient({
               </Link>
             </div>
           </div>
+          </div>
         )}
 
         {/* Work area */}
         {!complete && !sessionFull && articleA && articleB && (
           <>
-            {/* Two article cards — clickable */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "16px" }}>
+            {/* Two article cards — clickable, full container width */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
               <ArticleCard article={articleA} chosen={winnerId === articleA.id} onChoose={() => setWinnerId(articleA.id)} loading={loading} />
               <ArticleCard article={articleB} chosen={winnerId === articleB.id} onChoose={() => setWinnerId(articleB.id)} loading={loading} />
             </div>
 
             {/* Input + navigation — distinct background */}
-            <div style={{ background: "#eef0f4", borderRadius: "10px", padding: "20px 24px" }}>
+            <div style={{ background: "#eef0f4", padding: "14px 24px 20px" }}>
+
+              {/* Session status + save indicator */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                <span style={{ fontSize: "12px", color: "#94a3b8" }}>
+                  Pair {pairPositionInSession} of {sessionSize} in current session
+                </span>
+                {saveStatus === "saving" && <span style={{ fontSize: "11px", color: "#94a3b8" }}>Saving…</span>}
+                {saveStatus === "saved"  && <span style={{ fontSize: "11px", color: "#059669" }}>Saved</span>}
+              </div>
 
               {/* Categories */}
               <div style={{ fontSize: "11px", color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, marginBottom: "10px" }}>
@@ -326,48 +342,31 @@ export default function PairwiseClient({
               <div style={{ fontSize: "11px", color: "#5a6a85", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, marginBottom: "6px" }}>
                 Notes <span style={{ color: "#94a3b8", fontWeight: 400 }}>(optional)</span>
               </div>
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional free-text reasoning…" rows={2} style={{ width: "100%", fontSize: "13px", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: "8px", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", marginBottom: "16px" }} />
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional free-text reasoning…" rows={2} style={{ width: "100%", fontSize: "13px", padding: "10px 12px", border: "1px solid #dde3ed", borderRadius: "8px", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", marginBottom: "12px" }} />
 
-              {/* Navigation row: ← Previous | Submit | Next → */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: "12px" }}>
-
-                {/* ← Previous */}
-                <div>
-                  <button
-                    onClick={goToPrevious}
-                    disabled={!canPrev || loading}
-                    style={{ fontSize: "13px", fontFamily: "inherit", padding: "8px 16px", background: "#fff", color: canPrev ? "#5a6a85" : "#d1d5db", border: "1px solid", borderColor: canPrev ? "#e5e7eb" : "#f0f0f0", borderRadius: "8px", cursor: canPrev ? "pointer" : "default" }}
-                  >
-                    ← Previous
-                  </button>
-                </div>
-
-                {/* Submit */}
+              {/* Navigation row: ← Previous | Next → */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <button
-                  onClick={submit}
-                  disabled={!canSubmit}
-                  style={{ fontSize: "13px", fontWeight: 600, fontFamily: "inherit", padding: "8px 22px", background: canSubmit ? ACCENT : "#f0f2f5", color: canSubmit ? "#fff" : "#94a3b8", border: "none", borderRadius: "8px", cursor: canSubmit ? "pointer" : "default" }}
+                  onClick={goToPrevious}
+                  disabled={!canPrev}
+                  style={{ fontSize: "13px", fontFamily: "inherit", padding: "8px 16px", background: "#fff", color: canPrev ? "#5a6a85" : "#d1d5db", border: "1px solid", borderColor: canPrev ? "#dde3ed" : "#f0f0f0", borderRadius: "8px", cursor: canPrev ? "pointer" : "default" }}
                 >
-                  {submitting ? "Submitting…" : isDecided ? "Save changes" : "Submit and next →"}
+                  ← Previous
                 </button>
-
-                {/* Next → */}
-                <div style={{ textAlign: "right" }}>
-                  <button
-                    onClick={goToNext}
-                    disabled={!canNext || loading}
-                    style={{ fontSize: "13px", fontFamily: "inherit", padding: "8px 16px", background: "#fff", color: canNext ? "#5a6a85" : "#d1d5db", border: "1px solid", borderColor: canNext ? "#e5e7eb" : "#f0f0f0", borderRadius: "8px", cursor: canNext ? "pointer" : "default" }}
-                  >
-                    Next →
-                  </button>
-                </div>
+                <button
+                  onClick={goToNext}
+                  disabled={!canNext}
+                  style={{ fontSize: "13px", fontFamily: "inherit", padding: "8px 16px", background: "#fff", color: canNext ? "#5a6a85" : "#d1d5db", border: "1px solid", borderColor: canNext ? "#dde3ed" : "#f0f0f0", borderRadius: "8px", cursor: canNext ? "pointer" : "default" }}
+                >
+                  Next →
+                </button>
               </div>
 
             </div>
           </>
         )}
 
-        <div style={{ marginTop: "20px" }}>
+        <div style={{ marginTop: "16px", padding: "0 24px" }}>
           <Link href="/admin/lab/value-scoring/craft" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>
             ← Back to module
           </Link>
