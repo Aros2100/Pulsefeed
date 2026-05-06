@@ -65,7 +65,7 @@ export default function PreviewLayout({ id, data }: Props) {
 
   return (
     <div style={{ background: C.bg, minHeight: '100vh', fontFamily: F.sans }}>
-      <PageContainer style={{ paddingTop: '2rem', paddingBottom: '3rem' }}>
+      <PageContainer paddingTop="2rem" paddingBottom="3rem">
 
         {/* Top bar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>

@@ -1,14 +1,18 @@
-import { CSSProperties, ReactNode } from 'react';
+import { ReactNode } from 'react';
 
 interface PageContainerProps {
-  children:  ReactNode;
-  className?: string;
-  style?:    CSSProperties;
+  children:      ReactNode;
+  paddingTop?:    string;
+  paddingBottom?: string;
+  className?:    string;
 }
 
-export function PageContainer({ children, className, style }: PageContainerProps) {
+export function PageContainer({ children, paddingTop, paddingBottom, className }: PageContainerProps) {
   return (
-    <div className={`pf-page-container${className ? ` ${className}` : ''}`} style={style}>
+    <div
+      className={`pf-page-container${className ? ` ${className}` : ''}`}
+      style={{ paddingTop, paddingBottom }}
+    >
       {children}
     </div>
   );

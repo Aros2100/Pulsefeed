@@ -110,13 +110,15 @@ html, body {
 .pf-page-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 1rem;
   width: 100%;
   box-sizing: border-box;
+  padding-left: 1rem;
+  padding-right: 1rem;
 }
 
 @media (min-width: 768px) {
   .pf-page-container {
-    padding: 0 2rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
   }
 }

@@ -86,7 +86,7 @@ export function EditionClient({
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", color: "#1a1a1a", minHeight: "100vh", background: "#f5f7fa" }}>
-      <PageContainer style={{ paddingTop: "2rem", paddingBottom: "3rem" }}>
+      <PageContainer paddingTop="2rem" paddingBottom="3rem">
 
         <EditionHeader
           edition={edition}
