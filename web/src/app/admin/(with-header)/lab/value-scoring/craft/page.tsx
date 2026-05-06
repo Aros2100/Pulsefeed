@@ -129,7 +129,7 @@ export default async function CraftModulePage() {
                     }}>
                       {isDone ? "✓" : i + 1}
                     </div>
-                    <div style={{ fontSize: "11px", fontWeight: isActive ? 700 : 400, color: isActive ? ACCENT : isDone ? "#059669" : "#94a3b8", marginLeft: "6px", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: "11px", fontWeight: 400, color: isDone ? "#059669" : isActive ? "#1a1a1a" : "#94a3b8", marginLeft: "6px", whiteSpace: "nowrap" }}>
                       {PHASE_LABELS[phase]}
                     </div>
                     {!isLast && (
@@ -149,16 +149,16 @@ export default async function CraftModulePage() {
 
                 const card = (
                   <div style={{
-                    border: isActive ? `1.5px solid ${ACCENT}` : "1px solid #e5e7eb",
+                    border: "1px solid #e5e7eb",
+                    borderLeft: isActive ? `3px solid ${ACCENT}` : "1px solid #e5e7eb",
                     borderRadius: "10px",
                     padding: "14px 18px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    background: isActive ? "#fff8f7" : "#fff",
+                    background: "#fff",
                     opacity: !isActive && !isDone ? 0.5 : 1,
                     cursor: isActive && href ? "pointer" : "default",
-                    transition: "box-shadow 0.15s",
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                       <span style={{
@@ -171,19 +171,16 @@ export default async function CraftModulePage() {
                         {isDone ? "✓" : i + 1}
                       </span>
                       <div>
-                        <div style={{ fontSize: "13px", fontWeight: isActive ? 700 : 500, color: isActive ? ACCENT : isDone ? "#374151" : "#94a3b8" }}>
+                        <div style={{ fontSize: "13px", fontWeight: 500, color: isDone ? "#374151" : isActive ? "#1a1a1a" : "#94a3b8" }}>
                           {PHASE_LABELS[phase]}
                         </div>
                         {isDone && (
                           <div style={{ fontSize: "11px", color: "#059669", marginTop: "1px" }}>Færdig</div>
                         )}
-                        {isActive && (
-                          <div style={{ fontSize: "11px", color: ACCENT, marginTop: "1px" }}>Aktiv fase</div>
-                        )}
                       </div>
                     </div>
                     {isActive && href && (
-                      <span style={{ fontSize: "12px", fontWeight: 600, color: ACCENT }}>
+                      <span style={{ fontSize: "12px", color: ACCENT }}>
                         Åbn {PHASE_LABELS[phase]} →
                       </span>
                     )}
