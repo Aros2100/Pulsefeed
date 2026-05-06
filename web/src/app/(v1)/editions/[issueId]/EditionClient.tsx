@@ -7,6 +7,7 @@ import { EditionSidebar } from "@/components/editions/EditionSidebar";
 import { EditionDetail } from "@/components/editions/EditionDetail";
 import type { Edition, EditionArticle, SubspecialtyBlock } from "@/components/editions/types";
 import { nameToSlug, slugToName } from "@/components/editions/types";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 interface Props {
   edition: Edition;
@@ -85,7 +86,7 @@ export function EditionClient({
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", color: "#1a1a1a", minHeight: "100vh", background: "#f5f7fa" }}>
-      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem 2rem 3rem" }}>
+      <PageContainer style={{ paddingTop: "2rem", paddingBottom: "3rem" }}>
 
         <EditionHeader
           edition={edition}
@@ -118,7 +119,7 @@ export function EditionClient({
             key={`${activeBlock}-${view}`}
           />
         </div>
-      </div>
+      </PageContainer>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { C, F, EYEBROW, countryToIso2 } from './tokens';
+import { PageContainer } from '@/components/layout/PageContainer';
 import PreviewHeader  from './Header';
 import Score          from './Score';
 import Geo            from './Geo';
@@ -64,7 +65,7 @@ export default function PreviewLayout({ id, data }: Props) {
 
   return (
     <div style={{ background: C.bg, minHeight: '100vh', fontFamily: F.sans }}>
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 2rem 3rem' }}>
+      <PageContainer style={{ paddingTop: '2rem', paddingBottom: '3rem' }}>
 
         {/* Top bar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -161,7 +162,7 @@ export default function PreviewLayout({ id, data }: Props) {
           coiStatement={r('coi_statement')     as string | null}
         />
 
-      </div>
+      </PageContainer>
     </div>
   );
 }

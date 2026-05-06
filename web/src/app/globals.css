@@ -105,3 +105,18 @@ html, body {
   font-size: 13px;
   color: var(--color-text-secondary, #5a6a85);
 }
+
+/* ── Page container ──────────────────────────────────────────────────────── */
+.pf-page-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .pf-page-container {
+    padding: 0 2rem;
+  }
+}

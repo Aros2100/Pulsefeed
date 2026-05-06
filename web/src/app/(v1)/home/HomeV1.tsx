@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
+import { PageContainer } from "@/components/layout/PageContainer";
 import { EditionBand, type EditionData } from "@/components/home/EditionBand";
 import { PastEditionsRow } from "@/components/home/PastEditionsRow";
 import { FreshFromFeed, type FreshArticle } from "@/components/home/FreshFromFeed";
@@ -306,12 +307,12 @@ export default async function HomeV1() {
     <>
       {previewBanner}
 
-      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 0" }}>
+      <PageContainer>
         {/* 1. Hero — volume-first */}
-        <Hero data={heroData} />
-      </div>
+        <div style={{ paddingTop: "40px" }}>
+          <Hero data={heroData} />
+        </div>
 
-      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "0 24px 0" }}>
         {/* 2. Edition band (cream) */}
         {currentEdition && <EditionBand edition={currentEdition} />}
 
@@ -340,7 +341,7 @@ export default async function HomeV1() {
             />
           </div>
         )}
-      </div>
+      </PageContainer>
     </>
   );
 }
