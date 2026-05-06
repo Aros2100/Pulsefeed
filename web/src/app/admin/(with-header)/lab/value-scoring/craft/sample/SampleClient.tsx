@@ -136,7 +136,7 @@ export default function SampleClient({
   }
 
   return (
-    <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
+    <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f0f0f0", color: "#1a1a1a", minHeight: "100vh" }}>
       <div style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
         {/* Breadcrumb + title */}
@@ -347,9 +347,9 @@ export default function SampleClient({
                         </div>
                       </div>
 
-                      {/* Expanded details */}
+                      {/* Expanded details — same white background as compact row, no card break */}
                       {isExpanded && (
-                        <div style={{ borderTop: "1px solid #f0f0f0", padding: "20px 24px", background: "#fafbfc" }}>
+                        <div style={{ borderTop: "1px solid #f0f0f0", padding: "20px 24px", background: "#fff" }}>
                           <Field label="Short headline" value={c.short_headline} />
                           <Field label="Short resume"   value={c.short_resume}   divider />
                           <Field label="Bottom line"    value={c.bottom_line}    divider />
@@ -358,7 +358,7 @@ export default function SampleClient({
                             <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase" as const, color: "#5a6a85", marginBottom: "12px" }}>
                               SARI
                             </div>
-                            <div style={{ paddingLeft: "12px", borderLeft: "2px solid #e5e7eb" }}>
+                            <div style={{ paddingLeft: "14px", borderLeft: "2px solid #e5e7eb", background: "#fafafa", borderRadius: "0 6px 6px 0", padding: "12px 14px" }}>
                               <SariField label="Subject"     value={c.sari_subject} />
                               <SariField label="Action"      value={c.sari_action}      divider />
                               <SariField label="Result"      value={c.sari_result}      divider />
