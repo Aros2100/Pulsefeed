@@ -137,6 +137,7 @@ export default function SampleClient({
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f0f0f0", color: "#1a1a1a", minHeight: "100vh" }}>
+      <style>{`@media (max-width: 600px) { .sari-grid { grid-template-columns: 1fr !important; } }`}</style>
       <div style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
         {/* Breadcrumb + title */}
@@ -319,7 +320,7 @@ export default function SampleClient({
                             )}
                           </div>
                         </div>
-                        <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                        <div style={{ display: "flex", gap: "6px", flexShrink: 0, marginLeft: "20px", paddingRight: "4px" }}>
                           <button
                             onClick={() => toggleExpand(c.id)}
                             style={{
@@ -358,7 +359,7 @@ export default function SampleClient({
                             <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase" as const, color: "#5a6a85", paddingTop: "2px" }}>
                               SARI
                             </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", background: "#fafafa", borderRadius: "6px", padding: "14px" }}>
+                            <div className="sari-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px", background: "#fafafa", borderRadius: "6px", padding: "14px" }}>
                               <SariCell label="Subject"     value={c.sari_subject} />
                               <SariCell label="Action"      value={c.sari_action} />
                               <SariCell label="Result"      value={c.sari_result} />
