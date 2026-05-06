@@ -18,10 +18,10 @@ export const ARTICLE_TYPE_TARGETS: Record<string, number> = {
   'Tech':                     10,
   'Surgical Technique':       10,
   'Administration':           10,
-  'Guideline':                 8,
+  'Guideline':                10,
 };
 
-export const TOTAL_TARGET = Object.values(ARTICLE_TYPE_TARGETS).reduce((s, n) => s + n, 0); // 98
+export const TOTAL_TARGET = Object.values(ARTICLE_TYPE_TARGETS).reduce((s, n) => s + n, 0); // 100
 
 // Fields that must all be NOT NULL for an article to qualify
 export const QUALIFICATION_FIELDS = [
