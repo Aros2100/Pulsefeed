@@ -16,7 +16,7 @@ type Article = { id: string; title: string; abstract: string | null };
 
 export async function prepareCondensationTextBatch(
   specialty: string,
-  options: { limit?: number; edat_from?: string; edat_to?: string }
+  options: { limit?: number; edat_from?: string; edat_to?: string; mode?: "new" | "rescore"; since?: string }
 ): Promise<{
   activePrompt: ActivePrompt;
   articles: Article[];
@@ -29,9 +29,11 @@ export async function prepareCondensationTextBatch(
   const admin = createAdminClient() as any;
   const { data, error } = await admin.rpc("get_text_unscored_articles", {
     p_specialty: specialty,
-    p_limit:     options.limit ?? 10000,
+    p_limit:     options.limit ?? (options.mode ? 500 : 10000),
     p_edat_from: options.edat_from ?? null,
     p_edat_to:   options.edat_to   ?? null,
+    p_mode:      options.mode  ?? null,
+    p_since:     options.since ?? null,
   });
 
   if (error) throw new Error(`Failed to fetch unscored articles: ${error.message}`);
