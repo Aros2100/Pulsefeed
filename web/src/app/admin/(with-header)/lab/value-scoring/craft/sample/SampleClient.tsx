@@ -265,99 +265,111 @@ export default function SampleClient({
           const warning = warnings[type];
 
           return (
-            <div key={type} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", marginBottom: "16px", overflow: "hidden" }}>
-              {/* Group header */}
+            <div key={type} style={{ marginBottom: "40px" }}>
+              {/* Group header — standalone, visually detached from article cards */}
               <div style={{
-                padding: "12px 20px",
-                background: met ? "#f0fdf4" : "#fefce8",
-                borderBottom: articles.length > 0 ? "1px solid #e5e7eb" : "none",
                 display: "flex", alignItems: "center", justifyContent: "space-between",
+                marginBottom: "12px",
               }}>
-                <div style={{ fontSize: "13px", fontWeight: 600 }}>
-                  {type}
-                  <span style={{ marginLeft: "8px", fontSize: "12px", fontWeight: 400, color: met ? "#059669" : "#92400e" }}>
-                    ({articles.length}/{target})
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <span style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a" }}>{type}</span>
+                  <span style={{
+                    fontSize: "12px", fontWeight: 600,
+                    color: met ? "#fff" : "#92400e",
+                    background: met ? "#059669" : "#fef3c7",
+                    borderRadius: "6px", padding: "2px 8px",
+                  }}>
+                    {articles.length}/{target}
                   </span>
                 </div>
                 {warning && (
-                  <span style={{ fontSize: "11px", color: "#b45309", background: "#fef3c7", borderRadius: "4px", padding: "2px 8px" }}>
+                  <span style={{ fontSize: "11px", color: "#b45309", background: "#fef3c7", borderRadius: "4px", padding: "3px 10px" }}>
                     ⚠ {warning}
                   </span>
                 )}
               </div>
 
-              {/* Article rows */}
-              {articles.map(c => {
-                const isExpanded = expanded.has(c.id);
-                const isReplacing = !!replacing[c.id];
-                return (
-                  <div key={c.id} style={{ borderBottom: "1px solid #f5f5f5" }}>
-                    {/* Compact row */}
-                    <div style={{ padding: "10px 20px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: "13px", fontWeight: 500, color: "#1a1a1a", lineHeight: 1.4, marginBottom: "2px" }}>
-                          {c.title}
-                        </div>
-                        <div style={{ fontSize: "11px", color: "#94a3b8" }}>
-                          {[c.journal, fmtDate(c.published_date)].filter(Boolean).join(" · ")}
-                          {c.pubmed_id && (
-                            <span> · <a href={`https://pubmed.ncbi.nlm.nih.gov/${c.pubmed_id}/`} target="_blank" rel="noopener noreferrer" style={{ color: "#94a3b8" }}>PMID {c.pubmed_id}</a></span>
-                          )}
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                        <button
-                          onClick={() => toggleExpand(c.id)}
-                          style={{
-                            fontSize: "11px", fontFamily: "inherit",
-                            background: "#f5f7fa", color: "#5a6a85",
-                            border: "1px solid #e5e7eb", borderRadius: "6px", padding: "4px 10px",
-                            cursor: "pointer",
-                          }}
-                        >
-                          {isExpanded ? "Skjul" : "Vis detaljer"}
-                        </button>
-                        <button
-                          onClick={() => reject(c.id, c.article_type)}
-                          disabled={isReplacing}
-                          style={{
-                            fontSize: "11px", fontFamily: "inherit",
-                            background: isReplacing ? "#f5f7fa" : "#fff",
-                            color: isReplacing ? "#94a3b8" : "#b91c1c",
-                            border: "1px solid #fecaca", borderRadius: "6px", padding: "4px 10px",
-                            cursor: isReplacing ? "default" : "pointer",
-                          }}
-                        >
-                          {isReplacing ? "…" : "Afvis"}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Expanded details */}
-                    {isExpanded && (
-                      <div style={{ padding: "0 20px 16px", background: "#fafbfc", borderTop: "1px solid #f0f0f0" }}>
-                        <Field label="Short headline"  value={c.short_headline} />
-                        <Field label="Short resume"    value={c.short_resume} />
-                        <Field label="Bottom line"     value={c.bottom_line} />
-                        <div style={{ marginTop: "10px" }}>
-                          <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" as const, color: "#94a3b8", marginBottom: "6px" }}>
-                            SARI
-                          </div>
-                          <Field label="Subject"     value={c.sari_subject} />
-                          <Field label="Action"      value={c.sari_action} />
-                          <Field label="Result"      value={c.sari_result} />
-                          <Field label="Implication" value={c.sari_implication} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {articles.length === 0 && (
-                <div style={{ padding: "12px 20px", fontSize: "12px", color: "#94a3b8" }}>
+              {/* Article cards */}
+              {articles.length === 0 ? (
+                <div style={{ fontSize: "12px", color: "#94a3b8", padding: "12px 0" }}>
                   No articles sampled for this type yet.
                 </div>
+              ) : (
+                articles.map(c => {
+                  const isExpanded = expanded.has(c.id);
+                  const isReplacing = !!replacing[c.id];
+                  return (
+                    <div key={c.id} style={{
+                      background: "#fff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "10px",
+                      marginBottom: "12px",
+                      overflow: "hidden",
+                    }}>
+                      {/* Compact row */}
+                      <div style={{ padding: "14px 20px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "13px", fontWeight: 600, color: "#1a1a1a", lineHeight: 1.45, marginBottom: "4px" }}>
+                            {c.title}
+                          </div>
+                          <div style={{ fontSize: "11px", color: "#94a3b8" }}>
+                            {[c.journal, fmtDate(c.published_date)].filter(Boolean).join(" · ")}
+                            {c.pubmed_id && (
+                              <span> · <a href={`https://pubmed.ncbi.nlm.nih.gov/${c.pubmed_id}/`} target="_blank" rel="noopener noreferrer" style={{ color: "#94a3b8" }}>PMID {c.pubmed_id}</a></span>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                          <button
+                            onClick={() => toggleExpand(c.id)}
+                            style={{
+                              fontSize: "11px", fontFamily: "inherit",
+                              background: "#f5f7fa", color: "#5a6a85",
+                              border: "1px solid #e5e7eb", borderRadius: "6px", padding: "5px 12px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {isExpanded ? "Skjul" : "Vis detaljer"}
+                          </button>
+                          <button
+                            onClick={() => reject(c.id, c.article_type)}
+                            disabled={isReplacing}
+                            style={{
+                              fontSize: "11px", fontFamily: "inherit",
+                              background: "#fff",
+                              color: isReplacing ? "#94a3b8" : "#b91c1c",
+                              border: "1px solid #fecaca", borderRadius: "6px", padding: "5px 12px",
+                              cursor: isReplacing ? "default" : "pointer",
+                            }}
+                          >
+                            {isReplacing ? "…" : "Afvis"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Expanded details */}
+                      {isExpanded && (
+                        <div style={{ borderTop: "1px solid #f0f0f0", padding: "20px 24px", background: "#fafbfc" }}>
+                          <Field label="Short headline" value={c.short_headline} />
+                          <Field label="Short resume"   value={c.short_resume}   divider />
+                          <Field label="Bottom line"    value={c.bottom_line}    divider />
+                          {/* SARI — top-level field with indented sub-fields */}
+                          <div style={{ borderTop: "1px solid #ebebeb", paddingTop: "16px", marginTop: "16px" }}>
+                            <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase" as const, color: "#5a6a85", marginBottom: "12px" }}>
+                              SARI
+                            </div>
+                            <div style={{ paddingLeft: "12px", borderLeft: "2px solid #e5e7eb" }}>
+                              <SariField label="Subject"     value={c.sari_subject} />
+                              <SariField label="Action"      value={c.sari_action}      divider />
+                              <SariField label="Result"      value={c.sari_result}      divider />
+                              <SariField label="Implication" value={c.sari_implication} divider />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           );
@@ -373,13 +385,28 @@ export default function SampleClient({
   );
 }
 
-function Field({ label, value }: { label: string; value: string | null }) {
+// Top-level field (Short headline, Short resume, Bottom line)
+function Field({ label, value, divider }: { label: string; value: string | null; divider?: boolean }) {
   return (
-    <div style={{ marginTop: "8px" }}>
-      <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" as const, color: "#94a3b8", marginBottom: "2px" }}>
+    <div style={{ borderTop: divider ? "1px solid #ebebeb" : "none", paddingTop: divider ? "14px" : 0, marginTop: divider ? "14px" : 0 }}>
+      <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase" as const, color: "#5a6a85", marginBottom: "4px" }}>
         {label}
       </div>
-      <div style={{ fontSize: "13px", color: value ? "#1a1a1a" : "#bbb", lineHeight: 1.5 }}>
+      <div style={{ fontSize: "13px", color: value ? "#1a1a1a" : "#bbb", lineHeight: 1.6 }}>
+        {value ?? "—"}
+      </div>
+    </div>
+  );
+}
+
+// Secondary field inside SARI block
+function SariField({ label, value, divider }: { label: string; value: string | null; divider?: boolean }) {
+  return (
+    <div style={{ borderTop: divider ? "1px solid #f0f0f0" : "none", paddingTop: divider ? "10px" : 0, marginTop: divider ? "10px" : 0 }}>
+      <div style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" as const, color: "#94a3b8", marginBottom: "3px" }}>
+        {label}
+      </div>
+      <div style={{ fontSize: "13px", color: value ? "#374151" : "#bbb", lineHeight: 1.55 }}>
         {value ?? "—"}
       </div>
     </div>
