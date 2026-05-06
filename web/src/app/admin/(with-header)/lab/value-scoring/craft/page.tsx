@@ -14,7 +14,8 @@ const PHASE_LABELS: Record<Phase, string> = {
 };
 
 const PHASE_HREFS: Partial<Record<Phase, string>> = {
-  sample: "/admin/lab/value-scoring/craft/sample",
+  sample:   "/admin/lab/value-scoring/craft/sample",
+  pairwise: "/admin/lab/value-scoring/craft/pairwise",
 };
 
 export default async function CraftModulePage() {

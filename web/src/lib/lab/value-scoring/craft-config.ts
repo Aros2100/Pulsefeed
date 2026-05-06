@@ -36,3 +36,18 @@ export const QUALIFICATION_FIELDS = [
 
 // article_type values excluded from sampling
 export const EXCLUDED_ARTICLE_TYPES = ['Letters & Notices'];
+
+// ── Pairwise phase ───────────────────────────────────────────────────────────
+
+export const PAIRS_PER_ARTICLE     = 10;
+export const INITIAL_PAIR_BATCH    = 500;
+export const SESSION_SIZE          = 25;
+
+export const INITIAL_REASON_CATEGORIES = [
+  'Method',
+  'Sample size',
+  'Statistical analysis',
+  'Reporting quality',
+  'Reproducibility',
+  'Generalizability',
+] as const;

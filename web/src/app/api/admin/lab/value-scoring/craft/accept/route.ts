@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { CRAFT_MODULE_KEY, ARTICLE_TYPE_TARGETS } from "@/lib/lab/value-scoring/craft-config";
+import { CRAFT_MODULE_KEY, ARTICLE_TYPE_TARGETS, INITIAL_PAIR_BATCH } from "@/lib/lab/value-scoring/craft-config";
+import { generateInitialPairs, seedReasonCategories } from "@/lib/lab/value-scoring/pairwise";
 
 export async function POST() {
   const auth = await requireAdmin();
@@ -128,5 +129,18 @@ export async function POST() {
     return NextResponse.json({ ok: false, error: `Phase update failed: ${phaseErr.message}` }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, frozen: insertRows.length });
+  // Seed reason categories + generate the initial 500-pair batch
+  let pairsInserted = 0;
+  let categoriesInserted = 0;
+  try {
+    categoriesInserted = (await seedReasonCategories(admin, moduleId)).inserted;
+    pairsInserted = (await generateInitialPairs(admin, moduleId, INITIAL_PAIR_BATCH)).inserted;
+  } catch (e) {
+    return NextResponse.json({
+      ok: false,
+      error: `Phase advanced but pairwise setup failed: ${e instanceof Error ? e.message : String(e)}`,
+    }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, frozen: insertRows.length, pairsInserted, categoriesInserted });
 }
