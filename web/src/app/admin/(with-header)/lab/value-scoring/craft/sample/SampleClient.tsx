@@ -347,22 +347,22 @@ export default function SampleClient({
                         </div>
                       </div>
 
-                      {/* Expanded details — same white background as compact row, no card break */}
+                      {/* Expanded details */}
                       {isExpanded && (
                         <div style={{ borderTop: "1px solid #f0f0f0", padding: "20px 24px", background: "#fff" }}>
-                          <Field label="Short headline" value={c.short_headline} />
-                          <Field label="Short resume"   value={c.short_resume}   divider />
-                          <Field label="Bottom line"    value={c.bottom_line}    divider />
-                          {/* SARI — top-level field with indented sub-fields */}
-                          <div style={{ borderTop: "1px solid #ebebeb", paddingTop: "16px", marginTop: "16px" }}>
-                            <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase" as const, color: "#5a6a85", marginBottom: "12px" }}>
+                          <FieldRow label="Short headline" value={c.short_headline} />
+                          <FieldRow label="Short resume"   value={c.short_resume}   divider />
+                          <FieldRow label="Bottom line"    value={c.bottom_line}    divider />
+                          {/* SARI — label in left column, 2x2 grid in right column */}
+                          <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "0 16px", borderTop: "1px solid #ebebeb", paddingTop: "14px", marginTop: "14px", alignItems: "start" }}>
+                            <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase" as const, color: "#5a6a85", paddingTop: "2px" }}>
                               SARI
                             </div>
-                            <div style={{ paddingLeft: "14px", borderLeft: "2px solid #e5e7eb", background: "#fafafa", borderRadius: "0 6px 6px 0", padding: "12px 14px" }}>
-                              <SariField label="Subject"     value={c.sari_subject} />
-                              <SariField label="Action"      value={c.sari_action}      divider />
-                              <SariField label="Result"      value={c.sari_result}      divider />
-                              <SariField label="Implication" value={c.sari_implication} divider />
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", background: "#fafafa", borderRadius: "6px", padding: "14px" }}>
+                              <SariCell label="Subject"     value={c.sari_subject} />
+                              <SariCell label="Action"      value={c.sari_action} />
+                              <SariCell label="Result"      value={c.sari_result} />
+                              <SariCell label="Implication" value={c.sari_implication} />
                             </div>
                           </div>
                         </div>
@@ -385,11 +385,17 @@ export default function SampleClient({
   );
 }
 
-// Top-level field (Short headline, Short resume, Bottom line)
-function Field({ label, value, divider }: { label: string; value: string | null; divider?: boolean }) {
+// Two-column field row: fixed label column + flexible content column
+function FieldRow({ label, value, divider }: { label: string; value: string | null; divider?: boolean }) {
   return (
-    <div style={{ borderTop: divider ? "1px solid #ebebeb" : "none", paddingTop: divider ? "14px" : 0, marginTop: divider ? "14px" : 0 }}>
-      <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase" as const, color: "#5a6a85", marginBottom: "4px" }}>
+    <div style={{
+      display: "grid", gridTemplateColumns: "140px 1fr", gap: "0 16px",
+      alignItems: "start",
+      borderTop: divider ? "1px solid #ebebeb" : "none",
+      paddingTop: divider ? "14px" : 0,
+      marginTop: divider ? "14px" : 0,
+    }}>
+      <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase" as const, color: "#5a6a85", paddingTop: "2px" }}>
         {label}
       </div>
       <div style={{ fontSize: "13px", color: value ? "#1a1a1a" : "#bbb", lineHeight: 1.6 }}>
@@ -399,11 +405,11 @@ function Field({ label, value, divider }: { label: string; value: string | null;
   );
 }
 
-// Secondary field inside SARI block
-function SariField({ label, value, divider }: { label: string; value: string | null; divider?: boolean }) {
+// Cell inside the SARI 2x2 grid
+function SariCell({ label, value }: { label: string; value: string | null }) {
   return (
-    <div style={{ borderTop: divider ? "1px solid #f0f0f0" : "none", paddingTop: divider ? "10px" : 0, marginTop: divider ? "10px" : 0 }}>
-      <div style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" as const, color: "#94a3b8", marginBottom: "3px" }}>
+    <div>
+      <div style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" as const, color: "#94a3b8", marginBottom: "4px" }}>
         {label}
       </div>
       <div style={{ fontSize: "13px", color: value ? "#374151" : "#bbb", lineHeight: 1.55 }}>
