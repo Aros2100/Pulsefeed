@@ -112,7 +112,7 @@ export default async function CraftModulePage() {
                       </span>
                     )}
                     {phase === "pairwise" && (isActive || isDone) && (
-                      <Link href="/admin/lab/value-scoring/craft/ranking" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }} onClick={e => e.stopPropagation()}>
+                      <Link href="/admin/lab/value-scoring/craft/ranking" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>
                         View ranking
                       </Link>
                     )}
