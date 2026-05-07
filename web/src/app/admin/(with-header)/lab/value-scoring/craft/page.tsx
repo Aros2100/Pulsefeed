@@ -121,12 +121,25 @@ export default async function CraftModulePage() {
                 </div>
               );
 
-              return (isActive || isDone) && href ? (
-                <Link key={phase} href={href} style={{ textDecoration: "none", display: "block" }}>
-                  {row}
-                </Link>
-              ) : (
-                <div key={phase}>{row}</div>
+              const showRankingLink = phase === "pairwise" && (isActive || isDone);
+
+              return (
+                <div key={phase}>
+                  {(isActive || isDone) && href ? (
+                    <Link href={href} style={{ textDecoration: "none", display: "block" }}>
+                      {row}
+                    </Link>
+                  ) : (
+                    <div>{row}</div>
+                  )}
+                  {showRankingLink && (
+                    <div style={{ padding: "4px 24px 10px", borderBottom: "1px solid #f5f5f5" }}>
+                      <Link href="/admin/lab/value-scoring/craft/ranking" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>
+                        View ranking →
+                      </Link>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
