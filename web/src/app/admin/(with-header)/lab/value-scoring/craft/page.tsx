@@ -105,11 +105,16 @@ export default async function CraftModulePage() {
                       {PHASE_LABELS[phase]}
                     </span>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     {isDone && (
                       <span style={{ fontSize: "11px", fontWeight: 600, color: "#059669", background: "#f0fdf4", borderRadius: "4px", padding: "2px 8px" }}>
                         Done
                       </span>
+                    )}
+                    {phase === "pairwise" && (isActive || isDone) && (
+                      <Link href="/admin/lab/value-scoring/craft/ranking" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }} onClick={e => e.stopPropagation()}>
+                        View ranking
+                      </Link>
                     )}
                     {isActive && href && (
                       <span style={{ fontSize: "13px", color: "#E83B2A" }}>Open →</span>
@@ -121,25 +126,12 @@ export default async function CraftModulePage() {
                 </div>
               );
 
-              const showRankingLink = phase === "pairwise" && (isActive || isDone);
-
-              return (
-                <div key={phase}>
-                  {(isActive || isDone) && href ? (
-                    <Link href={href} style={{ textDecoration: "none", display: "block" }}>
-                      {row}
-                    </Link>
-                  ) : (
-                    <div>{row}</div>
-                  )}
-                  {showRankingLink && (
-                    <div style={{ padding: "4px 24px 10px", borderBottom: "1px solid #f5f5f5" }}>
-                      <Link href="/admin/lab/value-scoring/craft/ranking" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>
-                        View ranking →
-                      </Link>
-                    </div>
-                  )}
-                </div>
+              return (isActive || isDone) && href ? (
+                <Link key={phase} href={href} style={{ textDecoration: "none", display: "block" }}>
+                  {row}
+                </Link>
+              ) : (
+                <div key={phase}>{row}</div>
               );
             })}
           </div>
