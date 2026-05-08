@@ -6,6 +6,7 @@ import { useRef, useState, useEffect } from "react";
 import { ChevronDown, Check } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import { ACTIVE_SPECIALTY, AVAILABLE_SPECIALTIES } from "@/lib/auth/specialties";
+import { createClient } from "@/lib/supabase/client";
 
 interface Props {
   activePage: "articles" | "authors";
@@ -22,6 +23,9 @@ export default function UserHeader({ activePage, mode, onModeChange, onProfileCl
   const router = useRouter();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const avatarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!dropdownOpen) return;
@@ -40,6 +44,29 @@ export default function UserHeader({ activePage, mode, onModeChange, onProfileCl
       document.removeEventListener("keydown", handleEscape);
     };
   }, [dropdownOpen]);
+
+  useEffect(() => {
+    if (!avatarOpen) return;
+    function handleOutside(e: MouseEvent) {
+      if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) {
+        setAvatarOpen(false);
+      }
+    }
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") setAvatarOpen(false);
+    }
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [avatarOpen]);
+
+  async function handleSignOut() {
+    await createClient().auth.signOut();
+    router.push("/login");
+  }
 
   function handleModeUser() {
     onModeChange("user");
@@ -192,15 +219,66 @@ export default function UserHeader({ activePage, mode, onModeChange, onProfileCl
           {/* Bell */}
           {showNav && <NotificationBell />}
 
-          {/* Avatar pill */}
-          <div
-            onClick={onProfileClick}
-            className="bg-white/80 rounded-full h-[34px] px-3 pl-1.5 gap-2 flex items-center cursor-pointer hover:bg-white transition-colors"
-          >
-            <div className="w-6 h-6 rounded-full bg-pf-header flex items-center justify-center flex-shrink-0">
-              <span className="text-pf-teal text-[10px] font-medium leading-none">{user.initials}</span>
-            </div>
-            <span className="text-pf-dark font-medium text-[13px] pr-0.5">{user.name}</span>
+          {/* Avatar pill + dropdown */}
+          <div ref={avatarRef} style={{ position: "relative" }}>
+            <button
+              onClick={() => setAvatarOpen((o) => !o)}
+              className="bg-white/80 rounded-full h-[34px] px-3 pl-1.5 gap-2 flex items-center cursor-pointer hover:bg-white transition-colors"
+              style={{ border: "none" }}
+            >
+              <div className="w-6 h-6 rounded-full bg-pf-header flex items-center justify-center flex-shrink-0">
+                <span className="text-pf-teal text-[10px] font-medium leading-none">{user.initials}</span>
+              </div>
+              <span className="text-pf-dark font-medium text-[13px]">{user.name}</span>
+              <span style={{
+                fontSize: "10px", color: "#94a3b8", marginLeft: "2px",
+                display: "inline-block",
+                transform: avatarOpen ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.15s",
+              }}>▾</span>
+            </button>
+
+            {avatarOpen && (
+              <div style={{
+                position: "absolute", top: "calc(100% + 6px)", right: 0,
+                background: "#fff",
+                border: "0.5px solid rgba(0,0,0,0.08)",
+                borderRadius: "12px",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                padding: "6px",
+                minWidth: "200px",
+                zIndex: 50,
+              }}>
+                <Link
+                  href="/profile"
+                  onClick={() => setAvatarOpen(false)}
+                  style={{
+                    display: "flex", alignItems: "center",
+                    padding: "9px 12px", borderRadius: "8px",
+                    color: "#1a1a1a", fontSize: "13px", textDecoration: "none",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,0,0,0.04)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  Profile
+                </Link>
+                <div style={{ height: "0.5px", background: "rgba(0,0,0,0.06)", margin: "4px 8px" }} />
+                <button
+                  onClick={handleSignOut}
+                  style={{
+                    display: "flex", alignItems: "center", width: "100%",
+                    padding: "9px 12px", borderRadius: "8px",
+                    background: "transparent", border: "none",
+                    color: "#1a1a1a", fontSize: "13px", cursor: "pointer",
+                    fontFamily: "inherit", textAlign: "left",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,0,0,0.04)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
           </div>
 
         </div>
