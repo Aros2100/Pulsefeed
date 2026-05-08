@@ -57,8 +57,11 @@ async function main() {
   let skipped = 0;
   let failed  = 0;
   let totalProcessed = 0;
+  let skippedDuplicates = 0;
 
-  type RawRow = { id: string; article_id: string; pubmed_id: string; raw_xml: string };
+  const seenPmids = new Set<string>();
+
+  type RawRow = { id: string; article_id: string; pubmed_id: string; raw_xml: string; fetched_at: string };
 
   async function processRows(rows: RawRow[], batchLabel: string) {
     for (const row of rows) {
@@ -110,28 +113,52 @@ async function main() {
       const chunk = pmidList.slice(i, i + PAGE);
       const { data, error } = await admin
         .from("article_pubmed_raw")
-        .select("id, article_id, pubmed_id, raw_xml")
-        .in("pubmed_id", chunk);
+        .select("id, article_id, pubmed_id, raw_xml, fetched_at")
+        .in("pubmed_id", chunk)
+        .order("fetched_at", { ascending: false }); // newest first → first seen wins
       if (error) throw error;
       if (!data || data.length === 0) continue;
-      if (i === 0) console.log(`First chunk fetched (${data.length} rows). Processing...\n`);
-      await processRows(data as RawRow[], `chunk ${Math.floor(i / PAGE) + 1}`);
+
+      // Deduplicate: keep only the first (newest) row per pubmed_id
+      const deduped = (data as RawRow[]).filter((row) => {
+        if (seenPmids.has(row.pubmed_id)) {
+          skippedDuplicates++;
+          return false;
+        }
+        seenPmids.add(row.pubmed_id);
+        return true;
+      });
+
+      if (i === 0) console.log(`First chunk fetched (${data.length} rows, ${deduped.length} after dedup). Processing...\n`);
+      await processRows(deduped, `chunk ${Math.floor(i / PAGE) + 1}`);
     }
   } else {
-    // Default: paginate over all backfill rows.
+    // Default: paginate over all backfill rows, newest-first for determinism.
     let page = 0;
     for (;;) {
       const from = page * PAGE;
       const to   = from + PAGE - 1;
       const { data, error } = await admin
         .from("article_pubmed_raw")
-        .select("id, article_id, pubmed_id, raw_xml")
+        .select("id, article_id, pubmed_id, raw_xml, fetched_at")
         .eq("fetch_source", "backfill")
+        .order("fetched_at", { ascending: false })
         .range(from, to);
       if (error) throw error;
       if (!data || data.length === 0) break;
-      if (page === 0) console.log(`First page fetched (${data.length} rows). Processing...\n`);
-      await processRows(data as RawRow[], `page ${page + 1}`);
+
+      // Deduplicate across pages
+      const deduped = (data as RawRow[]).filter((row) => {
+        if (seenPmids.has(row.pubmed_id)) {
+          skippedDuplicates++;
+          return false;
+        }
+        seenPmids.add(row.pubmed_id);
+        return true;
+      });
+
+      if (page === 0) console.log(`First page fetched (${data.length} rows, ${deduped.length} after dedup). Processing...\n`);
+      await processRows(deduped, `page ${page + 1}`);
       if (isFinite(limit) && totalProcessed >= limit) break;
       if (data.length < PAGE) break;
       page++;
@@ -140,9 +167,9 @@ async function main() {
 
   console.log("\n──────────────────────────────────────────────────────────────");
   if (dryRun) {
-    console.log(`  DRY RUN complete. Would update: ${updated}, skip: ${skipped}`);
+    console.log(`  DRY RUN complete. Would update: ${updated}, skip: ${skipped}, duplicates skipped: ${skippedDuplicates}`);
   } else {
-    console.log(`  Done. Updated: ${updated}, Skipped: ${skipped}, Failed: ${failed}`);
+    console.log(`  Done. Updated: ${updated}, Skipped: ${skipped}, Failed: ${failed}, Duplicates skipped: ${skippedDuplicates}`);
   }
   console.log("──────────────────────────────────────────────────────────────\n");
 }

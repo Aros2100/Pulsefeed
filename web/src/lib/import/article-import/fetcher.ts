@@ -462,13 +462,38 @@ function parseArticleObject(
     ? extractTextFromXmlFragment(decodeHtmlEntities(titleMatch[1]))
     : decodeHtmlEntities(getText(art?.ArticleTitle));
 
-  // Abstract (may have multiple structured parts)
-  const abstractParts = toArray(
-    (art?.Abstract as Record<string, unknown> | undefined)?.AbstractText
+  // Abstract: scan ONLY inside <Abstract> block, with fallback to
+  // English plain-language-summary if no <Abstract> exists.
+  // Never include <OtherAbstract Type="Publisher"> (translations) — that's noise.
+  const abstractBlockMatch = articleXml.match(
+    /<Abstract>([\s\S]*?)<\/Abstract>/
   );
-  const abstractTextMatches = [
-    ...articleXml.matchAll(/<AbstractText([^>]*)>([\s\S]*?)<\/AbstractText>/g),
-  ];
+
+  let abstractScope: string | null = null;
+  let abstractParts: Record<string, unknown>[] = [];
+
+  if (abstractBlockMatch) {
+    abstractScope = abstractBlockMatch[1];
+    abstractParts = toArray(
+      (art?.Abstract as Record<string, unknown> | undefined)?.AbstractText
+    ) as Record<string, unknown>[];
+  } else {
+    // Fallback: standalone English plain-language-summary
+    const plsMatch = articleXml.match(
+      /<OtherAbstract Type="plain-language-summary" Language="eng">([\s\S]*?)<\/OtherAbstract>/
+    );
+    if (plsMatch) {
+      abstractScope = plsMatch[1];
+      // For PLS-fallback, label-objects are not in art.Abstract; leave abstractParts empty.
+      // Labels (if any) will be missed — acceptable since PLS rarely has labels and
+      // this is a rare fallback path (~9 articles in current DB).
+    }
+  }
+
+  const abstractTextMatches = abstractScope
+    ? [...abstractScope.matchAll(/<AbstractText([^>]*)>([\s\S]*?)<\/AbstractText>/g)]
+    : [];
+
   const abstract =
     abstractTextMatches.length > 0
       ? abstractTextMatches
