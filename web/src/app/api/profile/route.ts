@@ -6,11 +6,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 const schema = z.object({
   name:                z.string().optional(),
+  first_name:          z.string().optional(),
+  last_name:           z.string().optional(),
   title:               z.string().optional(),
   specialty_slugs:     z.array(z.string()).optional(),
   is_public:           z.boolean().optional(),
   email_notifications: z.boolean().optional(),
-  subspecialties:      z.array(z.string()).max(4).optional(), // mandatory + max 3 elective
+  subspecialties:      z.array(z.string()).max(3, "Maximum 3 subspecialties allowed").optional(),
   country:             z.string().nullable().optional(),
   city:                z.string().nullable().optional(),
   state:               z.string().nullable().optional(),
@@ -40,6 +42,35 @@ export async function PATCH(request: NextRequest) {
   );
   if (Object.keys(updateData).length === 0) {
     return NextResponse.json({ ok: false, error: "No fields provided" }, { status: 400 });
+  }
+
+  // Validate subspecialties against the source-of-truth table
+  if (Array.isArray(result.data.subspecialties)) {
+    const { data: validRows } = await supabase
+      .from("subspecialties")
+      .select("name")
+      .eq("specialty", (await import("@/lib/auth/specialties")).ACTIVE_SPECIALTY)
+      .eq("active", true);
+    const validNames = new Set((validRows ?? []).map((r: { name: string }) => r.name));
+    const invalid = result.data.subspecialties.filter((s) => !validNames.has(s));
+    if (invalid.length > 0) {
+      return NextResponse.json(
+        { ok: false, error: `Invalid subspecialties: ${invalid.join(", ")}` },
+        { status: 400 }
+      );
+    }
+  }
+
+  // When first_name or last_name changes, recompute the name column for V2 compatibility
+  if ("first_name" in updateData || "last_name" in updateData) {
+    const { data: current } = await supabase
+      .from("users")
+      .select("first_name, last_name")
+      .eq("id", user.id)
+      .single();
+    const fn = ("first_name" in updateData ? updateData.first_name : current?.first_name) as string | null;
+    const ln = ("last_name" in updateData ? updateData.last_name : current?.last_name) as string | null;
+    updateData.name = [fn, ln].filter(Boolean).join(" ") || null;
   }
 
   const { error, data } = await supabase

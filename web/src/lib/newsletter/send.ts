@@ -210,9 +210,7 @@ export async function buildRenderParams(
       short_name: sub.short_name,
       lead,
       more_count: moreCount,
-      more_url: moreCount > 0
-        ? `${SITE_URL}/feed?week=${week_number}&year=${year}&subspecialty=${encodeURIComponent(sub.name)}`
-        : null,
+      more_url: `${SITE_URL}/feed?week=${week_number}&year=${year}&subspecialty=${encodeURIComponent(sub.name)}`,
     };
   });
 
@@ -269,6 +267,7 @@ export async function buildRenderParams(
 
   // URLs
   const editionUrl    = `${SITE_URL}/edition/${week_number}/${year}`;
+  const profileUrl    = `${SITE_URL}/profile`;
   const acrossMoreUrl = acrossMoreCount > 0
     ? `${SITE_URL}/feed?week=${week_number}&year=${year}&scope=global`
     : null;
@@ -291,6 +290,7 @@ export async function buildRenderParams(
     pubmedTotal,
     pubmedBySub,
     editionUrl,
+    profileUrl,
     andFinally,
     featurePromo,
     footerSubspecialtyShortNames: orderedUserSubs.map((s) => s.short_name ?? s.name),

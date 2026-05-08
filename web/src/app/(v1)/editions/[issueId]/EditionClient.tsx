@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { EditionHeader } from "@/components/editions/EditionHeader";
 import { EditionSidebar } from "@/components/editions/EditionSidebar";
 import { EditionDetail } from "@/components/editions/EditionDetail";
@@ -19,6 +19,7 @@ interface Props {
   picksArticles: EditionArticle[];        // all picks for this edition
   specialtyPickCount: number;
   totalArticlesThisWeek: number;
+  blockCounts: Record<string, number>;    // per-block article counts for "All · N" toggle
   initialBlock: string;
   initialView: "picks" | "all";
 }
@@ -36,29 +37,28 @@ function getPicksForBlock(
   const subName = slugToName(block, subspecialties);
   if (!subName) return [];
   return articles
-    .filter(a => !a.is_global && a.subspecialty === subName)
+    .filter(a => a.subspecialty === subName)
     .sort((a, b) => a.sort_order - b.sort_order);
 }
 
 export function EditionClient({
   edition, isLatest, prevEditionId, nextEditionId,
   subspecialties, userSubNames,
-  picksArticles, specialtyPickCount, totalArticlesThisWeek,
+  picksArticles, specialtyPickCount, totalArticlesThisWeek, blockCounts,
   initialBlock, initialView,
 }: Props) {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [activeBlock, setActiveBlock] = useState(initialBlock);
   const [view, setView] = useState<"picks" | "all">(initialView);
 
   const updateUrl = useCallback((block: string, v: "picks" | "all") => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (block === "specialty") params.delete("block"); else params.set("block", block);
-    if (v === "picks") params.delete("view"); else params.set("view", v);
-    const qs = params.toString();
-    router.replace(`/editions/${edition.id}${qs ? `?${qs}` : ""}`, { scroll: false });
-  }, [router, edition.id, searchParams]);
+    const qs = new URLSearchParams();
+    if (block !== "specialty") qs.set("block", block);
+    if (v !== "picks") qs.set("view", v);
+    const str = qs.toString();
+    router.replace(`/editions/${edition.id}${str ? `?${str}` : ""}`, { scroll: false });
+  }, [router, edition.id]);
 
   function handleBlockSelect(block: string) {
     setActiveBlock(block);
@@ -85,7 +85,7 @@ export function EditionClient({
     : (subspecialties.find(s => nameToSlug(s.name) === activeBlock)?.pick_count ?? 0);
 
   return (
-    <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", color: "#1a1a1a", minHeight: "100vh", background: "#f5f7fa" }}>
+    <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", color: "#1a1a1a" }}>
       <PageContainer paddingTop="2rem" paddingBottom="3rem">
 
         <EditionHeader
@@ -113,7 +113,8 @@ export function EditionClient({
             blockKey={activeBlock}
             blockLabel={activeSubShort}
             picksArticles={blockPicks}
-            allModeTotal={totalArticlesThisWeek}
+            allModeTotal={blockCounts[activeBlock] ?? totalArticlesThisWeek}
+            subspecialties={subspecialties}
             onViewChange={handleViewChange}
             initialView={view}
             key={`${activeBlock}-${view}`}

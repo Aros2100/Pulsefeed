@@ -106,9 +106,7 @@ export async function PATCH(request: NextRequest) {
   if (step === "complete") {
     const subspecialties = body.subspecialties as string[] | undefined;
 
-    // Validate max 3 elective subspecialties (mandatory "Neurosurgery" doesn't count)
-    const elective = (subspecialties ?? []).filter((s) => s !== "Neurosurgery");
-    if (elective.length > 3) {
+    if ((subspecialties ?? []).length > 3) {
       return NextResponse.json({ ok: false, error: "Max 3 subspecialties allowed" }, { status: 400 });
     }
 

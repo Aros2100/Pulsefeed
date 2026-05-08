@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-import { isoWeekMonday } from "@/components/editions/types";
+import { isoWeekMonday, nameToSlug } from "@/components/editions/types";
 import type { AllModeArticle } from "@/components/editions/types";
 
 export async function GET(request: NextRequest) {
@@ -29,72 +29,82 @@ export async function GET(request: NextRequest) {
 
   if (!edition) return NextResponse.json({ error: "Edition not found" }, { status: 404 });
 
-  const monday = isoWeekMonday(edition.week_number, edition.year);
-  const nextMonday = new Date(monday.getTime() + 7 * 86_400_000);
+  const monday    = isoWeekMonday(edition.week_number, edition.year);
   const weekStart = monday.toISOString();
-  const weekEnd   = nextMonday.toISOString();
+  const weekEnd   = new Date(monday.getTime() + 7 * 86_400_000).toISOString();
 
-  // Get picks set for this edition
+  // Fetch all picks for this edition with block-scoping fields
   const { data: picksRows } = await admin
     .from("newsletter_edition_articles")
-    .select("article_id")
+    .select("article_id, subspecialty, is_global")
     .eq("edition_id", editionId);
-  const picksSet = new Set(((picksRows ?? []) as { article_id: string }[]).map(r => r.article_id));
+  type PickRow = { article_id: string; subspecialty: string | null; is_global: boolean };
+  const allPicks = (picksRows ?? []) as PickRow[];
 
-  // Build query for articles this week
-  let query = admin
-    .from("articles")
-    .select("id, title, pubmed_id, pubmed_indexed_at, article_type, journal_abbr")
-    .gte("pubmed_indexed_at", weekStart)
-    .lt("pubmed_indexed_at", weekEnd)
-    .order("pubmed_indexed_at", { ascending: false })
-    .limit(200);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let rows: any[] | null = null;
+  let picksSet: Set<string>;
 
-  // Specialty filter: use article_specialties join
   if (block === "specialty") {
-    // For specialty block, filter via article_specialties
+    // Specialty block: PICK star = article is the specialty lead (is_global=true)
+    picksSet = new Set(allPicks.filter(p => p.is_global).map(p => p.article_id));
+
+    // Fetch article data directly via the join — avoids a second .in() with ~400 UUIDs
+    // which would exceed PostgREST's URL length limit and silently return empty.
     const { data: aspRows } = await admin
       .from("article_specialties")
-      .select("article_id")
+      .select("articles!inner(id, title, pubmed_id, pubmed_indexed_at, article_type, journal_abbr, subspecialty)")
       .eq("specialty", ACTIVE_SPECIALTY)
-      .eq("specialty_match", true);
-    const specialtyIds = ((aspRows ?? []) as { article_id: string }[]).map(r => r.article_id);
-    if (specialtyIds.length === 0) {
-      return NextResponse.json({ articles: [] });
-    }
-    query = query.in("id", specialtyIds);
+      .eq("specialty_match", true)
+      .gte("articles.pubmed_indexed_at", weekStart)
+      .lt("articles.pubmed_indexed_at", weekEnd)
+      .limit(500);
+
+    rows = ((aspRows ?? []) as { articles: Record<string, unknown> }[])
+      .map(r => r.articles)
+      .filter(Boolean);
   } else {
-    // Subspecialty block: find subspecialty name from slug
+    // Resolve URL slug → full subspecialty name via the subspecialties table
     const { data: subRows } = await admin
       .from("subspecialties")
       .select("name")
       .eq("specialty", ACTIVE_SPECIALTY)
       .eq("active", true);
 
-    const { nameToSlug } = await import("@/components/editions/types");
     const sub = ((subRows ?? []) as { name: string }[]).find(s => nameToSlug(s.name) === block);
-
     if (!sub) return NextResponse.json({ articles: [] });
 
-    // Filter by subspecialty array
-    query = query.contains("subspecialty", [sub.name]);
+    // Subspecialty block: PICK star = article was specifically picked under this subspecialty
+    picksSet = new Set(allPicks.filter(p => p.subspecialty === sub.name).map(p => p.article_id));
+
+    // articles.subspecialty is a text array with full names (e.g. "Spine surgery")
+    const { data } = await admin
+      .from("articles")
+      .select("id, title, pubmed_id, pubmed_indexed_at, article_type, journal_abbr, subspecialty")
+      .gte("pubmed_indexed_at", weekStart)
+      .lt("pubmed_indexed_at", weekEnd)
+      .contains("subspecialty", [sub.name])
+      .order("pubmed_indexed_at", { ascending: false })
+      .order("id", { ascending: true })
+      .limit(500);
+    rows = data;
   }
 
-  const { data: articles } = await query;
-
-  const result: AllModeArticle[] = ((articles ?? []) as {
+  const result: AllModeArticle[] = ((rows ?? []) as {
     id: string; title: string; pubmed_id: string | null;
     pubmed_indexed_at: string | null; article_type: string | null; journal_abbr: string | null;
+    subspecialty: string[] | null;
   }[]).map(a => ({
     ...a,
     editors_pick: picksSet.has(a.id),
+    subspecialty: Array.isArray(a.subspecialty) ? a.subspecialty : null,
   }));
 
-  // Sort: picks first, then by date
+  // Picks first, then by date desc
   result.sort((a, b) => {
     if (a.editors_pick !== b.editors_pick) return a.editors_pick ? -1 : 1;
     return (b.pubmed_indexed_at ?? "").localeCompare(a.pubmed_indexed_at ?? "");
   });
 
-  return NextResponse.json({ articles: result });
+  return NextResponse.json({ articles: result, total: result.length });
 }

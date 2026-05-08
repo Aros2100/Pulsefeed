@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { EditionClient } from "./EditionClient";
 import type { Edition, EditionArticle, SubspecialtyBlock } from "@/components/editions/types";
-import { isoWeekMonday } from "@/components/editions/types";
+import { isoWeekMonday, nameToSlug } from "@/components/editions/types";
 
 export default async function EditionPage({
   params,
@@ -51,7 +52,7 @@ export default async function EditionPage({
     { data: subspecialtyRows },
     { data: editionArticlesRaw },
     { data: profileRow },
-    { data: weekArticles },
+    { data: weekSpecialtyData },
     { data: picksCountRows },
   ] = await Promise.all([
     // All published editions for navigation
@@ -77,7 +78,7 @@ export default async function EditionPage({
       .select(`
         id, article_id, sort_order, global_sort_order, is_global, subspecialty,
         newsletter_headline, newsletter_subheadline,
-        articles!inner(title, pubmed_id, pubmed_indexed_at, article_type, journal_abbr, sari_subject)
+        articles!inner(title, pubmed_id, pubmed_indexed_at, article_type, journal_abbr, sari_subject, subspecialty)
       `)
       .eq("edition_id", issueId)
       .order("sort_order"),
@@ -87,12 +88,17 @@ export default async function EditionPage({
       ? supabase.from("users").select("subspecialties").eq("id", user.id).single()
       : Promise.resolve({ data: null }),
 
-    // Total articles this week for specialty
+    // Specialty articles for this week WITH subspecialty arrays — used to derive
+    // both the specialty-level total and per-block counts for the "All · N" toggle.
+    // Fetches data (not head:true) so we can group by subspecialty in JS.
     admin
       .from("article_specialties")
-      .select("article_id")
+      .select("article_id, articles!inner(subspecialty)")
       .eq("specialty", ACTIVE_SPECIALTY)
-      .eq("specialty_match", true),
+      .eq("specialty_match", true)
+      .gte("articles.pubmed_indexed_at", monday.toISOString())
+      .lt("articles.pubmed_indexed_at", nextMonday.toISOString())
+      .limit(1000),
 
     // Pick counts per subspecialty
     admin
@@ -101,13 +107,14 @@ export default async function EditionPage({
       .eq("edition_id", issueId),
   ]);
 
-  // Build picks count per subspecialty
+  // Build picks count per subspecialty.
+  // A global (is_global=true) article is the specialty lead AND still belongs to its native
+  // subspecialty — count it in both specialtyPickCount and subPickCounts.
   const subPickCounts: Record<string, number> = {};
   let specialtyPickCount = 0;
   for (const row of ((picksCountRows ?? []) as { subspecialty: string | null; is_global: boolean }[])) {
-    if (row.is_global) {
-      specialtyPickCount++;
-    } else if (row.subspecialty) {
+    if (row.is_global) specialtyPickCount++;
+    if (row.subspecialty) {
       subPickCounts[row.subspecialty] = (subPickCounts[row.subspecialty] ?? 0) + 1;
     }
   }
@@ -133,6 +140,7 @@ export default async function EditionPage({
       global_sort_order:       row.global_sort_order as number | null,
       is_global:               row.is_global as boolean,
       subspecialty:            row.subspecialty as string | null,
+      articleSubspecialties:   Array.isArray(a?.subspecialty) ? (a.subspecialty as string[]) : null,
       newsletter_headline:     row.newsletter_headline as string | null,
       newsletter_subheadline:  row.newsletter_subheadline as string | null,
       title:                   a?.title as string,
@@ -160,32 +168,35 @@ export default async function EditionPage({
     ? (rawSubs as unknown[]).filter((s): s is string => typeof s === "string" && s !== "Neurosurgery")
     : [];
 
-  // Total articles this week (approximate count via article_specialties + date filter)
-  // We filter client-side since we don't have pubmed_indexed_at here
-  const weekArtIds = new Set(
-    ((weekArticles ?? []) as { article_id: string }[]).map(r => r.article_id)
-  );
-  // Estimate total by fetching count separately
-  const { count: totalArticlesThisWeek } = await admin
-    .from("articles")
-    .select("id", { count: "exact", head: true })
-    .gte("pubmed_indexed_at", monday.toISOString())
-    .lt("pubmed_indexed_at", nextMonday.toISOString())
-    .in("id", weekArtIds.size > 0 ? [...weekArtIds].slice(0, 500) : ["00000000-0000-0000-0000-000000000000"]);
+  // Derive specialty total + per-block counts from the week data
+  type WeekRow = { article_id: string; articles: { subspecialty: string[] | null } };
+  const weekRows = (weekSpecialtyData ?? []) as WeekRow[];
+  const totalArticlesThisWeek = weekRows.length;
+
+  const blockCounts: Record<string, number> = { specialty: totalArticlesThisWeek };
+  for (const sub of subspecialties) {
+    const slug = nameToSlug(sub.name);
+    blockCounts[slug] = weekRows.filter(
+      r => Array.isArray(r.articles?.subspecialty) && r.articles.subspecialty.includes(sub.name)
+    ).length;
+  }
 
   return (
-    <EditionClient
-      edition={resolvedEdition}
-      isLatest={isLatest}
-      prevEditionId={prevEditionId}
-      nextEditionId={nextEditionId}
-      subspecialties={subspecialties}
-      userSubNames={userSubNames}
-      picksArticles={picksArticles}
-      specialtyPickCount={specialtyPickCount}
-      totalArticlesThisWeek={totalArticlesThisWeek ?? 0}
-      initialBlock={blockParam}
-      initialView={view}
-    />
+    <Suspense fallback={null}>
+      <EditionClient
+        edition={resolvedEdition}
+        isLatest={isLatest}
+        prevEditionId={prevEditionId}
+        nextEditionId={nextEditionId}
+        subspecialties={subspecialties}
+        userSubNames={userSubNames}
+        picksArticles={picksArticles}
+        specialtyPickCount={specialtyPickCount}
+        totalArticlesThisWeek={totalArticlesThisWeek}
+        blockCounts={blockCounts}
+        initialBlock={blockParam}
+        initialView={view}
+      />
+    </Suspense>
   );
 }

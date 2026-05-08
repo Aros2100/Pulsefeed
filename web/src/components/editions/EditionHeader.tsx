@@ -33,10 +33,11 @@ export function EditionHeader({
   }
 
   const arrowStyle = (enabled: boolean): React.CSSProperties => ({
-    fontSize: "20px", fontWeight: 300, color: enabled ? "#1a1a1a" : "#cbd5e1",
+    fontSize: "18px", fontWeight: 300, color: "#94a3b8",
     background: "none", border: "none", cursor: enabled ? "pointer" : "default",
     padding: "4px 8px", fontFamily: "inherit",
-    opacity: enabled ? 1 : 0.4,
+    opacity: enabled ? 1 : 0.35,
+    flexShrink: 0,
   });
 
   return (
@@ -46,10 +47,16 @@ export function EditionHeader({
       borderRadius: "12px",
       padding: "1.5rem 1.75rem",
       marginBottom: "1rem",
-      display: "flex", alignItems: "center", justifyContent: "space-between",
+      display: "grid",
+      gridTemplateColumns: "1fr auto 1fr",
+      alignItems: "center",
+      gap: "24px",
     }}>
-      {/* Left: arrows + title */}
-      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      {/* Left: empty */}
+      <div />
+
+      {/* Center: arrows flanking title block */}
+      <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
         <button
           style={arrowStyle(!!prevEditionId)}
           onClick={() => prevEditionId && navigate(prevEditionId)}
@@ -59,14 +66,14 @@ export function EditionHeader({
           ‹
         </button>
 
-        <div>
+        <div style={{ textAlign: "center" }}>
           <div style={{
-            fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em",
-            textTransform: "uppercase", color: "#94a3b8", marginBottom: "3px",
+            fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em",
+            textTransform: "uppercase", color: "#94a3b8", marginBottom: "4px",
           }}>
             Issue {edition.week_number} · Week {edition.week_number}, {edition.year}
           </div>
-          <div style={{ fontFamily: "Georgia, serif", fontSize: "22px", color: "#1a1a1a", fontWeight: 400 }}>
+          <div style={{ fontFamily: "Georgia, serif", fontSize: "28px", lineHeight: 1.1, color: "#1a1a1a", fontWeight: 400 }}>
             {isLatest ? "This week's edition" : `Issue ${edition.week_number}`}
           </div>
         </div>
@@ -83,10 +90,13 @@ export function EditionHeader({
 
       {/* Right: date + counts */}
       <div style={{ textAlign: "right" }}>
-        <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "3px" }}>
+        <div style={{
+          fontFamily: "Georgia, serif", fontStyle: "italic",
+          fontSize: "12px", color: "#64748b", marginBottom: "3px",
+        }}>
           {fmtShortDate(edition.published_at)}
         </div>
-        <div style={{ fontSize: "12px", color: "#64748b" }}>
+        <div style={{ fontSize: "11px", color: "#94a3b8" }}>
           {totalPicks} editors picks out of {totalArticles}
         </div>
       </div>

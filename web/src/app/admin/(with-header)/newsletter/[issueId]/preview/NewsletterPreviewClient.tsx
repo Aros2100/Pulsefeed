@@ -9,11 +9,12 @@ interface Props {
   weekNumber: number;
   year: number;
   saturdayLabel: string;
+  globalCount: number;
 }
 
-export default function NewsletterPreviewClient({ editionId, weekNumber, year, saturdayLabel }: Props) {
+export default function NewsletterPreviewClient({ editionId, weekNumber, year, saturdayLabel, globalCount }: Props) {
   const router = useRouter();
-  const [subCount, setSubCount] = useState<1 | 2 | 3>(2);
+  const [subCount, setSubCount] = useState<0 | 1 | 2 | 3>(2);
   const [html, setHtml] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +88,7 @@ export default function NewsletterPreviewClient({ editionId, weekNumber, year, s
 
         {/* Subscriber preset selector */}
         <div style={{ display: "flex", alignItems: "center", gap: "4px", marginLeft: "8px" }}>
-          {([1, 2, 3] as const).map((n) => (
+          {([0, 1, 2, 3] as const).map((n) => (
             <button
               key={n}
               onClick={() => setSubCount(n)}
@@ -106,15 +107,22 @@ export default function NewsletterPreviewClient({ editionId, weekNumber, year, s
         </div>
 
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "10px" }}>
-          <TestSendButton editionId={editionId} />
+          <TestSendButton editionId={editionId} subPreset={subCount} />
+          <span style={{
+            fontSize: "12px", fontWeight: 600,
+            color: globalCount >= 6 ? "#15803d" : "#b91c1c",
+          }}>
+            {globalCount} / 6 globals
+          </span>
           <button
             onClick={approve}
-            disabled={approving}
+            disabled={approving || globalCount < 6}
+            title={globalCount < 6 ? `At least 6 global articles required (currently ${globalCount})` : undefined}
             style={{
               fontSize: "13px", fontWeight: 600, fontFamily: "inherit",
-              background: approving ? "#94a3b8" : "#059669", color: "#fff",
+              background: approving || globalCount < 6 ? "#94a3b8" : "#059669", color: "#fff",
               border: "none", borderRadius: "7px", padding: "7px 16px",
-              cursor: approving ? "default" : "pointer", whiteSpace: "nowrap",
+              cursor: approving || globalCount < 6 ? "not-allowed" : "pointer", whiteSpace: "nowrap",
             }}
           >
             {approving ? "Approving…" : "Approve →"}

@@ -247,8 +247,8 @@ export default function NewsletterReviewClient({ edition, subspecialties, editio
           Week {edition.week_number} · {edition.year}
         </span>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
-          <span style={{ fontSize: "12px", fontWeight: 600, color: globalCount > 0 ? "#059669" : "#94a3b8" }}>
-            {globalCount} global
+          <span style={{ fontSize: "12px", fontWeight: 600, color: globalCount >= 6 ? "#15803d" : "#b91c1c" }}>
+            {globalCount} / 6 globals
           </span>
           {saving && <span style={{ fontSize: "12px", color: "#94a3b8" }}>Saving…</span>}
           <button

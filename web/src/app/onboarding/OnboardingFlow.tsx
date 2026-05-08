@@ -8,7 +8,6 @@ import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 const TOTAL_STEPS = 3;
 
-const MANDATORY_SUBSPECIALTY = ACTIVE_SPECIALTY.charAt(0).toUpperCase() + ACTIVE_SPECIALTY.slice(1);
 const MAX_SUBSPECIALTIES = 3;
 
 function Spinner() {
@@ -168,7 +167,7 @@ export default function OnboardingFlow({ initialAuthorQuery = "", subspecialties
   async function handleComplete() {
     const ok = await callApi({
       step: "complete",
-      subspecialties: [MANDATORY_SUBSPECIALTY, ...selectedSubspecialties],
+      subspecialties: selectedSubspecialties,
     });
     if (ok) router.replace("/home");
   }
@@ -377,39 +376,6 @@ export default function OnboardingFlow({ initialAuthorQuery = "", subspecialties
         {currentStep === 3 && (
           <div>
             {/* Mandatory badge — separate, not a checkbox */}
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              padding: "12px 16px",
-              borderRadius: "10px",
-              background: "#f0fdf4",
-              border: "1px solid #bbf7d0",
-              marginBottom: "20px",
-            }}>
-              <div style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "28px",
-                height: "28px",
-                borderRadius: "50%",
-                background: "#22c55e",
-                flexShrink: 0,
-              }}>
-                <svg width="14" height="11" viewBox="0 0 10 8" fill="none">
-                  <path d="M1 4L3.5 6.5L9 1" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              <div>
-                <p style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", margin: 0 }}>
-                  {MANDATORY_SUBSPECIALTY}
-                </p>
-                <p style={{ fontSize: "12px", color: "#888", margin: "2px 0 0" }}>
-                  Dit hovedspeciale
-                </p>
-              </div>
-            </div>
 
             <div style={{
               display: "grid",

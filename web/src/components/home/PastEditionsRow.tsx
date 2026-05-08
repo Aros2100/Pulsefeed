@@ -1,6 +1,5 @@
 "use client";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import type { EditionData } from "./EditionBand";
 
 const MONTHS_SHORT = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
@@ -42,9 +41,6 @@ export function PastEditionsRow({
             Past editions
           </span>
         </div>
-        <Link href="/editions" style={{ fontSize: "11px", color: "#64748b", cursor: "pointer", textDecoration: "none" }}>
-          All editions →
-        </Link>
       </div>
 
       {/* Cards */}
@@ -58,10 +54,10 @@ export function PastEditionsRow({
             key={e.id}
             onClick={() => router.push(`/editions/${e.id}`)}
             style={{
-              background: "#FAF7F0",
+              background: "#ffffff",
               border: "0.5px solid rgba(0,0,0,0.06)",
-              borderRadius: "8px",
-              padding: "1rem 1.1rem 1.1rem",
+              borderRadius: "12px",
+              padding: "22px 24px",
               cursor: "pointer",
               boxSizing: "border-box",
             }}

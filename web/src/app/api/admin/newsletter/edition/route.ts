@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import { autoSelectAndFinally } from "@/lib/newsletter/and-finally";
+import { isoWeekSunday } from "@/lib/newsletter/dates";
 
 const postSchema = z.object({
   week_number: z.number().int().min(1).max(53),
@@ -104,6 +105,31 @@ export async function PATCH(request: NextRequest) {
 
   if (status !== undefined) {
     updatePayload.status = status;
+
+    if (status === "approved") {
+      const { count: globalCount } = await admin
+        .from("newsletter_edition_articles")
+        .select("id", { count: "exact", head: true })
+        .eq("edition_id", id)
+        .eq("is_global", true);
+
+      if ((globalCount ?? 0) < 6) {
+        return NextResponse.json(
+          { ok: false, error: `At least 6 global articles required (currently ${globalCount ?? 0})` },
+          { status: 400 }
+        );
+      }
+
+      const { data: current } = await admin
+        .from("newsletter_editions")
+        .select("week_number, year, published_at")
+        .eq("id", id)
+        .single();
+
+      if (current && !current.published_at) {
+        updatePayload.published_at = isoWeekSunday(current.week_number, current.year).toISOString();
+      }
+    }
   }
 
   if (Object.keys(updatePayload).length === 0) {

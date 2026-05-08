@@ -3,7 +3,7 @@ import { useState } from "react";
 
 const LS_KEY = "pf_test_email";
 
-export default function TestSendButton({ editionId }: { editionId: string }) {
+export default function TestSendButton({ editionId, subPreset }: { editionId: string; subPreset: number }) {
   const [showInput, setShowInput] = useState(false);
   const [email, setEmail] = useState<string>(() =>
     typeof window !== "undefined" ? (localStorage.getItem(LS_KEY) ?? "") : ""
@@ -21,7 +21,7 @@ export default function TestSendButton({ editionId }: { editionId: string }) {
       const res = await fetch("/api/admin/newsletter/test-send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ editionId, email }),
+        body: JSON.stringify({ editionId, email, subPreset }),
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);

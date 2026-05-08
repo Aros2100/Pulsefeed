@@ -10,6 +10,9 @@ import { getSubspecialties } from "@/lib/lab/classification-options";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import HomeV1 from "@/app/(v1)/home/HomeV1";
 import { getActiveVersion } from "@/lib/version";
+import { FreshFromFeed, type FreshArticle } from "@/components/home/FreshFromFeed";
+import { ArticleTypeMatrix } from "@/components/home/ArticleTypeMatrix";
+import { Footer } from "@/components/layout/Footer";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -26,7 +29,12 @@ export default async function DashboardPage() {
   const cookieStore = await cookies();
   const version = getActiveVersion(cookieStore.get("pf-version")?.value);
 
-  if (user.app_metadata?.role !== "admin" || version === "v1") return <HomeV1 />;
+  if (user.app_metadata?.role !== "admin" || version === "v1") return (
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+      <div style={{ flex: 1 }}><HomeV1 /></div>
+      <Footer />
+    </div>
+  );
 
   const { data: profile } = await supabase
     .from("users")
@@ -36,6 +44,44 @@ export default async function DashboardPage() {
 
   const firstName = profile?.name?.split(" ")[0] ?? "there";
   const userSubspecialties = (profile?.subspecialties as string[] | null) ?? null;
+
+  // ── Data for FreshFromFeed + ArticleTypeMatrix ────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = supabase as any;
+  const now = new Date();
+  const todayIso = now.toISOString().slice(0, 10);
+  const yesterdayIso = new Date(now.getTime() - 86_400_000).toISOString().slice(0, 10);
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 86_400_000).toISOString().slice(0, 10);
+  const userSubs = (userSubspecialties ?? []).filter(s => s.toLowerCase() !== "neurosurgery");
+
+  const [{ data: subsRows }, { data: todayRaw }] = await Promise.all([
+    admin.from("subspecialties").select("name, short_name").eq("specialty", ACTIVE_SPECIALTY).eq("active", true),
+    admin.from("articles").select("id, title, pubmed_id, journal_abbr, pubmed_indexed_at")
+      .gte("pubmed_indexed_at", todayIso).order("pubmed_indexed_at", { ascending: false }).limit(5),
+  ]);
+
+  const shortNameMap: Record<string, string> = Object.fromEntries(
+    ((subsRows ?? []) as { name: string; short_name: string | null }[]).map(r => [r.name, r.short_name ?? r.name])
+  );
+
+  let freshArticles = (todayRaw ?? []) as FreshArticle[];
+  let feedLabel: "Today" | "Yesterday" = "Today";
+  if (freshArticles.length === 0) {
+    const { data: yesterdayRaw } = await admin.from("articles")
+      .select("id, title, pubmed_id, journal_abbr, pubmed_indexed_at")
+      .gte("pubmed_indexed_at", yesterdayIso).lt("pubmed_indexed_at", todayIso)
+      .order("pubmed_indexed_at", { ascending: false }).limit(5);
+    freshArticles = (yesterdayRaw ?? []) as FreshArticle[];
+    feedLabel = "Yesterday";
+  }
+
+  let matrixRows: { subspecialty: string; article_type: string; article_count: number }[] = [];
+  if (userSubs.length > 0) {
+    const { data } = await admin.rpc("get_article_type_matrix", {
+      p_subspecialties: userSubs, p_from_date: thirtyDaysAgo,
+    });
+    matrixRows = data ?? [];
+  }
   // Fetch top subspecialties from DB
   const { data: topSubsData } = await supabase.rpc(
     "get_top_subspecialties",
@@ -117,6 +163,18 @@ export default async function DashboardPage() {
             </Link>
           ))}
         </div>
+
+        {/* Fresh from the feed */}
+        <div style={{ marginTop: "28px" }}>
+          <FreshFromFeed articles={freshArticles} totalToday={freshArticles.length} label={feedLabel} />
+        </div>
+
+        {/* Article type heatmap */}
+        {userSubs.length > 0 && (
+          <div style={{ marginTop: "28px", marginBottom: "40px" }}>
+            <ArticleTypeMatrix userSubs={userSubs} shortNameMap={shortNameMap} matrixRows={matrixRows} />
+          </div>
+        )}
 
       </div>
     </div>

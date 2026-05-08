@@ -21,7 +21,8 @@ export interface EditionArticle {
   sort_order: number;
   global_sort_order: number | null;
   is_global: boolean;
-  subspecialty: string | null;
+  subspecialty: string | null;           // block-routing field (from newsletter_edition_articles)
+  articleSubspecialties: string[] | null; // full tag array (from articles.subspecialty)
   newsletter_headline: string | null;
   newsletter_subheadline: string | null;
   title: string;
@@ -40,6 +41,7 @@ export interface AllModeArticle {
   article_type: string | null;
   journal_abbr: string | null;
   editors_pick: boolean;
+  subspecialty: string[] | null; // articles.subspecialty tag array
 }
 
 export interface SidebarData {
@@ -67,7 +69,11 @@ export function isoWeekMonday(weekNumber: number, year: number): Date {
   return monday;
 }
 
+const MONTHS_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
 export function fmtShortDate(iso: string | null): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+  // Parse date components in UTC to avoid server/client timezone mismatch
+  const [, m, d] = iso.slice(0, 10).split("-").map(Number);
+  return `${d} ${MONTHS_LONG[m - 1]}`;
 }

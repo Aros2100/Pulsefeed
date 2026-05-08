@@ -52,6 +52,7 @@ export interface RenderParams {
   pubmedBySub: { name: string; short_name: string | null; count: number }[];
 
   editionUrl: string;
+  profileUrl: string;
 
   andFinally: AndFinallyArticle | null;
   featurePromo: FeaturePromo | null;
@@ -133,7 +134,7 @@ function subArticleRow(block: SubspecialtyBlock, isFirst: boolean, isLast: boole
                         <p style="margin:0 0 8px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 9.5px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;">
                           <span style="color:#D94A43;">${subLabel}</span>
                         </p>
-                        <p style="margin: 8px 0 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 13px; color: #94A3B8; font-style: italic;">No articles selected for this issue.</p>
+                        <p style="margin: 8px 0 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 13px; color: #64748B; line-height: 1.5;">No editor&rsquo;s pick in ${subLabel} this week &mdash; <a href="${esc(block.more_url ?? '')}" style="color: #D94A43; text-decoration: underline;">see all articles on PulseFeeds &rarr;</a></p>
                       </td>
                     </tr>
                   </table>
@@ -144,9 +145,9 @@ function subArticleRow(block: SubspecialtyBlock, isFirst: boolean, isLast: boole
   const a = block.lead;
   const meta = a.article_type ? esc(a.article_type) : "";
   const moreLink = (block.more_count > 0 && block.more_url)
-    ? `<a href="${esc(block.more_url)}" style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12px; font-weight: 600; color:#D94A43; text-decoration:none;">${block.more_count} more worth reading in ${subLabel} →</a>`
+    ? `<p style="margin: 12px 0 0; text-align: right; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 13px;"><a href="${esc(block.more_url)}" style="color: #D94A43; text-decoration: none; font-weight: 600;">+ ${block.more_count} more worth reading in ${subLabel} →</a></p>`
     : "";
-  const subheadMargin = moreLink ? "margin:0 0 10px 0;" : "margin:0;";
+  const subheadMargin = moreLink ? "margin:0;" : "margin:0;";
 
   return `
               <tr>
@@ -176,7 +177,7 @@ function subArticleRow(block: SubspecialtyBlock, isFirst: boolean, isLast: boole
 
 export function renderNewsletterHtml(p: RenderParams): string {
   const { weekNumber, issueDate, firstName, hero, acrossLeads, acrossMoreCount, acrossMoreUrl,
-    subspecialtyBlocks, pubmedTotal, pubmedBySub, editionUrl, andFinally, featurePromo,
+    subspecialtyBlocks, pubmedTotal, pubmedBySub, editionUrl, profileUrl, andFinally, featurePromo,
     footerSubspecialtyShortNames, unsubscribeUrl, preferencesUrl, forwardUrl, trackingPixelUrl } = p;
 
   const issueDateStr = formatIssueDate(issueDate);
@@ -224,9 +225,9 @@ export function renderNewsletterHtml(p: RenderParams): string {
                 <td class="px-card" style="padding: 0 36px 22px 36px;">
                   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                     <tr>
-                      <td style="padding: 14px 0 0 0; border-top: 1px solid #F1F5F9;">
+                      <td style="padding: 14px 0 0 0; border-top: 1px solid #F1F5F9; text-align: right;">
                         <a href="${esc(acrossMoreUrl)}" style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 600; color:#D94A43; text-decoration:none;">
-                          ${acrossMoreCount} more worth reading across the field →
+                          + ${acrossMoreCount} more worth reading across the field →
                         </a>
                       </td>
                     </tr>
@@ -251,8 +252,8 @@ export function renderNewsletterHtml(p: RenderParams): string {
           </td>
         </tr>` : "";
 
-  // From your subspecialties
-  const subsHtml = subspecialtyBlocks.length > 0 ? `
+  // From your subspecialties — or personalisation CTA for 0-sub users
+  const subsOrCtaHtml = subspecialtyBlocks.length > 0 ? `
         <tr>
           <td>
             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#ffffff; border-radius: 14px; border: 1px solid #E2E8F0;">
@@ -266,7 +267,31 @@ export function renderNewsletterHtml(p: RenderParams): string {
               ${subspecialtyBlocks.map((b, i) => subArticleRow(b, i === 0, i === subspecialtyBlocks.length - 1)).join("")}
             </table>
           </td>
-        </tr>` : "";
+        </tr>` : `
+        <tr>
+          <td>
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 14px;">
+              <tr>
+                <td class="px-card" style="padding: 28px 36px;">
+                  <p style="margin: 0 0 8px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; color: #D94A43;">
+                    Personalise your feed
+                  </p>
+                  <p style="margin: 0 0 16px 0; font-family: Georgia, 'Times New Roman', serif; font-size: 17px; line-height: 1.4; color: #1A2332;">
+                    You haven&rsquo;t picked any subspecialties yet.
+                  </p>
+                  <p style="margin: 0 0 20px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.55; color: #475569;">
+                    Pick the ones that matter to you on your profile, and we&rsquo;ll surface their leads in every issue.
+                  </p>
+                  <p style="margin: 16px 0 0 0; text-align: right;">
+                    <a href="${esc(profileUrl)}" style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 600; color: #D94A43; text-decoration: underline;">
+                      Choose your subspecialties &rarr;
+                    </a>
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>`;
 
   // Numbers + CTA
   const totalCell = `<td align="left" style="padding: 14px 18px; border-right: 1px solid #E2E8F0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
@@ -363,9 +388,11 @@ export function renderNewsletterHtml(p: RenderParams): string {
                         <p style="margin:0 0 12px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 13px; line-height: 20px; color:#475569;">
                           ${esc(featurePromo.description)}
                         </p>
-                        <a href="${esc(featurePromo.cta_url)}" style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 600; color:#D94A43; text-decoration:none;">
-                          ${esc(featurePromo.cta_text)}
-                        </a>
+                        <p style="margin: 16px 0 0 0; text-align: right;">
+                          <a href="${esc(featurePromo.cta_url)}" style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 600; color: #D94A43; text-decoration: underline;">
+                            ${esc(featurePromo.cta_text)}
+                          </a>
+                        </p>
                       </td>
                     </tr>
                   </table>
@@ -401,10 +428,10 @@ export function renderNewsletterHtml(p: RenderParams): string {
     ? `<img src="${esc(trackingPixelUrl)}" width="1" height="1" style="display:block;width:1px;height:1px;border:0" alt="" />`
     : "";
 
-  // Section spacers (only between sections that exist)
-  const afterHeroSpacer = (acrossLeads.length > 0 || subspecialtyBlocks.length > 0) ? spacer() : "";
-  const afterAcrossSpacer = (acrossLeads.length > 0 && subspecialtyBlocks.length > 0) ? spacer() : "";
-  const afterSubsSpacer = (subspecialtyBlocks.length > 0) ? spacer() : (acrossLeads.length > 0 ? spacer() : spacer());
+  // Section spacers — subsOrCtaHtml is always present so treat it like subs always exist
+  const afterHeroSpacer = spacer();
+  const afterAcrossSpacer = acrossLeads.length > 0 ? spacer() : "";
+  const afterSubsSpacer = spacer();
 
   return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -452,32 +479,28 @@ export function renderNewsletterHtml(p: RenderParams): string {
             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
               <tr>
                 <td align="left" valign="middle">
-                  <table role="presentation" cellspacing="0" cellpadding="0" border="0">
-                    <tr>
-                      <td valign="middle" style="padding-right: 10px;">
-                        <!--[if !mso]><!-->
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="32" height="32" style="display:block;">
-                          <path d="${LOGO_PATH}" fill="#D94A43" fill-rule="evenodd"></path>
-                        </svg>
-                        <!--<![endif]-->
-                        <!--[if mso]>
-                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="32" height="32" style="background-color:#D94A43;"><tr><td>&nbsp;</td></tr></table>
-                        <![endif]-->
-                      </td>
-                      <td valign="middle" style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color:#334155; line-height: 12px;">
-                        PULSE<br/>FEEDS
-                      </td>
-                    </tr>
-                  </table>
+                  <!--[if !mso]><!-->
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 140" width="98" height="49" style="display:block;">
+                    <g transform="translate(20 20)">
+                      <path d="M14 0 L86 0 A14 14 0 0 1 100 14 L100 86 A14 14 0 0 1 86 100 L14 100 A14 14 0 0 1 0 86 L0 14 A14 14 0 0 1 14 0 Z M 50.598 16.442 C 50.626 16.714 50.666 22.718 50.694 29.804 C 50.728 36.876 50.768 43.064 50.802 43.547 L 50.850 44.417 L 57.854 37.325 C 61.703 33.422 64.865 30.198 64.878 30.164 C 64.892 30.117 53.856 19.148 51.272 16.653 L 50.551 15.959 L 50.598 16.442 M 37.046 26.370 C 33.014 26.411 29.002 26.452 28.124 26.458 L 26.526 26.486 L 34.877 34.700 C 39.467 39.215 44.043 43.717 45.043 44.689 L 46.858 46.471 L 46.811 43.397 C 46.784 41.711 46.736 37.168 46.716 33.299 L 46.668 26.282 L 45.512 26.295 C 44.893 26.302 41.078 26.336 37.046 26.370 M 64.974 37.576 L 54.896 47.654 L 65.001 47.654 L 75.092 47.654 L 75.092 37.576 C 75.092 32.028 75.085 27.492 75.072 27.492 C 75.065 27.492 70.522 32.028 64.974 37.576 M 23.650 43.118 L 16.524 50.245 L 30.817 50.245 L 45.104 50.245 L 37.978 43.118 C 34.061 39.202 30.838 35.992 30.817 35.992 C 30.790 35.992 27.567 39.202 23.650 43.118 M 49.837 46.600 C 49.177 46.736 48.348 47.205 47.885 47.715 C 45.886 49.898 47.042 53.352 49.959 53.896 C 51.659 54.209 53.482 53.142 54.046 51.496 C 54.604 49.878 54.026 48.130 52.618 47.151 C 51.904 46.668 50.687 46.423 49.837 46.600 M 62.043 57.385 L 69.183 64.532 L 76.323 57.385 L 83.476 50.245 L 69.183 50.245 L 54.896 50.245 L 62.043 57.385 M 26.445 64.062 L 26.445 74.167 L 36.522 64.083 C 42.064 58.541 46.600 53.998 46.600 53.992 C 46.600 53.978 42.064 53.964 36.522 53.964 L 26.445 53.964 L 26.445 64.062 M 54.291 64.613 L 54.291 74.691 L 64.382 74.691 L 74.487 74.691 L 64.409 64.613 C 58.867 59.064 54.325 54.536 54.318 54.536 C 54.298 54.536 54.291 59.064 54.291 64.613 M 42.914 62.757 C 39.134 66.735 36.026 70.019 36.012 70.060 C 36.006 70.094 39.276 73.249 43.282 77.064 L 50.564 84.000 L 50.517 82.565 C 50.496 81.776 50.333 75.378 50.163 68.353 C 49.993 61.322 49.837 55.562 49.823 55.542 C 49.816 55.535 46.702 58.786 42.914 62.757" fill="#D94A43" fill-rule="evenodd"></path>
+                    </g>
+                    <path d="M148.08 60L143.08 60L143.08 30.80L152.80 30.80Q155.72 30.80 157.90 31.92Q160.08 33.04 161.28 35.06Q162.48 37.08 162.48 39.80L162.48 39.80Q162.48 42.52 161.28 44.54Q160.08 46.56 157.90 47.68Q155.72 48.80 152.80 48.80L152.80 48.80L148.08 48.80L148.08 60ZM148.08 35.20L148.08 44.40L152.80 44.40Q154.92 44.40 156.16 43.12Q157.40 41.84 157.40 39.80L157.40 39.80Q157.40 37.76 156.16 36.48Q154.92 35.20 152.80 35.20L152.80 35.20L148.08 35.20ZM176 60.40L176 60.40Q171.72 60.40 169.30 58.06Q166.88 55.72 166.88 51.68L166.88 51.68L166.88 30.80L171.92 30.80L171.92 51.64Q171.92 53.72 172.96 54.88Q174 56.04 176 56.04L176 56.04Q177.96 56.04 179.02 54.88Q180.08 53.72 180.08 51.64L180.08 51.64L180.08 30.80L185.12 30.80L185.12 51.68Q185.12 55.72 182.72 58.06Q180.32 60.40 176 60.40ZM210.24 60L192.84 60L192.84 30.80L197.84 30.80L197.84 55.48L210.24 55.48L210.24 60ZM224.12 60.40L224.12 60.40Q221.16 60.40 218.94 59.36Q216.72 58.32 215.50 56.38Q214.28 54.44 214.28 51.76L214.28 51.76L219.20 51.76Q219.20 53.72 220.54 54.88Q221.88 56.04 224.12 56.04L224.12 56.04Q226.28 56.04 227.54 54.90Q228.80 53.76 228.80 51.84L228.80 51.84Q228.80 50.40 227.98 49.30Q227.16 48.20 225.64 47.80L225.64 47.80L221.72 46.80Q218.56 46 216.72 43.80Q214.88 41.60 214.88 38.56L214.88 38.56Q214.88 34.84 217.32 32.62Q219.76 30.40 223.84 30.40L223.84 30.40Q226.60 30.40 228.66 31.40Q230.72 32.40 231.84 34.22Q232.96 36.04 232.96 38.48L232.96 38.48L228.08 38.48Q228.08 36.80 226.92 35.76Q225.76 34.72 223.84 34.72L223.84 34.72Q221.96 34.72 220.86 35.74Q219.76 36.76 219.76 38.40L219.76 38.40Q219.76 39.76 220.54 40.64Q221.32 41.52 222.72 41.92L222.72 41.92L226.76 42.92Q230 43.72 231.86 46.12Q233.72 48.52 233.72 51.84L233.72 51.84Q233.72 54.44 232.54 56.36Q231.36 58.28 229.20 59.34Q227.04 60.40 224.12 60.40ZM257.04 60L239.52 60L239.52 30.80L257.04 30.80L257.04 35.20L244.44 35.20L244.44 42.80L255.64 42.80L255.64 47.04L244.44 47.04L244.44 55.60L257.04 55.60L257.04 60Z" fill="#334155"></path>
+                    <line x1="140" y1="70" x2="256" y2="70" stroke="#D94A43" stroke-width="2" stroke-linecap="square"></line>
+                    <path d="M148.20 108L143.20 108L143.20 78.80L161.36 78.80L161.36 83.44L148.12 83.44L148.12 91.24L160.32 91.24L160.32 95.88L148.20 95.88L148.20 108ZM185.04 108L167.52 108L167.52 78.80L185.04 78.80L185.04 83.20L172.44 83.20L172.44 90.80L183.64 90.80L183.64 95.04L172.44 95.04L172.44 103.60L185.04 103.60L185.04 108ZM209.04 108L191.52 108L191.52 78.80L209.04 78.80L209.04 83.20L196.44 83.20L196.44 90.80L207.64 90.80L207.64 95.04L196.44 95.04L196.44 103.60L209.04 103.60L209.04 108ZM223.68 108L215 108L215 78.80L223.68 78.80Q226.64 78.80 228.82 79.94Q231 81.08 232.20 83.12Q233.40 85.16 233.40 87.92L233.40 87.92L233.40 98.84Q233.40 101.60 232.20 103.66Q231 105.72 228.82 106.86Q226.64 108 223.68 108L223.68 108ZM220 83.28L220 103.52L223.68 103.52Q225.84 103.52 227.12 102.26Q228.40 101 228.40 98.84L228.40 98.84L228.40 87.92Q228.40 85.80 227.12 84.54Q225.84 83.28 223.68 83.28L223.68 83.28L220 83.28ZM248.12 108.40L248.12 108.40Q245.16 108.40 242.94 107.36Q240.72 106.32 239.50 104.38Q238.28 102.44 238.28 99.76L238.28 99.76L243.20 99.76Q243.20 101.72 244.54 102.88Q245.88 104.04 248.12 104.04L248.12 104.04Q250.28 104.04 251.54 102.90Q252.80 101.76 252.80 99.84L252.80 99.84Q252.80 98.40 251.98 97.30Q251.16 96.20 249.64 95.80L249.64 95.80L245.72 94.80Q242.56 94 240.72 91.80Q238.88 89.60 238.88 86.56L238.88 86.56Q238.88 82.84 241.32 80.62Q243.76 78.40 247.84 78.40L247.84 78.40Q250.60 78.40 252.66 79.40Q254.72 80.40 255.84 82.22Q256.96 84.04 256.96 86.48L256.96 86.48L252.08 86.48Q252.08 84.80 250.92 83.76Q249.76 82.72 247.84 82.72L247.84 82.72Q245.96 82.72 244.86 83.74Q243.76 84.76 243.76 86.40L243.76 86.40Q243.76 87.76 244.54 88.64Q245.32 89.52 246.72 89.92L246.72 89.92L250.76 90.92Q254 91.72 255.86 94.12Q257.72 96.52 257.72 99.84L257.72 99.84Q257.72 102.44 256.54 104.36Q255.36 106.28 253.20 107.34Q251.04 108.40 248.12 108.40Z" fill="#334155"></path>
+                  </svg>
+                  <!--<![endif]-->
+                  <!--[if mso]>
+                  <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:800;letter-spacing:1.5px;color:#334155;">PULSEFEEDS</td></tr></table>
+                  <![endif]-->
                 </td>
-                <td align="right" valign="middle" style="font-family: Georgia, 'Times New Roman', serif; font-size: 13px; color:#475569; font-style: italic; line-height: 1.3;">
+                <td align="right" valign="middle" style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #64748B; line-height: 1.5;">
                   Medical Intelligence<br/>for Neurosurgery
                 </td>
               </tr>
             </table>
             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 14px;">
               <tr>
-                <td style="border-top: 1px solid #CBD5E1; padding-top: 10px; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 11px; color:#64748B;" align="left">
+                <td style="border-top: 1px solid #CBD5E1; padding-top: 10px; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 11px; color:#64748B;" align="right">
                   Issue ${weekNumber} &nbsp;·&nbsp; ${issueDateStr}
                 </td>
               </tr>
@@ -498,8 +521,8 @@ export function renderNewsletterHtml(p: RenderParams): string {
 
         ${afterAcrossSpacer}
 
-        <!-- FROM YOUR SUBSPECIALTIES -->
-        ${subsHtml}
+        <!-- FROM YOUR SUBSPECIALTIES / PERSONALISATION CTA -->
+        ${subsOrCtaHtml}
 
         ${afterSubsSpacer}
 
@@ -510,6 +533,8 @@ export function renderNewsletterHtml(p: RenderParams): string {
 
         <!-- AND FINALLY -->
         ${andFinallyHtml}
+
+        ${spacer()}
 
         <!-- FEATURE PROMO -->
         ${featurePromoHtml}

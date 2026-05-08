@@ -23,6 +23,12 @@ export default async function NewsletterPreviewPage({ params }: { params: Promis
 
   if (error || !edition) notFound();
 
+  const { count: globalCount } = await admin
+    .from("newsletter_edition_articles")
+    .select("id", { count: "exact", head: true })
+    .eq("edition_id", issueId)
+    .eq("is_global", true);
+
   const saturday = isoWeekSaturday(edition.week_number, edition.year);
   const saturdayLabel = saturday.toLocaleDateString("en-GB", {
     weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
@@ -34,6 +40,7 @@ export default async function NewsletterPreviewPage({ params }: { params: Promis
       weekNumber={edition.week_number}
       year={edition.year}
       saturdayLabel={saturdayLabel}
+      globalCount={globalCount ?? 0}
     />
   );
 }

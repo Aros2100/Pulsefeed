@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveVersion } from "@/lib/version";
 import ProfileV1 from "@/app/(v1)/profile/ProfileV1";
+import { Footer } from "@/components/layout/Footer";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import ProfileClient from "./ProfileClient";
 import { getSubspecialties } from "@/lib/lab/classification-options";
@@ -53,11 +54,34 @@ export default async function ProfilePage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  if (user.app_metadata?.role !== "admin") redirect("/coming-soon");
-
   const cookieStore = await cookies();
   const version = getActiveVersion(cookieStore.get("pf-version")?.value);
-  if (version === "v1") return <ProfileV1 />;
+
+  if (version === "v1") {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("first_name, last_name, title, subspecialties, email_notifications")
+      .eq("id", user.id)
+      .single();
+    const subspecialtiesList = await getSubspecialties(ACTIVE_SPECIALTY);
+    return (
+      <>
+        <ProfileV1
+          email={user.email ?? ""}
+          initialNewEmail={(user as { new_email?: string | null }).new_email ?? null}
+          initialFirstName={(profile?.first_name as string | null) ?? null}
+          initialLastName={(profile?.last_name as string | null) ?? null}
+          initialTitle={(profile?.title as string | null) ?? null}
+          initialSubspecialties={Array.isArray(profile?.subspecialties) ? (profile.subspecialties as string[]) : []}
+          initialEmailNotifications={(profile?.email_notifications as boolean | null) ?? true}
+          subspecialties={subspecialtiesList}
+        />
+        <Footer />
+      </>
+    );
+  }
+
+  if (user.app_metadata?.role !== "admin") redirect("/coming-soon");
 
   const { data: profile } = await supabase
     .from("users")

@@ -27,6 +27,7 @@ export default async function NewsletterSendPage({ params }: { params: Promise<{
     .from("users")
     .select("id", { count: "exact", head: true })
     .eq("status", "active")
+    .is("deleted_at", null)
     .contains("specialty_slugs", [ACTIVE_SPECIALTY]);
 
   return (

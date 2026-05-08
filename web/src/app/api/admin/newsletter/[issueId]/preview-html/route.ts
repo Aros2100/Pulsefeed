@@ -13,7 +13,7 @@ export async function GET(
   if (!auth.ok) return auth.response;
 
   const { issueId } = await params;
-  const subPreset = Math.max(1, Math.min(4, parseInt(request.nextUrl.searchParams.get("subPreset") ?? "2", 10)));
+  const subPreset = Math.max(0, Math.min(4, parseInt(request.nextUrl.searchParams.get("subPreset") ?? "2", 10)));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;

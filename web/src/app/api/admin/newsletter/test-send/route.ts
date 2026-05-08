@@ -9,6 +9,7 @@ import { renderNewsletterHtml } from "@/lib/newsletter/render";
 const schema = z.object({
   editionId: z.string().min(1),
   email:     z.string().email(),
+  subPreset: z.number().int().min(0).max(3),
 });
 
 const FROM = process.env.NEWSLETTER_FROM_EMAIL ?? "PulseFeeds <newsletter@pulsefeeds.com>";
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: parsed.error.issues[0].message }, { status: 400 });
   }
 
-  const { editionId, email } = parsed.data;
+  const { editionId, email, subPreset } = parsed.data;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
@@ -40,16 +41,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Edition not found" }, { status: 404 });
   }
 
-  // Use admin's own account as the rendering perspective (2 subs preset)
-  const { data: subMeta } = await admin
-    .from("subspecialties")
-    .select("name")
-    .eq("specialty", (await import("@/lib/auth/specialties")).ACTIVE_SPECIALTY)
-    .eq("active", true)
-    .order("sort_order")
-    .limit(2);
-
-  const previewSubNames: string[] = ((subMeta ?? []) as { name: string }[]).map((s) => s.name);
+  // Build sub names matching the chosen preset (same logic as preview-html route)
+  let previewSubNames: string[] = [];
+  if (subPreset > 0) {
+    const { data: subMeta } = await admin
+      .from("subspecialties")
+      .select("name")
+      .eq("specialty", (await import("@/lib/auth/specialties")).ACTIVE_SPECIALTY)
+      .eq("active", true)
+      .order("sort_order")
+      .limit(subPreset);
+    previewSubNames = ((subMeta ?? []) as { name: string }[]).map((s) => s.name);
+  }
 
   const paramsResult = await buildRenderParams(admin, editionId, auth.userId ?? "", null, { previewSubNames });
   if ("error" in paramsResult) {

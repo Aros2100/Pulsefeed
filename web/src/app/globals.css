@@ -13,8 +13,9 @@
   --font-dm-sans: 'DM Sans', sans-serif;
   --font-dm-mono: 'DM Mono', monospace;
 
-  --pf-bg:           #EEF5F8;
-  --pf-header:       #EEF5F8;
+  --page-bg:         #EDF5F8;
+  --pf-bg:           #EDF5F8;
+  --pf-header:       #EDF5F8;
   --pf-header-border:#B8D4DE;
   --pf-red:          #E8403A;
   --pf-teal:         #4a7080;
@@ -29,6 +30,7 @@
 }
 
 @theme {
+  --color-page-bg:     var(--page-bg);
   --color-brand:       #E83B2A;
   --color-canvas:      #FAFAF8;
   --color-ink:         #1A1A1A;
@@ -61,6 +63,10 @@
 html, body {
   margin: 0;
   padding: 0;
+}
+
+body {
+  background-color: var(--page-bg);
 }
 
 /* Serif editorial font — applied per-component, not globally */
@@ -122,3 +128,9 @@ html, body {
     padding-right: 2rem;
   }
 }
+
+/* ── Lab value scoring ───────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .sari-grid { grid-template-columns: 1fr !important; }
+}
+.article-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.10) !important; }

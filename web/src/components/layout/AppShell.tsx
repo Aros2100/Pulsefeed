@@ -22,6 +22,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   async function toggleVersion() {

@@ -68,13 +68,14 @@ export function Hero({ data }: { data: HeroData }) {
       {/* Left column — Total volume */}
       <div style={{
         borderRight: "0.5px solid rgba(0,0,0,0.08)",
-        paddingRight: "40px",
+        padding: "0 2rem 0 0",
         display: "flex", flexDirection: "column", justifyContent: "center",
+        alignItems: "center", textAlign: "center",
       }}>
         {/* Greeting */}
         <div style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
-          fontStyle: "italic", fontSize: "13px", color: "#D94A43", marginBottom: "6px",
+          fontStyle: "italic", fontSize: "14px", color: "#D94A43", marginBottom: "12px",
         }}>
           Good {timeOfDay}, {firstName}
         </div>
@@ -82,7 +83,8 @@ export function Hero({ data }: { data: HeroData }) {
         {/* Setup line */}
         <div style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
-          fontSize: "16px", lineHeight: 1.35, color: "#475569", marginBottom: "18px",
+          fontSize: "17px", lineHeight: 1.4, color: "#1a1a1a",
+          marginBottom: "24px", maxWidth: "380px",
         }}>
           In the last 7 days, neurosurgery on PubMed produced:
         </div>
@@ -90,19 +92,19 @@ export function Hero({ data }: { data: HeroData }) {
         {/* Big number */}
         <div style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
-          fontSize: "76px", lineHeight: 1, letterSpacing: "-0.03em",
-          color: "#1a1a1a", fontWeight: 400,
+          fontSize: "72px", lineHeight: 1, letterSpacing: "-0.04em",
+          color: "#1a1a1a", fontWeight: 400, marginBottom: "16px",
         }}>
           {total.last7Days.toLocaleString("en-US")}
         </div>
 
         {/* Anchor row */}
         <div style={{
-          display: "flex", alignItems: "baseline", gap: "14px",
-          marginTop: "10px",
+          display: "flex", alignItems: "center", gap: "14px",
+          justifyContent: "center",
         }}>
           <span style={{
-            fontSize: "10px", letterSpacing: "0.08em", color: "#94a3b8",
+            fontSize: "11px", letterSpacing: "0.06em", color: "#94a3b8",
             textTransform: "uppercase",
           }}>
             New articles · {total.perDay} a day

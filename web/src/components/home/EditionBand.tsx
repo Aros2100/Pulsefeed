@@ -57,7 +57,7 @@ export function EditionBand({ edition }: { edition: EditionData }) {
             fontFamily: "Georgia, 'Times New Roman', serif",
             fontStyle: "italic", fontSize: "14px", fontWeight: 400, color: "#D94A43",
           }}>
-            The Edition
+            The latest edition
           </span>
           <span style={{
             fontSize: "10px", letterSpacing: "0.12em", color: "#94a3b8",
