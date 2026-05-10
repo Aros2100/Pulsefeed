@@ -4,13 +4,14 @@ export async function startScoringRun(
   module: string,
   specialty: string,
   version: string,
-  triggeredBy = "admin"
+  triggeredBy = "admin",
+  runKind: "new" | "rescore" | null = null,
 ): Promise<string | null> {
   try {
     const admin = createAdminClient();
     const { data, error } = await admin
       .from("scoring_runs")
-      .insert({ module, specialty, version, triggered_by: triggeredBy, status: "running" })
+      .insert({ module, specialty, version, triggered_by: triggeredBy, status: "running", run_kind: runKind })
       .select("id")
       .single();
     if (error) { console.error("[scoring-runs] startScoringRun failed:", error.message); return null; }

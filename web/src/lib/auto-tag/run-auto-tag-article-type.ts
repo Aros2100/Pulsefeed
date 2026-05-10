@@ -6,7 +6,7 @@ function normalize(s: string): string {
   return s.toLowerCase().replace(/,/g, "").trim();
 }
 
-export async function runAutoTagArticleType(): Promise<{ scored: number; skipped: number; approved: number }> {
+export async function runAutoTagArticleType(): Promise<{ scored: number; skipped: number; approved: number; evaluated: number }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
   const startedAt = new Date().toISOString();
@@ -124,12 +124,15 @@ export async function runAutoTagArticleType(): Promise<{ scored: number; skipped
       .update({
         status: errors.length > 0 ? "failed" : "completed",
         approved,
+        scored,
+        skipped,
+        evaluated: scored + skipped,
         completed_at: new Date().toISOString(),
         errors: errors.length > 0 ? errors : null,
       })
       .eq("id", logId);
   }
 
-  console.log(`[auto-tag-article-type] scored=${scored} skipped=${skipped} approved=${approved} errors=${errors.length}`);
-  return { scored, skipped, approved };
+  console.log(`[auto-tag-article-type] evaluated=${scored + skipped} scored=${scored} skipped=${skipped} approved=${approved} errors=${errors.length}`);
+  return { scored, skipped, approved, evaluated: scored + skipped };
 }

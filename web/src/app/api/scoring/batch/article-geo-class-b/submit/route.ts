@@ -76,7 +76,8 @@ export async function POST(request: NextRequest) {
     "article_geo_class_b",
     specialty ?? ACTIVE_SPECIALTY,
     activePrompt.version,
-    `batch:${triggeredBy}`
+    `batch:${triggeredBy}`,
+    mode ?? null,
   );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -92,6 +93,7 @@ export async function POST(request: NextRequest) {
       article_count:      articles.length,
       custom_id_map:      customIdMap,
       triggered_by:       triggeredBy,
+      run_kind:           mode ?? null,
       scoring_run_id:     runId,
     })
     .select("id")

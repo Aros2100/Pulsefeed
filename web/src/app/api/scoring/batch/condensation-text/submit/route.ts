@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: `Batch submission failed: ${(e as Error).message}` }, { status: 502 });
   }
 
-  const runId = await startScoringRun("condensation_text", specialty, activePrompt.version, `batch:${triggeredBy}`);
+  const runId = await startScoringRun("condensation_text", specialty, activePrompt.version, `batch:${triggeredBy}`, mode ?? null);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
       article_count:      articles.length,
       custom_id_map:      customIdMap,
       triggered_by:       triggeredBy,
+      run_kind:           mode ?? null,
       scoring_run_id:     runId,
     })
     .select("id")
