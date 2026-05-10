@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     .eq("status", "ended")
     .is("ingested_at", null)
     .order("ended_at", { ascending: true })
-    .limit(1);
+    .limit(5);
 
   if (error) {
     console.error("[cron/scoring-batch-ingest] query failed:", error);
@@ -27,20 +27,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true, ingested: null, message: "no candidates" });
   }
 
-  const batch = candidates[0];
+  const results = [];
+  for (const batch of candidates as { id: string; module: string }[]) {
+    const url = new URL(`/api/scoring/batch/${batch.id}/ingest`, request.url);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${process.env.CRON_SECRET}` },
+    });
+    await res.json().catch(() => ({}));
+    results.push({
+      batchId: batch.id,
+      module:  batch.module,
+      status:  res.status,
+      ok:      res.ok,
+    });
+  }
 
-  const url = new URL(`/api/scoring/batch/${batch.id}/ingest`, request.url);
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${process.env.CRON_SECRET}` },
-  });
-
-  const result = await res.json().catch(() => ({}));
   return NextResponse.json({
-    ok:      res.ok,
-    batchId: batch.id,
-    module:  batch.module,
-    status:  res.status,
-    result,
+    ok:           true,
+    ingestedCount: results.length,
+    results,
   });
 }
