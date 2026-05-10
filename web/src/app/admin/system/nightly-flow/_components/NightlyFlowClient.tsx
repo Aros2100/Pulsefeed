@@ -128,7 +128,10 @@ export function NightlyFlowClient({
             { id: "daily_author_update", box: r.tier3_autotag_authorupdate.daily_author_update, width: "half" },
           ]}
           showArrowDown
-          onBoxClick={setExpandedBox}
+          onBoxClick={(id) => {
+            if (id === "auto_tag_specialty") router.push("/admin/system/auto-tagging/specialty");
+            else setExpandedBox(id);
+          }}
         />
 
         {/* ── Tier 4: Specialty AI scoring ──────────────────────────────────── */}
@@ -151,7 +154,7 @@ export function NightlyFlowClient({
             { id: "auto_tag_article_type", box: r.tier5_autotag_articletype.auto_tag_article_type, width: "full" },
           ]}
           showArrowDown
-          onBoxClick={setExpandedBox}
+          onBoxClick={() => router.push("/admin/system/auto-tagging/article-type")}
         />
 
         {/* ── Tier 6: Scoring swarm ─────────────────────────────────────────── */}

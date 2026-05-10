@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import SpecialtyClient from "./SpecialtyClient";
 import SpecialtyNav from "./SpecialtyNav";
+import { RunHistorySection } from "@/app/admin/system/auto-tagging/_components/RunHistorySection";
 
 export default async function TaggingPage() {
   const admin = createAdminClient();
@@ -66,6 +67,7 @@ export default async function TaggingPage() {
             ← System
           </Link>
         </div>
+        <RunHistorySection job="specialty" />
         <SpecialtyNav />
       </div>
       <SpecialtyClient
