@@ -1,6 +1,6 @@
-import Link from "next/link";
 import NightlyReport from "@/app/admin/_components/NightlyReport";
 import { ArticleKpiSection } from "@/app/admin/_components/ArticleKpiSection";
+import { NewsletterCard } from "@/app/admin/_components/NewsletterCard";
 import { ImportStatusSection } from "@/app/admin/_components/ImportStatusSection";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
@@ -33,7 +33,6 @@ const navCards = [
 ];
 
 export default async function AdminDashboard() {
-  const weekNumber = getISOWeek(new Date());
   const { start, end } = getThisWeekRange();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,34 +51,14 @@ export default async function AdminDashboard() {
         {/* Article KPI tiles */}
         <ArticleKpiSection />
 
-        {/* Last night's import status */}
-        <ImportStatusSection />
+        {/* Newsletter + Import status — compact tiles */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+          <NewsletterCard articleCount={articleCount} />
+          <ImportStatusSection />
+        </div>
 
-        {/* Newsletter + Nightly report — two columns */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "28px" }}>
-          <div style={{
-            background: "#fff",
-            borderRadius: "10px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
-            overflow: "hidden",
-          }}>
-            <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
-              <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700 }}>
-                Newsletter
-              </div>
-            </div>
-            <Link
-              href="/admin/newsletter"
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "22px 24px", textDecoration: "none", color: "#1a1a1a" }}
-            >
-              <div>
-                <div style={{ fontSize: "18px", fontWeight: 700, lineHeight: 1.3 }}>Select articles · Week {weekNumber}</div>
-                <div style={{ fontSize: "13px", color: "#888", marginTop: "5px" }}>{articleCount} articles this week</div>
-              </div>
-              <div style={{ fontSize: "22px", color: "#ccc", flexShrink: 0 }}>→</div>
-            </Link>
-          </div>
-
+        {/* Nightly report table */}
+        <div style={{ marginBottom: "28px" }}>
           <NightlyReport />
         </div>
 
