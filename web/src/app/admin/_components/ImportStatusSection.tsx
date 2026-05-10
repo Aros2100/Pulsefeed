@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { fetchNightlyFlowReport } from "@/app/admin/system/nightly-flow/_lib/fetchReport";
 import type { NightlyFlowReport, BoxStatus, ComponentBox } from "@/app/admin/system/nightly-flow/_lib/types";
+import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
 function lastNightDate(): string {
   const now = new Date();
@@ -43,11 +44,12 @@ const CARD_BORDER: Record<CardStatus, string> = { ok: "#86EFAC", warn: "#FCD34D"
 const CARD_TEXT: Record<CardStatus, string>   = { ok: "#14532D", warn: "#78350F", error: "#7F1D1D", missing: "#6B7280" };
 const STATUS_ICON: Record<CardStatus, string> = { ok: "✅", warn: "⚠️", error: "❌", missing: "—" };
 
-function mainLine(status: CardStatus, imported: number, warnCount: number, errorCount: number): string {
+function mainLine(status: CardStatus, inSpecialty: number, warnCount: number, errorCount: number): string {
+  const label = `${inSpecialty} new ${ACTIVE_SPECIALTY} articles`;
   switch (status) {
-    case "ok":      return `${imported} imported · ran cleanly`;
-    case "warn":    return `${imported} imported · ${warnCount} warning${warnCount === 1 ? "" : "s"}`;
-    case "error":   return `${imported} imported · ${errorCount} error${errorCount === 1 ? "" : "s"}`;
+    case "ok":      return `${label} · ran cleanly`;
+    case "warn":    return `${label} · ${warnCount} warning${warnCount === 1 ? "" : "s"}`;
+    case "error":   return `${label} · ${errorCount} error${errorCount === 1 ? "" : "s"}`;
     case "missing": return "Last night did not run";
   }
 }
@@ -57,7 +59,7 @@ export async function ImportStatusSection() {
   const report = await fetchNightlyFlowReport(date);
   const statuses = buildPhases(report);
   const status = worstStatus(statuses);
-  const imported = (report.tier1_combined.daily_import.details.total_imported as number) ?? 0;
+  const imported = (report.tier8_result.ready_by_morning.details.in_specialty as number) ?? 0;
   const windowTime = report.window_start.slice(11, 16) + " UTC";
 
   return (
