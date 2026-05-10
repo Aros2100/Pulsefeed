@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import ArticleTypeClient from "./ArticleTypeClient";
-import { RunHistorySection } from "@/app/admin/system/auto-tagging/_components/RunHistorySection";
 
 type Rule = {
   id: string;
@@ -61,12 +60,14 @@ export default async function ArticleTypeSystemPage() {
         margin: "0 auto",
         padding: "40px 24px 0",
       }}>
-        <div style={{ marginBottom: "8px" }}>
+        <div style={{ marginBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Link href="/admin/system/auto-tagging" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
             ← Auto-Tagging
           </Link>
+          <Link href="/admin/system/auto-tagging/runs#article-type" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+            View runs →
+          </Link>
         </div>
-        <RunHistorySection job="article_type" />
         <div style={{ marginBottom: "28px" }}>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Artikel Type</h1>
           <p style={{ fontSize: "13px", color: "#888", marginTop: "6px" }}>

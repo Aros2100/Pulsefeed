@@ -3,7 +3,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 import SpecialtyClient from "./SpecialtyClient";
 import SpecialtyNav from "./SpecialtyNav";
-import { RunHistorySection } from "@/app/admin/system/auto-tagging/_components/RunHistorySection";
 
 export default async function TaggingPage() {
   const admin = createAdminClient();
@@ -62,12 +61,14 @@ export default async function TaggingPage() {
         margin: "0 auto",
         padding: "40px 24px 0",
       }}>
-        <div style={{ marginBottom: "8px" }}>
+        <div style={{ marginBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Link href="/admin/system/auto-tagging" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
             ← System
           </Link>
+          <Link href="/admin/system/auto-tagging/runs#specialty" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+            View runs →
+          </Link>
         </div>
-        <RunHistorySection job="specialty" />
         <SpecialtyNav />
       </div>
       <SpecialtyClient

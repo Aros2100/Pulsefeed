@@ -129,7 +129,7 @@ export function NightlyFlowClient({
           ]}
           showArrowDown
           onBoxClick={(id) => {
-            if (id === "auto_tag_specialty") router.push("/admin/system/auto-tagging/specialty");
+            if (id === "auto_tag_specialty") router.push("/admin/system/auto-tagging/runs#specialty");
             else setExpandedBox(id);
           }}
         />
@@ -154,7 +154,7 @@ export function NightlyFlowClient({
             { id: "auto_tag_article_type", box: r.tier5_autotag_articletype.auto_tag_article_type, width: "full" },
           ]}
           showArrowDown
-          onBoxClick={() => router.push("/admin/system/auto-tagging/article-type")}
+          onBoxClick={() => router.push("/admin/system/auto-tagging/runs#article-type")}
         />
 
         {/* ── Tier 6: Scoring swarm ─────────────────────────────────────────── */}
