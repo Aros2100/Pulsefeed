@@ -20,7 +20,7 @@ export function getBoxContent(id: string, box: ComponentBox): BoxContent {
       extra: box.timing ? fmtDuration(box.timing.duration_sec) : "",
     };
     case "import_c2": return {
-      explanation: "key institutions (reldate=7)",
+      explanation: "key institutions (reldate=2)",
       counts: `${d(box).fetched} fetched · ${d(box).imported} imported${d(box).skipped > 0 ? ` · ${d(box).skipped} skip` : ""}`,
       extra: box.timing ? fmtDuration(box.timing.duration_sec) : "",
     };
@@ -37,8 +37,8 @@ export function getBoxContent(id: string, box: ComponentBox): BoxContent {
     case "daily_pubmed_sync": return {
       explanation: "pull updates from PubMed",
       counts: `${d(box).events_total} events · ${d(box).events_updated} updated · ${d(box).events_retracted} retracted`,
-      extra: Array.isArray(d(box).top_fields_changed)
-        ? d(box).top_fields_changed.map((f: { field: string; count: number }) => `${f.field} (${f.count})`).join(" · ")
+      extra: Array.isArray(d(box).meaningful_fields_changed) && (d(box).meaningful_fields_changed as { field: string; count: number }[]).length > 0
+        ? (d(box).meaningful_fields_changed as { field: string; count: number }[]).map(f => `${f.field} (${f.count})`).join(" · ")
         : "",
     };
     case "trigger_author_linking": return {
