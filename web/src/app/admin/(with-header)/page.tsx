@@ -1,5 +1,4 @@
 import Link from "next/link";
-import NightlyReport from "@/app/admin/_components/NightlyReport";
 import { ArticleKpiSection } from "@/app/admin/_components/ArticleKpiSection";
 import { NewsletterCard } from "@/app/admin/_components/NewsletterCard";
 import { ImportStatusSection } from "@/app/admin/_components/ImportStatusSection";
@@ -56,11 +55,6 @@ export default async function AdminDashboard() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
           <NewsletterCard articleCount={articleCount} />
           <ImportStatusSection />
-        </div>
-
-        {/* Nightly report table */}
-        <div style={{ marginBottom: "28px" }}>
-          <NightlyReport />
         </div>
 
         {/* Quick access */}
