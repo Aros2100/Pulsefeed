@@ -168,6 +168,9 @@ export default async function ScoringPage() {
             <Link href="/admin/system/scoring/batches" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
               → Batches
             </Link>
+            <Link href="/admin/system/scoring/background" style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}>
+              → Background cron
+            </Link>
           </div>
         </div>
 

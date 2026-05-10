@@ -218,14 +218,17 @@ export function NightlyFlowClient({
         {/* Separator */}
         <div style={{ borderTop: "0.5px solid #dde3ed", margin: "16px 0 12px" }} />
 
-        {/* ── Tier 9: Background cron ───────────────────────────────────────── */}
+        {/* ── Tier 9: Background cron — clicks navigate to background page ─── */}
         <FlowTier
           title="Background (every 5 min, 24/7)"
           boxes={[
             { id: "scoring_batch_poll",   box: r.tier9_background.scoring_batch_poll,   width: "half" },
             { id: "scoring_batch_ingest", box: r.tier9_background.scoring_batch_ingest, width: "half" },
           ]}
-          onBoxClick={setExpandedBox}
+          onBoxClick={(id) => {
+            const anchor = id === "scoring_batch_poll" ? "#poll" : "#ingest";
+            router.push(`/admin/system/scoring/background${anchor}`);
+          }}
         />
 
       </div>
