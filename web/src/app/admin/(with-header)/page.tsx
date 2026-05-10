@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArticleKpiSection } from "@/app/admin/_components/ArticleKpiSection";
+import { UserKpiSection } from "@/app/admin/_components/UserKpiSection";
 import { NewsletterCard } from "@/app/admin/_components/NewsletterCard";
 import { ImportStatusSection } from "@/app/admin/_components/ImportStatusSection";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -50,6 +51,7 @@ export default async function AdminDashboard() {
 
         {/* Article KPI tiles */}
         <ArticleKpiSection />
+        <UserKpiSection />
 
         {/* Newsletter + Import status — compact tiles */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
