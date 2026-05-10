@@ -114,7 +114,7 @@ export function getBoxContent(id: string, box: ComponentBox): BoxContent {
     };
     case "ready_by_morning": return {
       explanation: "",
-      counts: `${d(box).imported_in_window} imported · ${d(box).in_specialty} in-specialty · ${d(box).out_of_specialty} out${d(box).pending > 0 ? ` · ${d(box).pending} pending` : ""}`,
+      counts: `${d(box).in_specialty} new ${ACTIVE_SPECIALTY} articles · ${d(box).imported_in_window} total imported · ${d(box).out_of_specialty} not in specialty${d(box).pending > 0 ? ` · ${d(box).pending} pending` : ""}`,
       extra: `Total ${ACTIVE_SPECIALTY} articles: ${Number(d(box).total_in_specialty ?? d(box).total_in_system).toLocaleString()} · prev night: ${Number(d(box).previous_night_in_specialty ?? d(box).previous_night_total).toLocaleString()} (+${d(box).delta})`,
     };
     case "scoring_batch_poll": return {
