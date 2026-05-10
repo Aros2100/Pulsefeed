@@ -30,11 +30,7 @@ export function NewsletterCard({
         justifyContent: "space-between",
         minHeight: "92px",
         cursor: "pointer",
-        transition: "box-shadow 0.15s",
-      }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "none"; }}
-      >
+      }}>
         <div style={{ fontSize: "11px", fontWeight: 700, color: "#E83B2A", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px" }}>
           Newsletter · Week {weekNumber}
         </div>
