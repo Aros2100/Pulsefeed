@@ -1,3 +1,4 @@
+import Link from "next/link";
 import NightlyReport from "@/app/admin/_components/NightlyReport";
 import { ArticleKpiSection } from "@/app/admin/_components/ArticleKpiSection";
 import { NewsletterCard } from "@/app/admin/_components/NewsletterCard";
