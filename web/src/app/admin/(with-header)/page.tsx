@@ -1,5 +1,6 @@
 import Link from "next/link";
 import NightlyReport from "@/app/admin/_components/NightlyReport";
+import { ArticleKpiSection } from "@/app/admin/_components/ArticleKpiSection";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
 
@@ -46,6 +47,9 @@ export default async function AdminDashboard() {
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 80px" }}>
+
+        {/* Article KPI tiles */}
+        <ArticleKpiSection />
 
         {/* Newsletter + Nightly report — two columns */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "28px" }}>
