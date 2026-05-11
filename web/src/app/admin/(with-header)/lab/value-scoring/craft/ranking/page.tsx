@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CRAFT_MODULE_KEY, INITIAL_PAIR_BATCH, SESSION_SIZE } from "@/lib/lab/value-scoring/craft-config";
+import ComputeButton from "./ComputeButton";
+import RankingTable, { type ArticlePairDetail, type RankedArticle } from "./RankingTable";
 
 export default async function CraftRankingPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,81 +33,170 @@ export default async function CraftRankingPage() {
 
   const moduleId = mod.id as string;
 
-  // Articles
-  const { data: articles } = await admin
-    .from("lab_value_articles")
-    .select("id, title, article_type")
-    .eq("module_id", moduleId);
+  // Load all data in parallel
+  const [
+    { data: articles },
+    { data: pairs },
+    { data: rankings },
+    { data: reasonRows },
+    { data: categoryRows },
+  ] = await Promise.all([
+    admin.from("lab_value_articles").select("id, title, article_type").eq("module_id", moduleId),
+    admin.from("lab_value_pairs").select("id, article_a_id, article_b_id, winner_id, session_id").eq("module_id", moduleId),
+    admin.from("lab_value_rankings").select("article_id, beta_score, computed_at").eq("module_id", moduleId),
+    admin.from("lab_value_pair_reasons").select("pair_id, category_id"),
+    admin.from("lab_value_reason_categories").select("id, label").eq("module_id", moduleId),
+  ]);
 
-  type Art = { id: string; title: string; article_type: string | null };
-  const arts = (articles ?? []) as Art[];
+  type Art    = { id: string; title: string; article_type: string | null };
+  type Pair   = { id: string; article_a_id: string; article_b_id: string; winner_id: string | null; session_id: string | null };
+  type RankR  = { article_id: string; beta_score: number; computed_at: string };
+  type Reason = { pair_id: string; category_id: string };
+  type Cat    = { id: string; label: string };
 
-  // Pairs
-  const { data: pairs } = await admin
-    .from("lab_value_pairs")
-    .select("article_a_id, article_b_id, winner_id, session_id")
-    .eq("module_id", moduleId);
+  const arts       = (articles    ?? []) as Art[];
+  const allPairs   = (pairs       ?? []) as Pair[];
+  const rankingRows = (rankings   ?? []) as RankR[];
+  const reasons    = (reasonRows  ?? []) as Reason[];
+  const categories = (categoryRows ?? []) as Cat[];
 
-  type Pair = { article_a_id: string; article_b_id: string; winner_id: string | null; session_id: string | null };
-  const allPairs = (pairs ?? []) as Pair[];
+  // β by article
+  const betaByArticle = new Map<string, number>(
+    rankingRows.map(r => [r.article_id, Number(r.beta_score)]),
+  );
+  const lastComputedAt = rankingRows.length > 0
+    ? rankingRows.reduce<string>((acc, r) => r.computed_at > acc ? r.computed_at : acc, rankingRows[0].computed_at)
+    : null;
+  const hasRanking = rankingRows.length > 0;
 
-  const totalPairs   = allPairs.length;
-  const decidedPairs = allPairs.filter(p => p.winner_id !== null).length;
+  // Category label map
+  const catLabel = new Map<string, string>(categories.map(c => [c.id, c.label]));
 
-  // Win/loss per article
+  // Reason categories per pair: Map<pairId, string[]>
+  const reasonsByPair = new Map<string, string[]>();
+  for (const r of reasons) {
+    const label = catLabel.get(r.category_id);
+    if (!label) continue;
+    const arr = reasonsByPair.get(r.pair_id) ?? [];
+    arr.push(label);
+    reasonsByPair.set(r.pair_id, arr);
+  }
+
+  // Article lookup
+  const artById = new Map<string, Art>(arts.map(a => [a.id, a]));
+
+  // Win/loss counters and pair details per article
   const wins   = new Map<string, number>(arts.map(a => [a.id, 0]));
   const losses = new Map<string, number>(arts.map(a => [a.id, 0]));
+  const pairDetails = new Map<string, ArticlePairDetail[]>(arts.map(a => [a.id, []]));
+
   for (const p of allPairs) {
     if (!p.winner_id) continue;
-    const loserId = p.winner_id === p.article_a_id ? p.article_b_id : p.article_a_id;
+
+    const loserId   = p.winner_id === p.article_a_id ? p.article_b_id : p.article_a_id;
     wins.set(p.winner_id, (wins.get(p.winner_id) ?? 0) + 1);
-    losses.set(loserId, (losses.get(loserId) ?? 0) + 1);
+    losses.set(loserId,   (losses.get(loserId)   ?? 0) + 1);
+
+    const cats = reasonsByPair.get(p.id) ?? [];
+
+    // Add pair to winner's list
+    const winnerOpponent = artById.get(loserId);
+    if (winnerOpponent) {
+      const arr = pairDetails.get(p.winner_id) ?? [];
+      arr.push({
+        result:     "won",
+        opponent:   { id: loserId, title: winnerOpponent.title, article_type: winnerOpponent.article_type, beta: betaByArticle.get(loserId) ?? null },
+        categories: cats,
+      });
+      pairDetails.set(p.winner_id, arr);
+    }
+
+    // Add pair to loser's list
+    const loserOpponent = artById.get(p.winner_id);
+    if (loserOpponent) {
+      const arr = pairDetails.get(loserId) ?? [];
+      arr.push({
+        result:     "lost",
+        opponent:   { id: p.winner_id, title: loserOpponent.title, article_type: loserOpponent.article_type, beta: betaByArticle.get(p.winner_id) ?? null },
+        categories: cats,
+      });
+      pairDetails.set(loserId, arr);
+    }
+  }
+
+  // Sort each article's pairs by opponent β descending (strongest opponents first)
+  for (const [, arr] of pairDetails) {
+    arr.sort((a, b) => (b.opponent.beta ?? -Infinity) - (a.opponent.beta ?? -Infinity));
   }
 
   // Session summary
-  const sessionMap = new Map<string, number>(); // session_id → decided count
+  const sessionMap = new Map<string, number>();
   for (const p of allPairs) {
     if (!p.session_id || !p.winner_id) continue;
     sessionMap.set(p.session_id, (sessionMap.get(p.session_id) ?? 0) + 1);
   }
-  const sessionsTotal    = sessionMap.size;
-  const sessionsComplete = [...sessionMap.values()].filter(n => n >= SESSION_SIZE).length;
+  const sessionsTotal      = sessionMap.size;
+  const sessionsComplete   = [...sessionMap.values()].filter(n => n >= SESSION_SIZE).length;
   const sessionsInProgress = sessionsTotal - sessionsComplete;
 
-  // Rank rows
-  const ranked = arts
+  const totalPairs   = allPairs.length;
+  const decidedPairs = allPairs.filter(p => p.winner_id !== null).length;
+  const totalTarget  = Math.max(totalPairs, INITIAL_PAIR_BATCH);
+  const progressPct  = totalTarget > 0 ? Math.round((decidedPairs / totalTarget) * 100) : 0;
+
+  // Build ranked list
+  const ranked: RankedArticle[] = arts
     .map(a => {
       const w = wins.get(a.id)   ?? 0;
       const l = losses.get(a.id) ?? 0;
       const total = w + l;
       const winRate = total > 0 ? w / total : 0;
-      return { ...a, wins: w, losses: l, total, winRate };
+      const beta = betaByArticle.get(a.id) ?? null;
+      return {
+        id:           a.id,
+        title:        a.title,
+        article_type: a.article_type,
+        wins:         w,
+        losses:       l,
+        winRate,
+        beta,
+        pairs:        pairDetails.get(a.id) ?? [],
+      };
     })
     .sort((x, y) => {
+      if (hasRanking) {
+        const bx = x.beta ?? -Infinity;
+        const by = y.beta ?? -Infinity;
+        if (by !== bx) return by - bx;
+      }
       if (y.wins !== x.wins) return y.wins - x.wins;
       return y.winRate - x.winRate;
     });
-
-  const totalTarget = Math.max(totalPairs, INITIAL_PAIR_BATCH);
-  const progressPct = totalTarget > 0 ? Math.round((decidedPairs / totalTarget) * 100) : 0;
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
       <div style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
         {/* Heading */}
-        <div style={{ marginBottom: "28px" }}>
-          <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
-            The Lab · Value Scoring · Craft
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "28px", gap: "20px" }}>
+          <div>
+            <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
+              The Lab · Value Scoring · Craft
+            </div>
+            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>Ranking</h1>
+            <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>
+              {hasRanking
+                ? "Ranking based on Bradley-Terry model. NFL standing shown as supplementary information."
+                : "No ranking computed yet. Showing NFL standing based on win counts."}
+            </p>
           </div>
-          <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>Ranking</h1>
-          <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>
-            Preliminary ranking based on completed pairwise comparisons.
-          </p>
+          <ComputeButton />
         </div>
 
         <div style={{ background: "#fff8e1", border: "1px solid #fde68a", borderRadius: "8px", padding: "10px 14px", marginBottom: "20px", fontSize: "12px", color: "#92400e" }}>
-          Note: Final ranking will be computed using a Bradley-Terry model. This is a preliminary view based on simple win counts.
+          {hasRanking
+            ? <>Ranking based on Bradley-Terry model when computed. NFL standing shown as supplementary information.{lastComputedAt && <> · Last computed {new Date(lastComputedAt).toLocaleString()}</>}</>
+            : <>No ranking computed yet. Click &quot;Compute Bradley-Terry ranking&quot; to generate.</>}
         </div>
 
         {/* Progress card */}
@@ -135,39 +226,10 @@ export default async function CraftRankingPage() {
         <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", overflow: "hidden" }}>
           <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
             <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
-              Articles · ranked by wins
+              Articles · ranked by {hasRanking ? "β" : "wins (NFL fallback)"} · click to expand pairs
             </span>
           </div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: "#fafbfc" }}>
-                <th style={{ ...thStyle, width: "48px" }}>#</th>
-                <th style={thStyle}>Title</th>
-                <th style={{ ...thStyle, width: "150px" }}>Article type</th>
-                <th style={{ ...thStyle, width: "70px", textAlign: "right" }}>W</th>
-                <th style={{ ...thStyle, width: "70px", textAlign: "right" }}>L</th>
-                <th style={{ ...thStyle, width: "90px", textAlign: "right" }}>Win rate</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ranked.map((r, i) => (
-                <tr key={r.id} style={{ borderTop: "1px solid #f5f5f5" }}>
-                  <td style={{ ...tdStyle, color: "#94a3b8", fontWeight: 600 }}>{i + 1}</td>
-                  <td style={{ ...tdStyle, color: "#1a1a1a" }} title={r.title}>
-                    <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "420px" }}>
-                      {r.title}
-                    </div>
-                  </td>
-                  <td style={{ ...tdStyle, color: "#5a6a85", fontSize: "12px" }}>{r.article_type ?? "—"}</td>
-                  <td style={{ ...tdStyle, textAlign: "right", color: "#059669", fontWeight: 600 }}>{r.wins}</td>
-                  <td style={{ ...tdStyle, textAlign: "right", color: "#b91c1c" }}>{r.losses}</td>
-                  <td style={{ ...tdStyle, textAlign: "right", color: r.total === 0 ? "#bbb" : "#1a1a1a" }}>
-                    {r.total === 0 ? "—" : `${Math.round(r.winRate * 100)}%`}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <RankingTable ranked={ranked} />
         </div>
 
         <div style={{ marginTop: "20px", display: "flex", justifyContent: "space-between" }}>
@@ -184,18 +246,3 @@ export default async function CraftRankingPage() {
     </div>
   );
 }
-
-const thStyle: React.CSSProperties = {
-  textAlign: "left",
-  fontSize: "11px",
-  fontWeight: 600,
-  textTransform: "uppercase",
-  letterSpacing: "0.05em",
-  color: "#5a6a85",
-  padding: "10px 16px",
-};
-
-const tdStyle: React.CSSProperties = {
-  fontSize: "13px",
-  padding: "10px 16px",
-};

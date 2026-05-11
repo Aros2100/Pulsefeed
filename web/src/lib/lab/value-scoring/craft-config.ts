@@ -51,3 +51,29 @@ export const INITIAL_REASON_CATEGORIES = [
   'Reproducibility',
   'Generalizability',
 ] as const;
+
+// ── Prompt phase ─────────────────────────────────────────────────────────────
+
+// Minimum decided pairs before the prompt phase is meaningful.
+export const MIN_PAIRS_FOR_PROMPT = 250;
+
+// Anthropic model used to score articles with a prompt version.
+// Haiku with thinking disabled, mirroring the conventions in lib/lab/scorer.ts.
+export const SCORING_MODEL      = 'claude-haiku-4-5-20251001';
+export const SCORING_MAX_TOKENS = 1000;
+
+// Articles are scored in parallel chunks to keep total wall time low while
+// respecting Anthropic concurrency limits.
+export const SCORING_CONCURRENCY = 10;
+
+// Quick-test sampling: pick this many articles from the top, bottom, and
+// middle of the Bradley-Terry ranking. The sum is the quick-test batch size.
+export const QUICK_TEST_TOP    = 5;
+export const QUICK_TEST_BOTTOM = 5;
+export const QUICK_TEST_MIDDLE = 5;
+export const QUICK_TEST_TOTAL  = QUICK_TEST_TOP + QUICK_TEST_BOTTOM + QUICK_TEST_MIDDLE;
+
+// Disagreement filter on the evaluation page: ignore pairs where the
+// prompt's |score_a - score_b| is smaller than this threshold (close calls
+// are not strong disagreements).
+export const DISAGREEMENT_MIN_DIFF = 1.0;

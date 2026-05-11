@@ -83,15 +83,14 @@ pulsefeed/
 - **Naming**: camelCase functions, PascalCase components, snake_case DB columns, kebab-case files.
 - **Error pattern**: `{ ok: false, error: string }` with appropriate HTTP status.
 - **Fire-and-forget**: Long tasks use `after()` hook or `void runTask()`.
-- **RLS**: Every new `public` table MUST have RLS enabled in the same migration. Never create a table without it. Choose the policy based on access pattern:
+- **RLS**: Every new `public` table MUST have RLS enabled in the same migration — no exceptions, no deferral. This has been violated repeatedly; treat it as a hard blocker. Choose the policy based on access pattern:
 
   ```sql
-  -- ALWAYS required:
+  -- ALWAYS required immediately after CREATE TABLE:
   ALTER TABLE public.my_table ENABLE ROW LEVEL SECURITY;
 
-  -- A) Server-side only (import pipelines, cron jobs, webhooks via createAdminClient):
+  -- A) Server-side only (import pipelines, cron jobs, admin routes via createAdminClient):
   --    No policy needed — service_role bypasses RLS automatically.
-  --    DO revoke write access from anon/authenticated if it was granted:
   REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.my_table FROM anon, authenticated;
 
   -- B) Public reference data (UI dropdowns, lookup tables):
@@ -99,7 +98,7 @@ pulsefeed/
     ON public.my_table FOR SELECT TO anon, authenticated USING (true);
   REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.my_table FROM anon, authenticated;
 
-  -- C) Requires login (user-facing data, newsletters, saved items):
+  -- C) Requires login:
   CREATE POLICY "my_table_authenticated_select"
     ON public.my_table FOR SELECT TO authenticated USING (true);
   REVOKE ALL ON public.my_table FROM anon;
@@ -109,7 +108,15 @@ pulsefeed/
     ON public.my_table FOR SELECT TO authenticated USING (user_id = auth.uid());
   ```
 
-  After applying, verify: `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public' AND tablename = 'my_table';`
+  **MANDATORY: Always end every migration that creates tables with this verification query:**
+  ```sql
+  SELECT tablename, rowsecurity
+  FROM pg_tables
+  WHERE schemaname = 'public'
+    AND tablename IN ('my_table') -- list every table created in this migration
+    AND rowsecurity = false; -- must return 0 rows
+  ```
+  If this query returns any rows, the migration is incomplete. Do not proceed.
 
 ## Environment Variables
 

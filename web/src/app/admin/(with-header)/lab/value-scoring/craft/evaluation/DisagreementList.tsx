@@ -1,0 +1,203 @@
+"use client";
+
+import { useState } from "react";
+import type { DisagreementRow } from "@/lib/lab/value-scoring/evaluation";
+
+type Sari = { subject?: string; action?: string; result?: string; implication?: string } | null;
+export interface ArticleFull {
+  id:              string;
+  title:           string;
+  journal:         string | null;
+  article_type:    string | null;
+  published_date:  string | null;
+  pmid:            string | null;
+  short_headline:  string | null;
+  resume:          string | null;
+  bottom_line:     string | null;
+  sari:            Sari;
+}
+
+interface Props {
+  rows:        DisagreementRow[];
+  articles:    Record<string, ArticleFull>;
+}
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+export default function DisagreementList({ rows, articles }: Props) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  function toggle(id: string) {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div style={{ padding: "32px 24px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+        No disagreements at this threshold.
+      </div>
+    );
+  }
+
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <thead>
+        <tr style={{ background: "#fafbfc" }}>
+          <th style={{ ...thStyle, width: "26px" }} />
+          <th style={thStyle}>Your choice</th>
+          <th style={thStyle}>Prompt choice</th>
+          <th style={{ ...thStyle, width: "80px", textAlign: "right" }}>β diff</th>
+          <th style={{ ...thStyle, width: "80px", textAlign: "right" }}>Score diff</th>
+          <th style={thStyle}>Reasons</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(r => {
+          const open = expanded.has(r.pairId);
+          const humanArt   = r.humanChoiceId === r.articleA.id ? r.articleA : r.articleB;
+          const promptArt  = r.promptChoiceId === null
+            ? null
+            : r.promptChoiceId === r.articleA.id ? r.articleA : r.articleB;
+          return (
+            <>
+              <tr key={r.pairId} onClick={() => toggle(r.pairId)} style={{ borderTop: "1px solid #f5f5f5", cursor: "pointer" }}>
+                <td style={{ ...tdStyle, color: "#94a3b8" }}>{open ? "▾" : "▸"}</td>
+                <td style={{ ...tdStyle, color: "#1a1a1a" }} title={humanArt.title}>
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "240px" }}>{humanArt.title}</div>
+                </td>
+                <td style={{ ...tdStyle, color: "#1a1a1a" }} title={promptArt?.title ?? "(tie)"}>
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "240px" }}>
+                    {promptArt ? promptArt.title : <em style={{ color: "#94a3b8" }}>(prompt tied)</em>}
+                  </div>
+                </td>
+                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{r.betaDiff.toFixed(2)}</td>
+                <td style={{ ...tdStyle, textAlign: "right", color: "#5a6a85", fontVariantNumeric: "tabular-nums" }}>{r.scoreDiff.toFixed(2)}</td>
+                <td style={{ ...tdStyle, color: "#5a6a85", fontSize: "12px" }}>
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "260px" }}>
+                    {r.reasons.length > 0 ? r.reasons.join(" · ") : <span style={{ color: "#bbb" }}>—</span>}
+                  </div>
+                </td>
+              </tr>
+              {open && (
+                <tr key={r.pairId + "-detail"} style={{ background: "#fafbfc" }}>
+                  <td colSpan={6} style={{ padding: "16px 24px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                      <ArticlePanel
+                        article={articles[r.articleA.id]}
+                        chosenByHuman={r.humanChoiceId === r.articleA.id}
+                        chosenByPrompt={r.promptChoiceId === r.articleA.id}
+                        score={r.scoreA}
+                        beta={r.betaA}
+                      />
+                      <ArticlePanel
+                        article={articles[r.articleB.id]}
+                        chosenByHuman={r.humanChoiceId === r.articleB.id}
+                        chosenByPrompt={r.promptChoiceId === r.articleB.id}
+                        score={r.scoreB}
+                        beta={r.betaB}
+                      />
+                    </div>
+                    {r.notes && (
+                      <div style={{ marginTop: "16px", padding: "10px 14px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "6px" }}>
+                        <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#5a6a85", marginBottom: "4px" }}>Your notes</div>
+                        <div style={{ fontSize: "13px", color: "#1a1a1a", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{r.notes}</div>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              )}
+            </>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function ArticlePanel({ article, chosenByHuman, chosenByPrompt, score, beta }: {
+  article: ArticleFull | undefined;
+  chosenByHuman: boolean;
+  chosenByPrompt: boolean;
+  score: number | null;
+  beta: number | null;
+}) {
+  if (!article) {
+    return <div style={{ padding: "12px", color: "#bbb", fontSize: "13px" }}>(article missing)</div>;
+  }
+  const border = chosenByHuman ? "2px solid #059669" : chosenByPrompt ? "2px solid #E83B2A" : "1px solid #e5e7eb";
+  return (
+    <div style={{ background: "#fff", borderRadius: "8px", border, padding: "14px 16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px", marginBottom: "8px" }}>
+        <div style={{ display: "flex", gap: "6px" }}>
+          {chosenByHuman && (
+            <span style={{ fontSize: "10px", fontWeight: 700, color: "#fff", background: "#059669", padding: "2px 6px", borderRadius: "4px" }}>YOUR CHOICE</span>
+          )}
+          {chosenByPrompt && (
+            <span style={{ fontSize: "10px", fontWeight: 700, color: "#fff", background: "#E83B2A", padding: "2px 6px", borderRadius: "4px" }}>PROMPT</span>
+          )}
+        </div>
+        <div style={{ fontSize: "11px", color: "#94a3b8", fontVariantNumeric: "tabular-nums" }}>
+          β {beta === null ? "—" : beta.toFixed(2)} · score {score === null ? "—" : score.toFixed(2)}
+        </div>
+      </div>
+      <div style={{ fontSize: "13px", fontWeight: 600, lineHeight: 1.4, marginBottom: "4px" }}>{article.title}</div>
+      <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "10px" }}>
+        {[article.journal, fmtDate(article.published_date), article.article_type].filter(Boolean).join(" · ")}
+        {article.pmid && <> · PMID {article.pmid}</>}
+      </div>
+      <FieldRow label="Short headline" value={article.short_headline} />
+      <FieldRow label="Short resume"   value={article.resume}         divider />
+      <FieldRow label="Bottom line"    value={article.bottom_line}    divider />
+      <div style={{ borderTop: "1px solid #ebebeb", paddingTop: "10px", marginTop: "10px" }}>
+        <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#5a6a85", marginBottom: "6px" }}>SARI</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", background: "#fafafa", borderRadius: "6px", padding: "10px" }}>
+          <SariCell label="Subject"     value={article.sari?.subject     ?? null} />
+          <SariCell label="Action"      value={article.sari?.action      ?? null} />
+          <SariCell label="Result"      value={article.sari?.result      ?? null} />
+          <SariCell label="Implication" value={article.sari?.implication ?? null} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FieldRow({ label, value, divider }: { label: string; value: string | null; divider?: boolean }) {
+  return (
+    <div style={{ borderTop: divider ? "1px solid #ebebeb" : "none", paddingTop: divider ? "10px" : 0, marginTop: divider ? "10px" : 0 }}>
+      <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#5a6a85", marginBottom: "2px" }}>{label}</div>
+      <div style={{ fontSize: "12px", color: value ? "#1a1a1a" : "#bbb", lineHeight: 1.5 }}>{value ?? "—"}</div>
+    </div>
+  );
+}
+
+function SariCell({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div>
+      <div style={{ fontSize: "9px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "#94a3b8", marginBottom: "2px" }}>{label}</div>
+      <div style={{ fontSize: "11px", color: value ? "#374151" : "#bbb", lineHeight: 1.4 }}>{value ?? "—"}</div>
+    </div>
+  );
+}
+
+const thStyle: React.CSSProperties = {
+  textAlign: "left",
+  fontSize: "11px",
+  fontWeight: 600,
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+  color: "#5a6a85",
+  padding: "10px 16px",
+};
+
+const tdStyle: React.CSSProperties = {
+  fontSize: "13px",
+  padding: "10px 16px",
+};
