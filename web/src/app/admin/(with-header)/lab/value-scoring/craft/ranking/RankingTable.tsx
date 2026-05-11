@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 
 export interface ArticlePairDetail {
   result:     "won" | "lost";
@@ -50,9 +50,8 @@ export default function RankingTable({ ranked }: Props) {
         {ranked.map((r, i) => {
           const isOpen = expanded.has(r.id);
           return (
-            <>
+            <React.Fragment key={r.id}>
               <tr
-                key={r.id}
                 onClick={() => toggle(r.id)}
                 style={{
                   borderTop: "1px solid #f5f5f5",
@@ -143,7 +142,7 @@ export default function RankingTable({ ranked }: Props) {
                   </td>
                 </tr>
               )}
-            </>
+            </React.Fragment>
           );
         })}
       </tbody>
