@@ -4,19 +4,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 
 interface VersionOption {
-  id:      string;
-  version: number;
+  id:          string;
+  version:     number;
   scoredCount: number;
   articleCount: number;
 }
 
 interface Props {
-  versions:     VersionOption[];
-  promptId:     string;
-  minScoreDiff: number;
+  versions: VersionOption[];
+  promptId: string;
 }
 
-export default function EvaluationFilters({ versions, promptId, minScoreDiff }: Props) {
+export default function EvaluationFilters({ versions, promptId }: Props) {
   const router = useRouter();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
@@ -47,26 +46,6 @@ export default function EvaluationFilters({ versions, promptId, minScoreDiff }: 
             </option>
           ))}
         </select>
-      </label>
-
-      <label style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#5a6a85" }}>
-          Min score diff
-        </span>
-        <input
-          type="number"
-          step="0.1"
-          min="0"
-          value={minScoreDiff}
-          onChange={e => update({ minScoreDiff: e.target.value })}
-          style={{
-            width: "70px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "6px",
-            padding: "6px 8px", fontSize: "13px", color: "#1a1a1a",
-          }}
-        />
-        <span style={{ fontSize: "11px", color: "#94a3b8" }}>
-          (hide close calls)
-        </span>
       </label>
     </div>
   );

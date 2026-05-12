@@ -73,7 +73,3 @@ export const QUICK_TEST_BOTTOM = 5;
 export const QUICK_TEST_MIDDLE = 5;
 export const QUICK_TEST_TOTAL  = QUICK_TEST_TOP + QUICK_TEST_BOTTOM + QUICK_TEST_MIDDLE;
 
-// Disagreement filter on the evaluation page: ignore pairs where the
-// prompt's |score_a - score_b| is smaller than this threshold (close calls
-// are not strong disagreements).
-export const DISAGREEMENT_MIN_DIFF = 1.0;

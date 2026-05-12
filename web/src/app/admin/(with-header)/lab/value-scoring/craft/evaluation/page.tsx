@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { CRAFT_MODULE_KEY, DISAGREEMENT_MIN_DIFF } from "@/lib/lab/value-scoring/craft-config";
+import { CRAFT_MODULE_KEY } from "@/lib/lab/value-scoring/craft-config";
 import { getPromptVersions } from "@/lib/lab/value-scoring/prompt-versions";
 import { computePairMatch, getDisagreements } from "@/lib/lab/value-scoring/evaluation";
 import EvaluationFilters from "./EvaluationFilters";
@@ -8,7 +8,7 @@ import DisagreementList, { type ArticleFull } from "./DisagreementList";
 import GenerateIterationButton from "./GenerateIterationButton";
 
 interface PageProps {
-  searchParams: Promise<{ promptId?: string; minScoreDiff?: string }>;
+  searchParams: Promise<{ promptId?: string }>;
 }
 
 export default async function EvaluationPage({ searchParams }: PageProps) {
@@ -52,13 +52,10 @@ export default async function EvaluationPage({ searchParams }: PageProps) {
   const promptId = (sp.promptId && fullyScored.some(v => v.id === sp.promptId))
     ? sp.promptId
     : fullyScored[0].id;
-  const minScoreDiff = sp.minScoreDiff !== undefined && !Number.isNaN(Number(sp.minScoreDiff))
-    ? Math.max(0, Number(sp.minScoreDiff))
-    : DISAGREEMENT_MIN_DIFF;
 
   const [pairMatch, disagreements] = await Promise.all([
     computePairMatch(admin, promptId),
-    getDisagreements(admin, promptId, { minScoreDiff }),
+    getDisagreements(admin, promptId, { minScoreDiff: 0 }),
   ]);
 
   // Iteration history: pair-match for each fully-scored version. Sorted by version desc.
@@ -93,7 +90,6 @@ export default async function EvaluationPage({ searchParams }: PageProps) {
       <EvaluationFilters
         versions={fullyScored.map(v => ({ id: v.id, version: v.version, scoredCount: v.scoredCount, articleCount: v.articleCount }))}
         promptId={promptId}
-        minScoreDiff={minScoreDiff}
       />
 
       {/* Iteration history card */}
@@ -121,7 +117,7 @@ export default async function EvaluationPage({ searchParams }: PageProps) {
                       {selected ? (
                         <span>v{h.version} <span style={{ fontSize: "10px", color: "#E83B2A", fontWeight: 700, marginLeft: "4px" }}>SELECTED</span></span>
                       ) : (
-                        <Link href={`?promptId=${h.id}&minScoreDiff=${minScoreDiff}`} style={{ color: "#E83B2A", textDecoration: "none" }}>
+                        <Link href={`?promptId=${h.id}`} style={{ color: "#E83B2A", textDecoration: "none" }}>
                           v{h.version}
                         </Link>
                       )}
@@ -154,7 +150,7 @@ export default async function EvaluationPage({ searchParams }: PageProps) {
       <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", overflow: "hidden" }}>
         <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
           <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
-            Disagreements · v{selectedVersion.version} · {disagreements.length} shown (score diff ≥ {minScoreDiff})
+            Disagreements · v{selectedVersion.version} · {disagreements.length} total
           </span>
         </div>
         <DisagreementList rows={disagreements} articles={articles} />
