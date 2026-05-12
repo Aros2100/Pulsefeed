@@ -95,8 +95,10 @@ export default function DisagreementList({ rows, articles }: Props) {
               </tr>
               {open && (
                 <tr key={r.pairId + "-detail"} style={{ background: "#fafbfc" }}>
-                  <td colSpan={5} style={{ padding: "16px 24px" }}>
-                    {/* YOUR CHOICE always left, PROMPT always right */}
+                  <td colSpan={5} style={{ padding: "16px 24px", maxWidth: 0, overflow: "hidden" }}>
+                    {/* YOUR CHOICE always left, PROMPT always right.
+                        minWidth: 0 on each ArticlePanel root div is essential — without it,
+                        CSS grid children expand to fit their content instead of their track. */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                       {/* Human-chosen panel */}
                       {r.humanChoiceId === r.articleA.id ? (
@@ -183,7 +185,7 @@ function ArticlePanel({ article, chosenByHuman, chosenByPrompt, craftScore, dime
   }
   const border = chosenByHuman ? "2px solid #059669" : chosenByPrompt ? "2px solid #E83B2A" : "1px solid #e5e7eb";
   return (
-    <div style={{ background: "#fff", borderRadius: "8px", border, padding: "14px 16px" }}>
+    <div style={{ background: "#fff", borderRadius: "8px", border, padding: "14px 16px", minWidth: 0, overflow: "hidden" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px", marginBottom: "8px" }}>
         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
           {chosenByHuman && (
