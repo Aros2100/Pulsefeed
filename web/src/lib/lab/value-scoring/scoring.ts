@@ -47,24 +47,21 @@ export const DIMENSION_WEIGHTS: Record<string, number> = {
 };
 
 /**
- * Compute normalised craft_score (10-100) from the rubric dimensions.
- * Null dimensions are excluded; the remaining weights are scaled to 100
- * so the result stays on the same 10-100 scale regardless of how many
- * dimensions were assessable.
+ * Compute craft_score (10-100) from the rubric dimensions.
+ * All 10 dimensions are expected to be scored (no nulls after parsing).
  *
- * formula: craft = sum(score×weight / 10 for scored dims) × (100 / sumWeights)
+ * formula: craft = sum(score × weight / 10) over all scored dimensions
+ * range: 10 (all 1s) → 100 (all 10s)
  */
 export function computeCraftScore(dimensions: DimensionScores): number | null {
-  let sumContributions = 0;
-  let sumWeights = 0;
+  let sum = 0;
+  let hasAny = false;
   for (const [key, val] of Object.entries(dimensions)) {
     if (val === null) continue;
-    const weight = DIMENSION_WEIGHTS[key] ?? 0;
-    sumContributions += (val * weight) / 10;
-    sumWeights += weight;
+    sum += (val * (DIMENSION_WEIGHTS[key] ?? 0)) / 10;
+    hasAny = true;
   }
-  if (sumWeights === 0) return null;
-  return sumContributions * (100 / sumWeights);
+  return hasAny ? sum : null;
 }
 
 export interface ParsedScore {
@@ -134,6 +131,10 @@ function readNumber(raw: unknown): number | null {
   return null;
 }
 
+// Fallback score used when model returns null for a dimension despite being
+// told to score all 10. Represents "missing reporting = weak craft signal".
+const NULL_DIMENSION_FALLBACK = 3;
+
 function parseDimensions(raw: unknown): DimensionScores | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const obj = raw as Record<string, unknown>;
@@ -141,7 +142,8 @@ function parseDimensions(raw: unknown): DimensionScores | null {
   let hasAny = false;
   for (const [key, val] of Object.entries(obj)) {
     if (val === null) {
-      result[key] = null;
+      // Model was told not to return null; treat as missing-reporting signal.
+      result[key] = NULL_DIMENSION_FALLBACK;
       hasAny = true;
     } else {
       const n = typeof val === "number" ? val : typeof val === "string" ? Number(val) : NaN;
