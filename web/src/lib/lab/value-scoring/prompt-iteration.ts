@@ -100,8 +100,10 @@ export function buildIterationRequest(
 }
 
 export function parseIterationResponse(rawText: string): { promptText: string; changeNotes: string } | null {
+  // Strip markdown fences (```json ... ``` or ``` ... ```) that models sometimes wrap around JSON.
+  const stripped = rawText.replace(/^```(?:json)?\s*/m, "").replace(/\s*```\s*$/m, "").trim();
   try {
-    const match = rawText.match(/\{[\s\S]*\}/);
+    const match = stripped.match(/\{[\s\S]*\}/);
     if (!match) return null;
     const parsed = JSON.parse(match[0]) as { prompt_text?: unknown; change_notes?: unknown };
     const promptText  = typeof parsed.prompt_text  === "string" ? parsed.prompt_text.trim()  : "";
@@ -440,8 +442,11 @@ export async function generatePromptIterationFromDisagreements(
   const message = await trackedCall(modelKey, params, undefined, "value_scoring_craft_iterate");
   const raw = (message.content[0] as { type: string; text: string }).text;
 
+  console.log(`[iterate v${p.version}] raw response (first 600 chars):\n${raw.slice(0, 600)}`);
+
   const parsed = parseIterationResponse(raw);
   if (!parsed) {
+    console.error(`[iterate v${p.version}] PARSE FAILED. Full raw response:\n${raw}`);
     throw new Error("AI response could not be parsed — try again");
   }
 
