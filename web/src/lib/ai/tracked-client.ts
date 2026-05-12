@@ -65,9 +65,10 @@ export async function trackedCall(
   modelKey: string,
   params: MessageCreateParamsNonStreaming,
   articleId?: string,
-  task?: string
+  task?: string,
+  timeoutMs = 300_000,
 ) {
-  const response = await anthropic.messages.create({ ...params, stream: false }, { timeout: 60_000 });
+  const response = await anthropic.messages.create({ ...params, stream: false }, { timeout: timeoutMs });
 
   const promptTokens     = response.usage.input_tokens;
   const completionTokens = response.usage.output_tokens;
