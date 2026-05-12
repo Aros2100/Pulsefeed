@@ -247,6 +247,7 @@ export interface QuickResultRow {
   article_type:     string | null;
   normalizedScore:  number | null; // BT normalized 1-10 score
   score:            number | null; // prompt score
+  reasoning:        string | null; // prompt reasoning text
 }
 
 /**
@@ -265,13 +266,15 @@ export async function getQuickResults(db: Db, promptId: string): Promise<QuickRe
 
   const { data: scores } = await db
     .from("lab_value_article_scores")
-    .select("article_id, score")
+    .select("article_id, score, reasoning")
     .eq("prompt_id", promptId);
-  type S = { article_id: string; score: number | string | null };
-  const scoreMap = new Map<string, number | null>();
+  type S = { article_id: string; score: number | string | null; reasoning: string | null };
+  const scoreMap     = new Map<string, number | null>();
+  const reasoningMap = new Map<string, string | null>();
   for (const s of (scores ?? []) as S[]) {
     const n = s.score === null ? null : Number(s.score);
     scoreMap.set(s.article_id, n !== null && Number.isFinite(n) ? n : null);
+    reasoningMap.set(s.article_id, s.reasoning ?? null);
   }
   if (scoreMap.size === 0) return [];
 
@@ -302,6 +305,7 @@ export async function getQuickResults(db: Db, promptId: string): Promise<QuickRe
       article_type:    art.article_type,
       normalizedScore: normalizedMap.get(articleId) ?? null,
       score,
+      reasoning:       reasoningMap.get(articleId) ?? null,
     });
   }
 
