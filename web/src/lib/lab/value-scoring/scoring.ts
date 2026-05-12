@@ -31,9 +31,12 @@ export interface ScoringArticle {
   sari:            unknown;
 }
 
+export type DimensionScores = Record<string, number>;
+
 export interface ParsedScore {
   score:      number | null; // 1-10 (derived from craft_score when present, else read directly)
   craftScore: number | null; // 20-100 from rubric prompt; null for legacy prompts
+  dimensions: DimensionScores | null; // per-dimension 1-5 scores; null for legacy or parse failure
   reasoning:  string | null;
 }
 
@@ -109,11 +112,24 @@ function readNumber(raw: unknown): number | null {
   return null;
 }
 
+function parseDimensions(raw: unknown): DimensionScores | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const obj = raw as Record<string, unknown>;
+  const result: DimensionScores = {};
+  let valid = 0;
+  for (const [key, val] of Object.entries(obj)) {
+    const n = typeof val === "number" ? val : typeof val === "string" ? Number(val) : NaN;
+    if (Number.isFinite(n)) { result[key] = n; valid++; }
+  }
+  if (valid === 0) return null;
+  return result;
+}
+
 export function parseScoringResponse(rawText: string): ParsedScore {
   try {
     const match = rawText.match(/\{[\s\S]*\}/);
-    if (!match) return { score: null, craftScore: null, reasoning: null };
-    const parsed = JSON.parse(match[0]) as { score?: unknown; craft_score?: unknown; reasoning?: unknown };
+    if (!match) return { score: null, craftScore: null, dimensions: null, reasoning: null };
+    const parsed = JSON.parse(match[0]) as { score?: unknown; craft_score?: unknown; dimensions?: unknown; reasoning?: unknown };
 
     const craftScore  = readNumber(parsed.craft_score);
     const directScore = readNumber(parsed.score);
@@ -125,10 +141,11 @@ export function parseScoringResponse(rawText: string): ParsedScore {
     if (craftScore !== null) score = craftScoreToScore(craftScore);
     else if (directScore !== null) score = directScore;
 
-    const reasoning = typeof parsed.reasoning === "string" ? parsed.reasoning : null;
-    return { score, craftScore, reasoning };
+    const dimensions = parseDimensions(parsed.dimensions);
+    const reasoning  = typeof parsed.reasoning === "string" ? parsed.reasoning : null;
+    return { score, craftScore, dimensions, reasoning };
   } catch {
-    return { score: null, craftScore: null, reasoning: null };
+    return { score: null, craftScore: null, dimensions: null, reasoning: null };
   }
 }
 
@@ -305,11 +322,12 @@ export async function scoreArticlesWithPrompt(
       const params = buildScoringRequest(article, p.prompt_text, effectiveModel);
       const message = await trackedCall(modelKey, params, article.id, task);
       const raw = (message.content[0] as { type: string; text: string }).text.trim();
-      const { score, craftScore, reasoning } = parseScoringResponse(raw);
+      const { score, craftScore, dimensions, reasoning } = parseScoringResponse(raw);
       return {
         article_id:   article.id,
         score,
         craftScore,
+        dimensions,
         reasoning,
         raw_response: { text: raw, usage: message.usage },
       };
@@ -319,6 +337,7 @@ export async function scoreArticlesWithPrompt(
         article_id:   article.id,
         score:        null,
         craftScore:   null,
+        dimensions:   null,
         reasoning:    null,
         raw_response: { error: errMessage },
       };
@@ -332,6 +351,7 @@ export async function scoreArticlesWithPrompt(
     article_id:    r.article_id,
     score:         r.score,
     craft_score:   r.craftScore,
+    dimensions:    r.dimensions,
     reasoning:     r.reasoning,
     raw_response:  r.raw_response,
     scoring_model: effectiveModel,
