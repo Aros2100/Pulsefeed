@@ -21,17 +21,51 @@ import {
 type Db = any;
 
 export interface ScoringArticle {
-  id:              string;
-  title:           string;
-  journal:         string | null;
-  article_type:    string | null;
-  short_headline:  string | null;
-  resume:          string | null;
-  bottom_line:     string | null;
-  sari:            unknown;
+  id:           string;
+  title:        string;
+  journal:      string | null;
+  article_type: string | null;
+  abstract:     string | null;
 }
 
-export type DimensionScores = Record<string, number>;
+// Dimension scores 1-10 per dimension; null means "not assessable from the abstract".
+export type DimensionScores = Record<string, number | null>;
+
+// Rubric weights per dimension (sum = 100).
+// Used to normalise craft_score when some dimensions are null.
+export const DIMENSION_WEIGHTS: Record<string, number> = {
+  bias:                   20,
+  statistical_analyses:   15,
+  study_design:           15,
+  outcome_quality:        10,
+  sample_size:            10,
+  intervention_integrity: 10,
+  protocol_adherence:      5,
+  consistency:             5,
+  generalizability:        5,
+  reproducibility:         5,
+};
+
+/**
+ * Compute normalised craft_score (10-100) from the rubric dimensions.
+ * Null dimensions are excluded; the remaining weights are scaled to 100
+ * so the result stays on the same 10-100 scale regardless of how many
+ * dimensions were assessable.
+ *
+ * formula: craft = sum(score×weight / 10 for scored dims) × (100 / sumWeights)
+ */
+export function computeCraftScore(dimensions: DimensionScores): number | null {
+  let sumContributions = 0;
+  let sumWeights = 0;
+  for (const [key, val] of Object.entries(dimensions)) {
+    if (val === null) continue;
+    const weight = DIMENSION_WEIGHTS[key] ?? 0;
+    sumContributions += (val * weight) / 10;
+    sumWeights += weight;
+  }
+  if (sumWeights === 0) return null;
+  return sumContributions * (100 / sumWeights);
+}
 
 export interface ParsedScore {
   score:      number | null; // 1-10 (derived from craft_score when present, else read directly)
@@ -53,36 +87,27 @@ export interface ScoringSummary {
   promptVersion: number;
 }
 
+const MIN_ABSTRACT_LENGTH = 100;
+
 function fmtField(label: string, value: string | null | undefined): string {
   return `${label}: ${value && value.trim().length > 0 ? value.trim() : "—"}`;
 }
 
-function fmtSari(sari: unknown): string {
-  if (!sari || typeof sari !== "object") return "SARI: —";
-  const s = sari as Record<string, unknown>;
-  const subject     = typeof s.subject     === "string" ? s.subject     : null;
-  const action      = typeof s.action      === "string" ? s.action      : null;
-  const result      = typeof s.result      === "string" ? s.result      : null;
-  const implication = typeof s.implication === "string" ? s.implication : null;
-  return [
-    "SARI:",
-    `  Subject: ${subject ?? "—"}`,
-    `  Action: ${action ?? "—"}`,
-    `  Result: ${result ?? "—"}`,
-    `  Implication: ${implication ?? "—"}`,
-  ].join("\n");
-}
-
 export function buildUserMessage(article: ScoringArticle): string {
-  return [
-    fmtField("Title",          article.title),
-    fmtField("Article type",   article.article_type),
-    fmtField("Journal",        article.journal),
-    fmtField("Short headline", article.short_headline),
-    fmtField("Resume",         article.resume),
-    fmtField("Bottom line",    article.bottom_line),
-    fmtSari(article.sari),
-  ].join("\n");
+  const abstract = article.abstract?.trim() ?? "";
+  const lines = [
+    fmtField("Title",        article.title),
+    fmtField("Article type", article.article_type),
+    fmtField("Journal",      article.journal),
+    "",
+  ];
+  if (abstract.length >= MIN_ABSTRACT_LENGTH) {
+    lines.push("Abstract:");
+    lines.push(abstract);
+  } else {
+    lines.push("Abstract: NOT AVAILABLE — score based on metadata alone. Return null for dimensions that cannot be assessed without the abstract.");
+  }
+  return lines.join("\n");
 }
 
 export function buildScoringRequest(article: ScoringArticle, promptText: string, modelOverride?: string) {
@@ -94,8 +119,7 @@ export function buildScoringRequest(article: ScoringArticle, promptText: string,
       promptText,
       "",
       "Respond only with valid JSON, no other text and no markdown fences.",
-      "Preferred output: {\"craft_score\": <number 20-100>, \"reasoning\": <string>}",
-      "Legacy output also accepted: {\"score\": <number 1-10>, \"reasoning\": <string>}",
+      "Output format: {\"craft_score\": <number 10-100>, \"dimensions\": {<dim>: <1-10 or null>, ...}, \"reasoning\": <string>}",
     ].join("\n"),
     messages: [{ role: "user" as const, content: buildUserMessage(article) }],
   };
@@ -114,13 +138,17 @@ function parseDimensions(raw: unknown): DimensionScores | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const obj = raw as Record<string, unknown>;
   const result: DimensionScores = {};
-  let valid = 0;
+  let hasAny = false;
   for (const [key, val] of Object.entries(obj)) {
-    const n = typeof val === "number" ? val : typeof val === "string" ? Number(val) : NaN;
-    if (Number.isFinite(n)) { result[key] = n; valid++; }
+    if (val === null) {
+      result[key] = null;
+      hasAny = true;
+    } else {
+      const n = typeof val === "number" ? val : typeof val === "string" ? Number(val) : NaN;
+      if (Number.isFinite(n)) { result[key] = n; hasAny = true; }
+    }
   }
-  if (valid === 0) return null;
-  return result;
+  return hasAny ? result : null;
 }
 
 export function parseScoringResponse(rawText: string): ParsedScore {
@@ -129,18 +157,26 @@ export function parseScoringResponse(rawText: string): ParsedScore {
     if (!match) return { score: null, craftScore: null, dimensions: null, reasoning: null };
     const parsed = JSON.parse(match[0]) as { score?: unknown; craft_score?: unknown; dimensions?: unknown; reasoning?: unknown };
 
-    const craftScore  = readNumber(parsed.craft_score);
-    const directScore = readNumber(parsed.score);
+    const dimensions = parseDimensions(parsed.dimensions);
 
-    // Prefer craft_score (the rubric's real output). Derive the 1-10 column
-    // from it so legacy consumers of `score` keep working. If only the
-    // legacy score is present, use it directly.
+    // If dimensions are present, compute craft_score from them using the
+    // normalised formula (null dims excluded, weights re-scaled to 100).
+    // This is authoritative when some dimensions are null.
+    // If no dimensions (legacy prompt), fall back to reported craft_score or score.
+    let craftScore: number | null = null;
+    if (dimensions !== null) {
+      craftScore = computeCraftScore(dimensions);
+    }
+    if (craftScore === null) {
+      craftScore = readNumber(parsed.craft_score);
+    }
+
+    const directScore = readNumber(parsed.score);
     let score: number | null = null;
     if (craftScore !== null) score = craftScoreToScore(craftScore);
     else if (directScore !== null) score = directScore;
 
-    const dimensions = parseDimensions(parsed.dimensions);
-    const reasoning  = typeof parsed.reasoning === "string" ? parsed.reasoning : null;
+    const reasoning = typeof parsed.reasoning === "string" ? parsed.reasoning : null;
     return { score, craftScore, dimensions, reasoning };
   } catch {
     return { score: null, craftScore: null, dimensions: null, reasoning: null };
@@ -303,10 +339,10 @@ export async function scoreArticlesWithPrompt(
     return { total: 0, succeeded: 0, failed: 0, durationMs: Date.now() - start, promptVersion: p.version };
   }
 
-  // Fetch full article rows for selected ids
+  // Fetch scoring fields — title/article_type/journal/abstract only.
   const { data: articles } = await db
     .from("lab_value_articles")
-    .select("id, title, journal, article_type, short_headline, resume, bottom_line, sari")
+    .select("id, title, journal, article_type, abstract")
     .in("id", articleIds);
 
   const arts = (articles ?? []) as ScoringArticle[];

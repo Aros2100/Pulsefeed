@@ -264,7 +264,7 @@ export function buildV1Request(
     "  }",
     "- The 20-100 scale should match how the BT ranking distributes: 100 looks like the top of the BT ranking (Article #1), 20 looks like the bottom (last article).",
     "- Do NOT ask the model to map craft_score onto a 1-10 scale — return the raw craft_score directly.",
-    "- The prompt should be self-contained — assume Claude only sees the prompt and one article's fields (title, article_type, journal, short_headline, resume, bottom_line, SARI).",
+    "- The prompt should be self-contained — assume Claude only sees: title, article_type, journal, and abstract. Abstract may be unavailable for some articles (letters, editorials).",
     "- Criteria in the generated prompt MUST be about HOW the work was done (study design rigor, statistical handling, reporting quality, methodological transparency, reproducibility), NOT about WHAT it concerns (clinical relevance, actionability, importance to practice).",
     "- If clinician reasons mention strategic value or clinical importance, treat that as background context — focus on the methodological elements they emphasised.",
     "- Reflect the actual dimensions the clinician cares about (visible in the reason categories and notes). Generic platitudes are not useful — be specific.",

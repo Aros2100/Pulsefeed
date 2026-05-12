@@ -34,9 +34,9 @@ export interface DisagreementRow {
   normalizedA:     number | null;
   normalizedB:     number | null;
   normalizedDiff:  number;
-  // Prompt dimensions + reasoning per article
-  dimensionsA:     Record<string, number> | null;
-  dimensionsB:     Record<string, number> | null;
+  // Prompt dimensions + reasoning per article (null per dimension = not assessable)
+  dimensionsA:     Record<string, number | null> | null;
+  dimensionsB:     Record<string, number | null> | null;
   reasoningA:      string | null;
   reasoningB:      string | null;
   articleA:        { id: string; title: string; article_type: string | null };
@@ -236,7 +236,7 @@ export async function computeRankingCorrelation(db: Db, promptId: string): Promi
 
 interface ArticleScoreDetail {
   craftScore:  number | null;
-  dimensions:  Record<string, number> | null;
+  dimensions:  Record<string, number | null> | null;
   reasoning:   string | null;
 }
 
