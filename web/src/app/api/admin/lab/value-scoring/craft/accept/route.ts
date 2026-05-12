@@ -60,7 +60,7 @@ export async function POST() {
   const prodIds = (candidates as { prod_article_id: string }[]).map(c => c.prod_article_id);
   const { data: articles, error: artErr } = await admin
     .from("articles")
-    .select("id, pubmed_id, title, journal_abbr, article_type, published_date, short_headline, short_resume, bottom_line, sari_subject, sari_action, sari_result, sari_implication")
+    .select("id, pubmed_id, title, journal_abbr, article_type, published_date, abstract, short_headline, short_resume, bottom_line, sari_subject, sari_action, sari_result, sari_implication")
     .in("id", prodIds);
 
   if (artErr) {
@@ -75,7 +75,9 @@ export async function POST() {
   const frozenAt = new Date().toISOString();
   type ArtRow = {
     id: string; pubmed_id: string | null; title: string; journal_abbr: string | null;
-    article_type: string | null; published_date: string | null; short_headline: string | null;
+    article_type: string | null; published_date: string | null;
+    abstract: string | null;
+    short_headline: string | null;
     short_resume: string | null; bottom_line: string | null;
     sari_subject: string | null; sari_action: string | null;
     sari_result: string | null; sari_implication: string | null;
@@ -92,6 +94,7 @@ export async function POST() {
         journal:         a.journal_abbr,
         article_type:    a.article_type,
         published_date:  a.published_date,
+        abstract:        a.abstract,
         short_headline:  a.short_headline,
         resume:          a.short_resume,
         bottom_line:     a.bottom_line,

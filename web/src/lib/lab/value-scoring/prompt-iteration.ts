@@ -245,7 +245,7 @@ export function buildV1Request(
     "Hard rules:",
     "- The prompt MUST instruct Claude to return only JSON of the form {\"score\": <number 1-10>, \"reasoning\": <string>}.",
     "- The 1-10 scale should match how the BT ranking distributes: 10 looks like the top of the BT ranking (Article #1), 1 looks like the bottom (last article).",
-    "- The prompt should be self-contained — assume Claude only sees the prompt and one article's fields (title, article_type, journal, short_headline, resume, bottom_line, SARI).",
+    "- The prompt should be self-contained — assume Claude only sees the prompt and one article's raw source fields: title, article_type, journal, and abstract. The clinician's pairwise decisions below also reference AI-generated summaries (short_headline, resume, bottom_line, SARI), but the SCORING MODEL DOES NOT receive those — it must derive craft signals from the abstract directly.",
     "- Criteria in the generated prompt MUST be about HOW the work was done (study design rigor, statistical handling, reporting quality, methodological transparency, reproducibility), NOT about WHAT it concerns (clinical relevance, actionability, importance to practice).",
     "- If clinician reasons mention strategic value or clinical importance, treat that as background context — focus on the methodological elements they emphasised.",
     "- Reflect the actual dimensions the clinician cares about (visible in the reason categories and notes). Generic platitudes are not useful — be specific.",
