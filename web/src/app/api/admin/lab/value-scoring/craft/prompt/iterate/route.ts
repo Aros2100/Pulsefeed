@@ -8,7 +8,8 @@ import { generatePromptIterationFromDisagreements } from "@/lib/lab/value-scorin
 export const maxDuration = 120;
 
 const schema = z.object({
-  promptId: z.string().uuid(),
+  promptId:       z.string().uuid(),
+  filterPairIds:  z.array(z.string().uuid()).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -23,13 +24,13 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: parsed.error.issues[0].message }, { status: 400 });
   }
-  const { promptId } = parsed.data;
+  const { promptId, filterPairIds } = parsed.data;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
 
   try {
-    const suggestion = await generatePromptIterationFromDisagreements(admin, promptId);
+    const suggestion = await generatePromptIterationFromDisagreements(admin, promptId, filterPairIds);
     return NextResponse.json({
       ok: true,
       promptText:         suggestion.promptText,

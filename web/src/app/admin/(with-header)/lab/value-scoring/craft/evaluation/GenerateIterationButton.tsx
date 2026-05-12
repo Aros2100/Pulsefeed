@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface Props {
-  promptId:      string;
-  promptVersion: number;
+  promptId:        string;
+  promptVersion:   number;
+  filterPairIds?:  string[]; // if set, only iterate on these pairs
 }
 
 type Suggestion = {
@@ -15,7 +16,7 @@ type Suggestion = {
   promptVersion:     number;
 };
 
-export default function GenerateIterationButton({ promptId, promptVersion }: Props) {
+export default function GenerateIterationButton({ promptId, promptVersion, filterPairIds }: Props) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
   const [creating, setCreating]     = useState(false);
@@ -32,7 +33,10 @@ export default function GenerateIterationButton({ promptId, promptVersion }: Pro
       const res = await fetch("/api/admin/lab/value-scoring/craft/prompt/iterate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ promptId }),
+        body: JSON.stringify({
+          promptId,
+          ...(filterPairIds && filterPairIds.length > 0 ? { filterPairIds } : {}),
+        }),
       });
       const json = await res.json();
       if (!json.ok) {
@@ -95,7 +99,11 @@ export default function GenerateIterationButton({ promptId, promptVersion }: Pro
               cursor: generating ? "default" : "pointer",
             }}
           >
-            {generating ? "Reading disagreements…" : "Generate next version based on disagreements"}
+            {generating
+            ? "Reading disagreements…"
+            : filterPairIds && filterPairIds.length > 0
+              ? `Generate next version based on ${filterPairIds.length} visible disagreements`
+              : "Generate next version based on disagreements"}
           </button>
         </div>
       )}

@@ -4,8 +4,8 @@ import { CRAFT_MODULE_KEY } from "@/lib/lab/value-scoring/craft-config";
 import { getPromptVersions } from "@/lib/lab/value-scoring/prompt-versions";
 import { computePairMatch, getDisagreements } from "@/lib/lab/value-scoring/evaluation";
 import EvaluationFilters from "./EvaluationFilters";
-import DisagreementList, { type ArticleFull } from "./DisagreementList";
-import GenerateIterationButton from "./GenerateIterationButton";
+import EvaluationActions from "./EvaluationActions";
+import { type ArticleFull } from "./DisagreementList";
 
 interface PageProps {
   searchParams: Promise<{ promptId?: string }>;
@@ -153,10 +153,13 @@ export default async function EvaluationPage({ searchParams }: PageProps) {
             Disagreements · v{selectedVersion.version} · {disagreements.length} total
           </span>
         </div>
-        <DisagreementList rows={disagreements} articles={articles} />
+        <EvaluationActions
+          rows={disagreements}
+          articles={articles}
+          promptId={promptId}
+          promptVersion={selectedVersion.version}
+        />
       </div>
-
-      <GenerateIterationButton promptId={promptId} promptVersion={selectedVersion.version} />
 
       <div style={{ marginTop: "20px", display: "flex", justifyContent: "space-between" }}>
         <Link href="/admin/lab/value-scoring/craft" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>

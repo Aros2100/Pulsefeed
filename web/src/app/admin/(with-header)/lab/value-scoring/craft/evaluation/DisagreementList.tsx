@@ -18,8 +18,9 @@ export interface ArticleFull {
 }
 
 interface Props {
-  rows:        DisagreementRow[];
-  articles:    Record<string, ArticleFull>;
+  rows:             DisagreementRow[];
+  articles:         Record<string, ArticleFull>;
+  onFilterChange?:  (pairIds: string[]) => void;
 }
 
 function fmtDate(iso: string | null): string {
@@ -27,7 +28,7 @@ function fmtDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export default function DisagreementList({ rows, articles }: Props) {
+export default function DisagreementList({ rows, articles, onFilterChange }: Props) {
   const [expanded,     setExpanded]     = useState<Set<string>>(new Set());
   const [minCraftDiff, setMinCraftDiff] = useState(0);
 
@@ -43,6 +44,12 @@ export default function DisagreementList({ rows, articles }: Props) {
   const filtered = minCraftDiff > 0
     ? rows.filter(r => r.craftDiff >= minCraftDiff)
     : rows;
+
+  // Notify parent whenever the visible set changes so the iterate button
+  // can pick up the filtered pair IDs.
+  React.useEffect(() => {
+    onFilterChange?.(filtered.map(r => r.pairId));
+  }, [filtered, onFilterChange]);
 
   if (rows.length === 0) {
     return (

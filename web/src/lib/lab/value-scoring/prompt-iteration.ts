@@ -446,6 +446,7 @@ export async function generatePromptV1FromPairwise(db: Db, moduleId: string): Pr
 export async function generatePromptIterationFromDisagreements(
   db: Db,
   promptId: string,
+  filterPairIds?: string[], // if provided, only use these disagreement pairs
 ): Promise<IterationSuggestion> {
   const { data: prompt } = await db
     .from("lab_value_prompts")
@@ -455,9 +456,10 @@ export async function generatePromptIterationFromDisagreements(
   if (!prompt) throw new Error("Prompt not found");
   const p = prompt as { id: string; prompt_text: string; version: number };
 
-  // Use the same disagreement source the evaluation page shows — but with
-  // no minScoreDiff threshold here so the AI sees the full picture.
-  const disagreements = await getDisagreements(db, promptId, { minScoreDiff: 0 });
+  const all = await getDisagreements(db, promptId, { minScoreDiff: 0 });
+  const disagreements = filterPairIds && filterPairIds.length > 0
+    ? all.filter(d => filterPairIds.includes(d.pairId))
+    : all;
   if (disagreements.length === 0) {
     throw new Error("No disagreements found for this prompt — nothing to iterate on");
   }
