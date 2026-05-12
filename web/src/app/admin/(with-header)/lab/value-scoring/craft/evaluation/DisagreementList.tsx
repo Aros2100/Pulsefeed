@@ -76,8 +76,12 @@ export default function DisagreementList({ rows, articles }: Props) {
           const promptCraft = r.promptChoiceId === null
             ? null
             : r.promptChoiceId === r.articleA.id ? r.craftScoreA : r.craftScoreB;
-          const craftCell = humanCraft !== null && promptCraft !== null
-            ? `${humanCraft.toFixed(0)} / ${promptCraft.toFixed(0)} · Δ${r.craftDiff.toFixed(0)}`
+          const humanDims   = r.humanChoiceId === r.articleA.id ? r.dimensionsA : r.dimensionsB;
+          const scoredCount = humanDims ? Object.values(humanDims).filter(v => v !== null).length : null;
+          const totalCount  = humanDims ? Object.keys(humanDims).length : null;
+          const dimsLabel   = scoredCount !== null && totalCount !== null ? ` (${scoredCount}/${totalCount})` : "";
+          const craftCell   = humanCraft !== null && promptCraft !== null
+            ? `${humanCraft.toFixed(0)} / ${promptCraft.toFixed(0)} · Δ${r.craftDiff.toFixed(0)}${dimsLabel}`
             : "—";
           return (
             <React.Fragment key={r.pairId}>
@@ -163,9 +167,17 @@ export default function DisagreementList({ rows, articles }: Props) {
 }
 
 function DimensionBar({ label, value }: { label: string; value: number | null }) {
-  const v = value ?? 3; // null shouldn't occur (parser replaces with 3), but guard anyway
-  const pct = (v / 10) * 100;
-  const color = v >= 7 ? "#059669" : v >= 4 ? "#92400e" : "#b91c1c";
+  if (value === null) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+        <span style={{ fontSize: "10px", color: "#94a3b8", minWidth: "130px", textAlign: "right" }}>{label}</span>
+        <div style={{ flex: 1, height: "3px", background: "#e5e7eb", borderRadius: "2px" }} />
+        <span style={{ fontSize: "10px", color: "#94a3b8", minWidth: "20px", fontStyle: "italic" }}>n/a</span>
+      </div>
+    );
+  }
+  const pct = (value / 10) * 100;
+  const color = value >= 7 ? "#059669" : value >= 4 ? "#92400e" : "#b91c1c";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
       <span style={{ fontSize: "10px", color: "#5a6a85", minWidth: "130px", textAlign: "right" }}>{label}</span>
@@ -225,7 +237,15 @@ function ArticlePanel({ article, chosenByHuman, chosenByPrompt, craftScore, dime
       </div>
       {(dimensions ?? reasoning) && (
         <div style={{ borderTop: "1px solid #ebebeb", paddingTop: "10px", marginTop: "10px" }}>
-          <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#5a6a85", marginBottom: "8px" }}>Prompt assessment</div>
+          {(() => {
+            const scored = dimensions ? Object.values(dimensions).filter(v => v !== null).length : 0;
+            const total  = dimensions ? Object.keys(dimensions).length : 0;
+            return (
+              <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#5a6a85", marginBottom: "8px" }}>
+                Prompt assessment · {scored}/{total} applicable
+              </div>
+            );
+          })()}
           {dimensions && Object.entries(dimensions).map(([key, val]) => (
             <DimensionBar key={key} label={key.replace(/_/g, " ")} value={val} />
           ))}

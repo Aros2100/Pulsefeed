@@ -46,22 +46,31 @@ export const DIMENSION_WEIGHTS: Record<string, number> = {
   reproducibility:         5,
 };
 
+// Minimum total weight required to produce a meaningful craft_score.
+const MIN_WEIGHT_THRESHOLD = 30;
+
 /**
- * Compute craft_score (10-100) from the rubric dimensions.
- * All 10 dimensions are expected to be scored (no nulls after parsing).
+ * Compute normalised craft_score (10-100) from the rubric dimensions.
+ * Null dimensions (not applicable) are excluded; the remaining weights are
+ * scaled to 100 so the result stays on the 10-100 scale.
  *
- * formula: craft = sum(score × weight / 10) over all scored dimensions
- * range: 10 (all 1s) → 100 (all 10s)
+ * formula: craft = sum(score × weight / 10) × (100 / sumWeights)
+ * returns null when no dimensions were scored or total weight < threshold.
  */
 export function computeCraftScore(dimensions: DimensionScores): number | null {
-  let sum = 0;
-  let hasAny = false;
+  let sumContributions = 0;
+  let sumWeights = 0;
   for (const [key, val] of Object.entries(dimensions)) {
     if (val === null) continue;
-    sum += (val * (DIMENSION_WEIGHTS[key] ?? 0)) / 10;
-    hasAny = true;
+    const w = DIMENSION_WEIGHTS[key] ?? 0;
+    sumContributions += (val * w) / 10;
+    sumWeights += w;
   }
-  return hasAny ? sum : null;
+  if (sumWeights === 0) return null; // all dimensions were null
+  if (sumWeights < MIN_WEIGHT_THRESHOLD) {
+    console.warn(`[computeCraftScore] Only ${sumWeights} weight units scored — article may be outside rubric domain`);
+  }
+  return sumContributions * (100 / sumWeights);
 }
 
 export interface ParsedScore {
@@ -131,10 +140,6 @@ function readNumber(raw: unknown): number | null {
   return null;
 }
 
-// Fallback score used when model returns null for a dimension despite being
-// told to score all 10. Represents "missing reporting = weak craft signal".
-const NULL_DIMENSION_FALLBACK = 3;
-
 function parseDimensions(raw: unknown): DimensionScores | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const obj = raw as Record<string, unknown>;
@@ -142,8 +147,7 @@ function parseDimensions(raw: unknown): DimensionScores | null {
   let hasAny = false;
   for (const [key, val] of Object.entries(obj)) {
     if (val === null) {
-      // Model was told not to return null; treat as missing-reporting signal.
-      result[key] = NULL_DIMENSION_FALLBACK;
+      result[key] = null; // legitimate "not applicable" signal
       hasAny = true;
     } else {
       const n = typeof val === "number" ? val : typeof val === "string" ? Number(val) : NaN;
