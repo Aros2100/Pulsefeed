@@ -11,7 +11,7 @@ type Db = any;
 // Sonnet for iteration: revising an existing prompt against concrete
 // disagreements is a constrained task that Sonnet handles well.
 const ITERATION_MODEL      = "claude-sonnet-4-6";
-const ITERATION_MAX_TOKENS = 4000;
+const ITERATION_MAX_TOKENS = 8000;
 
 // Opus for v1: writing the first prompt requires ignoring the most obvious
 // pattern in the data (article_type) in favour of the subtler one
@@ -493,7 +493,15 @@ export async function generatePromptIterationFromDisagreements(
   const message = await trackedCall(modelKey, params, undefined, "value_scoring_craft_iterate");
   const raw = (message.content[0] as { type: string; text: string }).text;
 
-  console.log(`[iterate v${p.version}] raw response (first 600 chars):\n${raw.slice(0, 600)}`);
+  const stopReason = message.stop_reason;
+  console.log(
+    `[iterate v${p.version}] stop_reason=${stopReason} length=${raw.length}`,
+    `\nfirst 600:\n${raw.slice(0, 600)}`,
+    `\nlast 200:\n${raw.slice(-200)}`,
+  );
+  if (stopReason === "max_tokens") {
+    throw new Error("Response was truncated (max_tokens reached). The prompt may be too large — try filtering to fewer disagreements.");
+  }
 
   const parsed = parseIterationResponse(raw);
   if (!parsed) {
