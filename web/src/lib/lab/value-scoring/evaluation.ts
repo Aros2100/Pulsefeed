@@ -410,7 +410,8 @@ export async function getDisagreements(
     };
   });
 
-  // Sort by biggest normalized-BT-score difference first (human was most confident)
-  rows.sort((a, b) => b.normalizedDiff - a.normalizedDiff);
+  // Sort by biggest craft_score difference first — pairs where the prompt
+  // was most wrong in its own terms appear at the top.
+  rows.sort((a, b) => b.craftDiff - a.craftDiff);
   return rows;
 }

@@ -54,10 +54,7 @@ export default function DisagreementList({ rows, articles }: Props) {
           <th style={{ ...thStyle, width: "26px" }} />
           <th style={thStyle}>Your choice</th>
           <th style={thStyle}>Prompt choice</th>
-          <th style={{ ...thStyle, width: "68px", textAlign: "right" }}>BT diff</th>
-          <th style={{ ...thStyle, width: "74px", textAlign: "right" }}>Your craft</th>
-          <th style={{ ...thStyle, width: "80px", textAlign: "right" }}>Prompt craft</th>
-          <th style={{ ...thStyle, width: "72px", textAlign: "right" }}>Craft diff</th>
+          <th style={{ ...thStyle, width: "140px", textAlign: "right" }}>Craft (20-100)</th>
           <th style={thStyle}>Reasons</th>
         </tr>
       </thead>
@@ -68,51 +65,43 @@ export default function DisagreementList({ rows, articles }: Props) {
           const promptArt = r.promptChoiceId === null
             ? null
             : r.promptChoiceId === r.articleA.id ? r.articleA : r.articleB;
-          // craft scores oriented: "your" = human-chosen, "prompt" = prompt-chosen
           const humanCraft  = r.humanChoiceId === r.articleA.id ? r.craftScoreA : r.craftScoreB;
           const promptCraft = r.promptChoiceId === null
             ? null
             : r.promptChoiceId === r.articleA.id ? r.craftScoreA : r.craftScoreB;
+          const craftCell = humanCraft !== null && promptCraft !== null
+            ? `${humanCraft.toFixed(0)} / ${promptCraft.toFixed(0)} (Δ${r.craftDiff.toFixed(0)})`
+            : "—";
           return (
             <>
               <tr key={r.pairId} onClick={() => toggle(r.pairId)} style={{ borderTop: "1px solid #f5f5f5", cursor: "pointer" }}>
                 <td style={{ ...tdStyle, color: "#94a3b8" }}>{open ? "▾" : "▸"}</td>
                 <td style={{ ...tdStyle, color: "#1a1a1a" }} title={humanArt.title}>
-                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "200px" }}>{humanArt.title}</div>
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "260px" }}>{humanArt.title}</div>
                 </td>
                 <td style={{ ...tdStyle, color: "#1a1a1a" }} title={promptArt?.title ?? "(tie)"}>
-                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "200px" }}>
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "260px" }}>
                     {promptArt ? promptArt.title : <em style={{ color: "#94a3b8" }}>(prompt tied)</em>}
                   </div>
                 </td>
-                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-                  {r.normalizedDiff > 0 ? r.normalizedDiff.toFixed(1) : "—"}
-                </td>
-                <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: humanCraft === null ? "#bbb" : "#059669" }}>
-                  {humanCraft === null ? "—" : humanCraft.toFixed(0)}
-                </td>
-                <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: promptCraft === null ? "#bbb" : "#b91c1c" }}>
-                  {promptCraft === null ? "—" : promptCraft.toFixed(0)}
-                </td>
-                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: r.craftDiff > 0 ? "#1a1a1a" : "#bbb" }}>
-                  {r.craftDiff > 0 ? r.craftDiff.toFixed(0) : "—"}
+                <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: humanCraft !== null && promptCraft !== null ? "#1a1a1a" : "#bbb", fontSize: "12px" }}>
+                  {craftCell}
                 </td>
                 <td style={{ ...tdStyle, color: "#5a6a85", fontSize: "12px" }}>
-                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "200px" }}>
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "260px" }}>
                     {r.reasons.length > 0 ? r.reasons.join(" · ") : <span style={{ color: "#bbb" }}>—</span>}
                   </div>
                 </td>
               </tr>
               {open && (
                 <tr key={r.pairId + "-detail"} style={{ background: "#fafbfc" }}>
-                  <td colSpan={8} style={{ padding: "16px 24px" }}>
+                  <td colSpan={5} style={{ padding: "16px 24px" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                       <ArticlePanel
                         article={articles[r.articleA.id]}
                         chosenByHuman={r.humanChoiceId === r.articleA.id}
                         chosenByPrompt={r.promptChoiceId === r.articleA.id}
                         craftScore={r.craftScoreA}
-                        btScore={r.normalizedA}
                         dimensions={r.dimensionsA}
                         reasoning={r.reasoningA}
                       />
@@ -121,7 +110,6 @@ export default function DisagreementList({ rows, articles }: Props) {
                         chosenByHuman={r.humanChoiceId === r.articleB.id}
                         chosenByPrompt={r.promptChoiceId === r.articleB.id}
                         craftScore={r.craftScoreB}
-                        btScore={r.normalizedB}
                         dimensions={r.dimensionsB}
                         reasoning={r.reasoningB}
                       />
@@ -157,14 +145,13 @@ function DimensionBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-function ArticlePanel({ article, chosenByHuman, chosenByPrompt, craftScore, btScore, dimensions, reasoning }: {
-  article:       ArticleFull | undefined;
-  chosenByHuman: boolean;
+function ArticlePanel({ article, chosenByHuman, chosenByPrompt, craftScore, dimensions, reasoning }: {
+  article:        ArticleFull | undefined;
+  chosenByHuman:  boolean;
   chosenByPrompt: boolean;
-  craftScore:    number | null;
-  btScore:       number | null;
-  dimensions:    Record<string, number> | null;
-  reasoning:     string | null;
+  craftScore:     number | null;
+  dimensions:     Record<string, number> | null;
+  reasoning:      string | null;
 }) {
   if (!article) {
     return <div style={{ padding: "12px", color: "#bbb", fontSize: "13px" }}>(article missing)</div>;
@@ -181,10 +168,11 @@ function ArticlePanel({ article, chosenByHuman, chosenByPrompt, craftScore, btSc
             <span style={{ fontSize: "10px", fontWeight: 700, color: "#fff", background: "#E83B2A", padding: "2px 6px", borderRadius: "4px" }}>PROMPT</span>
           )}
         </div>
-        <div style={{ fontSize: "11px", color: "#94a3b8", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-          BT {btScore === null ? "—" : btScore.toFixed(1)}
-          {craftScore !== null && <> · craft {craftScore.toFixed(0)}</>}
-        </div>
+        {craftScore !== null && (
+          <div style={{ fontSize: "11px", color: "#94a3b8", fontVariantNumeric: "tabular-nums" }}>
+            craft {craftScore.toFixed(0)}
+          </div>
+        )}
       </div>
       <div style={{ fontSize: "13px", fontWeight: 600, lineHeight: 1.4, marginBottom: "4px" }}>{article.title}</div>
       <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "10px" }}>

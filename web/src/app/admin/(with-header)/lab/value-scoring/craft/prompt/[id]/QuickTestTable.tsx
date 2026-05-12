@@ -56,7 +56,6 @@ export default function QuickTestTable({ rows, quickRho }: Props) {
             <th style={{ ...thStyle, width: "36px" }}>#</th>
             <th style={thStyle}>Title</th>
             <th style={{ ...thStyle, width: "140px" }}>Article type</th>
-            <th style={{ ...thStyle, width: "80px", textAlign: "right" }}>BT score</th>
             <th style={{ ...thStyle, width: "110px", textAlign: "right" }}>Craft score</th>
           </tr>
         </thead>
@@ -79,10 +78,6 @@ export default function QuickTestTable({ rows, quickRho }: Props) {
                     </div>
                   </td>
                   <td style={{ ...tdStyle, color: "#5a6a85", fontSize: "12px" }}>{r.article_type ?? "—"}</td>
-                  <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums",
-                    color: r.normalizedScore === null ? "#bbb" : r.normalizedScore >= 7.5 ? "#059669" : r.normalizedScore >= 3.5 ? "#1a1a1a" : "#b91c1c" }}>
-                    {r.normalizedScore === null ? "—" : r.normalizedScore.toFixed(1)}
-                  </td>
                   <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums",
                     color: r.score === null && r.craftScore === null ? "#b91c1c" : "#1a1a1a" }}>
                     {r.craftScore !== null
@@ -94,7 +89,7 @@ export default function QuickTestTable({ rows, quickRho }: Props) {
                 </tr>
                 {isOpen && (
                   <tr key={r.article_id + "-reasoning"} style={{ background: "#fafbfc" }}>
-                    <td colSpan={6} style={{ padding: "0 16px 12px 50px", borderTop: "none" }}>
+                    <td colSpan={5} style={{ padding: "0 16px 12px 50px", borderTop: "none" }}>
                       {r.reasoning ? (
                         <div style={{
                           marginTop: "8px",
