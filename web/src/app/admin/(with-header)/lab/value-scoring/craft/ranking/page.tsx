@@ -42,14 +42,14 @@ export default async function CraftRankingPage() {
     { data: categoryRows },
   ] = await Promise.all([
     admin.from("lab_value_articles").select("id, title, article_type").eq("module_id", moduleId),
-    admin.from("lab_value_pairs").select("id, article_a_id, article_b_id, winner_id, session_id").eq("module_id", moduleId),
+    admin.from("lab_value_pairs").select("id, article_a_id, article_b_id, winner_id, session_id, updated_at").eq("module_id", moduleId),
     admin.from("lab_value_rankings").select("article_id, normalized_score, computed_at").eq("module_id", moduleId),
     admin.from("lab_value_pair_reasons").select("pair_id, category_id"),
     admin.from("lab_value_reason_categories").select("id, label").eq("module_id", moduleId),
   ]);
 
   type Art    = { id: string; title: string; article_type: string | null };
-  type Pair   = { id: string; article_a_id: string; article_b_id: string; winner_id: string | null; session_id: string | null };
+  type Pair   = { id: string; article_a_id: string; article_b_id: string; winner_id: string | null; session_id: string | null; updated_at: string | null };
   type RankR  = { article_id: string; normalized_score: number | null; computed_at: string };
   type Reason = { pair_id: string; category_id: string };
   type Cat    = { id: string; label: string };
@@ -70,6 +70,16 @@ export default async function CraftRankingPage() {
     ? rankingRows.reduce<string>((acc, r) => r.computed_at > acc ? r.computed_at : acc, rankingRows[0].computed_at)
     : null;
   const hasRanking = rankingRows.length > 0;
+
+  // Out-of-date check: if any decided pair was updated after the last BT run,
+  // the rankings are stale and the user should recompute.
+  const maxPairUpdate = allPairs.reduce<string | null>((acc, p) => {
+    if (!p.winner_id || !p.updated_at) return acc;
+    return acc === null || p.updated_at > acc ? p.updated_at : acc;
+  }, null);
+  const rankingsOutOfDate = hasRanking && maxPairUpdate !== null && lastComputedAt !== null
+    ? maxPairUpdate > lastComputedAt
+    : false;
 
   // Category label map
   const catLabel = new Map<string, string>(categories.map(c => [c.id, c.label]));
@@ -196,6 +206,13 @@ export default async function CraftRankingPage() {
           </div>
           <ComputeButton />
         </div>
+
+        {rankingsOutOfDate && (
+          <div style={{ background: "#fef3c7", border: "1px solid #fcd34d", borderRadius: "8px", padding: "10px 16px", marginBottom: "16px", fontSize: "13px", color: "#92400e", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+            <span><strong>Rankings out of date</strong> · Pairs have been edited since the last BT computation.</span>
+            <ComputeButton compact />
+          </div>
+        )}
 
         <div style={{ background: "#fff8e1", border: "1px solid #fde68a", borderRadius: "8px", padding: "10px 14px", marginBottom: "20px", fontSize: "12px", color: "#92400e" }}>
           {hasRanking

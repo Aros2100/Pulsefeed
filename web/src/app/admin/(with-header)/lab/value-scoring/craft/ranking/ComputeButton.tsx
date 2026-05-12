@@ -13,7 +13,7 @@ type Summary = {
   betaMax: number;
 };
 
-export default function ComputeButton() {
+export default function ComputeButton({ compact }: { compact?: boolean } = {}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -36,6 +36,23 @@ export default function ComputeButton() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (compact) {
+    return (
+      <button
+        onClick={run}
+        disabled={busy}
+        style={{
+          background: busy ? "#fda99e" : "#E83B2A",
+          color: "#fff", border: "none", borderRadius: "6px",
+          padding: "6px 12px", fontSize: "12px", fontWeight: 600,
+          cursor: busy ? "default" : "pointer", whiteSpace: "nowrap",
+        }}
+      >
+        {busy ? "Computing…" : "Recompute Bradley-Terry"}
+      </button>
+    );
   }
 
   return (

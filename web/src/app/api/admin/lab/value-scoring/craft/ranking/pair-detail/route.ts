@@ -80,10 +80,19 @@ export async function GET(request: NextRequest) {
   type ReasonRow = { category_id: string; notes: string | null };
   type RankRow   = { normalized_score: number | string | null };
 
-  const catLabel = new Map<string, string>(((catRows ?? []) as CatRow[]).map(c => [c.id, c.label]));
-  const reasons = (reasonRows ?? []) as ReasonRow[];
+  const allCats  = (catRows    ?? []) as CatRow[];
+  const catLabel = new Map<string, string>(allCats.map(c => [c.id, c.label]));
+  const reasons  = (reasonRows ?? []) as ReasonRow[];
 
-  // Group notes by category label
+  // Derive selected category IDs and shared notes string (all reasons for a
+  // pair share the same notes text — see submit route convention).
+  const selectedCategoryIds: string[] = reasons.map(r => r.category_id);
+  let pairNotes: string | null = null;
+  for (const r of reasons) {
+    if (r.notes && r.notes.trim().length > 0) { pairNotes = r.notes.trim(); break; }
+  }
+
+  // Group notes by category label for the read-only display
   const categoryNotes = new Map<string, string[]>();
   for (const r of reasons) {
     const label = catLabel.get(r.category_id);
@@ -107,5 +116,9 @@ export async function GET(request: NextRequest) {
     articleA: artARow ? { ...artARow, normalizedScore: normalizedA !== null && normalizedA !== undefined ? Number(normalizedA) : null } : null,
     articleB: artBRow ? { ...artBRow, normalizedScore: normalizedB !== null && normalizedB !== undefined ? Number(normalizedB) : null } : null,
     reasons:  reasonDetails,
+    // Edit-mode fields
+    selectedCategoryIds,
+    pairNotes,
+    allCategories: allCats,
   });
 }
