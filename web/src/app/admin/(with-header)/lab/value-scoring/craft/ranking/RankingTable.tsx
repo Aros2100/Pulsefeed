@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
+import PairDetailModal from "./PairDetailModal";
 
 export interface ArticlePairDetail {
+  pairId:     string;
   result:     "won" | "lost";
   opponent:   { id: string; title: string; article_type: string | null; beta: number | null };
   categories: string[];
@@ -23,7 +25,8 @@ interface Props {
 }
 
 export default function RankingTable({ ranked }: Props) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded,       setExpanded]       = useState<Set<string>>(new Set());
+  const [activePairId,   setActivePairId]   = useState<string | null>(null);
 
   function toggle(id: string) {
     setExpanded(prev => {
@@ -35,6 +38,7 @@ export default function RankingTable({ ranked }: Props) {
   }
 
   return (
+    <>
     <table style={{ width: "100%", borderCollapse: "collapse" }}>
       <thead>
         <tr style={{ background: "#fafbfc" }}>
@@ -87,16 +91,25 @@ export default function RankingTable({ ranked }: Props) {
                         <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8", marginBottom: "8px" }}>
                           Pairs ({r.pairs.length})
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                           {r.pairs.map((p, pi) => (
-                            <div key={pi} style={{ display: "flex", alignItems: "baseline", gap: "10px", fontSize: "12px" }}>
+                            <div
+                              key={pi}
+                              onClick={e => { e.stopPropagation(); setActivePairId(p.pairId); }}
+                              style={{
+                                display: "flex", alignItems: "baseline", gap: "10px", fontSize: "12px",
+                                padding: "4px 6px", borderRadius: "5px", cursor: "pointer",
+                              }}
+                              onMouseEnter={e => (e.currentTarget.style.background = "#f0f4f8")}
+                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                            >
                               <span style={{
                                 minWidth: "38px", fontWeight: 700, fontSize: "11px",
-                                color: p.result === "won" ? "#059669" : "#b91c1c",
+                                color: p.result === "won" ? "#059669" : "#b91c1c", flexShrink: 0,
                               }}>
                                 {p.result === "won" ? "Won" : "Lost"}
                               </span>
-                              <span style={{ color: "#94a3b8" }}>·</span>
+                              <span style={{ color: "#94a3b8", flexShrink: 0 }}>·</span>
                               <span
                                 title={p.opponent.title}
                                 style={{
@@ -106,7 +119,6 @@ export default function RankingTable({ ranked }: Props) {
                                   whiteSpace: "nowrap",
                                   maxWidth: "300px",
                                   color: "#1a1a1a",
-                                  cursor: "default",
                                 }}
                               >
                                 {p.opponent.title}
@@ -147,6 +159,8 @@ export default function RankingTable({ ranked }: Props) {
         })}
       </tbody>
     </table>
+    <PairDetailModal pairId={activePairId} onClose={() => setActivePairId(null)} />
+    </>
   );
 }
 

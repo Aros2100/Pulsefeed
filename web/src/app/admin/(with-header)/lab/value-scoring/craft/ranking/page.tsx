@@ -106,6 +106,7 @@ export default async function CraftRankingPage() {
     if (winnerOpponent) {
       const arr = pairDetails.get(p.winner_id) ?? [];
       arr.push({
+        pairId:     p.id,
         result:     "won",
         opponent:   { id: loserId, title: winnerOpponent.title, article_type: winnerOpponent.article_type, beta: normalizedByArticle.get(loserId) ?? null },
         categories: cats,
@@ -118,6 +119,7 @@ export default async function CraftRankingPage() {
     if (loserOpponent) {
       const arr = pairDetails.get(loserId) ?? [];
       arr.push({
+        pairId:     p.id,
         result:     "lost",
         opponent:   { id: p.winner_id, title: loserOpponent.title, article_type: loserOpponent.article_type, beta: normalizedByArticle.get(p.winner_id) ?? null },
         categories: cats,
