@@ -8,10 +8,17 @@ import { getDisagreements, type DisagreementRow } from "./evaluation";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = any;
 
-// Model used for iteration analysis. Sonnet 4.6 — enough room to read the
-// current prompt and several dozen disagreements, with reasonable judgment.
+// Sonnet for iteration: revising an existing prompt against concrete
+// disagreements is a constrained task that Sonnet handles well.
 const ITERATION_MODEL      = "claude-sonnet-4-6";
 const ITERATION_MAX_TOKENS = 4000;
+
+// Opus for v1: writing the first prompt requires ignoring the most obvious
+// pattern in the data (article_type) in favour of the subtler one
+// (execution quality). That kind of nuance is worth the Opus call — v1 is
+// the foundation every later iteration builds on.
+const V1_MODEL      = "claude-opus-4-7";
+const V1_MAX_TOKENS = 4000;
 
 export interface IterationSuggestion {
   promptText:    string;
@@ -201,6 +208,30 @@ export function buildV1Request(
     "not the strategic value of the topic.",
     "=== END DEFINITION ===",
     "",
+    "=== CRITICAL CONSTRAINT: NO ARTICLE_TYPE-BASED SCORING ===",
+    "Do NOT generate a prompt that locks score ranges to article_type.",
+    "Article_type is NOT a craft signal.",
+    "",
+    "- A poorly-conducted RCT must be able to score lower than a well-executed",
+    "  case report.",
+    "- A sloppy meta-analysis must be able to score lower than a rigorous",
+    "  single-center cohort.",
+    "- A well-reported case report with clean methodology must be able to",
+    "  outscore a meta-analysis with poor heterogeneity handling.",
+    "",
+    "The generated prompt must evaluate craft on study-specific execution",
+    "signals (study design appropriateness for the question, statistical",
+    "rigor, reporting transparency, methodology) — NOT on category of article.",
+    "",
+    "Use article_type ONLY as context for what to look for (e.g., \"for a",
+    "case report, evaluate reporting completeness; for a meta-analysis,",
+    "evaluate search strategy transparency\"), NEVER as a score cap or floor.",
+    "",
+    "If the generated prompt contains language like \"Case report: typically",
+    "1-4\" or \"Meta-analysis: can score 7-10\", that is a failure of this",
+    "constraint.",
+    "=== END CONSTRAINT ===",
+    "",
     `The clinician has already scored ~${totalDecided} pairs of articles by hand, leaving categorised reasons and notes.`,
     "A Bradley-Terry ranking was derived from those pairwise choices — articles with high BT scores are the clinician's preferred work, and low BT scores are the rejected work.",
     "",
@@ -240,8 +271,8 @@ export function buildV1Request(
   ].join("\n");
 
   return {
-    model:      ITERATION_MODEL,
-    max_tokens: ITERATION_MAX_TOKENS,
+    model:      V1_MODEL,
+    max_tokens: V1_MAX_TOKENS,
     system,
     messages:   [{ role: "user" as const, content: user }],
   };
