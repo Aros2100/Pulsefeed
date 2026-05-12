@@ -76,7 +76,7 @@ export function buildIterationRequest(
     "- Stay within the same numerical scale the current prompt uses.",
     "- Be specific about the heuristics the clinician's reasons reveal. Generic edits (\"be more careful\") are not useful.",
     "",
-    "Respond with valid JSON only, no markdown fences, no prose around it:",
+    "Return ONLY valid JSON — no preamble, no analysis, no explanation before or after. Your entire response must be a single JSON object and nothing else:",
     "{",
     "  \"prompt_text\": \"<the full revised prompt as a single string>\",",
     "  \"change_notes\": \"<2-5 sentences describing the patterns you saw and what you changed and why>\"",
@@ -99,13 +99,38 @@ export function buildIterationRequest(
   };
 }
 
+/**
+ * Extract the first well-formed JSON object from the text using a brace
+ * depth counter. This is more robust than a greedy regex because:
+ * - Prose before the JSON is skipped (stops at first `{`)
+ * - Trailing text after the closing `}` is ignored
+ * - Nested `{}` inside string values are handled correctly
+ */
+function extractFirstJsonObject(text: string): string | null {
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (escape)                       { escape = false; continue; }
+    if (c === "\\" && inString)       { escape = true;  continue; }
+    if (c === '"')                    { inString = !inString; continue; }
+    if (inString)                     { continue; }
+    if (c === "{")                    { depth++; }
+    else if (c === "}") { depth--; if (depth === 0) return text.slice(start, i + 1); }
+  }
+  return null;
+}
+
 export function parseIterationResponse(rawText: string): { promptText: string; changeNotes: string } | null {
-  // Strip markdown fences (```json ... ``` or ``` ... ```) that models sometimes wrap around JSON.
+  // Strip markdown fences as belt-and-suspenders (model sometimes wraps JSON).
   const stripped = rawText.replace(/^```(?:json)?\s*/m, "").replace(/\s*```\s*$/m, "").trim();
   try {
-    const match = stripped.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    const parsed = JSON.parse(match[0]) as { prompt_text?: unknown; change_notes?: unknown };
+    const jsonStr = extractFirstJsonObject(stripped);
+    if (!jsonStr) return null;
+    const parsed = JSON.parse(jsonStr) as { prompt_text?: unknown; change_notes?: unknown };
     const promptText  = typeof parsed.prompt_text  === "string" ? parsed.prompt_text.trim()  : "";
     const changeNotes = typeof parsed.change_notes === "string" ? parsed.change_notes.trim() : "";
     if (promptText.length === 0) return null;
