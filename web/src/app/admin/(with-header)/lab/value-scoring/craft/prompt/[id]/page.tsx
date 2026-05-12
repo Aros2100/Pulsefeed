@@ -38,9 +38,9 @@ export default async function PromptVersionDetailPage({ params }: PageProps) {
 
   // Spearman over the quick-test pool (β vs prompt score) — gives a quick
   // visual sense of correlation before committing to full scoring.
-  const quickValid = quickResults.filter(r => r.score !== null);
+  const quickValid = quickResults.filter(r => r.score !== null && r.normalizedScore !== null);
   const quickRho = quickValid.length >= 2
-    ? spearman(quickValid.map(r => r.beta), quickValid.map(r => r.score as number))
+    ? spearman(quickValid.map(r => r.normalizedScore as number), quickValid.map(r => r.score as number))
     : null;
 
   return (
@@ -118,7 +118,7 @@ export default async function PromptVersionDetailPage({ params }: PageProps) {
                   <th style={{ ...thStyle, width: "44px" }}>#</th>
                   <th style={thStyle}>Title</th>
                   <th style={{ ...thStyle, width: "140px" }}>Article type</th>
-                  <th style={{ ...thStyle, width: "70px", textAlign: "right" }}>β</th>
+                  <th style={{ ...thStyle, width: "80px", textAlign: "right" }}>BT score</th>
                   <th style={{ ...thStyle, width: "90px", textAlign: "right" }}>Prompt score</th>
                 </tr>
               </thead>
@@ -132,8 +132,8 @@ export default async function PromptVersionDetailPage({ params }: PageProps) {
                       </div>
                     </td>
                     <td style={{ ...tdStyle, color: "#5a6a85", fontSize: "12px" }}>{r.article_type ?? "—"}</td>
-                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: r.beta >= 0 ? "#059669" : "#b91c1c" }}>
-                      {r.beta.toFixed(2)}
+                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: r.normalizedScore === null ? "#bbb" : r.normalizedScore >= 7.5 ? "#059669" : r.normalizedScore >= 3.5 ? "#1a1a1a" : "#b91c1c", fontVariantNumeric: "tabular-nums" }}>
+                      {r.normalizedScore === null ? "—" : r.normalizedScore.toFixed(1)}
                     </td>
                     <td style={{ ...tdStyle, textAlign: "right", color: r.score === null ? "#b91c1c" : "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>
                       {r.score === null ? "failed" : r.score.toFixed(2)}

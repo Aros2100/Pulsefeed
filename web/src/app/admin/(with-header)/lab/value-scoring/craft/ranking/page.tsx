@@ -43,14 +43,14 @@ export default async function CraftRankingPage() {
   ] = await Promise.all([
     admin.from("lab_value_articles").select("id, title, article_type").eq("module_id", moduleId),
     admin.from("lab_value_pairs").select("id, article_a_id, article_b_id, winner_id, session_id").eq("module_id", moduleId),
-    admin.from("lab_value_rankings").select("article_id, beta_score, computed_at").eq("module_id", moduleId),
+    admin.from("lab_value_rankings").select("article_id, normalized_score, computed_at").eq("module_id", moduleId),
     admin.from("lab_value_pair_reasons").select("pair_id, category_id"),
     admin.from("lab_value_reason_categories").select("id, label").eq("module_id", moduleId),
   ]);
 
   type Art    = { id: string; title: string; article_type: string | null };
   type Pair   = { id: string; article_a_id: string; article_b_id: string; winner_id: string | null; session_id: string | null };
-  type RankR  = { article_id: string; beta_score: number; computed_at: string };
+  type RankR  = { article_id: string; normalized_score: number | null; computed_at: string };
   type Reason = { pair_id: string; category_id: string };
   type Cat    = { id: string; label: string };
 
@@ -60,9 +60,11 @@ export default async function CraftRankingPage() {
   const reasons    = (reasonRows  ?? []) as Reason[];
   const categories = (categoryRows ?? []) as Cat[];
 
-  // β by article
-  const betaByArticle = new Map<string, number>(
-    rankingRows.map(r => [r.article_id, Number(r.beta_score)]),
+  // Normalized BT score (1-10) by article
+  const normalizedByArticle = new Map<string, number>(
+    rankingRows
+      .filter(r => r.normalized_score !== null)
+      .map(r => [r.article_id, Number(r.normalized_score)]),
   );
   const lastComputedAt = rankingRows.length > 0
     ? rankingRows.reduce<string>((acc, r) => r.computed_at > acc ? r.computed_at : acc, rankingRows[0].computed_at)
@@ -105,7 +107,7 @@ export default async function CraftRankingPage() {
       const arr = pairDetails.get(p.winner_id) ?? [];
       arr.push({
         result:     "won",
-        opponent:   { id: loserId, title: winnerOpponent.title, article_type: winnerOpponent.article_type, beta: betaByArticle.get(loserId) ?? null },
+        opponent:   { id: loserId, title: winnerOpponent.title, article_type: winnerOpponent.article_type, beta: normalizedByArticle.get(loserId) ?? null },
         categories: cats,
       });
       pairDetails.set(p.winner_id, arr);
@@ -117,14 +119,14 @@ export default async function CraftRankingPage() {
       const arr = pairDetails.get(loserId) ?? [];
       arr.push({
         result:     "lost",
-        opponent:   { id: p.winner_id, title: loserOpponent.title, article_type: loserOpponent.article_type, beta: betaByArticle.get(p.winner_id) ?? null },
+        opponent:   { id: p.winner_id, title: loserOpponent.title, article_type: loserOpponent.article_type, beta: normalizedByArticle.get(p.winner_id) ?? null },
         categories: cats,
       });
       pairDetails.set(loserId, arr);
     }
   }
 
-  // Sort each article's pairs by opponent β descending (strongest opponents first)
+  // Sort each article's pairs by opponent normalized score descending (strongest opponents first)
   for (const [, arr] of pairDetails) {
     arr.sort((a, b) => (b.opponent.beta ?? -Infinity) - (a.opponent.beta ?? -Infinity));
   }
@@ -151,7 +153,7 @@ export default async function CraftRankingPage() {
       const l = losses.get(a.id) ?? 0;
       const total = w + l;
       const winRate = total > 0 ? w / total : 0;
-      const beta = betaByArticle.get(a.id) ?? null;
+      const beta = normalizedByArticle.get(a.id) ?? null; // 1-10 normalized score
       return {
         id:           a.id,
         title:        a.title,

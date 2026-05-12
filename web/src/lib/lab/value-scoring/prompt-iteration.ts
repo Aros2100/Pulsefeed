@@ -34,7 +34,7 @@ function fmtDisagreement(d: DisagreementRow, i: number): string {
   const otherScore = d.humanChoiceId === d.articleA.id ? d.scoreB   : d.scoreA;
 
   const lines: string[] = [];
-  lines.push(`Disagreement ${i + 1} (β diff ${d.betaDiff.toFixed(2)}):`);
+  lines.push(`Disagreement ${i + 1} (BT score diff ${d.normalizedDiff.toFixed(1)}):`);
   lines.push(`  Your choice (winner): "${truncate(humanArt.title, 160)}" [${humanArt.article_type ?? "—"}] · prompt score ${humanScore === null ? "—" : humanScore.toFixed(2)}`);
   lines.push(`  Prompt picked:        "${truncate(otherArt.title, 160)}" [${otherArt.article_type ?? "—"}] · prompt score ${otherScore === null ? "—" : otherScore.toFixed(2)}`);
   if (d.reasons.length > 0) lines.push(`  Your reasons: ${d.reasons.join(", ")}`);

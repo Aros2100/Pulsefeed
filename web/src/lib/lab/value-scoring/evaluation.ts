@@ -20,19 +20,19 @@ export interface RankingCorrelationResult {
 }
 
 export interface DisagreementRow {
-  pairId:         string;
-  humanChoiceId:  string;
-  promptChoiceId: string | null; // null when the prompt tied
-  scoreA:         number | null;
-  scoreB:         number | null;
-  scoreDiff:      number;
-  betaA:          number | null;
-  betaB:          number | null;
-  betaDiff:       number;
-  articleA:       { id: string; title: string; article_type: string | null };
-  articleB:       { id: string; title: string; article_type: string | null };
-  reasons:        string[];
-  notes:          string | null;
+  pairId:          string;
+  humanChoiceId:   string;
+  promptChoiceId:  string | null; // null when the prompt tied
+  scoreA:          number | null;
+  scoreB:          number | null;
+  scoreDiff:       number;
+  normalizedA:     number | null; // BT normalized score 1-10 for article A
+  normalizedB:     number | null; // BT normalized score 1-10 for article B
+  normalizedDiff:  number;        // |normalizedA - normalizedB|
+  articleA:        { id: string; title: string; article_type: string | null };
+  articleB:        { id: string; title: string; article_type: string | null };
+  reasons:         string[];
+  notes:           string | null;
 }
 
 // ── Statistics ───────────────────────────────────────────────────────────────
@@ -140,16 +140,18 @@ async function loadScoreMap(db: Db, promptId: string): Promise<Map<string, numbe
   return map;
 }
 
-async function loadBetaMap(db: Db, moduleId: string): Promise<Map<string, number>> {
+async function loadNormalizedMap(db: Db, moduleId: string): Promise<Map<string, number>> {
   const { data: rankings } = await db
     .from("lab_value_rankings")
-    .select("article_id, beta_score")
+    .select("article_id, normalized_score")
     .eq("module_id", moduleId);
 
-  type R = { article_id: string; beta_score: number | string };
+  type R = { article_id: string; normalized_score: number | string | null };
   const map = new Map<string, number>();
   for (const r of (rankings ?? []) as R[]) {
-    map.set(r.article_id, Number(r.beta_score));
+    if (r.normalized_score !== null && r.normalized_score !== undefined) {
+      map.set(r.article_id, Number(r.normalized_score));
+    }
   }
   return map;
 }
@@ -196,16 +198,16 @@ export async function computePairMatch(db: Db, promptId: string): Promise<PairMa
 }
 
 export async function computeRankingCorrelation(db: Db, promptId: string): Promise<RankingCorrelationResult> {
-  const moduleId = await loadModuleId(db, promptId);
-  const betaMap  = await loadBetaMap(db, moduleId);
-  const scoreMap = await loadScoreMap(db, promptId);
+  const moduleId      = await loadModuleId(db, promptId);
+  const normalizedMap = await loadNormalizedMap(db, moduleId);
+  const scoreMap      = await loadScoreMap(db, promptId);
 
   const xs: number[] = [];
   const ys: number[] = [];
-  for (const [articleId, beta] of betaMap) {
+  for (const [articleId, norm] of normalizedMap) {
     const s = scoreMap.get(articleId);
     if (s === undefined) continue;
-    xs.push(beta);
+    xs.push(norm);
     ys.push(s);
   }
 
@@ -220,9 +222,9 @@ export async function getDisagreements(
   const includeTies  = options?.includeTies  ?? false;
   const minScoreDiff = options?.minScoreDiff ?? 0;
 
-  const moduleId = await loadModuleId(db, promptId);
-  const scoreMap = await loadScoreMap(db, promptId);
-  const betaMap  = await loadBetaMap(db, moduleId);
+  const moduleId      = await loadModuleId(db, promptId);
+  const scoreMap      = await loadScoreMap(db, promptId);
+  const normalizedMap = await loadNormalizedMap(db, moduleId);
 
   const { data: pairs } = await db
     .from("lab_value_pairs")
@@ -236,9 +238,9 @@ export async function getDisagreements(
   // First pass: classify and collect article ids + pair ids needed for join queries
   type Classified = {
     pair: Pair;
-    promptChoice: string | null;
+    promptChoice:  string | null;
     sa: number; sb: number; scoreDiff: number;
-    betaA: number | null; betaB: number | null; betaDiff: number;
+    normA: number | null; normB: number | null; normalizedDiff: number;
   };
   const disagreements: Classified[] = [];
   for (const p of decided) {
@@ -257,11 +259,11 @@ export async function getDisagreements(
     const scoreDiff = Math.abs(sa - sb);
     if (scoreDiff < minScoreDiff && !isTie) continue;
 
-    const betaA = betaMap.has(p.article_a_id) ? betaMap.get(p.article_a_id)! : null;
-    const betaB = betaMap.has(p.article_b_id) ? betaMap.get(p.article_b_id)! : null;
-    const betaDiff = (betaA !== null && betaB !== null) ? Math.abs(betaA - betaB) : 0;
+    const normA = normalizedMap.has(p.article_a_id) ? normalizedMap.get(p.article_a_id)! : null;
+    const normB = normalizedMap.has(p.article_b_id) ? normalizedMap.get(p.article_b_id)! : null;
+    const normalizedDiff = (normA !== null && normB !== null) ? Math.abs(normA - normB) : 0;
 
-    disagreements.push({ pair: p, promptChoice, sa, sb, scoreDiff, betaA, betaB, betaDiff });
+    disagreements.push({ pair: p, promptChoice, sa, sb, scoreDiff, normA, normB, normalizedDiff });
   }
 
   if (disagreements.length === 0) return [];
@@ -312,23 +314,23 @@ export async function getDisagreements(
     const artB = articleMap.get(d.pair.article_b_id);
     const reasons = reasonsByPair.get(d.pair.id);
     return {
-      pairId:         d.pair.id,
-      humanChoiceId:  d.pair.winner_id,
-      promptChoiceId: d.promptChoice,
-      scoreA:         d.sa,
-      scoreB:         d.sb,
-      scoreDiff:      d.scoreDiff,
-      betaA:          d.betaA,
-      betaB:          d.betaB,
-      betaDiff:       d.betaDiff,
-      articleA:       artA ?? { id: d.pair.article_a_id, title: "(missing)", article_type: null },
-      articleB:       artB ?? { id: d.pair.article_b_id, title: "(missing)", article_type: null },
-      reasons:        reasons ? [...reasons.labels].sort() : [],
-      notes:          reasons && reasons.notes.size > 0 ? [...reasons.notes].join(" · ") : null,
+      pairId:          d.pair.id,
+      humanChoiceId:   d.pair.winner_id,
+      promptChoiceId:  d.promptChoice,
+      scoreA:          d.sa,
+      scoreB:          d.sb,
+      scoreDiff:       d.scoreDiff,
+      normalizedA:     d.normA,
+      normalizedB:     d.normB,
+      normalizedDiff:  d.normalizedDiff,
+      articleA:        artA ?? { id: d.pair.article_a_id, title: "(missing)", article_type: null },
+      articleB:        artB ?? { id: d.pair.article_b_id, title: "(missing)", article_type: null },
+      reasons:         reasons ? [...reasons.labels].sort() : [],
+      notes:           reasons && reasons.notes.size > 0 ? [...reasons.notes].join(" · ") : null,
     };
   });
 
-  // Sort by biggest β-difference first (human was most confident)
-  rows.sort((a, b) => b.betaDiff - a.betaDiff);
+  // Sort by biggest normalized-BT-score difference first (human was most confident)
+  rows.sort((a, b) => b.normalizedDiff - a.normalizedDiff);
   return rows;
 }

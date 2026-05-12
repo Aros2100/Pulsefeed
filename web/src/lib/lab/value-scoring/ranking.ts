@@ -1,6 +1,6 @@
 // Server-side Bradley-Terry ranking for a value-scoring module.
 // Reads decided pairs from lab_value_pairs, runs the BT estimator,
-// and upserts (module_id, article_id, β, pair_count) into lab_value_rankings.
+// and upserts (module_id, article_id, β, normalized_score, pair_count) into lab_value_rankings.
 
 import { computeBradleyTerry } from "./bradley-terry";
 
@@ -10,11 +10,18 @@ type Db = any;
 export interface ComputeSummary {
   articleCount: number;
   decidedPairs: number;
-  iterations: number;
-  converged: boolean;
-  durationMs: number;
-  betaMin: number;
-  betaMax: number;
+  iterations:   number;
+  converged:    boolean;
+  durationMs:   number;
+  betaMin:      number;
+  betaMax:      number;
+}
+
+// Linear mapping of β → [1, 10]. Articles with the same β all receive 5.5.
+function normalise(beta: number, betaMin: number, betaMax: number): number {
+  const range = betaMax - betaMin;
+  if (range === 0) return 5.5;
+  return 1 + 9 * (beta - betaMin) / range;
 }
 
 export async function computeAndStoreBradleyTerry(db: Db, moduleId: string): Promise<ComputeSummary> {
@@ -44,7 +51,6 @@ export async function computeAndStoreBradleyTerry(db: Db, moduleId: string): Pro
     loserId:  p.winner_id === p.article_a_id ? p.article_b_id : p.article_a_id,
   }));
 
-  // Pair counts per article (used for the pair_count column)
   const pairCount = new Map<string, number>(articleIds.map(id => [id, 0]));
   for (const p of decided) {
     pairCount.set(p.article_a_id, (pairCount.get(p.article_a_id) ?? 0) + 1);
@@ -53,14 +59,27 @@ export async function computeAndStoreBradleyTerry(db: Db, moduleId: string): Pro
 
   const { betas, iterations, converged } = computeBradleyTerry(articleIds, btPairs);
 
+  // Compute normalised score range
+  let betaMin = Infinity;
+  let betaMax = -Infinity;
+  for (const beta of betas.values()) {
+    if (beta < betaMin) betaMin = beta;
+    if (beta > betaMax) betaMax = beta;
+  }
+  if (articleIds.length === 0) { betaMin = 0; betaMax = 0; }
+
   const now = new Date().toISOString();
-  const rows = articleIds.map(id => ({
-    module_id:   moduleId,
-    article_id:  id,
-    beta_score:  betas.get(id) ?? 0,
-    pair_count:  pairCount.get(id) ?? 0,
-    computed_at: now,
-  }));
+  const rows = articleIds.map(id => {
+    const beta = betas.get(id) ?? 0;
+    return {
+      module_id:        moduleId,
+      article_id:       id,
+      beta_score:       beta,
+      normalized_score: normalise(beta, betaMin, betaMax),
+      pair_count:       pairCount.get(id) ?? 0,
+      computed_at:      now,
+    };
+  });
 
   if (rows.length > 0) {
     const { error: upErr } = await db
@@ -69,24 +88,13 @@ export async function computeAndStoreBradleyTerry(db: Db, moduleId: string): Pro
     if (upErr) throw new Error(`Failed to upsert rankings: ${upErr.message}`);
   }
 
-  let betaMin = 0;
-  let betaMax = 0;
-  if (rows.length > 0) {
-    betaMin = Infinity;
-    betaMax = -Infinity;
-    for (const r of rows) {
-      if (r.beta_score < betaMin) betaMin = r.beta_score;
-      if (r.beta_score > betaMax) betaMax = r.beta_score;
-    }
-  }
-
   return {
     articleCount: articleIds.length,
     decidedPairs: decided.length,
     iterations,
     converged,
     durationMs:   Date.now() - start,
-    betaMin,
-    betaMax,
+    betaMin:      betaMin === Infinity  ? 0 : betaMin,
+    betaMax:      betaMax === -Infinity ? 0 : betaMax,
   };
 }

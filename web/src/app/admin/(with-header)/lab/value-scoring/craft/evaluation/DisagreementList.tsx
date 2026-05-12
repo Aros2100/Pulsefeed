@@ -54,8 +54,8 @@ export default function DisagreementList({ rows, articles }: Props) {
           <th style={{ ...thStyle, width: "26px" }} />
           <th style={thStyle}>Your choice</th>
           <th style={thStyle}>Prompt choice</th>
-          <th style={{ ...thStyle, width: "80px", textAlign: "right" }}>β diff</th>
-          <th style={{ ...thStyle, width: "80px", textAlign: "right" }}>Score diff</th>
+          <th style={{ ...thStyle, width: "80px", textAlign: "right" }}>BT diff</th>
+          <th style={{ ...thStyle, width: "85px", textAlign: "right" }}>Score diff</th>
           <th style={thStyle}>Reasons</th>
         </tr>
       </thead>
@@ -78,7 +78,9 @@ export default function DisagreementList({ rows, articles }: Props) {
                     {promptArt ? promptArt.title : <em style={{ color: "#94a3b8" }}>(prompt tied)</em>}
                   </div>
                 </td>
-                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{r.betaDiff.toFixed(2)}</td>
+                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                  {r.normalizedDiff > 0 ? r.normalizedDiff.toFixed(1) : "—"}
+                </td>
                 <td style={{ ...tdStyle, textAlign: "right", color: "#5a6a85", fontVariantNumeric: "tabular-nums" }}>{r.scoreDiff.toFixed(2)}</td>
                 <td style={{ ...tdStyle, color: "#5a6a85", fontSize: "12px" }}>
                   <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "260px" }}>
@@ -95,14 +97,14 @@ export default function DisagreementList({ rows, articles }: Props) {
                         chosenByHuman={r.humanChoiceId === r.articleA.id}
                         chosenByPrompt={r.promptChoiceId === r.articleA.id}
                         score={r.scoreA}
-                        beta={r.betaA}
+                        btScore={r.normalizedA}
                       />
                       <ArticlePanel
                         article={articles[r.articleB.id]}
                         chosenByHuman={r.humanChoiceId === r.articleB.id}
                         chosenByPrompt={r.promptChoiceId === r.articleB.id}
                         score={r.scoreB}
-                        beta={r.betaB}
+                        btScore={r.normalizedB}
                       />
                     </div>
                     {r.notes && (
@@ -122,12 +124,12 @@ export default function DisagreementList({ rows, articles }: Props) {
   );
 }
 
-function ArticlePanel({ article, chosenByHuman, chosenByPrompt, score, beta }: {
+function ArticlePanel({ article, chosenByHuman, chosenByPrompt, score, btScore }: {
   article: ArticleFull | undefined;
   chosenByHuman: boolean;
   chosenByPrompt: boolean;
   score: number | null;
-  beta: number | null;
+  btScore: number | null;
 }) {
   if (!article) {
     return <div style={{ padding: "12px", color: "#bbb", fontSize: "13px" }}>(article missing)</div>;
@@ -145,7 +147,7 @@ function ArticlePanel({ article, chosenByHuman, chosenByPrompt, score, beta }: {
           )}
         </div>
         <div style={{ fontSize: "11px", color: "#94a3b8", fontVariantNumeric: "tabular-nums" }}>
-          β {beta === null ? "—" : beta.toFixed(2)} · score {score === null ? "—" : score.toFixed(2)}
+          BT {btScore === null ? "—" : btScore.toFixed(1)} · score {score === null ? "—" : score.toFixed(2)}
         </div>
       </div>
       <div style={{ fontSize: "13px", fontWeight: 600, lineHeight: 1.4, marginBottom: "4px" }}>{article.title}</div>

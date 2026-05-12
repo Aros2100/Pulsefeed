@@ -242,11 +242,11 @@ export async function updatePromptVersion(
 }
 
 export interface QuickResultRow {
-  article_id:   string;
-  title:        string;
-  article_type: string | null;
-  beta:         number;
-  score:        number | null;
+  article_id:       string;
+  title:            string;
+  article_type:     string | null;
+  normalizedScore:  number | null; // BT normalized 1-10 score
+  score:            number | null; // prompt score
 }
 
 /**
@@ -279,32 +279,34 @@ export async function getQuickResults(db: Db, promptId: string): Promise<QuickRe
 
   const [{ data: arts }, { data: rankings }] = await Promise.all([
     db.from("lab_value_articles").select("id, title, article_type").in("id", articleIds),
-    db.from("lab_value_rankings").select("article_id, beta_score").eq("module_id", moduleId),
+    db.from("lab_value_rankings").select("article_id, normalized_score").eq("module_id", moduleId),
   ]);
 
   type ArtRow = { id: string; title: string; article_type: string | null };
   const artMap = new Map<string, ArtRow>();
   for (const a of (arts ?? []) as ArtRow[]) artMap.set(a.id, a);
 
-  type RankRow = { article_id: string; beta_score: number | string };
-  const betaMap = new Map<string, number>();
-  for (const r of (rankings ?? []) as RankRow[]) betaMap.set(r.article_id, Number(r.beta_score));
+  type RankRow = { article_id: string; normalized_score: number | string | null };
+  const normalizedMap = new Map<string, number | null>();
+  for (const r of (rankings ?? []) as RankRow[]) {
+    normalizedMap.set(r.article_id, r.normalized_score !== null ? Number(r.normalized_score) : null);
+  }
 
   const rows: QuickResultRow[] = [];
   for (const [articleId, score] of scoreMap) {
     const art = artMap.get(articleId);
-    const beta = betaMap.get(articleId);
-    if (!art || beta === undefined) continue;
+    if (!art) continue;
     rows.push({
-      article_id:   articleId,
-      title:        art.title,
-      article_type: art.article_type,
-      beta,
+      article_id:      articleId,
+      title:           art.title,
+      article_type:    art.article_type,
+      normalizedScore: normalizedMap.get(articleId) ?? null,
       score,
     });
   }
 
-  rows.sort((a, b) => b.beta - a.beta);
+  // Sort by BT normalized score descending; articles without a ranking go last
+  rows.sort((a, b) => (b.normalizedScore ?? -Infinity) - (a.normalizedScore ?? -Infinity));
   return rows;
 }
 

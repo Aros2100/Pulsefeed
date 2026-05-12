@@ -42,7 +42,7 @@ export default function RankingTable({ ranked }: Props) {
           <th style={{ ...thStyle, width: "44px" }}>#</th>
           <th style={thStyle}>Title</th>
           <th style={{ ...thStyle, width: "140px" }}>Article type</th>
-          <th style={{ ...thStyle, width: "76px", textAlign: "right" }}>β</th>
+          <th style={{ ...thStyle, width: "80px", textAlign: "right" }}>BT score</th>
           <th style={{ ...thStyle, width: "76px", textAlign: "right" }}>NFL</th>
         </tr>
       </thead>
@@ -69,8 +69,8 @@ export default function RankingTable({ ranked }: Props) {
                   </div>
                 </td>
                 <td style={{ ...tdStyle, color: "#5a6a85", fontSize: "12px" }}>{r.article_type ?? "—"}</td>
-                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: r.beta === null ? "#bbb" : r.beta >= 0 ? "#059669" : "#b91c1c" }}>
-                  {r.beta === null ? "—" : r.beta.toFixed(2)}
+                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: r.beta === null ? "#bbb" : r.beta >= 7.5 ? "#059669" : r.beta >= 3.5 ? "#1a1a1a" : "#b91c1c", fontVariantNumeric: "tabular-nums" }}>
+                  {r.beta === null ? "—" : r.beta.toFixed(1)}
                 </td>
                 <td style={{ ...tdStyle, textAlign: "right", color: (r.wins + r.losses) === 0 ? "#bbb" : "#5a6a85", fontSize: "12px", fontVariantNumeric: "tabular-nums" }}>
                   {(r.wins + r.losses) === 0 ? "—" : `${r.wins}-${r.losses}`}
@@ -114,9 +114,9 @@ export default function RankingTable({ ranked }: Props) {
                               <span style={{ color: "#94a3b8", flexShrink: 0 }}>·</span>
                               <span style={{
                                 flexShrink: 0, fontWeight: 600, fontSize: "11px",
-                                color: p.opponent.beta === null ? "#bbb" : p.opponent.beta >= 0 ? "#059669" : "#b91c1c",
+                                color: p.opponent.beta === null ? "#bbb" : p.opponent.beta >= 7.5 ? "#059669" : p.opponent.beta >= 3.5 ? "#5a6a85" : "#b91c1c",
                               }}>
-                                β {p.opponent.beta === null ? "—" : p.opponent.beta.toFixed(2)}
+                                BT {p.opponent.beta === null ? "—" : p.opponent.beta.toFixed(1)}
                               </span>
                               {p.categories.length > 0 && (
                                 <>
