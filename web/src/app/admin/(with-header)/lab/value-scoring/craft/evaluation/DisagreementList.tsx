@@ -28,7 +28,8 @@ function fmtDate(iso: string | null): string {
 }
 
 export default function DisagreementList({ rows, articles }: Props) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded,     setExpanded]     = useState<Set<string>>(new Set());
+  const [minCraftDiff, setMinCraftDiff] = useState(0);
 
   function toggle(id: string) {
     setExpanded(prev => {
@@ -39,15 +40,58 @@ export default function DisagreementList({ rows, articles }: Props) {
     });
   }
 
+  const filtered = minCraftDiff > 0
+    ? rows.filter(r => r.craftDiff >= minCraftDiff)
+    : rows;
+
   if (rows.length === 0) {
     return (
       <div style={{ padding: "32px 24px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
-        No disagreements at this threshold.
+        No disagreements.
       </div>
     );
   }
 
   return (
+    <>
+      {/* Filter row */}
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 16px", borderBottom: "1px solid #f0f0f0", background: "#fafbfc" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#5a6a85" }}>
+          Min craft diff
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={minCraftDiff}
+            onChange={e => setMinCraftDiff(Math.max(0, Number(e.target.value) || 0))}
+            style={{
+              width: "56px",
+              padding: "3px 7px",
+              fontSize: "13px",
+              fontWeight: 400,
+              border: "1px solid #e5e7eb",
+              borderRadius: "5px",
+              color: "#1a1a1a",
+              background: "#fff",
+              textTransform: "none",
+              letterSpacing: 0,
+            }}
+          />
+        </label>
+        <span style={{ fontSize: "12px", color: "#94a3b8" }}>
+          {minCraftDiff > 0
+            ? `showing ${filtered.length} of ${rows.length}`
+            : `showing all ${rows.length}`}
+        </span>
+      </div>
+
+      {filtered.length === 0 && (
+        <div style={{ padding: "32px 24px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
+          No disagreements with craft diff ≥ {minCraftDiff}.
+        </div>
+      )}
+
+      {filtered.length > 0 && (
     <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }}>
       <colgroup>
         <col style={{ width: "30px" }} />
@@ -66,7 +110,7 @@ export default function DisagreementList({ rows, articles }: Props) {
         </tr>
       </thead>
       <tbody>
-        {rows.map(r => {
+        {filtered.map(r => {
           const open = expanded.has(r.pairId);
           const humanArt  = r.humanChoiceId === r.articleA.id ? r.articleA : r.articleB;
           const promptArt = r.promptChoiceId === null
@@ -163,6 +207,8 @@ export default function DisagreementList({ rows, articles }: Props) {
         })}
       </tbody>
     </table>
+      )}
+    </>
   );
 }
 
