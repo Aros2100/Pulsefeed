@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import type { DisagreementRow } from "@/lib/lab/value-scoring/evaluation";
 
 type Sari = { subject?: string; action?: string; result?: string; implication?: string } | null;
@@ -80,8 +80,8 @@ export default function DisagreementList({ rows, articles }: Props) {
             ? `${humanCraft.toFixed(0)} / ${promptCraft.toFixed(0)} · Δ${r.craftDiff.toFixed(0)}`
             : "—";
           return (
-            <>
-              <tr key={r.pairId} onClick={() => toggle(r.pairId)} style={{ borderTop: "1px solid #f5f5f5", cursor: "pointer" }}>
+            <React.Fragment key={r.pairId}>
+              <tr onClick={() => toggle(r.pairId)} style={{ borderTop: "1px solid #f5f5f5", cursor: "pointer" }}>
                 <td style={{ ...tdStyle, color: "#94a3b8" }}>{open ? "▾" : "▸"}</td>
                 <td style={{ ...tdStyle, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={humanArt.title}>
                   {humanArt.title}
@@ -154,7 +154,7 @@ export default function DisagreementList({ rows, articles }: Props) {
                   </td>
                 </tr>
               )}
-            </>
+            </React.Fragment>
           );
         })}
       </tbody>
