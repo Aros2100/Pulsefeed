@@ -48,13 +48,20 @@ export default function DisagreementList({ rows, articles }: Props) {
   }
 
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+    <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }}>
+      <colgroup>
+        <col style={{ width: "30px" }} />   {/* toggle */}
+        <col style={{ width: "28%" }} />    {/* Your choice */}
+        <col style={{ width: "28%" }} />    {/* Prompt choice */}
+        <col style={{ width: "130px" }} />  {/* Craft — fixed so "72 / 62 · Δ10" fits */}
+        <col />                             {/* Reasons — takes remaining space */}
+      </colgroup>
       <thead>
         <tr style={{ background: "#fafbfc" }}>
-          <th style={{ ...thStyle, width: "26px" }} />
+          <th style={{ ...thStyle, width: "30px" }} />
           <th style={thStyle}>Your choice</th>
           <th style={thStyle}>Prompt choice</th>
-          <th style={{ ...thStyle, minWidth: "130px", textAlign: "right" }}>Craft</th>
+          <th style={{ ...thStyle, textAlign: "right" }}>Craft</th>
           <th style={thStyle}>Reasons</th>
         </tr>
       </thead>
@@ -76,29 +83,26 @@ export default function DisagreementList({ rows, articles }: Props) {
             <>
               <tr key={r.pairId} onClick={() => toggle(r.pairId)} style={{ borderTop: "1px solid #f5f5f5", cursor: "pointer" }}>
                 <td style={{ ...tdStyle, color: "#94a3b8" }}>{open ? "▾" : "▸"}</td>
-                <td style={{ ...tdStyle, color: "#1a1a1a" }} title={humanArt.title}>
-                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "260px" }}>{humanArt.title}</div>
+                <td style={{ ...tdStyle, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={humanArt.title}>
+                  {humanArt.title}
                 </td>
-                <td style={{ ...tdStyle, color: "#1a1a1a" }} title={promptArt?.title ?? "(tie)"}>
-                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "260px" }}>
-                    {promptArt ? promptArt.title : <em style={{ color: "#94a3b8" }}>(prompt tied)</em>}
-                  </div>
+                <td style={{ ...tdStyle, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={promptArt?.title ?? "(tie)"}>
+                  {promptArt ? promptArt.title : <em style={{ color: "#94a3b8" }}>(prompt tied)</em>}
                 </td>
                 <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: humanCraft !== null && promptCraft !== null ? "#1a1a1a" : "#bbb", fontSize: "12px", whiteSpace: "nowrap" }}>
                   {craftCell}
                 </td>
-                <td style={{ ...tdStyle, color: "#5a6a85", fontSize: "12px" }}>
-                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "260px" }}>
-                    {r.reasons.length > 0 ? r.reasons.join(" · ") : <span style={{ color: "#bbb" }}>—</span>}
-                  </div>
+                <td style={{ ...tdStyle, color: "#5a6a85", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {r.reasons.length > 0 ? r.reasons.join(" · ") : <span style={{ color: "#bbb" }}>—</span>}
                 </td>
               </tr>
               {open && (
                 <tr key={r.pairId + "-detail"} style={{ background: "#fafbfc" }}>
-                  <td colSpan={5} style={{ padding: "16px 24px", maxWidth: 0, overflow: "hidden" }}>
+                  <td colSpan={5} style={{ padding: "16px 24px" }}>
                     {/* YOUR CHOICE always left, PROMPT always right.
                         minWidth: 0 on each ArticlePanel root div is essential — without it,
-                        CSS grid children expand to fit their content instead of their track. */}
+                        CSS grid children expand to fit their content instead of their track.
+                        The table-layout: fixed on <table> caps this <td> to table width. */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                       {/* Human-chosen panel */}
                       {r.humanChoiceId === r.articleA.id ? (
