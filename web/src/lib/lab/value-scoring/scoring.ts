@@ -40,11 +40,9 @@ export interface ParsedScore {
   reasoning:  string | null;
 }
 
-// craft_score (20-100) → score (1-10), rounded to integer. Inverse of how
-// the rubric prompt was previously asked to map; we now do the mapping here
-// so the model can report the honest rubric value.
+// craft_score (10-100) → score (1-10), rounded to integer.
 export function craftScoreToScore(craft: number): number {
-  return Math.round((craft - 20) / 80 * 9 + 1);
+  return Math.round((craft - 10) / 90 * 9 + 1);
 }
 
 export interface ScoringSummary {
