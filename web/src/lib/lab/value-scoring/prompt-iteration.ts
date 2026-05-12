@@ -34,6 +34,14 @@ function truncate(s: string | null | undefined, n: number): string {
   return t.length > n ? t.slice(0, n - 1) + "…" : t;
 }
 
+// Returns the trimmed value or "—" for empty/null. Used in v1 generation
+// where we send the full text (no truncation) so Opus sees the ground truth.
+function full(s: string | null | undefined): string {
+  if (!s) return "—";
+  const t = s.trim();
+  return t.length > 0 ? t : "—";
+}
+
 function fmtDisagreement(d: DisagreementRow, i: number): string {
   const humanArt   = d.humanChoiceId === d.articleA.id ? d.articleA : d.articleB;
   const otherArt   = d.humanChoiceId === d.articleA.id ? d.articleB : d.articleA;
@@ -144,13 +152,13 @@ function fmtArticleBlock(label: string, a: ArticleFull): string {
     `${label} (BT score ${a.normalizedScore === null ? "—" : a.normalizedScore.toFixed(1)})`,
     `  Title: ${a.title}`,
     `  Article type: ${a.article_type ?? "—"} · Journal: ${a.journal ?? "—"}`,
-    `  Short headline: ${truncate(a.short_headline, 240)}`,
-    `  Resume: ${truncate(a.resume, 320)}`,
-    `  Bottom line: ${truncate(a.bottom_line, 240)}`,
-    `  SARI subject: ${truncate(sari.subject ?? null, 180)}`,
-    `  SARI action: ${truncate(sari.action ?? null, 180)}`,
-    `  SARI result: ${truncate(sari.result ?? null, 180)}`,
-    `  SARI implication: ${truncate(sari.implication ?? null, 180)}`,
+    `  Short headline: ${full(a.short_headline)}`,
+    `  Resume: ${full(a.resume)}`,
+    `  Bottom line: ${full(a.bottom_line)}`,
+    `  SARI subject: ${full(sari.subject)}`,
+    `  SARI action: ${full(sari.action)}`,
+    `  SARI result: ${full(sari.result)}`,
+    `  SARI implication: ${full(sari.implication)}`,
   ].join("\n");
 }
 
@@ -165,29 +173,26 @@ interface PairExample {
 function fmtPairExample(p: PairExample, i: number): string {
   const lines: string[] = [];
   lines.push(`Pair ${i + 1} (BT diff ${p.btDiff.toFixed(1)}):`);
-  lines.push(`  Winner: "${truncate(p.winner.title, 160)}" [${p.winner.article_type ?? "—"}] · BT ${p.winner.normalizedScore === null ? "—" : p.winner.normalizedScore.toFixed(1)}`);
-  lines.push(`  Loser:  "${truncate(p.loser.title,  160)}" [${p.loser.article_type  ?? "—"}] · BT ${p.loser.normalizedScore  === null ? "—" : p.loser.normalizedScore.toFixed(1)}`);
+  lines.push(`  Winner: "${p.winner.title}" [${p.winner.article_type ?? "—"}] · BT ${p.winner.normalizedScore === null ? "—" : p.winner.normalizedScore.toFixed(1)}`);
+  lines.push(`  Loser:  "${p.loser.title}" [${p.loser.article_type  ?? "—"}] · BT ${p.loser.normalizedScore  === null ? "—" : p.loser.normalizedScore.toFixed(1)}`);
   if (p.reasons.length > 0) lines.push(`  Reasons: ${p.reasons.join(", ")}`);
-  if (p.notes)              lines.push(`  Notes: ${truncate(p.notes, 320)}`);
+  if (p.notes)              lines.push(`  Notes: ${full(p.notes)}`);
   return lines.join("\n");
 }
 
 export function buildV1Request(
-  topArticles:    ArticleFull[],
-  middleArticles: ArticleFull[],
-  bottomArticles: ArticleFull[],
-  topCategories:  { label: string; count: number }[],
-  examplePairs:   PairExample[],
-  totalDecided:   number,
+  allArticles:   ArticleFull[],
+  topCategories: { label: string; count: number }[],
+  allPairs:      PairExample[],
+  totalDecided:  number,
 ) {
   const categoryStats = topCategories.length === 0
     ? "(no reason categories used)"
     : topCategories.map(c => `  ${c.label}: ${c.count}×`).join("\n");
 
-  const topBlocks    = topArticles.map((a, i)    => fmtArticleBlock(`HIGHLY VALUED #${i + 1}`, a)).join("\n\n");
-  const middleBlocks = middleArticles.map((a, i) => fmtArticleBlock(`MID-RANKED #${i + 1}`,    a)).join("\n\n");
-  const bottomBlocks = bottomArticles.map((a, i) => fmtArticleBlock(`LOW VALUED #${i + 1}`,    a)).join("\n\n");
-  const pairBlocks   = examplePairs.map(fmtPairExample).join("\n\n");
+  // All articles, sorted by BT desc. Numbered so Opus can refer back.
+  const articleBlocks = allArticles.map((a, i) => fmtArticleBlock(`Article #${i + 1}`, a)).join("\n\n");
+  const pairBlocks    = allPairs.map(fmtPairExample).join("\n\n");
 
   const system = [
     "You are writing the first version of a scoring prompt for a clinical-newsletter editor.",
@@ -239,7 +244,7 @@ export function buildV1Request(
     "",
     "Hard rules:",
     "- The prompt MUST instruct Claude to return only JSON of the form {\"score\": <number 1-10>, \"reasoning\": <string>}.",
-    "- The 1-10 scale should match how the BT ranking distributes: 10 looks like the HIGHLY VALUED examples, 1 looks like the LOW VALUED examples.",
+    "- The 1-10 scale should match how the BT ranking distributes: 10 looks like the top of the BT ranking (Article #1), 1 looks like the bottom (last article).",
     "- The prompt should be self-contained — assume Claude only sees the prompt and one article's fields (title, article_type, journal, short_headline, resume, bottom_line, SARI).",
     "- Criteria in the generated prompt MUST be about HOW the work was done (study design rigor, statistical handling, reporting quality, methodological transparency, reproducibility), NOT about WHAT it concerns (clinical relevance, actionability, importance to practice).",
     "- If clinician reasons mention strategic value or clinical importance, treat that as background context — focus on the methodological elements they emphasised.",
@@ -257,16 +262,10 @@ export function buildV1Request(
     `=== CATEGORY USAGE (top reason categories across all ${totalDecided} pairs) ===`,
     categoryStats,
     "",
-    "=== HIGHLY VALUED ARTICLES (top of BT ranking) ===",
-    topBlocks.length > 0 ? topBlocks : "(none)",
+    `=== ALL ${allArticles.length} ARTICLES (sorted by BT score descending — #1 is the clinician's most preferred work) ===`,
+    articleBlocks.length > 0 ? articleBlocks : "(none)",
     "",
-    "=== MID-RANKED ARTICLES (around the middle of BT ranking) ===",
-    middleBlocks.length > 0 ? middleBlocks : "(none)",
-    "",
-    "=== LOW VALUED ARTICLES (bottom of BT ranking) ===",
-    bottomBlocks.length > 0 ? bottomBlocks : "(none)",
-    "",
-    `=== INFORMATIVE PAIRS (${examplePairs.length} of ${totalDecided}, picked by largest BT difference + having reasons) ===`,
+    `=== ALL ${allPairs.length} DECIDED PAIRS (sorted by BT difference descending — clearest preferences first) ===`,
     pairBlocks.length > 0 ? pairBlocks : "(none)",
   ].join("\n");
 
@@ -280,9 +279,10 @@ export function buildV1Request(
 
 /**
  * Generate a first prompt version from pairwise data alone, with no parent
- * prompt to iterate from. Loads the BT ranking, picks representative top /
- * middle / bottom articles, aggregates reason-category usage, samples the
- * most-informative pairs, then asks Sonnet to produce {prompt_text, change_notes}.
+ * prompt to iterate from. Sends Opus the full ground truth: every ranked
+ * article (sorted by BT score desc) with its full text fields, every
+ * decided pair (sorted by BT diff desc) with reasons and untruncated notes,
+ * plus the reason-category usage histogram. Returns {prompt_text, change_notes}.
  */
 export async function generatePromptV1FromPairwise(db: Db, moduleId: string): Promise<V1Suggestion> {
   // Articles
@@ -349,22 +349,14 @@ export async function generatePromptV1FromPairwise(db: Db, moduleId: string): Pr
     .slice(0, 12)
     .map(([label, count]) => ({ label, count }));
 
-  // Sort articles by BT score
-  const articlesWithScore = articles
+  // All articles with BT scores, sorted by BT descending
+  const allArticles: ArticleFull[] = articles
     .map(a => ({ ...a, normalizedScore: normalizedMap.get(a.id) ?? null }))
     .filter(a => a.normalizedScore !== null)
     .sort((a, b) => (b.normalizedScore as number) - (a.normalizedScore as number));
 
-  const EXAMPLES_PER_BUCKET = 3;
-  const topArticles    = articlesWithScore.slice(0, EXAMPLES_PER_BUCKET);
-  const bottomArticles = articlesWithScore.slice(Math.max(0, articlesWithScore.length - EXAMPLES_PER_BUCKET));
-  const midPool        = articlesWithScore.slice(EXAMPLES_PER_BUCKET, articlesWithScore.length - EXAMPLES_PER_BUCKET);
-  midPool.sort((a, b) => Math.abs((a.normalizedScore as number) - 5.5) - Math.abs((b.normalizedScore as number) - 5.5));
-  const middleArticles = midPool.slice(0, EXAMPLES_PER_BUCKET);
-
-  // Build pair examples: prefer pairs with reasons AND large BT diff
-  type Scored = PairExample & { score: number };
-  const candidates: Scored[] = [];
+  // All decided pairs, sorted by BT difference descending (clearest preferences first)
+  const allPairs: PairExample[] = [];
   for (const p of decided) {
     const winnerArt = articleMap.get(p.winner_id);
     const loserId   = p.winner_id === p.article_a_id ? p.article_b_id : p.article_a_id;
@@ -376,20 +368,15 @@ export async function generatePromptV1FromPairwise(db: Db, moduleId: string): Pr
     const r = reasonsByPair.get(p.id);
     const reasons = r ? [...r.labels].sort() : [];
     const notes   = r && r.notes.size > 0 ? [...r.notes].join(" · ") : null;
-    // Informativeness: BT diff weight + bonus for reasons/notes
-    const score = btDiff + (reasons.length > 0 ? 1 : 0) + (notes ? 1 : 0);
-    candidates.push({
+    allPairs.push({
       winner: { title: winnerArt.title, article_type: winnerArt.article_type, normalizedScore: winnerScore },
       loser:  { title: loserArt.title,  article_type: loserArt.article_type,  normalizedScore: loserScore  },
-      reasons, notes, btDiff, score,
+      reasons, notes, btDiff,
     });
   }
-  candidates.sort((a, b) => b.score - a.score);
-  const examplePairs: PairExample[] = candidates.slice(0, 20).map(c => ({
-    winner: c.winner, loser: c.loser, reasons: c.reasons, notes: c.notes, btDiff: c.btDiff,
-  }));
+  allPairs.sort((a, b) => b.btDiff - a.btDiff);
 
-  const params = buildV1Request(topArticles, middleArticles, bottomArticles, topCategories, examplePairs, decided.length);
+  const params = buildV1Request(allArticles, topCategories, allPairs, decided.length);
   const modelKey = `value_scoring_craft_generate_v1`;
   const message = await trackedCall(modelKey, params, undefined, "value_scoring_craft_generate_v1");
   const raw = (message.content[0] as { type: string; text: string }).text;
@@ -404,9 +391,9 @@ export async function generatePromptV1FromPairwise(db: Db, moduleId: string): Pr
     changeNotes: parsed.changeNotes,
     summary: {
       decidedPairs:   decided.length,
-      rankedArticles: articlesWithScore.length,
+      rankedArticles: allArticles.length,
       topCategories,
-      examplePairs:   examplePairs.length,
+      examplePairs:   allPairs.length,
     },
     rawResponse: raw,
   };
