@@ -54,7 +54,7 @@ export default function DisagreementList({ rows, articles }: Props) {
           <th style={{ ...thStyle, width: "26px" }} />
           <th style={thStyle}>Your choice</th>
           <th style={thStyle}>Prompt choice</th>
-          <th style={{ ...thStyle, width: "140px", textAlign: "right" }}>Craft (20-100)</th>
+          <th style={{ ...thStyle, minWidth: "130px", textAlign: "right" }}>Craft</th>
           <th style={thStyle}>Reasons</th>
         </tr>
       </thead>
@@ -70,7 +70,7 @@ export default function DisagreementList({ rows, articles }: Props) {
             ? null
             : r.promptChoiceId === r.articleA.id ? r.craftScoreA : r.craftScoreB;
           const craftCell = humanCraft !== null && promptCraft !== null
-            ? `${humanCraft.toFixed(0)} / ${promptCraft.toFixed(0)} (Δ${r.craftDiff.toFixed(0)})`
+            ? `${humanCraft.toFixed(0)} / ${promptCraft.toFixed(0)} · Δ${r.craftDiff.toFixed(0)}`
             : "—";
           return (
             <>
@@ -84,7 +84,7 @@ export default function DisagreementList({ rows, articles }: Props) {
                     {promptArt ? promptArt.title : <em style={{ color: "#94a3b8" }}>(prompt tied)</em>}
                   </div>
                 </td>
-                <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: humanCraft !== null && promptCraft !== null ? "#1a1a1a" : "#bbb", fontSize: "12px" }}>
+                <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums", color: humanCraft !== null && promptCraft !== null ? "#1a1a1a" : "#bbb", fontSize: "12px", whiteSpace: "nowrap" }}>
                   {craftCell}
                 </td>
                 <td style={{ ...tdStyle, color: "#5a6a85", fontSize: "12px" }}>
@@ -96,23 +96,48 @@ export default function DisagreementList({ rows, articles }: Props) {
               {open && (
                 <tr key={r.pairId + "-detail"} style={{ background: "#fafbfc" }}>
                   <td colSpan={5} style={{ padding: "16px 24px" }}>
+                    {/* YOUR CHOICE always left, PROMPT always right */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                      <ArticlePanel
-                        article={articles[r.articleA.id]}
-                        chosenByHuman={r.humanChoiceId === r.articleA.id}
-                        chosenByPrompt={r.promptChoiceId === r.articleA.id}
-                        craftScore={r.craftScoreA}
-                        dimensions={r.dimensionsA}
-                        reasoning={r.reasoningA}
-                      />
-                      <ArticlePanel
-                        article={articles[r.articleB.id]}
-                        chosenByHuman={r.humanChoiceId === r.articleB.id}
-                        chosenByPrompt={r.promptChoiceId === r.articleB.id}
-                        craftScore={r.craftScoreB}
-                        dimensions={r.dimensionsB}
-                        reasoning={r.reasoningB}
-                      />
+                      {/* Human-chosen panel */}
+                      {r.humanChoiceId === r.articleA.id ? (
+                        <ArticlePanel
+                          article={articles[r.articleA.id]}
+                          chosenByHuman
+                          chosenByPrompt={r.promptChoiceId === r.articleA.id}
+                          craftScore={r.craftScoreA}
+                          dimensions={r.dimensionsA}
+                          reasoning={r.reasoningA}
+                        />
+                      ) : (
+                        <ArticlePanel
+                          article={articles[r.articleB.id]}
+                          chosenByHuman
+                          chosenByPrompt={r.promptChoiceId === r.articleB.id}
+                          craftScore={r.craftScoreB}
+                          dimensions={r.dimensionsB}
+                          reasoning={r.reasoningB}
+                        />
+                      )}
+                      {/* Prompt-chosen (or other) panel */}
+                      {r.humanChoiceId === r.articleA.id ? (
+                        <ArticlePanel
+                          article={articles[r.articleB.id]}
+                          chosenByHuman={false}
+                          chosenByPrompt={r.promptChoiceId === r.articleB.id}
+                          craftScore={r.craftScoreB}
+                          dimensions={r.dimensionsB}
+                          reasoning={r.reasoningB}
+                        />
+                      ) : (
+                        <ArticlePanel
+                          article={articles[r.articleA.id]}
+                          chosenByHuman={false}
+                          chosenByPrompt={r.promptChoiceId === r.articleA.id}
+                          craftScore={r.craftScoreA}
+                          dimensions={r.dimensionsA}
+                          reasoning={r.reasoningA}
+                        />
+                      )}
                     </div>
                     {r.notes && (
                       <div style={{ marginTop: "16px", padding: "10px 14px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "6px" }}>
@@ -174,7 +199,7 @@ function ArticlePanel({ article, chosenByHuman, chosenByPrompt, craftScore, dime
           </div>
         )}
       </div>
-      <div style={{ fontSize: "13px", fontWeight: 600, lineHeight: 1.4, marginBottom: "4px" }}>{article.title}</div>
+      <div style={{ fontSize: "13px", fontWeight: 600, lineHeight: 1.4, marginBottom: "4px", overflowWrap: "break-word" }}>{article.title}</div>
       <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "10px" }}>
         {[article.journal, fmtDate(article.published_date), article.article_type].filter(Boolean).join(" · ")}
         {article.pmid && <> · PMID {article.pmid}</>}
@@ -212,7 +237,7 @@ function FieldRow({ label, value, divider }: { label: string; value: string | nu
   return (
     <div style={{ borderTop: divider ? "1px solid #ebebeb" : "none", paddingTop: divider ? "10px" : 0, marginTop: divider ? "10px" : 0 }}>
       <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#5a6a85", marginBottom: "2px" }}>{label}</div>
-      <div style={{ fontSize: "12px", color: value ? "#1a1a1a" : "#bbb", lineHeight: 1.5 }}>{value ?? "—"}</div>
+      <div style={{ fontSize: "12px", color: value ? "#1a1a1a" : "#bbb", lineHeight: 1.5, overflowWrap: "break-word" }}>{value ?? "—"}</div>
     </div>
   );
 }
@@ -221,7 +246,7 @@ function SariCell({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
       <div style={{ fontSize: "9px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "#94a3b8", marginBottom: "2px" }}>{label}</div>
-      <div style={{ fontSize: "11px", color: value ? "#374151" : "#bbb", lineHeight: 1.4 }}>{value ?? "—"}</div>
+      <div style={{ fontSize: "11px", color: value ? "#374151" : "#bbb", lineHeight: 1.4, overflowWrap: "break-word" }}>{value ?? "—"}</div>
     </div>
   );
 }
