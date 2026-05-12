@@ -26,9 +26,19 @@ export interface DisagreementRow {
   scoreA:          number | null;
   scoreB:          number | null;
   scoreDiff:       number;
-  normalizedA:     number | null; // BT normalized score 1-10 for article A
-  normalizedB:     number | null; // BT normalized score 1-10 for article B
-  normalizedDiff:  number;        // |normalizedA - normalizedB|
+  // Raw craft_score (20-100) per article — null for legacy prompts without rubric
+  craftScoreA:     number | null;
+  craftScoreB:     number | null;
+  craftDiff:       number;
+  // BT normalised 1-10
+  normalizedA:     number | null;
+  normalizedB:     number | null;
+  normalizedDiff:  number;
+  // Prompt dimensions + reasoning per article
+  dimensionsA:     Record<string, number> | null;
+  dimensionsB:     Record<string, number> | null;
+  reasoningA:      string | null;
+  reasoningB:      string | null;
   articleA:        { id: string; title: string; article_type: string | null };
   articleB:        { id: string; title: string; article_type: string | null };
   reasons:         string[];
@@ -224,6 +234,53 @@ export async function computeRankingCorrelation(db: Db, promptId: string): Promi
   return { rho: spearman(xs, ys), n: xs.length };
 }
 
+interface ArticleScoreDetail {
+  craftScore:  number | null;
+  dimensions:  Record<string, number> | null;
+  reasoning:   string | null;
+}
+
+/** Loads craft_score, dimensions, reasoning per article from the prompt chain. */
+async function loadArticleScoreDetails(
+  db: Db,
+  chain: string[],
+  articleIds: string[],
+): Promise<Map<string, ArticleScoreDetail>> {
+  if (articleIds.length === 0) return new Map();
+
+  const { data: scores } = await db
+    .from("lab_value_article_scores")
+    .select("prompt_id, article_id, craft_score, dimensions, reasoning")
+    .in("prompt_id", chain)
+    .in("article_id", articleIds);
+
+  type R = { prompt_id: string; article_id: string; craft_score: number | string | null; dimensions: unknown; reasoning: string | null };
+  const priority = new Map<string, number>(chain.map((id, i) => [id, i]));
+  const best = new Map<string, { rank: number } & ArticleScoreDetail>();
+
+  for (const r of (scores ?? []) as R[]) {
+    const rank = priority.get(r.prompt_id) ?? Infinity;
+    const prev = best.get(r.article_id);
+    if (prev && prev.rank <= rank) continue;
+    const craft = r.craft_score !== null ? Number(r.craft_score) : null;
+    const dims  = (r.dimensions && typeof r.dimensions === "object" && !Array.isArray(r.dimensions))
+      ? r.dimensions as Record<string, number>
+      : null;
+    best.set(r.article_id, {
+      rank,
+      craftScore: craft !== null && Number.isFinite(craft) ? craft : null,
+      dimensions: dims,
+      reasoning:  r.reasoning ?? null,
+    });
+  }
+
+  const result = new Map<string, ArticleScoreDetail>();
+  for (const [articleId, { craftScore, dimensions, reasoning }] of best) {
+    result.set(articleId, { craftScore, dimensions, reasoning });
+  }
+  return result;
+}
+
 export async function getDisagreements(
   db: Db,
   promptId: string,
@@ -232,7 +289,7 @@ export async function getDisagreements(
   const includeTies  = options?.includeTies  ?? false;
   const minScoreDiff = options?.minScoreDiff ?? 0;
 
-  const moduleId      = await loadModuleId(db, promptId);
+  const { moduleId, chain } = await loadPromptChain(db, promptId);
   const scoreMap      = await loadScoreMap(db, promptId);
   const normalizedMap = await loadNormalizedMap(db, moduleId);
 
@@ -278,7 +335,7 @@ export async function getDisagreements(
 
   if (disagreements.length === 0) return [];
 
-  // Bulk-load articles, reasons, categories for the affected pairs
+  // Bulk-load articles, reasons, categories, and score details for affected pairs
   const articleIds = new Set<string>();
   const pairIds: string[] = [];
   for (const d of disagreements) {
@@ -286,6 +343,8 @@ export async function getDisagreements(
     articleIds.add(d.pair.article_b_id);
     pairIds.push(d.pair.id);
   }
+
+  const scoreDetails = await loadArticleScoreDetails(db, chain, [...articleIds]);
 
   const { data: articleRows } = await db
     .from("lab_value_articles")
@@ -320,9 +379,13 @@ export async function getDisagreements(
   }
 
   const rows: DisagreementRow[] = disagreements.map(d => {
-    const artA = articleMap.get(d.pair.article_a_id);
-    const artB = articleMap.get(d.pair.article_b_id);
+    const artA    = articleMap.get(d.pair.article_a_id);
+    const artB    = articleMap.get(d.pair.article_b_id);
     const reasons = reasonsByPair.get(d.pair.id);
+    const detA    = scoreDetails.get(d.pair.article_a_id);
+    const detB    = scoreDetails.get(d.pair.article_b_id);
+    const csA     = detA?.craftScore ?? null;
+    const csB     = detB?.craftScore ?? null;
     return {
       pairId:          d.pair.id,
       humanChoiceId:   d.pair.winner_id,
@@ -330,9 +393,16 @@ export async function getDisagreements(
       scoreA:          d.sa,
       scoreB:          d.sb,
       scoreDiff:       d.scoreDiff,
+      craftScoreA:     csA,
+      craftScoreB:     csB,
+      craftDiff:       csA !== null && csB !== null ? Math.abs(csA - csB) : 0,
       normalizedA:     d.normA,
       normalizedB:     d.normB,
       normalizedDiff:  d.normalizedDiff,
+      dimensionsA:     detA?.dimensions ?? null,
+      dimensionsB:     detB?.dimensions ?? null,
+      reasoningA:      detA?.reasoning ?? null,
+      reasoningB:      detB?.reasoning ?? null,
       articleA:        artA ?? { id: d.pair.article_a_id, title: "(missing)", article_type: null },
       articleB:        artB ?? { id: d.pair.article_b_id, title: "(missing)", article_type: null },
       reasons:         reasons ? [...reasons.labels].sort() : [],
