@@ -76,9 +76,9 @@ export function buildUserMessage(article: ScoringArticle): string {
   ].join("\n");
 }
 
-export function buildScoringRequest(article: ScoringArticle, promptText: string) {
+export function buildScoringRequest(article: ScoringArticle, promptText: string, modelOverride?: string) {
   return {
-    model:      SCORING_MODEL,
+    model:      modelOverride ?? SCORING_MODEL,
     max_tokens: SCORING_MAX_TOKENS,
     thinking:   { type: "disabled" as const },
     system: [
@@ -221,6 +221,7 @@ export async function scoreArticlesWithPrompt(
   db: Db,
   promptId: string,
   mode: ScoringMode,
+  modelOverride?: string,
 ): Promise<ScoringSummary> {
   const start = Date.now();
 
@@ -271,12 +272,13 @@ export async function scoreArticlesWithPrompt(
 
   const arts = (articles ?? []) as ScoringArticle[];
 
+  const effectiveModel = modelOverride ?? SCORING_MODEL;
   const modelKey = `value_scoring_craft_v${p.version}_${mode}`;
   const task = `value_scoring_craft_${mode}`;
 
   const results = await runInChunks(arts, SCORING_CONCURRENCY, async (article) => {
     try {
-      const params = buildScoringRequest(article, p.prompt_text);
+      const params = buildScoringRequest(article, p.prompt_text, effectiveModel);
       const message = await trackedCall(modelKey, params, article.id, task);
       const raw = (message.content[0] as { type: string; text: string }).text.trim();
       const { score, reasoning } = parseScoringResponse(raw);
@@ -299,13 +301,14 @@ export async function scoreArticlesWithPrompt(
 
   const now = new Date().toISOString();
   const rows = results.map(r => ({
-    module_id:    p.module_id,
-    prompt_id:    p.id,
-    article_id:   r.article_id,
-    score:        r.score,
-    reasoning:    r.reasoning,
-    raw_response: r.raw_response,
-    scored_at:    now,
+    module_id:     p.module_id,
+    prompt_id:     p.id,
+    article_id:    r.article_id,
+    score:         r.score,
+    reasoning:     r.reasoning,
+    raw_response:  r.raw_response,
+    scoring_model: effectiveModel,
+    scored_at:     now,
   }));
 
   const UPSERT_CHUNK = 100;

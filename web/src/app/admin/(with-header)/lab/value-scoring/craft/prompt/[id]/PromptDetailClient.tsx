@@ -36,6 +36,7 @@ export default function PromptDetailClient({
   const [savingState, setSavingState] = useState<"idle" | "saving" | "saved">("idle");
   const [busy, setBusy] = useState<null | "quick" | "full" | "advanced" | "disagreements">(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [scoringModel, setScoringModel] = useState("claude-haiku-4-5-20251001");
   const [summary, setSummary] = useState<ScoreSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,6 +84,7 @@ export default function PromptDetailClient({
       switch (action) {
         case "quick":
           url = "/api/admin/lab/value-scoring/craft/prompt/score-quick";
+          body.model = scoringModel;
           break;
         case "disagreements":
           url = "/api/admin/lab/value-scoring/craft/prompt/score-disagreements";
@@ -166,6 +168,27 @@ export default function PromptDetailClient({
           Scored {summary.succeeded}/{summary.total} articles ·
           {summary.failed > 0 && <> {summary.failed} failed to parse · </>}
           {(summary.durationMs / 1000).toFixed(1)}s
+        </div>
+      )}
+
+      {/* Model selector — only shown before quick test is run */}
+      {status === "draft" && (
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+          <label style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#5a6a85", whiteSpace: "nowrap" }}>
+            Scoring model
+          </label>
+          <select
+            value={scoringModel}
+            onChange={e => setScoringModel(e.target.value)}
+            style={{
+              background: "#fff", border: "1px solid #e5e7eb", borderRadius: "6px",
+              padding: "6px 10px", fontSize: "13px", color: "#1a1a1a",
+            }}
+          >
+            <option value="claude-haiku-4-5-20251001">Haiku 4.5 (default — fastest)</option>
+            <option value="claude-sonnet-4-6">Sonnet 4.6 (better calibration)</option>
+            <option value="claude-opus-4-7">Opus 4.7 (best calibration)</option>
+          </select>
         </div>
       )}
 

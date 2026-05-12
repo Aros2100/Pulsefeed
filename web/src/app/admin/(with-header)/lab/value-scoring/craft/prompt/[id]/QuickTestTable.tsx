@@ -3,6 +3,12 @@
 import React, { useState } from "react";
 import type { QuickResultRow } from "@/lib/lab/value-scoring/prompt-versions";
 
+const MODEL_SHORT: Record<string, string> = {
+  "claude-haiku-4-5-20251001": "Haiku 4.5",
+  "claude-sonnet-4-6":         "Sonnet 4.6",
+  "claude-opus-4-7":           "Opus 4.7",
+};
+
 interface Props {
   rows: QuickResultRow[];
   quickRho: number | null;
@@ -23,9 +29,17 @@ export default function QuickTestTable({ rows, quickRho }: Props) {
   return (
     <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", overflow: "hidden", marginBottom: "20px" }}>
       <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
-          Quick test · {rows.length} articles
-        </span>
+        <div>
+          <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
+            Quick test · {rows.length} articles
+          </span>
+          {rows[0]?.scoring_model && (
+            <span style={{ fontSize: "11px", color: "#94a3b8", marginLeft: "12px" }}>
+              Scored with {MODEL_SHORT[rows[0].scoring_model] ?? rows[0].scoring_model}
+              {rows[0].scored_at && <> · {new Date(rows[0].scored_at).toLocaleDateString("en-CA")}</>}
+            </span>
+          )}
+        </div>
         {quickRho !== null && (
           <span style={{ fontSize: "11px", color: "#5a6a85" }}>
             Spearman ρ (BT vs prompt score):{" "}
