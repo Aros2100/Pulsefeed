@@ -57,7 +57,7 @@ export default function QuickTestTable({ rows, quickRho }: Props) {
             <th style={thStyle}>Title</th>
             <th style={{ ...thStyle, width: "140px" }}>Article type</th>
             <th style={{ ...thStyle, width: "80px", textAlign: "right" }}>BT score</th>
-            <th style={{ ...thStyle, width: "90px", textAlign: "right" }}>Prompt score</th>
+            <th style={{ ...thStyle, width: "110px", textAlign: "right" }}>Craft score</th>
           </tr>
         </thead>
         <tbody>
@@ -84,8 +84,12 @@ export default function QuickTestTable({ rows, quickRho }: Props) {
                     {r.normalizedScore === null ? "—" : r.normalizedScore.toFixed(1)}
                   </td>
                   <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums",
-                    color: r.score === null ? "#b91c1c" : "#1a1a1a" }}>
-                    {r.score === null ? "failed" : r.score.toFixed(2)}
+                    color: r.score === null && r.craftScore === null ? "#b91c1c" : "#1a1a1a" }}>
+                    {r.craftScore !== null
+                      ? <>{r.craftScore.toFixed(0)} <span style={{ color: "#94a3b8", fontWeight: 400 }}>({r.score === null ? "—" : r.score.toFixed(0)})</span></>
+                      : r.score === null
+                        ? "failed"
+                        : r.score.toFixed(2)}
                   </td>
                 </tr>
                 {isOpen && (

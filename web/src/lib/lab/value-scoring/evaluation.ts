@@ -110,33 +110,43 @@ async function loadModuleId(db: Db, promptId: string): Promise<string> {
 /**
  * Returns the effective score map for the prompt, walking the parent chain.
  * For each article we use the score from the deepest (leaf-most) prompt that
- * has it — newer overrides older.
+ * has it — newer overrides older. Within each row we prefer craft_score
+ * (20-100) over the legacy 1-10 score, and normalise legacy values into the
+ * 20-100 range so the whole map is on a single scale (avoids cross-prompt
+ * comparison artefacts when a chain mixes rubric and legacy prompts).
  */
 async function loadScoreMap(db: Db, promptId: string): Promise<Map<string, number>> {
   const { chain } = await loadPromptChain(db, promptId);
 
   const { data: scores } = await db
     .from("lab_value_article_scores")
-    .select("prompt_id, article_id, score")
+    .select("prompt_id, article_id, score, craft_score")
     .in("prompt_id", chain)
     .not("score", "is", null);
 
-  type R = { prompt_id: string; article_id: string; score: number | string };
+  type R = { prompt_id: string; article_id: string; score: number | string; craft_score: number | string | null };
   const all = (scores ?? []) as R[];
 
   // Process in chain order (leaf first). First write wins → leaf overrides parents.
   const priority = new Map<string, number>(chain.map((id, i) => [id, i]));
-  const best = new Map<string, { rank: number; score: number }>();
+  const best = new Map<string, { rank: number; value: number }>();
   for (const r of all) {
-    const n = Number(r.score);
-    if (!Number.isFinite(n)) continue;
+    const craft = r.craft_score !== null ? Number(r.craft_score) : NaN;
+    const legacy = Number(r.score);
+    let value: number;
+    if (Number.isFinite(craft)) {
+      value = craft;
+    } else if (Number.isFinite(legacy)) {
+      // Scale legacy 1-10 up to 20-100 for chain consistency
+      value = (legacy - 1) / 9 * 80 + 20;
+    } else continue;
     const rank = priority.get(r.prompt_id) ?? Infinity;
     const prev = best.get(r.article_id);
-    if (!prev || rank < prev.rank) best.set(r.article_id, { rank, score: n });
+    if (!prev || rank < prev.rank) best.set(r.article_id, { rank, value });
   }
 
   const map = new Map<string, number>();
-  for (const [articleId, { score }] of best) map.set(articleId, score);
+  for (const [articleId, { value }] of best) map.set(articleId, value);
   return map;
 }
 

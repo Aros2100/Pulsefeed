@@ -246,7 +246,8 @@ export interface QuickResultRow {
   title:            string;
   article_type:     string | null;
   normalizedScore:  number | null; // BT normalized 1-10 score
-  score:            number | null; // prompt score
+  score:            number | null; // prompt score (1-10, legacy/derived)
+  craftScore:       number | null; // rubric craft_score (20-100), null for legacy prompts
   reasoning:        string | null; // prompt reasoning text
   scoring_model:    string | null; // model that produced the score
   scored_at:        string | null; // ISO timestamp
@@ -268,16 +269,19 @@ export async function getQuickResults(db: Db, promptId: string): Promise<QuickRe
 
   const { data: scores } = await db
     .from("lab_value_article_scores")
-    .select("article_id, score, reasoning, scoring_model, scored_at")
+    .select("article_id, score, craft_score, reasoning, scoring_model, scored_at")
     .eq("prompt_id", promptId);
-  type S = { article_id: string; score: number | string | null; reasoning: string | null; scoring_model: string | null; scored_at: string | null };
-  const scoreMap     = new Map<string, number | null>();
-  const reasoningMap = new Map<string, string | null>();
-  const modelMap     = new Map<string, string | null>();
-  const scoredAtMap  = new Map<string, string | null>();
+  type S = { article_id: string; score: number | string | null; craft_score: number | string | null; reasoning: string | null; scoring_model: string | null; scored_at: string | null };
+  const scoreMap      = new Map<string, number | null>();
+  const craftScoreMap = new Map<string, number | null>();
+  const reasoningMap  = new Map<string, string | null>();
+  const modelMap      = new Map<string, string | null>();
+  const scoredAtMap   = new Map<string, string | null>();
   for (const s of (scores ?? []) as S[]) {
     const n = s.score === null ? null : Number(s.score);
     scoreMap.set(s.article_id, n !== null && Number.isFinite(n) ? n : null);
+    const c = s.craft_score === null ? null : Number(s.craft_score);
+    craftScoreMap.set(s.article_id, c !== null && Number.isFinite(c) ? c : null);
     reasoningMap.set(s.article_id, s.reasoning ?? null);
     modelMap.set(s.article_id, s.scoring_model ?? null);
     scoredAtMap.set(s.article_id, s.scored_at ?? null);
@@ -306,14 +310,15 @@ export async function getQuickResults(db: Db, promptId: string): Promise<QuickRe
     const art = artMap.get(articleId);
     if (!art) continue;
     rows.push({
-      article_id:    articleId,
-      title:         art.title,
-      article_type:  art.article_type,
+      article_id:      articleId,
+      title:           art.title,
+      article_type:    art.article_type,
       normalizedScore: normalizedMap.get(articleId) ?? null,
       score,
-      reasoning:     reasoningMap.get(articleId) ?? null,
-      scoring_model: modelMap.get(articleId) ?? null,
-      scored_at:     scoredAtMap.get(articleId) ?? null,
+      craftScore:      craftScoreMap.get(articleId) ?? null,
+      reasoning:       reasoningMap.get(articleId) ?? null,
+      scoring_model:   modelMap.get(articleId) ?? null,
+      scored_at:       scoredAtMap.get(articleId) ?? null,
     });
   }
 

@@ -32,8 +32,16 @@ export interface ScoringArticle {
 }
 
 export interface ParsedScore {
-  score:     number | null;
-  reasoning: string | null;
+  score:      number | null; // 1-10 (derived from craft_score when present, else read directly)
+  craftScore: number | null; // 20-100 from rubric prompt; null for legacy prompts
+  reasoning:  string | null;
+}
+
+// craft_score (20-100) → score (1-10), rounded to integer. Inverse of how
+// the rubric prompt was previously asked to map; we now do the mapping here
+// so the model can report the honest rubric value.
+export function craftScoreToScore(craft: number): number {
+  return Math.round((craft - 20) / 80 * 9 + 1);
 }
 
 export interface ScoringSummary {
@@ -84,30 +92,43 @@ export function buildScoringRequest(article: ScoringArticle, promptText: string,
     system: [
       promptText,
       "",
-      "Respond only with valid JSON of the form {\"score\": <number>, \"reasoning\": <string>}.",
-      "No other text, no markdown fences.",
+      "Respond only with valid JSON, no other text and no markdown fences.",
+      "Preferred output: {\"craft_score\": <number 20-100>, \"reasoning\": <string>}",
+      "Legacy output also accepted: {\"score\": <number 1-10>, \"reasoning\": <string>}",
     ].join("\n"),
     messages: [{ role: "user" as const, content: buildUserMessage(article) }],
   };
 }
 
+function readNumber(raw: unknown): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string" && raw.trim().length > 0) {
+    const n = Number(raw);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
 export function parseScoringResponse(rawText: string): ParsedScore {
   try {
     const match = rawText.match(/\{[\s\S]*\}/);
-    if (!match) return { score: null, reasoning: null };
-    const parsed = JSON.parse(match[0]) as { score?: unknown; reasoning?: unknown };
-    const rawScore = parsed.score;
+    if (!match) return { score: null, craftScore: null, reasoning: null };
+    const parsed = JSON.parse(match[0]) as { score?: unknown; craft_score?: unknown; reasoning?: unknown };
+
+    const craftScore  = readNumber(parsed.craft_score);
+    const directScore = readNumber(parsed.score);
+
+    // Prefer craft_score (the rubric's real output). Derive the 1-10 column
+    // from it so legacy consumers of `score` keep working. If only the
+    // legacy score is present, use it directly.
     let score: number | null = null;
-    if (typeof rawScore === "number" && Number.isFinite(rawScore)) {
-      score = rawScore;
-    } else if (typeof rawScore === "string" && rawScore.trim().length > 0) {
-      const n = Number(rawScore);
-      if (Number.isFinite(n)) score = n;
-    }
+    if (craftScore !== null) score = craftScoreToScore(craftScore);
+    else if (directScore !== null) score = directScore;
+
     const reasoning = typeof parsed.reasoning === "string" ? parsed.reasoning : null;
-    return { score, reasoning };
+    return { score, craftScore, reasoning };
   } catch {
-    return { score: null, reasoning: null };
+    return { score: null, craftScore: null, reasoning: null };
   }
 }
 
@@ -144,7 +165,7 @@ export async function selectDisagreementArticleIds(db: Db, promptId: string): Pr
   // Pull the parent's scores and the module's decided pairs
   const [{ data: scores }, { data: pairs }] = await Promise.all([
     db.from("lab_value_article_scores")
-      .select("article_id, score")
+      .select("article_id, score, craft_score")
       .eq("prompt_id", p.parent_prompt_id)
       .not("score", "is", null),
     db.from("lab_value_pairs")
@@ -153,11 +174,14 @@ export async function selectDisagreementArticleIds(db: Db, promptId: string): Pr
       .not("winner_id", "is", null),
   ]);
 
-  type ScoreRow = { article_id: string; score: number | string };
+  type ScoreRow = { article_id: string; score: number | string; craft_score: number | string | null };
   const scoreMap = new Map<string, number>();
   for (const r of (scores ?? []) as ScoreRow[]) {
-    const n = Number(r.score);
-    if (Number.isFinite(n)) scoreMap.set(r.article_id, n);
+    // Prefer craft_score (20-100) when present; comparison only cares about order.
+    const craft = r.craft_score !== null ? Number(r.craft_score) : NaN;
+    const fallback = Number(r.score);
+    const v = Number.isFinite(craft) ? craft : Number.isFinite(fallback) ? fallback : null;
+    if (v !== null) scoreMap.set(r.article_id, v);
   }
 
   type Pair = { article_a_id: string; article_b_id: string; winner_id: string };
@@ -281,10 +305,11 @@ export async function scoreArticlesWithPrompt(
       const params = buildScoringRequest(article, p.prompt_text, effectiveModel);
       const message = await trackedCall(modelKey, params, article.id, task);
       const raw = (message.content[0] as { type: string; text: string }).text.trim();
-      const { score, reasoning } = parseScoringResponse(raw);
+      const { score, craftScore, reasoning } = parseScoringResponse(raw);
       return {
         article_id:   article.id,
         score,
+        craftScore,
         reasoning,
         raw_response: { text: raw, usage: message.usage },
       };
@@ -293,6 +318,7 @@ export async function scoreArticlesWithPrompt(
       return {
         article_id:   article.id,
         score:        null,
+        craftScore:   null,
         reasoning:    null,
         raw_response: { error: errMessage },
       };
@@ -305,6 +331,7 @@ export async function scoreArticlesWithPrompt(
     prompt_id:     p.id,
     article_id:    r.article_id,
     score:         r.score,
+    craft_score:   r.craftScore,
     reasoning:     r.reasoning,
     raw_response:  r.raw_response,
     scoring_model: effectiveModel,
