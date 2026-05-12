@@ -50,11 +50,11 @@ export default function DisagreementList({ rows, articles }: Props) {
   return (
     <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }}>
       <colgroup>
-        <col style={{ width: "30px" }} />   {/* toggle */}
-        <col style={{ width: "28%" }} />    {/* Your choice */}
-        <col style={{ width: "28%" }} />    {/* Prompt choice */}
-        <col style={{ width: "130px" }} />  {/* Craft — fixed so "72 / 62 · Δ10" fits */}
-        <col />                             {/* Reasons — takes remaining space */}
+        <col style={{ width: "30px" }} />
+        <col style={{ width: "28%" }} />
+        <col style={{ width: "28%" }} />
+        <col style={{ width: "130px" }} />
+        <col />
       </colgroup>
       <thead>
         <tr style={{ background: "#fafbfc" }}>
