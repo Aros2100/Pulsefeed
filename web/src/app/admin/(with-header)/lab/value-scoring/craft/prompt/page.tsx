@@ -6,6 +6,7 @@ import {
   getPromptVersions,
   type PromptStatus,
 } from "@/lib/lab/value-scoring/prompt-versions";
+import GenerateV1Button from "./GenerateV1Button";
 
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleString("en-GB", {
@@ -79,7 +80,7 @@ export default async function PromptListPage() {
               Develop and test a scoring prompt based on the pairwise data.
             </p>
           </div>
-          {canCreate && (
+          {canCreate && versions.length > 0 && (
             <Link
               href="/admin/lab/value-scoring/craft/prompt/new"
               style={{
@@ -100,19 +101,35 @@ export default async function PromptListPage() {
           </div>
         )}
 
-        {/* Versions card */}
-        <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", overflow: "hidden" }}>
-          <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
-            <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
-              Versions
-            </span>
-          </div>
-          {versions.length === 0 ? (
-            <div style={{ padding: "32px 24px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
-              No prompt versions yet.
-              {canCreate && <> Click <strong>Create new version</strong> to start.</>}
+        {/* Empty-state: prominent v1 generation flow */}
+        {canCreate && versions.length === 0 && (
+          <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "24px 28px", marginBottom: "20px" }}>
+            <h2 style={{ fontSize: "16px", fontWeight: 700, margin: "0 0 6px" }}>
+              No prompt versions yet
+            </h2>
+            <p style={{ fontSize: "13px", color: "#5a6a85", margin: "0 0 18px", lineHeight: 1.5 }}>
+              Let the AI draft v1 by reading the {decidedPairs} pairwise decisions, your reason categories and notes, and the Bradley-Terry ranking. You can review and edit before saving.
+            </p>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: "16px", flexWrap: "wrap" }}>
+              <Link
+                href="/admin/lab/value-scoring/craft/prompt/new"
+                style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "underline" }}
+              >
+                Advanced: create empty version
+              </Link>
+              <GenerateV1Button />
             </div>
-          ) : (
+          </div>
+        )}
+
+        {/* Versions card — only shown when at least one version exists */}
+        {versions.length > 0 && (
+          <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", overflow: "hidden" }}>
+            <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
+              <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
+                Versions
+              </span>
+            </div>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "#fafbfc" }}>
@@ -151,8 +168,8 @@ export default async function PromptListPage() {
                 })}
               </tbody>
             </table>
-          )}
-        </div>
+          </div>
+        )}
 
         <div style={{ marginTop: "20px", display: "flex", justifyContent: "space-between" }}>
           <Link href="/admin/lab/value-scoring/craft" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>

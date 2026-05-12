@@ -98,6 +98,271 @@ export function parseIterationResponse(rawText: string): { promptText: string; c
   }
 }
 
+// ── v1 generation from pairwise data ─────────────────────────────────────────
+
+export interface V1Suggestion {
+  promptText:  string;
+  changeNotes: string;
+  summary: {
+    decidedPairs:  number;
+    rankedArticles: number;
+    topCategories: { label: string; count: number }[];
+    examplePairs:  number;
+  };
+  rawResponse: string;
+}
+
+interface Sari {
+  subject?:     string | null;
+  action?:      string | null;
+  result?:      string | null;
+  implication?: string | null;
+}
+
+interface ArticleFull {
+  id:              string;
+  title:           string;
+  journal:         string | null;
+  article_type:    string | null;
+  short_headline:  string | null;
+  resume:          string | null;
+  bottom_line:     string | null;
+  sari:            Sari | null;
+  normalizedScore: number | null;
+}
+
+function fmtArticleBlock(label: string, a: ArticleFull): string {
+  const sari = a.sari ?? {};
+  return [
+    `${label} (BT score ${a.normalizedScore === null ? "—" : a.normalizedScore.toFixed(1)})`,
+    `  Title: ${a.title}`,
+    `  Article type: ${a.article_type ?? "—"} · Journal: ${a.journal ?? "—"}`,
+    `  Short headline: ${truncate(a.short_headline, 240)}`,
+    `  Resume: ${truncate(a.resume, 320)}`,
+    `  Bottom line: ${truncate(a.bottom_line, 240)}`,
+    `  SARI subject: ${truncate(sari.subject ?? null, 180)}`,
+    `  SARI action: ${truncate(sari.action ?? null, 180)}`,
+    `  SARI result: ${truncate(sari.result ?? null, 180)}`,
+    `  SARI implication: ${truncate(sari.implication ?? null, 180)}`,
+  ].join("\n");
+}
+
+interface PairExample {
+  winner:    { title: string; article_type: string | null; normalizedScore: number | null };
+  loser:     { title: string; article_type: string | null; normalizedScore: number | null };
+  reasons:   string[];
+  notes:     string | null;
+  btDiff:    number;
+}
+
+function fmtPairExample(p: PairExample, i: number): string {
+  const lines: string[] = [];
+  lines.push(`Pair ${i + 1} (BT diff ${p.btDiff.toFixed(1)}):`);
+  lines.push(`  Winner: "${truncate(p.winner.title, 160)}" [${p.winner.article_type ?? "—"}] · BT ${p.winner.normalizedScore === null ? "—" : p.winner.normalizedScore.toFixed(1)}`);
+  lines.push(`  Loser:  "${truncate(p.loser.title,  160)}" [${p.loser.article_type  ?? "—"}] · BT ${p.loser.normalizedScore  === null ? "—" : p.loser.normalizedScore.toFixed(1)}`);
+  if (p.reasons.length > 0) lines.push(`  Reasons: ${p.reasons.join(", ")}`);
+  if (p.notes)              lines.push(`  Notes: ${truncate(p.notes, 320)}`);
+  return lines.join("\n");
+}
+
+export function buildV1Request(
+  topArticles:    ArticleFull[],
+  middleArticles: ArticleFull[],
+  bottomArticles: ArticleFull[],
+  topCategories:  { label: string; count: number }[],
+  examplePairs:   PairExample[],
+  totalDecided:   number,
+) {
+  const categoryStats = topCategories.length === 0
+    ? "(no reason categories used)"
+    : topCategories.map(c => `  ${c.label}: ${c.count}×`).join("\n");
+
+  const topBlocks    = topArticles.map((a, i)    => fmtArticleBlock(`HIGHLY VALUED #${i + 1}`, a)).join("\n\n");
+  const middleBlocks = middleArticles.map((a, i) => fmtArticleBlock(`MID-RANKED #${i + 1}`,    a)).join("\n\n");
+  const bottomBlocks = bottomArticles.map((a, i) => fmtArticleBlock(`LOW VALUED #${i + 1}`,    a)).join("\n\n");
+  const pairBlocks   = examplePairs.map(fmtPairExample).join("\n\n");
+
+  const system = [
+    "You are writing the first version of a scoring prompt for a clinical-newsletter editor.",
+    "The prompt will instruct Claude Haiku to score the 'craft' of medical research articles on a 1-10 scale.",
+    `The clinician has already scored ~${totalDecided} pairs of articles by hand, leaving categorised reasons and notes.`,
+    "A Bradley-Terry ranking was derived from those pairwise choices — articles with high BT scores are the clinician's preferred work, and low BT scores are the rejected work.",
+    "",
+    "Your job: infer the clinician's implicit scoring criteria from the data and produce a scoring prompt that captures them.",
+    "",
+    "Hard rules:",
+    "- The prompt MUST instruct Claude to return only JSON of the form {\"score\": <number 1-10>, \"reasoning\": <string>}.",
+    "- The 1-10 scale should match how the BT ranking distributes: 10 looks like the HIGHLY VALUED examples, 1 looks like the LOW VALUED examples.",
+    "- The prompt should be self-contained — assume Claude only sees the prompt and one article's fields (title, article_type, journal, short_headline, resume, bottom_line, SARI).",
+    "- Reflect the actual dimensions the clinician cares about (visible in the reason categories and notes). Generic platitudes (\"high quality\", \"good methodology\") are not useful — be specific about what those terms mean here.",
+    "- Do not embed the example articles verbatim in the prompt. The prompt should generalise the patterns, not memorise these specific 100 articles.",
+    "",
+    "Respond with valid JSON only, no markdown fences, no prose around it:",
+    "{",
+    "  \"prompt_text\": \"<the full prompt as a single string>\",",
+    "  \"change_notes\": \"<2-5 sentences: what scoring criteria you inferred and how you wove them into the prompt>\"",
+    "}",
+  ].join("\n");
+
+  const user = [
+    `=== CATEGORY USAGE (top reason categories across all ${totalDecided} pairs) ===`,
+    categoryStats,
+    "",
+    "=== HIGHLY VALUED ARTICLES (top of BT ranking) ===",
+    topBlocks.length > 0 ? topBlocks : "(none)",
+    "",
+    "=== MID-RANKED ARTICLES (around the middle of BT ranking) ===",
+    middleBlocks.length > 0 ? middleBlocks : "(none)",
+    "",
+    "=== LOW VALUED ARTICLES (bottom of BT ranking) ===",
+    bottomBlocks.length > 0 ? bottomBlocks : "(none)",
+    "",
+    `=== INFORMATIVE PAIRS (${examplePairs.length} of ${totalDecided}, picked by largest BT difference + having reasons) ===`,
+    pairBlocks.length > 0 ? pairBlocks : "(none)",
+  ].join("\n");
+
+  return {
+    model:      ITERATION_MODEL,
+    max_tokens: ITERATION_MAX_TOKENS,
+    system,
+    messages:   [{ role: "user" as const, content: user }],
+  };
+}
+
+/**
+ * Generate a first prompt version from pairwise data alone, with no parent
+ * prompt to iterate from. Loads the BT ranking, picks representative top /
+ * middle / bottom articles, aggregates reason-category usage, samples the
+ * most-informative pairs, then asks Sonnet to produce {prompt_text, change_notes}.
+ */
+export async function generatePromptV1FromPairwise(db: Db, moduleId: string): Promise<V1Suggestion> {
+  // Articles
+  const { data: articleRows } = await db
+    .from("lab_value_articles")
+    .select("id, title, journal, article_type, short_headline, resume, bottom_line, sari")
+    .eq("module_id", moduleId);
+  type ArticleDbRow = { id: string; title: string; journal: string | null; article_type: string | null; short_headline: string | null; resume: string | null; bottom_line: string | null; sari: Sari | null };
+  const articles = (articleRows ?? []) as ArticleDbRow[];
+  const articleMap = new Map<string, ArticleDbRow>(articles.map(a => [a.id, a]));
+
+  // BT rankings
+  const { data: rankingRows } = await db
+    .from("lab_value_rankings")
+    .select("article_id, normalized_score")
+    .eq("module_id", moduleId);
+  type RankRow = { article_id: string; normalized_score: number | string | null };
+  const normalizedMap = new Map<string, number>();
+  for (const r of (rankingRows ?? []) as RankRow[]) {
+    if (r.normalized_score !== null && r.normalized_score !== undefined) {
+      normalizedMap.set(r.article_id, Number(r.normalized_score));
+    }
+  }
+  if (normalizedMap.size === 0) {
+    throw new Error("Bradley-Terry ranking has not been computed yet — compute it before generating v1");
+  }
+
+  // Decided pairs
+  const { data: pairRows } = await db
+    .from("lab_value_pairs")
+    .select("id, article_a_id, article_b_id, winner_id")
+    .eq("module_id", moduleId)
+    .not("winner_id", "is", null);
+  type PairRow = { id: string; article_a_id: string; article_b_id: string; winner_id: string };
+  const decided = (pairRows ?? []) as PairRow[];
+  if (decided.length === 0) {
+    throw new Error("No decided pairs found — finish pairwise scoring before generating v1");
+  }
+
+  // Reasons + categories
+  const pairIds = decided.map(p => p.id);
+  const [{ data: reasonRows }, { data: catRows }] = await Promise.all([
+    db.from("lab_value_pair_reasons").select("pair_id, category_id, notes").in("pair_id", pairIds),
+    db.from("lab_value_reason_categories").select("id, label").eq("module_id", moduleId),
+  ]);
+  type ReasonRow = { pair_id: string; category_id: string; notes: string | null };
+  type CatRow    = { id: string; label: string };
+  const catLabel = new Map<string, string>(((catRows ?? []) as CatRow[]).map(c => [c.id, c.label]));
+
+  const reasonsByPair = new Map<string, { labels: Set<string>; notes: Set<string> }>();
+  const categoryCount = new Map<string, number>();
+  for (const r of (reasonRows ?? []) as ReasonRow[]) {
+    const label = catLabel.get(r.category_id);
+    if (label) {
+      categoryCount.set(label, (categoryCount.get(label) ?? 0) + 1);
+      let entry = reasonsByPair.get(r.pair_id);
+      if (!entry) { entry = { labels: new Set(), notes: new Set() }; reasonsByPair.set(r.pair_id, entry); }
+      entry.labels.add(label);
+      if (r.notes && r.notes.trim().length > 0) entry.notes.add(r.notes.trim());
+    }
+  }
+  const topCategories = [...categoryCount.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12)
+    .map(([label, count]) => ({ label, count }));
+
+  // Sort articles by BT score
+  const articlesWithScore = articles
+    .map(a => ({ ...a, normalizedScore: normalizedMap.get(a.id) ?? null }))
+    .filter(a => a.normalizedScore !== null)
+    .sort((a, b) => (b.normalizedScore as number) - (a.normalizedScore as number));
+
+  const EXAMPLES_PER_BUCKET = 3;
+  const topArticles    = articlesWithScore.slice(0, EXAMPLES_PER_BUCKET);
+  const bottomArticles = articlesWithScore.slice(Math.max(0, articlesWithScore.length - EXAMPLES_PER_BUCKET));
+  const midPool        = articlesWithScore.slice(EXAMPLES_PER_BUCKET, articlesWithScore.length - EXAMPLES_PER_BUCKET);
+  midPool.sort((a, b) => Math.abs((a.normalizedScore as number) - 5.5) - Math.abs((b.normalizedScore as number) - 5.5));
+  const middleArticles = midPool.slice(0, EXAMPLES_PER_BUCKET);
+
+  // Build pair examples: prefer pairs with reasons AND large BT diff
+  type Scored = PairExample & { score: number };
+  const candidates: Scored[] = [];
+  for (const p of decided) {
+    const winnerArt = articleMap.get(p.winner_id);
+    const loserId   = p.winner_id === p.article_a_id ? p.article_b_id : p.article_a_id;
+    const loserArt  = articleMap.get(loserId);
+    if (!winnerArt || !loserArt) continue;
+    const winnerScore = normalizedMap.get(p.winner_id) ?? null;
+    const loserScore  = normalizedMap.get(loserId)     ?? null;
+    const btDiff = (winnerScore !== null && loserScore !== null) ? Math.abs(winnerScore - loserScore) : 0;
+    const r = reasonsByPair.get(p.id);
+    const reasons = r ? [...r.labels].sort() : [];
+    const notes   = r && r.notes.size > 0 ? [...r.notes].join(" · ") : null;
+    // Informativeness: BT diff weight + bonus for reasons/notes
+    const score = btDiff + (reasons.length > 0 ? 1 : 0) + (notes ? 1 : 0);
+    candidates.push({
+      winner: { title: winnerArt.title, article_type: winnerArt.article_type, normalizedScore: winnerScore },
+      loser:  { title: loserArt.title,  article_type: loserArt.article_type,  normalizedScore: loserScore  },
+      reasons, notes, btDiff, score,
+    });
+  }
+  candidates.sort((a, b) => b.score - a.score);
+  const examplePairs: PairExample[] = candidates.slice(0, 20).map(c => ({
+    winner: c.winner, loser: c.loser, reasons: c.reasons, notes: c.notes, btDiff: c.btDiff,
+  }));
+
+  const params = buildV1Request(topArticles, middleArticles, bottomArticles, topCategories, examplePairs, decided.length);
+  const modelKey = `value_scoring_craft_generate_v1`;
+  const message = await trackedCall(modelKey, params, undefined, "value_scoring_craft_generate_v1");
+  const raw = (message.content[0] as { type: string; text: string }).text;
+
+  const parsed = parseIterationResponse(raw);
+  if (!parsed) {
+    throw new Error("AI response could not be parsed — try again");
+  }
+
+  return {
+    promptText:  parsed.promptText,
+    changeNotes: parsed.changeNotes,
+    summary: {
+      decidedPairs:   decided.length,
+      rankedArticles: articlesWithScore.length,
+      topCategories,
+      examplePairs:   examplePairs.length,
+    },
+    rawResponse: raw,
+  };
+}
+
 export async function generatePromptIterationFromDisagreements(
   db: Db,
   promptId: string,
