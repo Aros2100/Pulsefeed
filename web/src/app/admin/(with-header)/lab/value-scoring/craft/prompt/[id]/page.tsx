@@ -4,7 +4,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   getPromptVersion,
   getQuickResults,
-  getScoreDistribution,
   type QuickResultRow,
 } from "@/lib/lab/value-scoring/prompt-versions";
 import { spearman } from "@/lib/lab/value-scoring/evaluation";
@@ -12,11 +11,6 @@ import PromptDetailClient from "./PromptDetailClient";
 
 interface PageProps {
   params: Promise<{ id: string }>;
-}
-
-function fmtNum(n: number | null, digits = 2): string {
-  if (n === null) return "—";
-  return n.toFixed(digits);
 }
 
 export default async function PromptVersionDetailPage({ params }: PageProps) {
@@ -27,10 +21,20 @@ export default async function PromptVersionDetailPage({ params }: PageProps) {
   const version = await getPromptVersion(admin, id);
   if (!version) notFound();
 
-  const fullyScored  = version.status === "scored";
-  const quickTested  = version.status === "quick_tested";
-  const distribution = fullyScored ? await getScoreDistribution(admin, version.id) : null;
+  const fullyScored = version.status === "scored";
+  const quickTested = version.status === "quick_tested";
   const quickResults: QuickResultRow[] = quickTested ? await getQuickResults(admin, version.id) : [];
+
+  // Look up parent version number for the header (e.g. "iteration of v1")
+  let parentVersionNumber: number | null = null;
+  if (version.parent_prompt_id) {
+    const { data: parent } = await admin
+      .from("lab_value_prompts")
+      .select("version")
+      .eq("id", version.parent_prompt_id)
+      .maybeSingle();
+    if (parent) parentVersionNumber = (parent as { version: number }).version;
+  }
 
   // Spearman over the quick-test pool (β vs prompt score) — gives a quick
   // visual sense of correlation before committing to full scoring.
@@ -47,11 +51,16 @@ export default async function PromptVersionDetailPage({ params }: PageProps) {
           <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
             The Lab · Value Scoring · Craft · Prompt
           </div>
-          <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>v{version.version}</h1>
+          <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>
+            v{version.version}
+            {parentVersionNumber !== null && (
+              <span style={{ fontSize: "12px", fontWeight: 500, color: "#94a3b8", marginLeft: "10px" }}>
+                iteration of v{parentVersionNumber}
+              </span>
+            )}
+          </h1>
           <p style={{ fontSize: "12px", color: "#888", margin: 0 }}>
             Created {new Date(version.created_at).toLocaleString()}
-            {version.scoredCount > 0 && <> · {version.scoredCount}/{version.articleCount} scored</>}
-            {version.quick_tested_at && <> · Quick tested {new Date(version.quick_tested_at).toLocaleString()}</>}
           </p>
         </div>
 
@@ -63,7 +72,30 @@ export default async function PromptVersionDetailPage({ params }: PageProps) {
           status={version.status}
           scoredCount={version.scoredCount}
           articleCount={version.articleCount}
+          hasParent={version.parent_prompt_id !== null}
         />
+
+        {/* Scoring status line — replaces the old distribution card */}
+        {(version.scoredCount > 0 || version.lastScoredAt) && (
+          <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "14px 18px", marginBottom: "20px", fontSize: "13px", color: "#5a6a85", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+            <span>
+              <strong style={{ color: fullyScored ? "#059669" : "#1a1a1a" }}>
+                {fullyScored ? `Scored ${version.articleCount}/${version.articleCount} articles` : `${version.scoredCount}/${version.articleCount} scored`}
+              </strong>
+              {version.lastScoredAt && (
+                <> · last scored {new Date(version.lastScoredAt).toLocaleDateString("en-CA")}</>
+              )}
+              {version.quick_tested_at && !fullyScored && (
+                <> · quick tested</>
+              )}
+            </span>
+            {fullyScored && (
+              <Link href={`/admin/lab/value-scoring/craft/evaluation?promptId=${version.id}`} style={{ fontSize: "13px", color: "#E83B2A", textDecoration: "none", fontWeight: 600 }}>
+                Open evaluation →
+              </Link>
+            )}
+          </div>
+        )}
 
         {quickTested && quickResults.length > 0 && (
           <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", overflow: "hidden", marginBottom: "20px" }}>
@@ -113,44 +145,17 @@ export default async function PromptVersionDetailPage({ params }: PageProps) {
           </div>
         )}
 
-        {fullyScored && distribution && (
-          <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", overflow: "hidden" }}>
-            <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
-              <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
-                Score distribution
-              </span>
-            </div>
-            <div style={{ padding: "20px 24px", display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "12px" }}>
-              <Stat label="N (valid)" value={String(distribution.count)} />
-              <Stat label="Failed"   value={String(distribution.failed)} fg={distribution.failed > 0 ? "#b91c1c" : undefined} />
-              <Stat label="Min"      value={fmtNum(distribution.min)} />
-              <Stat label="Median"   value={fmtNum(distribution.median)} />
-              <Stat label="Max"      value={fmtNum(distribution.max)} />
-              <Stat label="Mean"     value={fmtNum(distribution.mean)} />
-            </div>
-          </div>
-        )}
-
         <div style={{ marginTop: "20px", display: "flex", justifyContent: "space-between" }}>
           <Link href="/admin/lab/value-scoring/craft/prompt" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>
             ← Back to prompt list
           </Link>
           {!version.editable && (
-            <Link href={`/admin/lab/value-scoring/craft/prompt/new?from=${version.id}`} style={{ fontSize: "13px", color: "#E83B2A", textDecoration: "none" }}>
-              Create new version from v{version.version} →
+            <Link href={`/admin/lab/value-scoring/craft/prompt/new?from=${version.id}`} style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "none" }}>
+              Create new version manually →
             </Link>
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function Stat({ label, value, fg }: { label: string; value: string; fg?: string }) {
-  return (
-    <div>
-      <div style={{ fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8", fontWeight: 700, marginBottom: "4px" }}>{label}</div>
-      <div style={{ fontSize: "18px", fontWeight: 700, color: fg ?? "#1a1a1a", fontVariantNumeric: "tabular-nums" }}>{value}</div>
     </div>
   );
 }

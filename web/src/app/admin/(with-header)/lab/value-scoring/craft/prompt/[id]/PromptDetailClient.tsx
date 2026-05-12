@@ -13,6 +13,7 @@ interface Props {
   status:      PromptStatus;
   scoredCount: number;
   articleCount: number;
+  hasParent:   boolean;
 }
 
 type ScoreSummary = {
@@ -24,7 +25,7 @@ type ScoreSummary = {
 };
 
 export default function PromptDetailClient({
-  promptId, initialText, initialNotes, editable, status, scoredCount, articleCount,
+  promptId, initialText, initialNotes, editable, status, scoredCount, articleCount, hasParent,
 }: Props) {
   const router = useRouter();
   const [text, setText] = useState(initialText);
@@ -33,7 +34,7 @@ export default function PromptDetailClient({
   const [savedNotes, setSavedNotes] = useState(initialNotes);
 
   const [savingState, setSavingState] = useState<"idle" | "saving" | "saved">("idle");
-  const [busy, setBusy] = useState<null | "quick" | "full" | "advanced">(null);
+  const [busy, setBusy] = useState<null | "quick" | "full" | "advanced" | "disagreements">(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [summary, setSummary] = useState<ScoreSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +69,7 @@ export default function PromptDetailClient({
     }
   }
 
-  async function runScore(action: "quick" | "full" | "advanced") {
+  async function runScore(action: "quick" | "full" | "advanced" | "disagreements") {
     if (dirty) {
       setError("Save changes before scoring.");
       return;
@@ -77,11 +78,23 @@ export default function PromptDetailClient({
     setError(null);
     setSummary(null);
     try {
-      const url = action === "quick"
-        ? "/api/admin/lab/value-scoring/craft/prompt/score-quick"
-        : "/api/admin/lab/value-scoring/craft/prompt/score-full";
+      let url: string;
       const body: Record<string, unknown> = { promptId };
-      if (action === "advanced") body.force = true;
+      switch (action) {
+        case "quick":
+          url = "/api/admin/lab/value-scoring/craft/prompt/score-quick";
+          break;
+        case "disagreements":
+          url = "/api/admin/lab/value-scoring/craft/prompt/score-disagreements";
+          break;
+        case "advanced":
+          url = "/api/admin/lab/value-scoring/craft/prompt/score-full";
+          body.force = true;
+          break;
+        case "full":
+        default:
+          url = "/api/admin/lab/value-scoring/craft/prompt/score-full";
+      }
 
       const res = await fetch(url, {
         method: "POST",
@@ -178,7 +191,7 @@ export default function PromptDetailClient({
             </button>
           )}
 
-          {status === "draft" && (
+          {status === "draft" && !hasParent && (
             <>
               {showAdvanced ? (
                 <button
@@ -205,6 +218,37 @@ export default function PromptDetailClient({
                 style={btnPrimary(busy !== null || dirty)}
               >
                 {busy === "quick" ? "Running quick test…" : "Quick test (15 articles)"}
+              </button>
+            </>
+          )}
+
+          {status === "draft" && hasParent && (
+            <>
+              {showAdvanced ? (
+                <button
+                  onClick={() => runScore("advanced")}
+                  disabled={busy !== null || dirty}
+                  title={dirty ? "Save changes first" : "Re-score all 100 articles for final validation"}
+                  style={btnSecondary(busy !== null || dirty)}
+                >
+                  {busy === "advanced" ? "Scoring…" : `Score all ${articleCount} articles`}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowAdvanced(true)}
+                  disabled={busy !== null}
+                  style={{ fontSize: "12px", color: "#94a3b8", background: "none", border: "none", padding: "10px 8px", cursor: "pointer", textDecoration: "underline" }}
+                >
+                  Advanced
+                </button>
+              )}
+              <button
+                onClick={() => runScore("disagreements")}
+                disabled={busy !== null || dirty}
+                title={dirty ? "Save changes first" : "Score only the articles involved in the parent version's disagreements"}
+                style={btnPrimary(busy !== null || dirty)}
+              >
+                {busy === "disagreements" ? "Scoring…" : "Score disagreement articles only"}
               </button>
             </>
           )}
@@ -242,7 +286,7 @@ export default function PromptDetailClient({
 
           {fullyScored && (
             <Link
-              href="/admin/lab/value-scoring/craft/evaluation"
+              href={`/admin/lab/value-scoring/craft/evaluation?promptId=${promptId}`}
               style={{
                 background: "#E83B2A", color: "#fff",
                 border: "none", borderRadius: "6px",

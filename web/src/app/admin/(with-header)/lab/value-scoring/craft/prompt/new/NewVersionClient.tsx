@@ -5,14 +5,16 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 interface Props {
-  startingText: string;
+  startingText:       string;
+  startingChangeNotes?: string;
   startedFromVersion: number | null;
+  parentPromptId:     string | null;
 }
 
-export default function NewVersionClient({ startingText, startedFromVersion }: Props) {
+export default function NewVersionClient({ startingText, startingChangeNotes, startedFromVersion, parentPromptId }: Props) {
   const router = useRouter();
   const [promptText, setPromptText] = useState(startingText);
-  const [changeNotes, setChangeNotes] = useState("");
+  const [changeNotes, setChangeNotes] = useState(startingChangeNotes ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,7 +25,7 @@ export default function NewVersionClient({ startingText, startedFromVersion }: P
       const res = await fetch("/api/admin/lab/value-scoring/craft/prompt/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ promptText, changeNotes }),
+        body: JSON.stringify({ promptText, changeNotes, parentPromptId }),
       });
       const json = await res.json();
       if (!json.ok) {

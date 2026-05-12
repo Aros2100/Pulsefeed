@@ -2,13 +2,10 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CRAFT_MODULE_KEY, DISAGREEMENT_MIN_DIFF } from "@/lib/lab/value-scoring/craft-config";
 import { getPromptVersions } from "@/lib/lab/value-scoring/prompt-versions";
-import {
-  computePairMatch,
-  computeRankingCorrelation,
-  getDisagreements,
-} from "@/lib/lab/value-scoring/evaluation";
+import { computePairMatch, getDisagreements } from "@/lib/lab/value-scoring/evaluation";
 import EvaluationFilters from "./EvaluationFilters";
 import DisagreementList, { type ArticleFull } from "./DisagreementList";
+import GenerateIterationButton from "./GenerateIterationButton";
 
 interface PageProps {
   searchParams: Promise<{ promptId?: string; minScoreDiff?: string }>;
@@ -59,11 +56,20 @@ export default async function EvaluationPage({ searchParams }: PageProps) {
     ? Math.max(0, Number(sp.minScoreDiff))
     : DISAGREEMENT_MIN_DIFF;
 
-  const [pairMatch, correlation, disagreements] = await Promise.all([
+  const [pairMatch, disagreements] = await Promise.all([
     computePairMatch(admin, promptId),
-    computeRankingCorrelation(admin, promptId),
     getDisagreements(admin, promptId, { minScoreDiff }),
   ]);
+
+  // Iteration history: pair-match for each fully-scored version. Sorted by version desc.
+  const historyByVersion = await Promise.all(
+    fullyScored.map(async v => ({
+      id:      v.id,
+      version: v.version,
+      created_at: v.created_at,
+      pairMatch:  v.id === promptId ? pairMatch : await computePairMatch(admin, v.id),
+    })),
+  );
 
   // Pre-fetch full article fields for every article appearing in the disagreement list
   const articleIds = new Set<string>();
@@ -90,19 +96,57 @@ export default async function EvaluationPage({ searchParams }: PageProps) {
         minScoreDiff={minScoreDiff}
       />
 
-      {/* Metric cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+      {/* Iteration history card */}
+      {historyByVersion.length > 1 && (
+        <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", overflow: "hidden", marginBottom: "20px" }}>
+          <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
+            <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
+              Iteration history
+            </span>
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#fafbfc" }}>
+                <th style={{ ...thStyle, width: "80px" }}>Version</th>
+                <th style={{ ...thStyle, width: "120px", textAlign: "right" }}>Pair-match</th>
+                <th style={thStyle}>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {historyByVersion.map(h => {
+                const selected = h.id === promptId;
+                return (
+                  <tr key={h.id} style={{ borderTop: "1px solid #f5f5f5", background: selected ? "#fff4f3" : undefined }}>
+                    <td style={{ ...tdStyle, fontWeight: 600 }}>
+                      {selected ? (
+                        <span>v{h.version} <span style={{ fontSize: "10px", color: "#E83B2A", fontWeight: 700, marginLeft: "4px" }}>SELECTED</span></span>
+                      ) : (
+                        <Link href={`?promptId=${h.id}&minScoreDiff=${minScoreDiff}`} style={{ color: "#E83B2A", textDecoration: "none" }}>
+                          v{h.version}
+                        </Link>
+                      )}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: h.pairMatch.matchPercent >= 75 ? "#059669" : h.pairMatch.matchPercent >= 60 ? "#92400e" : "#b91c1c" }}>
+                      {h.pairMatch.matchPercent.toFixed(1)}%
+                    </td>
+                    <td style={{ ...tdStyle, color: "#5a6a85", fontSize: "12px" }}>
+                      {new Date(h.created_at).toLocaleString()}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Pair-match metric */}
+      <div style={{ marginBottom: "20px" }}>
         <MetricCard
           title="Pair-match"
           value={`${pairMatch.matchPercent.toFixed(1)}%`}
           subtitle={`Prompt matched your choice on ${pairMatch.matches} of ${pairMatch.totalPairs} pairs${pairMatch.ties > 0 ? ` · ${pairMatch.ties} ties` : ""}`}
           accent={pairMatch.matchPercent >= 75 ? "#059669" : pairMatch.matchPercent >= 60 ? "#92400e" : "#b91c1c"}
-        />
-        <MetricCard
-          title="Ranking correlation"
-          value={correlation.rho.toFixed(2)}
-          subtitle={`Spearman ρ between prompt scores and β · ${correlation.n} articles`}
-          accent={correlation.rho >= 0.7 ? "#059669" : correlation.rho >= 0.4 ? "#92400e" : "#b91c1c"}
         />
       </div>
 
@@ -116,12 +160,14 @@ export default async function EvaluationPage({ searchParams }: PageProps) {
         <DisagreementList rows={disagreements} articles={articles} />
       </div>
 
+      <GenerateIterationButton promptId={promptId} promptVersion={selectedVersion.version} />
+
       <div style={{ marginTop: "20px", display: "flex", justifyContent: "space-between" }}>
         <Link href="/admin/lab/value-scoring/craft" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>
           ← Back to module
         </Link>
-        <Link href={`/admin/lab/value-scoring/craft/prompt/new?from=${promptId}`} style={{ fontSize: "13px", color: "#E83B2A", textDecoration: "none" }}>
-          Create new version from v{selectedVersion.version} →
+        <Link href={`/admin/lab/value-scoring/craft/prompt/new?from=${promptId}`} style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "none" }}>
+          Create version manually →
         </Link>
       </div>
     </>,
@@ -152,7 +198,7 @@ function shell(children: React.ReactNode) {
           </div>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>Evaluation</h1>
           <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>
-            Test how well the prompt matches your pairwise choices and overall ranking.
+            Test how well the prompt matches your pairwise choices, then iterate based on the disagreements.
           </p>
         </div>
         {children}
@@ -160,3 +206,18 @@ function shell(children: React.ReactNode) {
     </div>
   );
 }
+
+const thStyle: React.CSSProperties = {
+  textAlign: "left",
+  fontSize: "11px",
+  fontWeight: 600,
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+  color: "#5a6a85",
+  padding: "10px 16px",
+};
+
+const tdStyle: React.CSSProperties = {
+  fontSize: "13px",
+  padding: "10px 16px",
+};

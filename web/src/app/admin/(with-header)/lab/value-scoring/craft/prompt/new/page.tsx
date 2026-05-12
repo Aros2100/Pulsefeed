@@ -56,6 +56,7 @@ export default async function NewPromptVersionPage({ searchParams }: PageProps) 
   // otherwise default to the latest existing version (if any), else blank.
   let startingText = "";
   let startedFromVersion: number | null = null;
+  let parentPromptId: string | null = null;
 
   if (from) {
     const { data: src } = await admin
@@ -64,6 +65,7 @@ export default async function NewPromptVersionPage({ searchParams }: PageProps) 
       .eq("id", from)
       .maybeSingle();
     if (src && (src as { module_id: string }).module_id === moduleId) {
+      parentPromptId = from;
       startingText = (src as { prompt_text: string }).prompt_text;
       startedFromVersion = (src as { version: number }).version;
     }
@@ -77,11 +79,13 @@ export default async function NewPromptVersionPage({ searchParams }: PageProps) 
         .eq("id", latest.id)
         .maybeSingle();
       if (src) {
+        parentPromptId = latest.id;
         startingText = (src as { prompt_text: string }).prompt_text;
         startedFromVersion = (src as { version: number }).version;
       }
     }
   }
+
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
@@ -97,7 +101,11 @@ export default async function NewPromptVersionPage({ searchParams }: PageProps) 
           </p>
         </div>
 
-        <NewVersionClient startingText={startingText} startedFromVersion={startedFromVersion} />
+        <NewVersionClient
+          startingText={startingText}
+          startedFromVersion={startedFromVersion}
+          parentPromptId={parentPromptId}
+        />
       </div>
     </div>
   );

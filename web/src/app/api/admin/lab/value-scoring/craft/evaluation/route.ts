@@ -2,11 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  computePairMatch,
-  computeRankingCorrelation,
-  getDisagreements,
-} from "@/lib/lab/value-scoring/evaluation";
+import { computePairMatch, getDisagreements } from "@/lib/lab/value-scoring/evaluation";
 
 const querySchema = z.object({
   promptId:     z.string().uuid(),
@@ -29,15 +25,14 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient() as any;
 
   try {
-    const [pairMatch, correlation, disagreements] = await Promise.all([
+    const [pairMatch, disagreements] = await Promise.all([
       computePairMatch(admin, promptId),
-      computeRankingCorrelation(admin, promptId),
       getDisagreements(admin, promptId, {
         minScoreDiff: minScoreDiff ?? 0,
         includeTies:  includeTies === "true",
       }),
     ]);
-    return NextResponse.json({ ok: true, pairMatch, correlation, disagreements });
+    return NextResponse.json({ ok: true, pairMatch, disagreements });
   } catch (err) {
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
   }

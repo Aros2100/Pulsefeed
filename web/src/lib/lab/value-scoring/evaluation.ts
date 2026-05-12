@@ -77,29 +77,66 @@ export function spearman(xs: number[], ys: number[]): number {
 
 // ── DB-backed evaluation ────────────────────────────────────────────────────
 
-async function loadModuleId(db: Db, promptId: string): Promise<string> {
-  const { data: prompt } = await db
-    .from("lab_value_prompts")
-    .select("module_id")
-    .eq("id", promptId)
-    .maybeSingle();
-  if (!prompt) throw new Error("Prompt not found");
-  return (prompt as { module_id: string }).module_id;
+async function loadPromptChain(db: Db, promptId: string): Promise<{ moduleId: string; chain: string[] }> {
+  // Walk parent_prompt_id from the given prompt to its root. Returns prompt
+  // IDs ordered from leaf (the given prompt) to root.
+  const chain: string[] = [];
+  let moduleId = "";
+  let current: string | null | undefined = promptId;
+  const seen = new Set<string>();
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    const { data: row } = await db
+      .from("lab_value_prompts")
+      .select("id, module_id, parent_prompt_id")
+      .eq("id", current)
+      .maybeSingle();
+    if (!row) break;
+    type R = { id: string; module_id: string; parent_prompt_id: string | null };
+    const r = row as R;
+    chain.push(r.id);
+    moduleId = r.module_id;
+    current = r.parent_prompt_id;
+  }
+  if (chain.length === 0) throw new Error("Prompt not found");
+  return { moduleId, chain };
 }
 
+async function loadModuleId(db: Db, promptId: string): Promise<string> {
+  const { moduleId } = await loadPromptChain(db, promptId);
+  return moduleId;
+}
+
+/**
+ * Returns the effective score map for the prompt, walking the parent chain.
+ * For each article we use the score from the deepest (leaf-most) prompt that
+ * has it — newer overrides older.
+ */
 async function loadScoreMap(db: Db, promptId: string): Promise<Map<string, number>> {
+  const { chain } = await loadPromptChain(db, promptId);
+
   const { data: scores } = await db
     .from("lab_value_article_scores")
-    .select("article_id, score")
-    .eq("prompt_id", promptId)
+    .select("prompt_id, article_id, score")
+    .in("prompt_id", chain)
     .not("score", "is", null);
 
-  type R = { article_id: string; score: number | string };
-  const map = new Map<string, number>();
-  for (const r of (scores ?? []) as R[]) {
+  type R = { prompt_id: string; article_id: string; score: number | string };
+  const all = (scores ?? []) as R[];
+
+  // Process in chain order (leaf first). First write wins → leaf overrides parents.
+  const priority = new Map<string, number>(chain.map((id, i) => [id, i]));
+  const best = new Map<string, { rank: number; score: number }>();
+  for (const r of all) {
     const n = Number(r.score);
-    if (Number.isFinite(n)) map.set(r.article_id, n);
+    if (!Number.isFinite(n)) continue;
+    const rank = priority.get(r.prompt_id) ?? Infinity;
+    const prev = best.get(r.article_id);
+    if (!prev || rank < prev.rank) best.set(r.article_id, { rank, score: n });
   }
+
+  const map = new Map<string, number>();
+  for (const [articleId, { score }] of best) map.set(articleId, score);
   return map;
 }
 

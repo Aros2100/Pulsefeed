@@ -121,7 +121,63 @@ async function runInChunks<T, R>(items: T[], chunkSize: number, fn: (item: T) =>
   return out;
 }
 
-export type ScoringMode = "quick" | "full";
+export type ScoringMode = "quick" | "full" | "disagreements";
+
+/**
+ * Returns the unique article ids appearing in the parent prompt's disagreement
+ * pairs. Used by the "Score disagreement articles only" iteration step: the
+ * new version re-scores just these articles, while inheriting scores for the
+ * rest from the parent chain.
+ */
+export async function selectDisagreementArticleIds(db: Db, promptId: string): Promise<string[]> {
+  const { data: prompt } = await db
+    .from("lab_value_prompts")
+    .select("module_id, parent_prompt_id")
+    .eq("id", promptId)
+    .maybeSingle();
+  if (!prompt) throw new Error("Prompt not found");
+  const p = prompt as { module_id: string; parent_prompt_id: string | null };
+  if (!p.parent_prompt_id) {
+    throw new Error("This version has no parent — disagreement-only scoring requires a prior version to compare against");
+  }
+
+  // Pull the parent's scores and the module's decided pairs
+  const [{ data: scores }, { data: pairs }] = await Promise.all([
+    db.from("lab_value_article_scores")
+      .select("article_id, score")
+      .eq("prompt_id", p.parent_prompt_id)
+      .not("score", "is", null),
+    db.from("lab_value_pairs")
+      .select("article_a_id, article_b_id, winner_id")
+      .eq("module_id", p.module_id)
+      .not("winner_id", "is", null),
+  ]);
+
+  type ScoreRow = { article_id: string; score: number | string };
+  const scoreMap = new Map<string, number>();
+  for (const r of (scores ?? []) as ScoreRow[]) {
+    const n = Number(r.score);
+    if (Number.isFinite(n)) scoreMap.set(r.article_id, n);
+  }
+
+  type Pair = { article_a_id: string; article_b_id: string; winner_id: string };
+  const decided = (pairs ?? []) as Pair[];
+
+  const ids = new Set<string>();
+  for (const pair of decided) {
+    const sa = scoreMap.get(pair.article_a_id);
+    const sb = scoreMap.get(pair.article_b_id);
+    if (sa === undefined || sb === undefined) continue;
+    if (sa === sb) continue; // tie, skip
+    const promptChoice = sa > sb ? pair.article_a_id : pair.article_b_id;
+    if (promptChoice !== pair.winner_id) {
+      ids.add(pair.article_a_id);
+      ids.add(pair.article_b_id);
+    }
+  }
+
+  return [...ids];
+}
 
 /**
  * Pick the quick-test article set: top N, bottom N, and middle N by β.
@@ -182,6 +238,8 @@ export async function scoreArticlesWithPrompt(
   let articleIds: string[];
   if (mode === "quick") {
     articleIds = await selectQuickArticleIds(db, p.module_id);
+  } else if (mode === "disagreements") {
+    articleIds = await selectDisagreementArticleIds(db, p.id);
   } else {
     // full: every article in the module that hasn't been scored by this prompt yet
     const { data: allArts } = await db

@@ -12,14 +12,16 @@ type Db = any;
 export type PromptStatus = "draft" | "quick_tested" | "scoring" | "scored";
 
 export interface PromptVersionRow {
-  id:               string;
-  version:          number;
-  created_at:       string;
-  change_notes:     string | null;
-  scoredCount:      number;
-  articleCount:     number;
-  quick_tested_at:  string | null;
-  status:           PromptStatus;
+  id:                string;
+  version:           number;
+  created_at:        string;
+  change_notes:      string | null;
+  scoredCount:       number;
+  articleCount:      number;
+  quick_tested_at:   string | null;
+  parent_prompt_id:  string | null;
+  status:            PromptStatus;
+  lastScoredAt:      string | null;
 }
 
 export interface PromptVersionDetail extends PromptVersionRow {
@@ -36,11 +38,18 @@ export interface ScoreDistribution {
   median: number | null;
 }
 
-function deriveStatus(scoredCount: number, articleCount: number, quickTestedAt: string | null): PromptStatus {
-  if (scoredCount === 0) return "draft";
-  if (scoredCount >= articleCount) return "scored";
-  // Quick test specifically scored QUICK_TEST_TOTAL articles AND we marked quick_tested_at
-  if (quickTestedAt !== null && scoredCount === QUICK_TEST_TOTAL) return "quick_tested";
+function deriveStatus(
+  effectiveCount: number,
+  articleCount:   number,
+  quickTestedAt:  string | null,
+  ownCount:       number,
+): PromptStatus {
+  if (ownCount === 0) return "draft";
+  // A version is considered "scored" when every article has an effective
+  // score (own or inherited from a parent chain).
+  if (effectiveCount >= articleCount) return "scored";
+  // Quick test marker: own count is the quick batch size and we set quick_tested_at.
+  if (quickTestedAt !== null && ownCount === QUICK_TEST_TOTAL) return "quick_tested";
   return "scoring";
 }
 
@@ -64,40 +73,79 @@ export async function getDecidedPairCount(db: Db, moduleId: string): Promise<num
 export async function getPromptVersions(db: Db, moduleId: string): Promise<PromptVersionRow[]> {
   const { data: prompts } = await db
     .from("lab_value_prompts")
-    .select("id, version, created_at, change_notes, quick_tested_at")
+    .select("id, version, created_at, change_notes, quick_tested_at, parent_prompt_id")
     .eq("module_id", moduleId)
     .order("version", { ascending: false });
 
-  type PromptRow = { id: string; version: number; created_at: string; change_notes: string | null; quick_tested_at: string | null };
+  type PromptRow = {
+    id: string; version: number; created_at: string;
+    change_notes: string | null; quick_tested_at: string | null;
+    parent_prompt_id: string | null;
+  };
   const rows = (prompts ?? []) as PromptRow[];
   if (rows.length === 0) return [];
 
   const articleCount = await getModuleArticleCount(db, moduleId);
 
-  // Count scored rows per prompt in a single query
+  // Pull all scores for these prompts in one query — gives us both the count
+  // and the latest scored_at per prompt without a second roundtrip.
   const promptIds = rows.map(r => r.id);
   const { data: scoreRows } = await db
     .from("lab_value_article_scores")
-    .select("prompt_id")
+    .select("prompt_id, scored_at")
     .in("prompt_id", promptIds);
 
-  type ScoreCountRow = { prompt_id: string };
+  type ScoreCountRow = { prompt_id: string; scored_at: string };
   const counts = new Map<string, number>();
+  const lastScored = new Map<string, string>();
   for (const s of (scoreRows ?? []) as ScoreCountRow[]) {
     counts.set(s.prompt_id, (counts.get(s.prompt_id) ?? 0) + 1);
+    const prev = lastScored.get(s.prompt_id);
+    if (!prev || s.scored_at > prev) lastScored.set(s.prompt_id, s.scored_at);
+  }
+
+  // Build parent map so we can compute the effective scored count by walking
+  // the parent chain — v_n inherits scores from v_(n-1) for articles it didn't
+  // re-score itself.
+  const parentOf = new Map<string, string | null>(rows.map(r => [r.id, r.parent_prompt_id]));
+  const scoredArticleIds = new Map<string, Set<string>>();
+  if (scoreRows && (scoreRows as { prompt_id: string }[]).length > 0) {
+    const { data: detailedRows } = await db
+      .from("lab_value_article_scores")
+      .select("prompt_id, article_id")
+      .in("prompt_id", promptIds);
+    type DRow = { prompt_id: string; article_id: string };
+    for (const r of (detailedRows ?? []) as DRow[]) {
+      let set = scoredArticleIds.get(r.prompt_id);
+      if (!set) { set = new Set(); scoredArticleIds.set(r.prompt_id, set); }
+      set.add(r.article_id);
+    }
+  }
+  function effectiveCount(promptId: string): number {
+    const seen = new Set<string>();
+    let current: string | null | undefined = promptId;
+    while (current) {
+      const set = scoredArticleIds.get(current);
+      if (set) for (const id of set) seen.add(id);
+      current = parentOf.get(current) ?? null;
+    }
+    return seen.size;
   }
 
   return rows.map(r => {
     const scoredCount = counts.get(r.id) ?? 0;
+    const effective   = effectiveCount(r.id);
     return {
-      id:              r.id,
-      version:         r.version,
-      created_at:      r.created_at,
-      change_notes:    r.change_notes,
-      quick_tested_at: r.quick_tested_at,
+      id:               r.id,
+      version:          r.version,
+      created_at:       r.created_at,
+      change_notes:     r.change_notes,
+      quick_tested_at:  r.quick_tested_at,
+      parent_prompt_id: r.parent_prompt_id,
       scoredCount,
       articleCount,
-      status:          deriveStatus(scoredCount, articleCount, r.quick_tested_at),
+      lastScoredAt:     lastScored.get(r.id) ?? null,
+      status:           deriveStatus(effective, articleCount, r.quick_tested_at, scoredCount),
     };
   });
 }
@@ -105,33 +153,31 @@ export async function getPromptVersions(db: Db, moduleId: string): Promise<Promp
 export async function getPromptVersion(db: Db, promptId: string): Promise<PromptVersionDetail | null> {
   const { data: prompt } = await db
     .from("lab_value_prompts")
-    .select("id, module_id, version, prompt_text, change_notes, created_at, quick_tested_at")
+    .select("id, module_id, version, prompt_text, change_notes, created_at, quick_tested_at, parent_prompt_id")
     .eq("id", promptId)
     .maybeSingle();
 
   if (!prompt) return null;
 
-  type P = { id: string; module_id: string; version: number; prompt_text: string; change_notes: string | null; created_at: string; quick_tested_at: string | null };
+  type P = {
+    id: string; module_id: string; version: number; prompt_text: string;
+    change_notes: string | null; created_at: string;
+    quick_tested_at: string | null; parent_prompt_id: string | null;
+  };
   const p = prompt as P;
 
-  const articleCount = await getModuleArticleCount(db, p.module_id);
-  const { count: scoredCount } = await db
-    .from("lab_value_article_scores")
-    .select("id", { count: "exact", head: true })
-    .eq("prompt_id", p.id);
+  // Use the module-wide listing for parent-chain walk so we don't duplicate logic.
+  const versions = await getPromptVersions(db, p.module_id);
+  const row = versions.find(v => v.id === p.id);
+  if (!row) {
+    // Shouldn't happen — the prompt exists but isn't in its module's listing.
+    return null;
+  }
 
-  const sc = scoredCount ?? 0;
   return {
-    id:              p.id,
-    version:         p.version,
-    created_at:      p.created_at,
-    change_notes:    p.change_notes,
-    prompt_text:     p.prompt_text,
-    quick_tested_at: p.quick_tested_at,
-    scoredCount:     sc,
-    articleCount,
-    status:          deriveStatus(sc, articleCount, p.quick_tested_at),
-    editable:        sc === 0,
+    ...row,
+    prompt_text: p.prompt_text,
+    editable:    row.scoredCount === 0,
   };
 }
 
@@ -140,6 +186,7 @@ export async function createPromptVersion(
   moduleId: string,
   promptText: string,
   changeNotes: string | null,
+  parentPromptId: string | null = null,
 ): Promise<{ id: string; version: number }> {
   // Auto-increment version per module
   const { data: latest } = await db
@@ -156,10 +203,11 @@ export async function createPromptVersion(
   const { data: inserted, error } = await db
     .from("lab_value_prompts")
     .insert({
-      module_id:    moduleId,
-      version:      nextVersion,
-      prompt_text:  promptText,
-      change_notes: changeNotes && changeNotes.trim().length > 0 ? changeNotes.trim() : null,
+      module_id:        moduleId,
+      version:          nextVersion,
+      prompt_text:      promptText,
+      change_notes:     changeNotes && changeNotes.trim().length > 0 ? changeNotes.trim() : null,
+      parent_prompt_id: parentPromptId,
     })
     .select("id, version")
     .single();

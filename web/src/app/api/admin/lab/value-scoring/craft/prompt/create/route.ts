@@ -6,8 +6,9 @@ import { CRAFT_MODULE_KEY, MIN_PAIRS_FOR_PROMPT } from "@/lib/lab/value-scoring/
 import { createPromptVersion, getDecidedPairCount } from "@/lib/lab/value-scoring/prompt-versions";
 
 const schema = z.object({
-  promptText:  z.string().min(1, "Prompt text is required"),
-  changeNotes: z.string().optional(),
+  promptText:     z.string().min(1, "Prompt text is required"),
+  changeNotes:    z.string().optional(),
+  parentPromptId: z.string().uuid().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: parsed.error.issues[0].message }, { status: 400 });
   }
-  const { promptText, changeNotes } = parsed.data;
+  const { promptText, changeNotes, parentPromptId } = parsed.data;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
@@ -44,8 +45,26 @@ export async function POST(request: NextRequest) {
     }, { status: 409 });
   }
 
+  // If a parent was specified, verify it belongs to the same module
+  if (parentPromptId) {
+    const { data: parent } = await admin
+      .from("lab_value_prompts")
+      .select("module_id")
+      .eq("id", parentPromptId)
+      .maybeSingle();
+    if (!parent || (parent as { module_id: string }).module_id !== mod.id) {
+      return NextResponse.json({ ok: false, error: "Parent prompt not found in this module" }, { status: 400 });
+    }
+  }
+
   try {
-    const created = await createPromptVersion(admin, mod.id as string, promptText, changeNotes ?? null);
+    const created = await createPromptVersion(
+      admin,
+      mod.id as string,
+      promptText,
+      changeNotes ?? null,
+      parentPromptId ?? null,
+    );
     return NextResponse.json({ ok: true, id: created.id, version: created.version });
   } catch (err) {
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
