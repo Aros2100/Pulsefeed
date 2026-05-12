@@ -76,7 +76,11 @@ export function buildIterationRequest(
     "- Stay within the same numerical scale the current prompt uses.",
     "- Be specific about the heuristics the clinician's reasons reveal. Generic edits (\"be more careful\") are not useful.",
     "",
-    "Return ONLY valid JSON — no preamble, no analysis, no explanation before or after. Your entire response must be a single JSON object and nothing else:",
+    "CRITICAL: Return ONLY a JSON object. Do NOT include any preamble, analysis prose,",
+    "or explanatory text before or after the JSON. Do NOT wrap the JSON in markdown code fences.",
+    "Your entire response must start with { and end with }.",
+    "If you need to convey your analysis, put it inside the \"change_notes\" field.",
+    "",
     "{",
     "  \"prompt_text\": \"<the full revised prompt as a single string>\",",
     "  \"change_notes\": \"<2-5 sentences describing the patterns you saw and what you changed and why>\"",
@@ -124,20 +128,40 @@ function extractFirstJsonObject(text: string): string | null {
   return null;
 }
 
-export function parseIterationResponse(rawText: string): { promptText: string; changeNotes: string } | null {
-  // Strip markdown fences as belt-and-suspenders (model sometimes wraps JSON).
-  const stripped = rawText.replace(/^```(?:json)?\s*/m, "").replace(/\s*```\s*$/m, "").trim();
+function tryParseJson(jsonStr: string): { prompt_text?: unknown; change_notes?: unknown } | null {
   try {
-    const jsonStr = extractFirstJsonObject(stripped);
-    if (!jsonStr) return null;
-    const parsed = JSON.parse(jsonStr) as { prompt_text?: unknown; change_notes?: unknown };
-    const promptText  = typeof parsed.prompt_text  === "string" ? parsed.prompt_text.trim()  : "";
-    const changeNotes = typeof parsed.change_notes === "string" ? parsed.change_notes.trim() : "";
-    if (promptText.length === 0) return null;
-    return { promptText, changeNotes };
+    return JSON.parse(jsonStr) as { prompt_text?: unknown; change_notes?: unknown };
   } catch {
     return null;
   }
+}
+
+export function parseIterationResponse(rawText: string): { promptText: string; changeNotes: string } | null {
+  // Strip markdown fences (belt-and-suspenders: model sometimes wraps JSON).
+  const stripped = rawText.replace(/^```(?:json)?\s*/m, "").replace(/\s*```\s*$/m, "").trim();
+
+  // Attempt 1: depth-balanced extractor (handles {nested} in strings correctly).
+  let parsed = (() => {
+    const jsonStr = extractFirstJsonObject(stripped);
+    return jsonStr ? tryParseJson(jsonStr) : null;
+  })();
+
+  // Attempt 2: first-{ to last-} slice (simpler; works when prose precedes
+  // the JSON and there is no closing } in any prose after the JSON object).
+  if (!parsed) {
+    const first = stripped.indexOf("{");
+    const last  = stripped.lastIndexOf("}");
+    if (first !== -1 && last > first) {
+      parsed = tryParseJson(stripped.slice(first, last + 1));
+    }
+  }
+
+  if (!parsed) return null;
+
+  const promptText  = typeof parsed.prompt_text  === "string" ? parsed.prompt_text.trim()  : "";
+  const changeNotes = typeof parsed.change_notes === "string" ? parsed.change_notes.trim() : "";
+  if (promptText.length === 0) return null;
+  return { promptText, changeNotes };
 }
 
 // ── v1 generation from pairwise data ─────────────────────────────────────────
