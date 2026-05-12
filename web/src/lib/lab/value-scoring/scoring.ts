@@ -20,16 +20,15 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = any;
 
-// Scoring input is intentionally limited to raw source data (title +
-// article_type + journal + abstract). The AI-generated summary fields
-// (short_headline, resume, bottom_line, SARI) are not sent to the scoring
-// model — they're fed-forward interpretations and create redundancy.
 export interface ScoringArticle {
-  id:           string;
-  title:        string;
-  journal:      string | null;
-  article_type: string | null;
-  abstract:     string | null;
+  id:              string;
+  title:           string;
+  journal:         string | null;
+  article_type:    string | null;
+  short_headline:  string | null;
+  resume:          string | null;
+  bottom_line:     string | null;
+  sari:            unknown;
 }
 
 export interface ParsedScore {
@@ -49,26 +48,32 @@ function fmtField(label: string, value: string | null | undefined): string {
   return `${label}: ${value && value.trim().length > 0 ? value.trim() : "—"}`;
 }
 
-// Abstracts shorter than this are treated as effectively missing —
-// PubMed often returns just a title-length blurb for letters / errata.
-const MIN_ABSTRACT_LENGTH = 100;
+function fmtSari(sari: unknown): string {
+  if (!sari || typeof sari !== "object") return "SARI: —";
+  const s = sari as Record<string, unknown>;
+  const subject     = typeof s.subject     === "string" ? s.subject     : null;
+  const action      = typeof s.action      === "string" ? s.action      : null;
+  const result      = typeof s.result      === "string" ? s.result      : null;
+  const implication = typeof s.implication === "string" ? s.implication : null;
+  return [
+    "SARI:",
+    `  Subject: ${subject ?? "—"}`,
+    `  Action: ${action ?? "—"}`,
+    `  Result: ${result ?? "—"}`,
+    `  Implication: ${implication ?? "—"}`,
+  ].join("\n");
+}
 
 export function buildUserMessage(article: ScoringArticle): string {
-  const abstract = article.abstract?.trim() ?? "";
-  const lines: string[] = [
-    fmtField("Title",        article.title),
-    fmtField("Article type", article.article_type),
-    fmtField("Journal",      article.journal),
-  ];
-  if (abstract.length >= MIN_ABSTRACT_LENGTH) {
-    lines.push("");
-    lines.push("Abstract:");
-    lines.push(abstract);
-  } else {
-    lines.push("");
-    lines.push("Abstract: NOT AVAILABLE. Score on the title, article type, and journal alone — recognise that you have very little information about how the work was actually done.");
-  }
-  return lines.join("\n");
+  return [
+    fmtField("Title",          article.title),
+    fmtField("Article type",   article.article_type),
+    fmtField("Journal",        article.journal),
+    fmtField("Short headline", article.short_headline),
+    fmtField("Resume",         article.resume),
+    fmtField("Bottom line",    article.bottom_line),
+    fmtSari(article.sari),
+  ].join("\n");
 }
 
 export function buildScoringRequest(article: ScoringArticle, promptText: string, modelOverride?: string) {
@@ -259,11 +264,10 @@ export async function scoreArticlesWithPrompt(
     return { total: 0, succeeded: 0, failed: 0, durationMs: Date.now() - start, promptVersion: p.version };
   }
 
-  // Fetch raw scoring fields for selected ids — only title/article_type/
-  // journal/abstract reach the scoring model.
+  // Fetch full article rows for selected ids
   const { data: articles } = await db
     .from("lab_value_articles")
-    .select("id, title, journal, article_type, abstract")
+    .select("id, title, journal, article_type, short_headline, resume, bottom_line, sari")
     .in("id", articleIds);
 
   const arts = (articles ?? []) as ScoringArticle[];
