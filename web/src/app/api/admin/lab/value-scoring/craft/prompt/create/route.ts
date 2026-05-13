@@ -9,6 +9,7 @@ const schema = z.object({
   promptText:     z.string().min(1, "Prompt text is required"),
   changeNotes:    z.string().optional(),
   parentPromptId: z.string().uuid().optional(),
+  directionId:    z.string().uuid().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: parsed.error.issues[0].message }, { status: 400 });
   }
-  const { promptText, changeNotes, parentPromptId } = parsed.data;
+  const { promptText, changeNotes, parentPromptId, directionId } = parsed.data;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
       promptText,
       changeNotes ?? null,
       parentPromptId ?? null,
+      directionId ?? null,
     );
     return NextResponse.json({ ok: true, id: created.id, version: created.version });
   } catch (err) {

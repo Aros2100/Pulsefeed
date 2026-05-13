@@ -5,11 +5,11 @@ import { getDecidedPairCount, getPromptVersions } from "@/lib/lab/value-scoring/
 import NewVersionClient from "./NewVersionClient";
 
 interface PageProps {
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<{ from?: string; directionId?: string }>;
 }
 
 export default async function NewPromptVersionPage({ searchParams }: PageProps) {
-  const { from } = await searchParams;
+  const { from, directionId } = await searchParams;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
@@ -105,6 +105,7 @@ export default async function NewPromptVersionPage({ searchParams }: PageProps) 
           startingText={startingText}
           startedFromVersion={startedFromVersion}
           parentPromptId={parentPromptId}
+          directionId={directionId ?? null}
         />
       </div>
     </div>

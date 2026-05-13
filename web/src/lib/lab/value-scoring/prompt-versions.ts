@@ -187,6 +187,7 @@ export async function createPromptVersion(
   promptText: string,
   changeNotes: string | null,
   parentPromptId: string | null = null,
+  directionId: string | null = null,
 ): Promise<{ id: string; version: number }> {
   // Auto-increment version per module
   const { data: latest } = await db
@@ -208,6 +209,7 @@ export async function createPromptVersion(
       prompt_text:      promptText,
       change_notes:     changeNotes && changeNotes.trim().length > 0 ? changeNotes.trim() : null,
       parent_prompt_id: parentPromptId,
+      direction_id:     directionId,
     })
     .select("id, version")
     .single();

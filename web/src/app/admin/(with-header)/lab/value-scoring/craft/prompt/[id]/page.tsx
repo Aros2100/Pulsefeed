@@ -26,7 +26,7 @@ export default async function PromptVersionDetailPage({ params }: PageProps) {
   const quickTested = version.status === "quick_tested";
   const quickResults: QuickResultRow[] = quickTested ? await getQuickResults(admin, version.id) : [];
 
-  // Look up parent version number for the header (e.g. "iteration of v1")
+  // Look up parent version number for the header
   let parentVersionNumber: number | null = null;
   if (version.parent_prompt_id) {
     const { data: parent } = await admin
@@ -35,6 +35,19 @@ export default async function PromptVersionDetailPage({ params }: PageProps) {
       .eq("id", version.parent_prompt_id)
       .maybeSingle();
     if (parent) parentVersionNumber = (parent as { version: number }).version;
+  }
+
+  // Look up direction for breadcrumb
+  const { data: promptRow } = await admin
+    .from("lab_value_prompts")
+    .select("direction_id")
+    .eq("id", version.id)
+    .maybeSingle();
+  const directionId = promptRow ? (promptRow as { direction_id: string | null }).direction_id : null;
+  let directionName: string | null = null;
+  if (directionId) {
+    const { data: dir } = await admin.from("lab_value_directions").select("name").eq("id", directionId).maybeSingle();
+    if (dir) directionName = (dir as { name: string }).name;
   }
 
   // Spearman over the quick-test pool (β vs prompt score) — gives a quick
@@ -50,7 +63,10 @@ export default async function PromptVersionDetailPage({ params }: PageProps) {
 
         <div style={{ marginBottom: "28px" }}>
           <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
-            The Lab · Value Scoring · Craft · Prompt
+            The Lab · Value Scoring · Craft
+            {directionName && (
+              <> · <Link href={directionId ? `/admin/lab/value-scoring/craft/direction/${directionId}` : "/admin/lab/value-scoring/craft/direction"} style={{ color: "#E83B2A", textDecoration: "none" }}>{directionName}</Link></>
+            )}
           </div>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>
             v{version.version}
