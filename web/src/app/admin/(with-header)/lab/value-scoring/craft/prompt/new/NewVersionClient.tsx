@@ -70,12 +70,9 @@ export default function NewVersionClient({ startingText, startingChangeNotes, st
             background: "#fff",
           }}
         />
-        <div style={{ marginTop: "8px", fontSize: "11px", color: "#94a3b8", lineHeight: 1.6 }}>
-          The prompt is sent as the system message. Each article is appended as the user message with these fields: <strong style={{ color: "#5a6a85" }}>title, article_type, journal, abstract</strong>.
-          {" "}Instruct the model to return JSON of the form:
-          <code style={{ display: "block", marginTop: "6px", padding: "8px 10px", background: "#f3f4f6", borderRadius: "5px", fontFamily: "ui-monospace, Menlo, monospace", fontSize: "10px", color: "#374151", whiteSpace: "pre" }}>
-            {`{\n  "craft_score": <number 10-100>,\n  "dimensions": {\n    "<dim>": {"score": <1-10 or null>, "status": "scored"|"neutral"|"not_applicable"}\n  },\n  "reasoning": "<string>"\n}`}
-          </code>
+        <div style={{ marginTop: "8px", fontSize: "11px", color: "#94a3b8", lineHeight: 1.5 }}>
+          Write your prompt. Available article fields: <strong style={{ color: "#5a6a85" }}>title, article_type, journal, abstract</strong>.
+          {" "}The expected output format depends on your scoring approach — the current backend parses the rubric format (craft_score + dimensions + reasoning), but you can experiment with other formats.
         </div>
       </div>
 
