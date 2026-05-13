@@ -111,19 +111,19 @@ export default async function DirectionDetailPage({ params }: PageProps) {
         <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", overflow: "hidden" }}>
           <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700 }}>
-              Experiments · {experiments.length}
+              Versions · {experiments.length}
             </span>
             <Link
               href={`/admin/lab/value-scoring/craft/prompt/new?directionId=${dir.id}`}
               style={{ fontSize: "12px", color: "#E83B2A", fontWeight: 600, textDecoration: "none", padding: "4px 10px", border: "1px solid #E83B2A", borderRadius: "5px" }}
             >
-              + New experiment
+              + New version
             </Link>
           </div>
 
           {experiments.length === 0 ? (
             <div style={{ padding: "32px 24px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
-              No experiments yet. Create one to start scoring.
+              No versions yet. Create one to start scoring.
             </div>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -177,7 +177,7 @@ export default async function DirectionDetailPage({ params }: PageProps) {
               href={`/admin/lab/value-scoring/craft/compare?${experiments.filter(e => e.pairMatch !== null).map((e, i) => `${i === 0 ? "a" : "b"}=${e.id}`).slice(0, 2).join("&")}`}
               style={{ fontSize: "13px", color: "#E83B2A", textDecoration: "none", fontWeight: 600 }}
             >
-              Compare top 2 experiments →
+              Compare top 2 versions →
             </Link>
           </div>
         )}
