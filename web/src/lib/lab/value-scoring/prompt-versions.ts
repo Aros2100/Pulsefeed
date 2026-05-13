@@ -189,17 +189,32 @@ export async function createPromptVersion(
   parentPromptId: string | null = null,
   directionId: string | null = null,
 ): Promise<{ id: string; version: number }> {
-  // Auto-increment version per module
-  const { data: latest } = await db
+  // Version counter is scoped to the direction (or module-wide if no direction).
+  let versionQuery = db
     .from("lab_value_prompts")
     .select("version")
     .eq("module_id", moduleId)
     .order("version", { ascending: false })
     .limit(1);
+  if (directionId) versionQuery = versionQuery.eq("direction_id", directionId);
 
+  const { data: latest } = await versionQuery;
   type V = { version: number };
   const latestRows = (latest ?? []) as V[];
   const nextVersion = latestRows.length > 0 ? latestRows[0].version + 1 : 1;
+
+  // Only keep parent if it lives in the same direction — prevents a new
+  // direction's first experiment from inheriting an unrelated iteration chain.
+  let resolvedParent = parentPromptId;
+  if (resolvedParent && directionId) {
+    const { data: parentRow } = await db
+      .from("lab_value_prompts")
+      .select("direction_id")
+      .eq("id", resolvedParent)
+      .maybeSingle();
+    const parentDir = (parentRow as { direction_id: string | null } | null)?.direction_id ?? null;
+    if (parentDir !== directionId) resolvedParent = null;
+  }
 
   const { data: inserted, error } = await db
     .from("lab_value_prompts")
@@ -208,7 +223,7 @@ export async function createPromptVersion(
       version:          nextVersion,
       prompt_text:      promptText,
       change_notes:     changeNotes && changeNotes.trim().length > 0 ? changeNotes.trim() : null,
-      parent_prompt_id: parentPromptId,
+      parent_prompt_id: resolvedParent,
       direction_id:     directionId,
     })
     .select("id, version")
