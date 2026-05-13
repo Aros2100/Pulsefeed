@@ -7,9 +7,9 @@ import { createPromptVersion, getDecidedPairCount } from "@/lib/lab/value-scorin
 
 const schema = z.object({
   promptText:     z.string().min(1, "Prompt text is required"),
-  changeNotes:    z.string().optional(),
-  parentPromptId: z.string().uuid().optional(),
-  directionId:    z.string().uuid().optional(),
+  changeNotes:    z.string().nullish(),
+  parentPromptId: z.string().uuid().nullish(),
+  directionId:    z.string().uuid().nullish(),
 });
 
 export async function POST(request: NextRequest) {
