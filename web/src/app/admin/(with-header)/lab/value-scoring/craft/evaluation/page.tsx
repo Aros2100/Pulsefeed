@@ -26,49 +26,78 @@ export default async function EvaluationPage({ searchParams }: PageProps) {
     .maybeSingle();
 
   if (!mod) {
-    return shell(
+    return shell(null, null, null,
       <div style={{ background: "#fff", borderRadius: "10px", padding: "32px", textAlign: "center", fontSize: "14px", color: "#5a6a85" }}>
         Module not found.
       </div>,
     );
   }
 
+  // Resolve the selected prompt first so we can scope to its direction.
+  // If no promptId in URL, pick the most recently scored across all directions.
   const allVersions = await getPromptVersions(admin, mod.id as string);
-  const fullyScored = allVersions.filter(v => v.status === "scored");
+  const allScored   = allVersions.filter(v => v.status === "scored");
 
-  if (fullyScored.length === 0) {
-    return shell(
+  if (allScored.length === 0) {
+    return shell(null, null, null,
       <div style={{ background: "#fff8e1", border: "1px solid #fde68a", borderRadius: "8px", padding: "16px 20px", fontSize: "13px", color: "#92400e" }}>
         No fully-scored prompt versions yet. Finish scoring a version before opening evaluation.
         <div style={{ marginTop: "10px" }}>
-          <Link href="/admin/lab/value-scoring/craft/prompt" style={{ fontSize: "13px", color: "#E83B2A" }}>
-            ← Back to prompt list
+          <Link href="/admin/lab/value-scoring/craft/direction" style={{ fontSize: "13px", color: "#E83B2A" }}>
+            ← Back to directions
           </Link>
         </div>
       </div>,
     );
   }
 
-  const promptId = (sp.promptId && fullyScored.some(v => v.id === sp.promptId))
+  const promptId = (sp.promptId && allScored.some(v => v.id === sp.promptId))
     ? sp.promptId
-    : fullyScored[0].id;
+    : allScored[0].id;
+
+  // Look up this prompt's direction so we can scope the version list.
+  const { data: promptRow } = await admin
+    .from("lab_value_prompts")
+    .select("direction_id")
+    .eq("id", promptId)
+    .maybeSingle();
+  const directionId = promptRow ? (promptRow as { direction_id: string | null }).direction_id : null;
+
+  // Load direction name for breadcrumb.
+  let directionName: string | null = null;
+  if (directionId) {
+    const { data: dir } = await admin.from("lab_value_directions").select("name").eq("id", directionId).maybeSingle();
+    if (dir) directionName = (dir as { name: string }).name;
+  }
+
+  // Fetch direction_id for all scored versions to scope the list.
+  const scoredIds = allScored.map(v => v.id);
+  const { data: promptDirs } = await admin
+    .from("lab_value_prompts")
+    .select("id, direction_id")
+    .in("id", scoredIds);
+  type PDRow = { id: string; direction_id: string | null };
+  const dirById = new Map<string, string | null>((promptDirs ?? []).map((r: PDRow) => [r.id, r.direction_id]));
+
+  // Only show versions in the same direction as the selected prompt.
+  const scoredInDirection = allScored.filter(v => dirById.get(v.id) === directionId);
 
   const [pairMatch, disagreements] = await Promise.all([
     computePairMatch(admin, promptId),
     getDisagreements(admin, promptId, { minScoreDiff: 0 }),
   ]);
 
-  // Iteration history: pair-match for each fully-scored version. Sorted by version desc.
+  // Iteration history scoped to same direction.
   const historyByVersion = await Promise.all(
-    fullyScored.map(async v => ({
-      id:      v.id,
-      version: v.version,
+    scoredInDirection.map(async v => ({
+      id:         v.id,
+      version:    v.version,
       created_at: v.created_at,
       pairMatch:  v.id === promptId ? pairMatch : await computePairMatch(admin, v.id),
     })),
   );
 
-  // Pre-fetch full article fields for every article appearing in the disagreement list
+  // Pre-fetch full article fields for disagreements.
   const articleIds = new Set<string>();
   for (const d of disagreements) {
     articleIds.add(d.articleA.id);
@@ -83,16 +112,17 @@ export default async function EvaluationPage({ searchParams }: PageProps) {
     for (const r of (rows ?? []) as ArticleFull[]) articles[r.id] = r;
   }
 
-  const selectedVersion = fullyScored.find(v => v.id === promptId)!;
+  const selectedVersion = scoredInDirection.find(v => v.id === promptId)
+    ?? allScored.find(v => v.id === promptId)!;
 
-  return shell(
+  return shell(directionId, directionName, selectedVersion.version,
     <>
       <EvaluationFilters
-        versions={fullyScored.map(v => ({ id: v.id, version: v.version, scoredCount: v.scoredCount, articleCount: v.articleCount }))}
+        versions={scoredInDirection.map(v => ({ id: v.id, version: v.version, scoredCount: v.scoredCount, articleCount: v.articleCount }))}
         promptId={promptId}
       />
 
-      {/* Iteration history card */}
+      {/* Iteration history — scoped to direction */}
       {historyByVersion.length > 1 && (
         <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", overflow: "hidden", marginBottom: "20px" }}>
           <div style={{ background: "#EEF2F7", borderBottom: "1px solid #dde3ed", padding: "10px 24px" }}>
@@ -162,10 +192,13 @@ export default async function EvaluationPage({ searchParams }: PageProps) {
       </div>
 
       <div style={{ marginTop: "20px", display: "flex", justifyContent: "space-between" }}>
-        <Link href="/admin/lab/value-scoring/craft" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>
-          ← Back to module
+        <Link
+          href={directionId ? `/admin/lab/value-scoring/craft/direction/${directionId}` : "/admin/lab/value-scoring/craft/direction"}
+          style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}
+        >
+          ← Back to {directionName ?? "directions"}
         </Link>
-        <Link href={`/admin/lab/value-scoring/craft/prompt/new?from=${promptId}`} style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "none" }}>
+        <Link href={`/admin/lab/value-scoring/craft/prompt/new?from=${promptId}${directionId ? `&directionId=${directionId}` : ""}`} style={{ fontSize: "13px", color: "#94a3b8", textDecoration: "none" }}>
           Create version manually →
         </Link>
       </div>
@@ -187,15 +220,25 @@ function MetricCard({ title, value, subtitle, accent }: { title: string; value: 
   );
 }
 
-function shell(children: React.ReactNode) {
+function shell(
+  directionId: string | null,
+  directionName: string | null,
+  version: number | null,
+  children: React.ReactNode,
+) {
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 80px" }}>
         <div style={{ marginBottom: "28px" }}>
           <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
             The Lab · Value Scoring · Craft
+            {directionName && directionId && (
+              <> · <Link href={`/admin/lab/value-scoring/craft/direction/${directionId}`} style={{ color: "#E83B2A", textDecoration: "none" }}>{directionName}</Link></>
+            )}
           </div>
-          <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>Evaluation</h1>
+          <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>
+            Evaluation{version !== null ? ` · v${version}` : ""}
+          </h1>
           <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>
             Test how well the prompt matches your pairwise choices, then iterate based on the disagreements.
           </p>
