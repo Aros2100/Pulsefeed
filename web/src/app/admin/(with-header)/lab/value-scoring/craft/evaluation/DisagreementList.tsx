@@ -129,7 +129,7 @@ export default function DisagreementList({ rows, articles, onFilterChange }: Pro
             ? null
             : r.promptChoiceId === r.articleA.id ? r.craftScoreA : r.craftScoreB;
           const humanDims   = r.humanChoiceId === r.articleA.id ? r.dimensionsA : r.dimensionsB;
-          const scoredCount = humanDims ? Object.values(humanDims).filter(v => v !== null).length : null;
+          const scoredCount = humanDims ? Object.values(humanDims).filter(v => v && v.status !== "not_applicable").length : null;
           const totalCount  = humanDims ? Object.keys(humanDims).length : null;
           const dimsLabel   = scoredCount !== null && totalCount !== null ? ` (${scoredCount}/${totalCount})` : "";
           const craftCell   = humanCraft !== null && promptCraft !== null
@@ -222,7 +222,7 @@ export default function DisagreementList({ rows, articles, onFilterChange }: Pro
 
 function DimensionBar({ label, entry }: { label: string; entry: DimensionEntry | null | undefined }) {
   // Null entry (no data at all) or not_applicable
-  if (!entry || entry.applicability === "not_applicable" || entry.score === null) {
+  if (!entry || entry.status === "not_applicable" || entry.score === null) {
     return (
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
         <span style={{ fontSize: "10px", color: "#94a3b8", minWidth: "130px", textAlign: "right" }}>{label}</span>
@@ -233,7 +233,7 @@ function DimensionBar({ label, entry }: { label: string; entry: DimensionEntry |
   }
 
   // Neutral fallback — dashed bar in grey
-  if (entry.applicability === "neutral") {
+  if (entry.status === "neutral") {
     const pct = (entry.score / 10) * 100;
     return (
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
@@ -246,9 +246,14 @@ function DimensionBar({ label, entry }: { label: string; entry: DimensionEntry |
     );
   }
 
-  // Scored — solid coloured bar
+  // Scored — solid coloured bar with exact spec palette
   const pct = (entry.score / 10) * 100;
-  const color = entry.score >= 7 ? "#059669" : entry.score >= 4 ? "#92400e" : "#b91c1c";
+  const color =
+    entry.score >= 9 ? "#15803d" :
+    entry.score >= 7 ? "#22c55e" :
+    entry.score >= 5 ? "#f97316" :
+    entry.score >= 3 ? "#dc2626" :
+                       "#991b1b";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
       <span style={{ fontSize: "10px", color: "#5a6a85", minWidth: "130px", textAlign: "right" }}>{label}</span>
@@ -309,11 +314,13 @@ function ArticlePanel({ article, chosenByHuman, chosenByPrompt, craftScore, dime
       {(dimensions ?? reasoning) && (
         <div style={{ borderTop: "1px solid #ebebeb", paddingTop: "10px", marginTop: "10px" }}>
           {(() => {
-            const scored = dimensions ? Object.values(dimensions).filter(v => v !== null).length : 0;
-            const total  = dimensions ? Object.keys(dimensions).length : 0;
+            const entries = dimensions ? Object.values(dimensions) : [];
+            const nScored  = entries.filter(e => e?.status === "scored").length;
+            const nNeutral = entries.filter(e => e?.status === "neutral").length;
+            const nNA      = entries.filter(e => !e || e.status === "not_applicable").length;
             return (
               <div style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#5a6a85", marginBottom: "8px" }}>
-                Prompt assessment · {scored}/{total} applicable
+                Prompt assessment · {nScored} scored · {nNeutral} neutral · {nNA} n/a
               </div>
             );
           })()}

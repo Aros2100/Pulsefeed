@@ -28,11 +28,11 @@ export interface ScoringArticle {
   abstract:     string | null;
 }
 
-export type DimensionApplicability = "scored" | "neutral" | "not_applicable";
+export type DimensionStatus = "scored" | "neutral" | "not_applicable";
 
 export interface DimensionEntry {
   score:         number | null;
-  applicability: DimensionApplicability;
+  status: DimensionStatus;
 }
 
 // Rich per-dimension structure. Old format (plain number | null) is converted
@@ -69,7 +69,7 @@ export function computeCraftScore(dimensions: DimensionScores): number | null {
   let sumContributions = 0;
   let sumWeights = 0;
   for (const [key, entry] of Object.entries(dimensions)) {
-    if (!entry || entry.applicability === "not_applicable" || entry.score === null) continue;
+    if (!entry || entry.status === "not_applicable" || entry.score === null) continue;
     const w = DIMENSION_WEIGHTS[key] ?? 0;
     sumContributions += (entry.score * w) / 10;
     sumWeights += w;
@@ -133,7 +133,7 @@ export function buildScoringRequest(article: ScoringArticle, promptText: string,
       promptText,
       "",
       "Respond only with valid JSON, no other text and no markdown fences.",
-      "Output format: {\"craft_score\": <number 10-100>, \"dimensions\": {\"<dim>\": {\"score\": <1-10 or null>, \"applicability\": <\"scored\"|\"neutral\"|\"not_applicable\">}, ...}, \"reasoning\": <string>}",
+      "Output format: {\"craft_score\": <number 10-100>, \"dimensions\": {\"<dim>\": {\"score\": <1-10 or null>, \"status\": <\"scored\"|\"neutral\"|\"not_applicable\">}, ...}, \"reasoning\": <string>}",
     ].join("\n"),
     messages: [{ role: "user" as const, content: buildUserMessage(article) }],
   };
@@ -148,11 +148,11 @@ function readNumber(raw: unknown): number | null {
   return null;
 }
 
-const VALID_APPLICABILITY = new Set<DimensionApplicability>(["scored", "neutral", "not_applicable"]);
+const VALID_STATUS = new Set<DimensionStatus>(["scored", "neutral", "not_applicable"]);
 
-function parseApplicability(raw: unknown): DimensionApplicability {
-  return VALID_APPLICABILITY.has(raw as DimensionApplicability)
-    ? (raw as DimensionApplicability)
+function parseStatus(raw: unknown): DimensionStatus {
+  return VALID_STATUS.has(raw as DimensionStatus)
+    ? (raw as DimensionStatus)
     : "scored";
 }
 
@@ -164,18 +164,18 @@ function parseDimensions(raw: unknown): DimensionScores | null {
   for (const [key, val] of Object.entries(obj)) {
     if (val === null) {
       // Old format: null → not_applicable
-      result[key] = { score: null, applicability: "not_applicable" };
+      result[key] = { score: null, status: "not_applicable" };
       hasAny = true;
     } else if (typeof val === "object" && !Array.isArray(val)) {
-      // New format: { score, applicability }
-      const e = val as { score?: unknown; applicability?: unknown };
+      // New format: { score, status }
+      const e = val as { score?: unknown; status?: unknown };
       const score = e.score === null ? null : readNumber(e.score);
-      result[key] = { score, applicability: parseApplicability(e.applicability) };
+      result[key] = { score, status: parseStatus(e.status) };
       hasAny = true;
     } else {
       // Old format: plain number → scored
       const n = readNumber(val);
-      if (n !== null) { result[key] = { score: n, applicability: "scored" }; hasAny = true; }
+      if (n !== null) { result[key] = { score: n, status: "scored" }; hasAny = true; }
     }
   }
   return hasAny ? result : null;

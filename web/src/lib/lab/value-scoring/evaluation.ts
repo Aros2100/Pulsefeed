@@ -273,19 +273,19 @@ async function loadArticleScoreDetails(
       let hasAny = false;
       for (const [key, val] of Object.entries(obj)) {
         if (val === null) {
-          result[key] = { score: null, applicability: "not_applicable" };
+          result[key] = { score: null, status: "not_applicable" };
           hasAny = true;
         } else if (typeof val === "object" && !Array.isArray(val)) {
-          const e = val as { score?: unknown; applicability?: unknown };
+          const e = val as { score?: unknown; status?: unknown };
           const s = e.score === null ? null : (typeof e.score === "number" ? e.score : null);
-          const a = (["scored","neutral","not_applicable"] as string[]).includes(e.applicability as string)
-            ? (e.applicability as DimensionEntry["applicability"])
+          const a = (["scored","neutral","not_applicable"] as string[]).includes(e.status as string)
+            ? (e.status as DimensionEntry["status"])
             : "scored";
-          result[key] = { score: s, applicability: a };
+          result[key] = { score: s, status: a };
           hasAny = true;
         } else {
           const n = typeof val === "number" ? val : null;
-          if (n !== null) { result[key] = { score: n, applicability: "scored" }; hasAny = true; }
+          if (n !== null) { result[key] = { score: n, status: "scored" }; hasAny = true; }
         }
       }
       return hasAny ? result : null;
