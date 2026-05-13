@@ -70,8 +70,12 @@ export default function NewVersionClient({ startingText, startingChangeNotes, st
             background: "#fff",
           }}
         />
-        <div style={{ marginTop: "8px", fontSize: "11px", color: "#94a3b8" }}>
-          The prompt is sent as the system message. The article fields (title, journal, article type, headline, resume, bottom line, SARI) are appended as the user message. Instruct the model to return JSON of the form {"{\"score\": <number>, \"reasoning\": <string>}"}.
+        <div style={{ marginTop: "8px", fontSize: "11px", color: "#94a3b8", lineHeight: 1.6 }}>
+          The prompt is sent as the system message. Each article is appended as the user message with these fields: <strong style={{ color: "#5a6a85" }}>title, article_type, journal, abstract</strong>.
+          {" "}Instruct the model to return JSON of the form:
+          <code style={{ display: "block", marginTop: "6px", padding: "8px 10px", background: "#f3f4f6", borderRadius: "5px", fontFamily: "ui-monospace, Menlo, monospace", fontSize: "10px", color: "#374151", whiteSpace: "pre" }}>
+            {`{\n  "craft_score": <number 10-100>,\n  "dimensions": {\n    "<dim>": {"score": <1-10 or null>, "status": "scored"|"neutral"|"not_applicable"}\n  },\n  "reasoning": "<string>"\n}`}
+          </code>
         </div>
       </div>
 
@@ -110,6 +114,7 @@ export default function NewVersionClient({ startingText, startingChangeNotes, st
         <button
           onClick={submit}
           disabled={busy || promptText.trim().length === 0}
+          title={promptText.trim().length === 0 ? "Prompt text is required" : undefined}
           style={{
             background: busy || promptText.trim().length === 0 ? "#fda99e" : "#E83B2A",
             color: "#fff",
