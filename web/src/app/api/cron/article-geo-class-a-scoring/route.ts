@@ -27,7 +27,8 @@ export async function POST(request: NextRequest) {
   }
 
   const { mode } = parsed.data;
-  const since = parsed.data.since ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const defaultHours = mode === "new" ? 48 : 24;
+  const since = parsed.data.since ?? new Date(Date.now() - defaultHours * 60 * 60 * 1000).toISOString();
 
   const submitUrl = new URL("/api/scoring/batch/article-geo-class-a/submit", request.url);
   const payload = { mode, since, limit: 500 };
