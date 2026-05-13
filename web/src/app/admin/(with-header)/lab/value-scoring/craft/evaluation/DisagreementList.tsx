@@ -246,21 +246,15 @@ function DimensionBar({ label, entry }: { label: string; entry: DimensionEntry |
     );
   }
 
-  // Scored — solid coloured bar with exact spec palette
+  // Scored — solid dark-grey bar; length encodes value, colour encodes status
   const pct = (entry.score / 10) * 100;
-  const color =
-    entry.score >= 9 ? "#15803d" :
-    entry.score >= 7 ? "#22c55e" :
-    entry.score >= 5 ? "#f97316" :
-    entry.score >= 3 ? "#dc2626" :
-                       "#991b1b";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
       <span style={{ fontSize: "10px", color: "#5a6a85", minWidth: "130px", textAlign: "right" }}>{label}</span>
       <div style={{ flex: 1, height: "6px", background: "#f0f0f0", borderRadius: "3px", overflow: "hidden" }}>
-        <div style={{ width: `${pct}%`, height: "100%", background: color }} />
+        <div style={{ width: `${pct}%`, height: "100%", background: "#374151" }} />
       </div>
-      <span style={{ fontSize: "10px", fontWeight: 700, color, minWidth: "30px", fontVariantNumeric: "tabular-nums" }}>{entry.score}</span>
+      <span style={{ fontSize: "10px", fontWeight: 700, color: "#374151", minWidth: "30px", fontVariantNumeric: "tabular-nums" }}>{entry.score}</span>
     </div>
   );
 }
