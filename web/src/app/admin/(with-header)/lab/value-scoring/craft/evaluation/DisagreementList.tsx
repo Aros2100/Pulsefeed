@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import type { DisagreementRow } from "@/lib/lab/value-scoring/evaluation";
+import type { DimensionEntry, DimensionScores } from "@/lib/lab/value-scoring/scoring";
 
 type Sari = { subject?: string; action?: string; result?: string; implication?: string } | null;
 export interface ArticleFull {
@@ -219,25 +220,42 @@ export default function DisagreementList({ rows, articles, onFilterChange }: Pro
   );
 }
 
-function DimensionBar({ label, value }: { label: string; value: number | null }) {
-  if (value === null) {
+function DimensionBar({ label, entry }: { label: string; entry: DimensionEntry | null | undefined }) {
+  // Null entry (no data at all) or not_applicable
+  if (!entry || entry.applicability === "not_applicable" || entry.score === null) {
     return (
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
         <span style={{ fontSize: "10px", color: "#94a3b8", minWidth: "130px", textAlign: "right" }}>{label}</span>
         <div style={{ flex: 1, height: "3px", background: "#e5e7eb", borderRadius: "2px" }} />
-        <span style={{ fontSize: "10px", color: "#94a3b8", minWidth: "20px", fontStyle: "italic" }}>n/a</span>
+        <span style={{ fontSize: "10px", color: "#94a3b8", minWidth: "30px", fontStyle: "italic" }}>n/a</span>
       </div>
     );
   }
-  const pct = (value / 10) * 100;
-  const color = value >= 7 ? "#059669" : value >= 4 ? "#92400e" : "#b91c1c";
+
+  // Neutral fallback — dashed bar in grey
+  if (entry.applicability === "neutral") {
+    const pct = (entry.score / 10) * 100;
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+        <span style={{ fontSize: "10px", color: "#94a3b8", minWidth: "130px", textAlign: "right" }}>{label}</span>
+        <div style={{ flex: 1, height: "6px", background: "repeating-linear-gradient(90deg,#d1d5db 0,#d1d5db 4px,transparent 4px,transparent 8px)", borderRadius: "3px", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", inset: 0, width: `${pct}%`, background: "repeating-linear-gradient(90deg,#9ca3af 0,#9ca3af 4px,transparent 4px,transparent 8px)" }} />
+        </div>
+        <span style={{ fontSize: "10px", color: "#94a3b8", minWidth: "30px", fontVariantNumeric: "tabular-nums" }}>{entry.score} <span style={{ fontStyle: "italic", fontSize: "9px" }}>~</span></span>
+      </div>
+    );
+  }
+
+  // Scored — solid coloured bar
+  const pct = (entry.score / 10) * 100;
+  const color = entry.score >= 7 ? "#059669" : entry.score >= 4 ? "#92400e" : "#b91c1c";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
       <span style={{ fontSize: "10px", color: "#5a6a85", minWidth: "130px", textAlign: "right" }}>{label}</span>
       <div style={{ flex: 1, height: "6px", background: "#f0f0f0", borderRadius: "3px", overflow: "hidden" }}>
         <div style={{ width: `${pct}%`, height: "100%", background: color }} />
       </div>
-      <span style={{ fontSize: "10px", fontWeight: 700, color, minWidth: "20px" }}>{value}</span>
+      <span style={{ fontSize: "10px", fontWeight: 700, color, minWidth: "30px", fontVariantNumeric: "tabular-nums" }}>{entry.score}</span>
     </div>
   );
 }
@@ -247,7 +265,7 @@ function ArticlePanel({ article, chosenByHuman, chosenByPrompt, craftScore, dime
   chosenByHuman:  boolean;
   chosenByPrompt: boolean;
   craftScore:     number | null;
-  dimensions:     Record<string, number | null> | null;
+  dimensions:     DimensionScores | null;
   reasoning:      string | null;
 }) {
   if (!article) {
@@ -300,7 +318,7 @@ function ArticlePanel({ article, chosenByHuman, chosenByPrompt, craftScore, dime
             );
           })()}
           {dimensions && Object.entries(dimensions).map(([key, val]) => (
-            <DimensionBar key={key} label={key.replace(/_/g, " ")} value={val} />
+            <DimensionBar key={key} label={key.replace(/_/g, " ")} entry={val} />
           ))}
           {reasoning && (
             <div style={{ marginTop: "8px", fontSize: "11px", color: "#374151", lineHeight: 1.55, borderLeft: "2px solid #e5e7eb", paddingLeft: "10px" }}>

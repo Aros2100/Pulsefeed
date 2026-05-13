@@ -28,8 +28,16 @@ export interface ScoringArticle {
   abstract:     string | null;
 }
 
-// Dimension scores 1-10 per dimension; null means "not assessable from the abstract".
-export type DimensionScores = Record<string, number | null>;
+export type DimensionApplicability = "scored" | "neutral" | "not_applicable";
+
+export interface DimensionEntry {
+  score:         number | null;
+  applicability: DimensionApplicability;
+}
+
+// Rich per-dimension structure. Old format (plain number | null) is converted
+// during parsing so downstream code always sees DimensionEntry.
+export type DimensionScores = Record<string, DimensionEntry | null>;
 
 // Rubric weights per dimension (sum = 100).
 // Used to normalise craft_score when some dimensions are null.
@@ -60,13 +68,13 @@ const MIN_WEIGHT_THRESHOLD = 30;
 export function computeCraftScore(dimensions: DimensionScores): number | null {
   let sumContributions = 0;
   let sumWeights = 0;
-  for (const [key, val] of Object.entries(dimensions)) {
-    if (val === null) continue;
+  for (const [key, entry] of Object.entries(dimensions)) {
+    if (!entry || entry.applicability === "not_applicable" || entry.score === null) continue;
     const w = DIMENSION_WEIGHTS[key] ?? 0;
-    sumContributions += (val * w) / 10;
+    sumContributions += (entry.score * w) / 10;
     sumWeights += w;
   }
-  if (sumWeights === 0) return null; // all dimensions were null
+  if (sumWeights === 0) return null;
   if (sumWeights < MIN_WEIGHT_THRESHOLD) {
     console.warn(`[computeCraftScore] Only ${sumWeights} weight units scored — article may be outside rubric domain`);
   }
@@ -125,7 +133,7 @@ export function buildScoringRequest(article: ScoringArticle, promptText: string,
       promptText,
       "",
       "Respond only with valid JSON, no other text and no markdown fences.",
-      "Output format: {\"craft_score\": <number 10-100>, \"dimensions\": {<dim>: <1-10 or null>, ...}, \"reasoning\": <string>}",
+      "Output format: {\"craft_score\": <number 10-100>, \"dimensions\": {\"<dim>\": {\"score\": <1-10 or null>, \"applicability\": <\"scored\"|\"neutral\"|\"not_applicable\">}, ...}, \"reasoning\": <string>}",
     ].join("\n"),
     messages: [{ role: "user" as const, content: buildUserMessage(article) }],
   };
@@ -140,6 +148,14 @@ function readNumber(raw: unknown): number | null {
   return null;
 }
 
+const VALID_APPLICABILITY = new Set<DimensionApplicability>(["scored", "neutral", "not_applicable"]);
+
+function parseApplicability(raw: unknown): DimensionApplicability {
+  return VALID_APPLICABILITY.has(raw as DimensionApplicability)
+    ? (raw as DimensionApplicability)
+    : "scored";
+}
+
 function parseDimensions(raw: unknown): DimensionScores | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const obj = raw as Record<string, unknown>;
@@ -147,11 +163,19 @@ function parseDimensions(raw: unknown): DimensionScores | null {
   let hasAny = false;
   for (const [key, val] of Object.entries(obj)) {
     if (val === null) {
-      result[key] = null; // legitimate "not applicable" signal
+      // Old format: null → not_applicable
+      result[key] = { score: null, applicability: "not_applicable" };
+      hasAny = true;
+    } else if (typeof val === "object" && !Array.isArray(val)) {
+      // New format: { score, applicability }
+      const e = val as { score?: unknown; applicability?: unknown };
+      const score = e.score === null ? null : readNumber(e.score);
+      result[key] = { score, applicability: parseApplicability(e.applicability) };
       hasAny = true;
     } else {
-      const n = typeof val === "number" ? val : typeof val === "string" ? Number(val) : NaN;
-      if (Number.isFinite(n)) { result[key] = n; hasAny = true; }
+      // Old format: plain number → scored
+      const n = readNumber(val);
+      if (n !== null) { result[key] = { score: n, applicability: "scored" }; hasAny = true; }
     }
   }
   return hasAny ? result : null;

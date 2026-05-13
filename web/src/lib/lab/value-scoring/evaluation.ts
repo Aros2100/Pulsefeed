@@ -3,6 +3,8 @@
 // and a list of disagreements (with reason categories and notes) intended as
 // the raw material for iterating on the next prompt.
 
+import type { DimensionScores, DimensionEntry } from "./scoring";
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = any;
 
@@ -34,9 +36,9 @@ export interface DisagreementRow {
   normalizedA:     number | null;
   normalizedB:     number | null;
   normalizedDiff:  number;
-  // Prompt dimensions + reasoning per article (null per dimension = not assessable)
-  dimensionsA:     Record<string, number | null> | null;
-  dimensionsB:     Record<string, number | null> | null;
+  // Prompt dimensions + reasoning per article
+  dimensionsA:     DimensionScores | null;
+  dimensionsB:     DimensionScores | null;
   reasoningA:      string | null;
   reasoningB:      string | null;
   articleA:        { id: string; title: string; article_type: string | null };
@@ -236,7 +238,7 @@ export async function computeRankingCorrelation(db: Db, promptId: string): Promi
 
 interface ArticleScoreDetail {
   craftScore:  number | null;
-  dimensions:  Record<string, number | null> | null;
+  dimensions:  DimensionScores | null;
   reasoning:   string | null;
 }
 
@@ -263,9 +265,31 @@ async function loadArticleScoreDetails(
     const prev = best.get(r.article_id);
     if (prev && prev.rank <= rank) continue;
     const craft = r.craft_score !== null ? Number(r.craft_score) : null;
-    const dims  = (r.dimensions && typeof r.dimensions === "object" && !Array.isArray(r.dimensions))
-      ? r.dimensions as Record<string, number>
-      : null;
+    // Parse raw DB jsonb into rich DimensionScores (handles both old and new format).
+    const dims: DimensionScores | null = (() => {
+      if (!r.dimensions || typeof r.dimensions !== "object" || Array.isArray(r.dimensions)) return null;
+      const obj = r.dimensions as Record<string, unknown>;
+      const result: DimensionScores = {};
+      let hasAny = false;
+      for (const [key, val] of Object.entries(obj)) {
+        if (val === null) {
+          result[key] = { score: null, applicability: "not_applicable" };
+          hasAny = true;
+        } else if (typeof val === "object" && !Array.isArray(val)) {
+          const e = val as { score?: unknown; applicability?: unknown };
+          const s = e.score === null ? null : (typeof e.score === "number" ? e.score : null);
+          const a = (["scored","neutral","not_applicable"] as string[]).includes(e.applicability as string)
+            ? (e.applicability as DimensionEntry["applicability"])
+            : "scored";
+          result[key] = { score: s, applicability: a };
+          hasAny = true;
+        } else {
+          const n = typeof val === "number" ? val : null;
+          if (n !== null) { result[key] = { score: n, applicability: "scored" }; hasAny = true; }
+        }
+      }
+      return hasAny ? result : null;
+    })();
     best.set(r.article_id, {
       rank,
       craftScore: craft !== null && Number.isFinite(craft) ? craft : null,
