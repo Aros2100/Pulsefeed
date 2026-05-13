@@ -33,18 +33,117 @@ export default async function EvaluationPage({ searchParams }: PageProps) {
     );
   }
 
-  // Resolve the selected prompt first so we can scope to its direction.
-  // If no promptId in URL, pick the most recently scored across all directions.
   const allVersions = await getPromptVersions(admin, mod.id as string);
   const allScored   = allVersions.filter(v => v.status === "scored");
 
+  // ── Landing: no promptId → show direction list ───────────────────────────
+  if (!sp.promptId) {
+    const { data: directions } = await admin
+      .from("lab_value_directions")
+      .select("id, name, created_at")
+      .eq("module_id", mod.id)
+      .order("created_at");
+    type Dir = { id: string; name: string; created_at: string };
+    const dirs = (directions ?? []) as Dir[];
+
+    // Fetch direction_id for scored versions
+    const scoredIds = allScored.map(v => v.id);
+    let dirById = new Map<string, string | null>();
+    if (scoredIds.length > 0) {
+      const { data: pd } = await admin
+        .from("lab_value_prompts")
+        .select("id, direction_id")
+        .in("id", scoredIds);
+      type PD = { id: string; direction_id: string | null };
+      dirById = new Map((pd ?? []).map((r: PD) => [r.id, r.direction_id]));
+    }
+
+    // Per direction: best pair-match + version count + latest scored promptId
+    const dirStats = await Promise.all(dirs.map(async d => {
+      const inDir = allScored.filter(v => dirById.get(v.id) === d.id);
+      // Also count all versions (not just scored) in this direction
+      const { count: versionCount } = await admin
+        .from("lab_value_prompts")
+        .select("id", { count: "exact", head: true })
+        .eq("direction_id", d.id);
+      let bestMatch: number | null = null;
+      const latestScoredId: string | null = inDir.length > 0 ? inDir[inDir.length - 1].id : null;
+      for (const v of inDir) {
+        try {
+          const pm = await computePairMatch(admin, v.id);
+          if (pm.totalPairs > 0 && (bestMatch === null || pm.matchPercent > bestMatch)) {
+            bestMatch = pm.matchPercent;
+          }
+        } catch { /* not scored */ }
+      }
+      return { ...d, versionCount: versionCount ?? 0, scoredCount: inDir.length, bestMatch, latestScoredId };
+    }));
+
+    return (
+      <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
+        <div style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px 80px" }}>
+          <div style={{ marginBottom: "28px" }}>
+            <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#E83B2A", textTransform: "uppercase", fontWeight: 700, marginBottom: "6px" }}>
+              The Lab · Value Scoring · Craft
+            </div>
+            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px" }}>Evaluation</h1>
+            <p style={{ fontSize: "13px", color: "#888", margin: 0 }}>
+              Choose a direction to evaluate its versions.
+            </p>
+          </div>
+
+          {dirStats.length === 0 ? (
+            <div style={{ background: "#fff8e1", border: "1px solid #fde68a", borderRadius: "8px", padding: "16px 20px", fontSize: "13px", color: "#92400e" }}>
+              No directions yet. Create a direction and score a version before evaluating.
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {dirStats.map(d => (
+                <div key={d.id} style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "18px 22px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "20px" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: "15px", fontWeight: 600, color: "#1a1a1a", marginBottom: "3px" }}>{d.name}</div>
+                    <div style={{ fontSize: "12px", color: "#94a3b8" }}>
+                      {d.versionCount} version{d.versionCount !== 1 ? "s" : ""} · {d.scoredCount} scored · created {new Date(d.created_at).toLocaleDateString("en-CA")}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "20px", alignItems: "center", flexShrink: 0 }}>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: "20px", fontWeight: 700, color: d.bestMatch === null ? "#bbb" : d.bestMatch >= 75 ? "#059669" : "#92400e", fontVariantNumeric: "tabular-nums" }}>
+                        {d.bestMatch === null ? "—" : `${d.bestMatch.toFixed(1)}%`}
+                      </div>
+                      <div style={{ fontSize: "10px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em" }}>Best match</div>
+                    </div>
+                    {d.latestScoredId ? (
+                      <Link href={`/admin/lab/value-scoring/craft/evaluation?promptId=${d.latestScoredId}`} style={{ background: "#E83B2A", color: "#fff", textDecoration: "none", borderRadius: "6px", padding: "8px 14px", fontSize: "13px", fontWeight: 600 }}>
+                        Open →
+                      </Link>
+                    ) : (
+                      <span style={{ fontSize: "12px", color: "#bbb" }}>No scored versions</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ marginTop: "24px" }}>
+            <Link href="/admin/lab/value-scoring/craft" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>
+              ← Back to module
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Per-prompt evaluation ─────────────────────────────────────────────────
   if (allScored.length === 0) {
     return shell(null, null, null,
       <div style={{ background: "#fff8e1", border: "1px solid #fde68a", borderRadius: "8px", padding: "16px 20px", fontSize: "13px", color: "#92400e" }}>
-        No fully-scored prompt versions yet. Finish scoring a version before opening evaluation.
+        No fully-scored prompt versions yet.
         <div style={{ marginTop: "10px" }}>
-          <Link href="/admin/lab/value-scoring/craft/direction" style={{ fontSize: "13px", color: "#E83B2A" }}>
-            ← Back to directions
+          <Link href="/admin/lab/value-scoring/craft/evaluation" style={{ fontSize: "13px", color: "#E83B2A" }}>
+            ← Back to evaluation overview
           </Link>
         </div>
       </div>,
