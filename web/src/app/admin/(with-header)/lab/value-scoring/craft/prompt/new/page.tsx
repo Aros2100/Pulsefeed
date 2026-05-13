@@ -52,8 +52,10 @@ export default async function NewPromptVersionPage({ searchParams }: PageProps) 
     );
   }
 
-  // Determine starting text. If `from` is provided, prefill from that version;
-  // otherwise default to the latest existing version (if any), else blank.
+  // If `from` is explicitly provided → prefill from that version and use it as
+  // parent (explicit iteration). If creating in a direction without explicit
+  // `from` → blank form, no parent (manual new experiment in a direction never
+  // auto-inherits from another direction's history).
   let startingText = "";
   let startedFromVersion: number | null = null;
   let parentPromptId: string | null = null;
@@ -69,7 +71,8 @@ export default async function NewPromptVersionPage({ searchParams }: PageProps) 
       startingText = (src as { prompt_text: string }).prompt_text;
       startedFromVersion = (src as { version: number }).version;
     }
-  } else {
+  } else if (!directionId) {
+    // Legacy path (no direction context): prefill from latest version
     const versions = await getPromptVersions(admin, moduleId);
     if (versions.length > 0) {
       const latest = versions[0];
@@ -85,6 +88,7 @@ export default async function NewPromptVersionPage({ searchParams }: PageProps) 
       }
     }
   }
+  // else: directionId set, no `from` → blank form, parentPromptId stays null
 
 
   return (
