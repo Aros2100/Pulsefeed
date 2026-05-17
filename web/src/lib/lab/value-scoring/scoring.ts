@@ -363,10 +363,12 @@ export async function scoreArticlesWithPrompt(
     type IdRow = { id: string };
     const allIds = ((allArts ?? []) as IdRow[]).map(r => r.id);
 
+    // Only rows with a valid craft_score count as "done" — parse failures retry.
     const { data: existing } = await db
       .from("lab_value_article_scores")
       .select("article_id")
-      .eq("prompt_id", p.id);
+      .eq("prompt_id", p.id)
+      .not("craft_score", "is", null);
     type ScoredRow = { article_id: string };
     const scored = new Set(((existing ?? []) as ScoredRow[]).map(r => r.article_id));
 

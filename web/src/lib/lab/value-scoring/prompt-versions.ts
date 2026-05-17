@@ -87,39 +87,31 @@ export async function getPromptVersions(db: Db, moduleId: string): Promise<Promp
 
   const articleCount = await getModuleArticleCount(db, moduleId);
 
-  // Pull all scores for these prompts in one query — gives us both the count
-  // and the latest scored_at per prompt without a second roundtrip.
+  // Pull only successfully-parsed scores (craft_score IS NOT NULL).
+  // Rows with null craft_score are parse failures that should be retried —
+  // they must not be counted as "scored".
   const promptIds = rows.map(r => r.id);
   const { data: scoreRows } = await db
     .from("lab_value_article_scores")
-    .select("prompt_id, scored_at")
-    .in("prompt_id", promptIds);
+    .select("prompt_id, article_id, scored_at")
+    .in("prompt_id", promptIds)
+    .not("craft_score", "is", null);
 
-  type ScoreCountRow = { prompt_id: string; scored_at: string };
+  type ScoreCountRow = { prompt_id: string; article_id: string; scored_at: string };
   const counts = new Map<string, number>();
   const lastScored = new Map<string, string>();
-  for (const s of (scoreRows ?? []) as ScoreCountRow[]) {
-    counts.set(s.prompt_id, (counts.get(s.prompt_id) ?? 0) + 1);
-    const prev = lastScored.get(s.prompt_id);
-    if (!prev || s.scored_at > prev) lastScored.set(s.prompt_id, s.scored_at);
-  }
-
   // Build parent map so we can compute the effective scored count by walking
   // the parent chain — v_n inherits scores from v_(n-1) for articles it didn't
   // re-score itself.
   const parentOf = new Map<string, string | null>(rows.map(r => [r.id, r.parent_prompt_id]));
   const scoredArticleIds = new Map<string, Set<string>>();
-  if (scoreRows && (scoreRows as { prompt_id: string }[]).length > 0) {
-    const { data: detailedRows } = await db
-      .from("lab_value_article_scores")
-      .select("prompt_id, article_id")
-      .in("prompt_id", promptIds);
-    type DRow = { prompt_id: string; article_id: string };
-    for (const r of (detailedRows ?? []) as DRow[]) {
-      let set = scoredArticleIds.get(r.prompt_id);
-      if (!set) { set = new Set(); scoredArticleIds.set(r.prompt_id, set); }
-      set.add(r.article_id);
-    }
+  for (const s of (scoreRows ?? []) as ScoreCountRow[]) {
+    counts.set(s.prompt_id, (counts.get(s.prompt_id) ?? 0) + 1);
+    const prev = lastScored.get(s.prompt_id);
+    if (!prev || s.scored_at > prev) lastScored.set(s.prompt_id, s.scored_at);
+    let set = scoredArticleIds.get(s.prompt_id);
+    if (!set) { set = new Set(); scoredArticleIds.set(s.prompt_id, set); }
+    set.add(s.article_id);
   }
   function effectiveCount(promptId: string): number {
     const seen = new Set<string>();
