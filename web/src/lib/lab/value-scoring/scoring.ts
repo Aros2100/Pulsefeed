@@ -181,9 +181,17 @@ function parseDimensions(raw: unknown): DimensionScores | null {
   return hasAny ? result : null;
 }
 
+function stripMarkdownFences(text: string): string {
+  return text
+    .replace(/^\s*```(?:json)?\s*\n?/i, "")
+    .replace(/\n?\s*```\s*$/i, "")
+    .trim();
+}
+
 export function parseScoringResponse(rawText: string): ParsedScore {
   try {
-    const match = rawText.match(/\{[\s\S]*\}/);
+    const stripped = stripMarkdownFences(rawText);
+    const match = stripped.match(/\{[\s\S]*\}/);
     if (!match) return { score: null, craftScore: null, dimensions: null, reasoning: null };
     const parsed = JSON.parse(match[0]) as { score?: unknown; craft_score?: unknown; dimensions?: unknown; reasoning?: unknown };
 
