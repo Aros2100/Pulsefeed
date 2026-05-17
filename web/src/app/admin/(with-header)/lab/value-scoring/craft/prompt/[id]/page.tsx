@@ -22,17 +22,6 @@ export default async function PromptVersionDetailPage({ params }: PageProps) {
   const version = await getPromptVersion(admin, id);
   if (!version) notFound();
 
-  // DEBUG — remove after diagnosing 88/100 count issue
-  console.log("[page.tsx] DEBUG getPromptVersion result", {
-    id: version.id,
-    version: version.version,
-    scoredCount: version.scoredCount,
-    effectiveScoredCount: version.effectiveScoredCount,
-    articleCount: version.articleCount,
-    status: version.status,
-    parent_prompt_id: version.parent_prompt_id,
-  });
-
   const fullyScored = version.status === "scored";
   const quickTested = version.status === "quick_tested";
   const quickResults: QuickResultRow[] = quickTested ? await getQuickResults(admin, version.id) : [];
