@@ -63,7 +63,9 @@ export default async function DirectionDetailPage({ params }: PageProps) {
   const { data: scoreCounts } = promptIds.length > 0 ? await admin
     .from("lab_value_article_scores")
     .select("prompt_id")
-    .in("prompt_id", promptIds) : { data: [] };
+    .in("prompt_id", promptIds)
+    .not("craft_score", "is", null)
+    .limit(10000) : { data: [] };
   type SC = { prompt_id: string };
   const countByPrompt = new Map<string, number>();
   for (const s of (scoreCounts ?? []) as SC[]) {

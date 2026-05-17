@@ -134,7 +134,8 @@ async function loadScoreMap(db: Db, promptId: string): Promise<Map<string, numbe
     .from("lab_value_article_scores")
     .select("prompt_id, article_id, score, craft_score")
     .in("prompt_id", chain)
-    .not("score", "is", null);
+    .not("score", "is", null)
+    .limit(10000);
 
   type R = { prompt_id: string; article_id: string; score: number | string; craft_score: number | string | null };
   const all = (scores ?? []) as R[];
