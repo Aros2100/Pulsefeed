@@ -96,7 +96,8 @@ export async function getPromptVersions(db: Db, moduleId: string): Promise<Promp
     .from("lab_value_article_scores")
     .select("prompt_id, article_id, scored_at")
     .in("prompt_id", promptIds)
-    .not("craft_score", "is", null);
+    .not("craft_score", "is", null)
+    .limit(10000); // default PostgREST limit is 1000; we need all rows
 
   type ScoreCountRow = { prompt_id: string; article_id: string; scored_at: string };
   const counts = new Map<string, number>();
