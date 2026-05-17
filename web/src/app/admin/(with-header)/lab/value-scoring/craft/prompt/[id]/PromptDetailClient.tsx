@@ -46,6 +46,18 @@ export default function PromptDetailClient({
   const remaining = Math.max(0, articleCount - effectiveScoredCount);
   const fullyScored = status === "scored";
 
+  // DEBUG — remove after diagnosing 88/100 count issue
+  console.log("[PromptDetailClient] DEBUG", {
+    promptId,
+    scoredCount,
+    effectiveScoredCount,
+    articleCount,
+    remaining,
+    status,
+    hasParent,
+    fullyScored,
+  });
+
   async function save() {
     setSavingState("saving");
     setError(null);
