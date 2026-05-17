@@ -91,15 +91,28 @@ export async function getPromptVersions(db: Db, moduleId: string): Promise<Promp
   // Pull only successfully-parsed scores (craft_score IS NOT NULL).
   // Rows with null craft_score are parse failures that should be retried —
   // they must not be counted as "scored".
+  // PostgREST server max_rows caps responses at 1000 regardless of client
+  // .limit() calls. Paginate explicitly to get all rows.
   const promptIds = rows.map(r => r.id);
-  const { data: scoreRows } = await db
-    .from("lab_value_article_scores")
-    .select("prompt_id, article_id, scored_at")
-    .in("prompt_id", promptIds)
-    .not("craft_score", "is", null)
-    .limit(10000); // default PostgREST limit is 1000; we need all rows
-
   type ScoreCountRow = { prompt_id: string; article_id: string; scored_at: string };
+  const allScoreRows: ScoreCountRow[] = [];
+  if (promptIds.length > 0) {
+    const PAGE = 1000;
+    let offset = 0;
+    while (true) {
+      const { data: page } = await db
+        .from("lab_value_article_scores")
+        .select("prompt_id, article_id, scored_at")
+        .in("prompt_id", promptIds)
+        .not("craft_score", "is", null)
+        .range(offset, offset + PAGE - 1);
+      const batch = (page ?? []) as ScoreCountRow[];
+      allScoreRows.push(...batch);
+      if (batch.length < PAGE) break;
+      offset += PAGE;
+    }
+  }
+  const scoreRows = allScoreRows;
   const counts = new Map<string, number>();
   const lastScored = new Map<string, string>();
   // Build parent map so we can compute the effective scored count by walking

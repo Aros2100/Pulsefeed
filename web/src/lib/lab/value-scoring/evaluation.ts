@@ -130,15 +130,23 @@ async function loadModuleId(db: Db, promptId: string): Promise<string> {
 async function loadScoreMap(db: Db, promptId: string): Promise<Map<string, number>> {
   const { chain } = await loadPromptChain(db, promptId);
 
-  const { data: scores } = await db
-    .from("lab_value_article_scores")
-    .select("prompt_id, article_id, score, craft_score")
-    .in("prompt_id", chain)
-    .not("score", "is", null)
-    .limit(10000);
-
-  type R = { prompt_id: string; article_id: string; score: number | string; craft_score: number | string | null };
-  const all = (scores ?? []) as R[];
+  type ScoreRow = { prompt_id: string; article_id: string; score: number | string; craft_score: number | string | null };
+  const allScores: ScoreRow[] = [];
+  const PAGE_SCORES = 1000;
+  let scoreOffset = 0;
+  while (true) {
+    const { data: page } = await db
+      .from("lab_value_article_scores")
+      .select("prompt_id, article_id, score, craft_score")
+      .in("prompt_id", chain)
+      .not("score", "is", null)
+      .range(scoreOffset, scoreOffset + PAGE_SCORES - 1);
+    const batch = (page ?? []) as ScoreRow[];
+    allScores.push(...batch);
+    if (batch.length < PAGE_SCORES) break;
+    scoreOffset += PAGE_SCORES;
+  }
+  const all = allScores;
 
   // Process in chain order (leaf first). First write wins → leaf overrides parents.
   const priority = new Map<string, number>(chain.map((id, i) => [id, i]));
