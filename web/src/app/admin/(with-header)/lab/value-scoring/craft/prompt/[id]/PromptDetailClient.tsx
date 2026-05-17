@@ -6,14 +6,15 @@ import Link from "next/link";
 import type { PromptStatus } from "@/lib/lab/value-scoring/prompt-versions";
 
 interface Props {
-  promptId:    string;
-  initialText: string;
-  initialNotes: string;
-  editable:    boolean;
-  status:      PromptStatus;
-  scoredCount: number;
-  articleCount: number;
-  hasParent:   boolean;
+  promptId:             string;
+  initialText:          string;
+  initialNotes:         string;
+  editable:             boolean;
+  status:               PromptStatus;
+  scoredCount:          number; // own rows (for "Score remaining" backend calc)
+  effectiveScoredCount: number; // own + parent chain (for display)
+  articleCount:         number;
+  hasParent:            boolean;
 }
 
 type ScoreSummary = {
@@ -25,7 +26,7 @@ type ScoreSummary = {
 };
 
 export default function PromptDetailClient({
-  promptId, initialText, initialNotes, editable, status, scoredCount, articleCount, hasParent,
+  promptId, initialText, initialNotes, editable, status, scoredCount, effectiveScoredCount, articleCount, hasParent,
 }: Props) {
   const router = useRouter();
   const [text, setText] = useState(initialText);
@@ -41,7 +42,8 @@ export default function PromptDetailClient({
   const [error, setError] = useState<string | null>(null);
 
   const dirty = text !== savedText || notes !== savedNotes;
-  const remaining = Math.max(0, articleCount - scoredCount);
+  // Use effectiveScoredCount (own + parent chain) for display and remaining
+  const remaining = Math.max(0, articleCount - effectiveScoredCount);
   const fullyScored = status === "scored";
 
   async function save() {

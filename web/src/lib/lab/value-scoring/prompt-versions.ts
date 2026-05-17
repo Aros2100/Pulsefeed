@@ -12,16 +12,17 @@ type Db = any;
 export type PromptStatus = "draft" | "quick_tested" | "scoring" | "scored";
 
 export interface PromptVersionRow {
-  id:                string;
-  version:           number;
-  created_at:        string;
-  change_notes:      string | null;
-  scoredCount:       number;
-  articleCount:      number;
-  quick_tested_at:   string | null;
-  parent_prompt_id:  string | null;
-  status:            PromptStatus;
-  lastScoredAt:      string | null;
+  id:                   string;
+  version:              number;
+  created_at:           string;
+  change_notes:         string | null;
+  scoredCount:          number; // own rows for this prompt with valid craft_score
+  effectiveScoredCount: number; // scoredCount + parent-chain coverage (used for display)
+  articleCount:         number;
+  quick_tested_at:      string | null;
+  parent_prompt_id:     string | null;
+  status:               PromptStatus;
+  lastScoredAt:         string | null;
 }
 
 export interface PromptVersionDetail extends PromptVersionRow {
@@ -128,16 +129,17 @@ export async function getPromptVersions(db: Db, moduleId: string): Promise<Promp
     const scoredCount = counts.get(r.id) ?? 0;
     const effective   = effectiveCount(r.id);
     return {
-      id:               r.id,
-      version:          r.version,
-      created_at:       r.created_at,
-      change_notes:     r.change_notes,
-      quick_tested_at:  r.quick_tested_at,
-      parent_prompt_id: r.parent_prompt_id,
+      id:                   r.id,
+      version:              r.version,
+      created_at:           r.created_at,
+      change_notes:         r.change_notes,
+      quick_tested_at:      r.quick_tested_at,
+      parent_prompt_id:     r.parent_prompt_id,
       scoredCount,
+      effectiveScoredCount: effective,
       articleCount,
-      lastScoredAt:     lastScored.get(r.id) ?? null,
-      status:           deriveStatus(effective, articleCount, r.quick_tested_at, scoredCount),
+      lastScoredAt:         lastScored.get(r.id) ?? null,
+      status:               deriveStatus(effective, articleCount, r.quick_tested_at, scoredCount),
     };
   });
 }

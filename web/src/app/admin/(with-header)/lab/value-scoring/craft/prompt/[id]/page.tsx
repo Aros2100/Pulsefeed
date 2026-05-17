@@ -88,16 +88,17 @@ export default async function PromptVersionDetailPage({ params }: PageProps) {
           editable={version.editable}
           status={version.status}
           scoredCount={version.scoredCount}
+          effectiveScoredCount={version.effectiveScoredCount}
           articleCount={version.articleCount}
           hasParent={version.parent_prompt_id !== null}
         />
 
         {/* Scoring status line — replaces the old distribution card */}
-        {(version.scoredCount > 0 || version.lastScoredAt) && (
+        {(version.effectiveScoredCount > 0 || version.lastScoredAt) && (
           <div style={{ background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "14px 18px", marginBottom: "20px", fontSize: "13px", color: "#5a6a85", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
             <span>
               <strong style={{ color: fullyScored ? "#059669" : "#1a1a1a" }}>
-                {fullyScored ? `Scored ${version.articleCount}/${version.articleCount} articles` : `${version.scoredCount}/${version.articleCount} scored`}
+                {fullyScored ? `Scored ${version.articleCount}/${version.articleCount} articles` : `${version.effectiveScoredCount}/${version.articleCount} scored`}
               </strong>
               {version.lastScoredAt && (
                 <> · last scored {new Date(version.lastScoredAt).toLocaleDateString("en-CA")}</>
