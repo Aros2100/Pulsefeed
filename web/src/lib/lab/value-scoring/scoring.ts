@@ -39,38 +39,43 @@ export interface DimensionEntry {
 // during parsing so downstream code always sees DimensionEntry.
 export type DimensionScores = Record<string, DimensionEntry | null>;
 
-// Rubric weights per dimension (sum = 100).
-// Used to normalise craft_score when some dimensions are null.
-export const DIMENSION_WEIGHTS: Record<string, number> = {
-  bias:                   20,
-  statistical_analyses:   15,
-  study_design:           15,
-  outcome_quality:        10,
-  sample_size:            10,
-  intervention_integrity: 10,
-  protocol_adherence:      5,
-  consistency:             5,
-  generalizability:        5,
-  reproducibility:         5,
-};
+// Matches "identifier: number" pairs, e.g. "bias: 25" or "study_design: 15".
+const WEIGHT_PAIR_RE = /\b([a-z][a-z_]*[a-z])\s*:\s*(\d+)/gi;
+
+/**
+ * Extract dimension weights from the prompt's "Weights" paragraph.
+ * Throws if no weights block is found — prompts must declare weights explicitly.
+ */
+export function parseWeightsFromPrompt(promptText: string): Record<string, number> {
+  for (const block of promptText.split(/\n\s*\n/)) {
+    if (!/weight/i.test(block)) continue;
+    const weights: Record<string, number> = {};
+    for (const [, key, val] of block.matchAll(WEIGHT_PAIR_RE)) {
+      weights[key.toLowerCase()] = Number(val);
+    }
+    if (Object.keys(weights).length >= 2) return weights;
+  }
+  throw new Error(
+    "Could not parse dimension weights from prompt — add a 'Weights' paragraph with 'dimension: number' pairs"
+  );
+}
 
 // Minimum total weight required to produce a meaningful craft_score.
 const MIN_WEIGHT_THRESHOLD = 30;
 
 /**
- * Compute normalised craft_score (10-100) from the rubric dimensions.
- * Null dimensions (not applicable) are excluded; the remaining weights are
- * scaled to 100 so the result stays on the 10-100 scale.
+ * Compute craft_score from the rubric dimensions.
+ * Null/not-applicable dimensions are excluded from both sum and weight.
  *
- * formula: craft = sum(score × weight / 10) × (100 / sumWeights)
+ * formula: craft = sum(score × weight / 10)
  * returns null when no dimensions were scored or total weight < threshold.
  */
-export function computeCraftScore(dimensions: DimensionScores): number | null {
+export function computeCraftScore(dimensions: DimensionScores, weights: Record<string, number>): number | null {
   let sumContributions = 0;
   let sumWeights = 0;
   for (const [key, entry] of Object.entries(dimensions)) {
     if (!entry || entry.status === "not_applicable" || entry.score === null) continue;
-    const w = DIMENSION_WEIGHTS[key] ?? 0;
+    const w = weights[key] ?? 0;
     sumContributions += (entry.score * w) / 10;
     sumWeights += w;
   }
@@ -78,7 +83,7 @@ export function computeCraftScore(dimensions: DimensionScores): number | null {
   if (sumWeights < MIN_WEIGHT_THRESHOLD) {
     console.warn(`[computeCraftScore] Only ${sumWeights} weight units scored — article may be outside rubric domain`);
   }
-  return sumContributions * (100 / sumWeights);
+  return sumContributions;
 }
 
 export interface ParsedScore {
@@ -133,7 +138,7 @@ export function buildScoringRequest(article: ScoringArticle, promptText: string,
       promptText,
       "",
       "Respond only with valid JSON, no other text and no markdown fences.",
-      "Output format: {\"craft_score\": <number 10-100>, \"dimensions\": {\"<dim>\": {\"score\": <1-10 or null>, \"status\": <\"scored\"|\"neutral\"|\"not_applicable\">}, ...}, \"reasoning\": <string>}",
+      "Output format: {\"dimensions\": {\"<dim>\": {\"score\": <1-10 or null>, \"status\": <\"scored\"|\"neutral\"|\"not_applicable\">}, ...}, \"reasoning\": <string>}",
     ].join("\n"),
     messages: [{ role: "user" as const, content: buildUserMessage(article) }],
   };
@@ -188,7 +193,7 @@ function stripMarkdownFences(text: string): string {
     .trim();
 }
 
-export function parseScoringResponse(rawText: string): ParsedScore {
+export function parseScoringResponse(rawText: string, weights: Record<string, number>): ParsedScore {
   try {
     const stripped = stripMarkdownFences(rawText);
     const match = stripped.match(/\{[\s\S]*\}/);
@@ -197,13 +202,11 @@ export function parseScoringResponse(rawText: string): ParsedScore {
 
     const dimensions = parseDimensions(parsed.dimensions);
 
-    // If dimensions are present, compute craft_score from them using the
-    // normalised formula (null dims excluded, weights re-scaled to 100).
-    // This is authoritative when some dimensions are null.
+    // If dimensions are present, compute craft_score using weights from the prompt.
     // If no dimensions (legacy prompt), fall back to reported craft_score or score.
     let craftScore: number | null = null;
     if (dimensions !== null) {
-      craftScore = computeCraftScore(dimensions);
+      craftScore = computeCraftScore(dimensions, weights);
     }
     if (craftScore === null) {
       craftScore = readNumber(parsed.craft_score);
@@ -390,13 +393,14 @@ export async function scoreArticlesWithPrompt(
   const effectiveModel = modelOverride ?? SCORING_MODEL;
   const modelKey = `value_scoring_craft_v${p.version}_${mode}`;
   const task = `value_scoring_craft_${mode}`;
+  const weights = parseWeightsFromPrompt(p.prompt_text);
 
   const results = await runInChunks(arts, SCORING_CONCURRENCY, async (article) => {
     try {
       const params = buildScoringRequest(article, p.prompt_text, effectiveModel);
       const message = await trackedCall(modelKey, params, article.id, task);
       const raw = (message.content[0] as { type: string; text: string }).text.trim();
-      const { score, craftScore, dimensions, reasoning } = parseScoringResponse(raw);
+      const { score, craftScore, dimensions, reasoning } = parseScoringResponse(raw, weights);
       return {
         article_id:   article.id,
         score,

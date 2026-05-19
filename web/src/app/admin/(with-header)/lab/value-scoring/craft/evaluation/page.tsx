@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CRAFT_MODULE_KEY } from "@/lib/lab/value-scoring/craft-config";
 import { getPromptVersions } from "@/lib/lab/value-scoring/prompt-versions";
-import { computePairMatch, getDisagreements } from "@/lib/lab/value-scoring/evaluation";
+import { computePairMatch, computeRankingCorrelation, getDisagreements } from "@/lib/lab/value-scoring/evaluation";
 import EvaluationFilters from "./EvaluationFilters";
 import EvaluationActions from "./EvaluationActions";
 import { type ArticleFull } from "./DisagreementList";
@@ -181,9 +181,13 @@ export default async function EvaluationPage({ searchParams }: PageProps) {
   // Only show versions in the same direction as the selected prompt.
   const scoredInDirection = allScored.filter(v => dirById.get(v.id) === directionId);
 
-  const [pairMatch, disagreements] = await Promise.all([
+  const selectedArticleCount = allScored.find(v => v.id === promptId)?.articleCount ?? 0;
+  const showRankingsLink = selectedArticleCount >= 90 && directionId !== null;
+
+  const [pairMatch, disagreements, rankCorr] = await Promise.all([
     computePairMatch(admin, promptId),
     getDisagreements(admin, promptId, { minScoreDiff: 0 }),
+    selectedArticleCount >= 90 ? computeRankingCorrelation(admin, promptId) : Promise.resolve(null),
   ]);
 
   // Iteration history scoped to same direction.
@@ -265,14 +269,22 @@ export default async function EvaluationPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      {/* Pair-match metric */}
-      <div style={{ marginBottom: "20px" }}>
+      {/* Metrics row: pair-match + rank correlation */}
+      <div style={{ display: "grid", gridTemplateColumns: rankCorr ? "1fr 1fr" : "1fr", gap: "16px", marginBottom: "20px" }}>
         <MetricCard
           title="Pair-match"
           value={`${pairMatch.matchPercent.toFixed(1)}%`}
           subtitle={`Prompt matched your choice on ${pairMatch.matches} of ${pairMatch.totalPairs} pairs${pairMatch.ties > 0 ? ` · ${pairMatch.ties} ties` : ""}`}
           accent={pairMatch.matchPercent >= 75 ? "#059669" : pairMatch.matchPercent >= 60 ? "#92400e" : "#b91c1c"}
         />
+        {rankCorr && (
+          <MetricCard
+            title="Rank correlation (Spearman ρ)"
+            value={rankCorr.rho.toFixed(2)}
+            subtitle={`BT ranking vs prompt score over ${rankCorr.n} articles`}
+            accent={rankCorr.rho >= 0.7 ? "#059669" : rankCorr.rho >= 0.4 ? "#92400e" : "#b91c1c"}
+          />
+        )}
       </div>
 
       {/* Disagreements card */}
@@ -301,6 +313,17 @@ export default async function EvaluationPage({ searchParams }: PageProps) {
           Create version manually →
         </Link>
       </div>
+
+      {showRankingsLink && (
+        <div style={{ marginTop: "12px", textAlign: "right" }}>
+          <Link
+            href={`/admin/lab/value-scoring/craft/direction/${directionId}/prompt/${promptId}/rankings`}
+            style={{ fontSize: "13px", color: "#5a6a85", textDecoration: "none" }}
+          >
+            View full rankings →
+          </Link>
+        </div>
+      )}
     </>,
   );
 }

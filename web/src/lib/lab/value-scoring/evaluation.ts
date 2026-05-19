@@ -21,6 +21,18 @@ export interface RankingCorrelationResult {
   n:   number;   // number of articles with both β and prompt score
 }
 
+export interface RankingsTableRow {
+  article_id:      string;
+  prod_article_id: string | null;
+  title:           string;
+  article_type:    string | null;
+  btRank:          number;
+  craftRank:       number;
+  diff:            number;   // btRank − craftRank (positive = prompt over-ranks)
+  betaScore:       number;
+  craftScore:      number;
+}
+
 export interface DisagreementRow {
   pairId:          string;
   humanChoiceId:   string;
@@ -447,4 +459,101 @@ export async function getDisagreements(
   // was most wrong in its own terms appear at the top.
   rows.sort((a, b) => b.craftDiff - a.craftDiff);
   return rows;
+}
+
+/**
+ * Build the full-rankings table for a prompt detail page.
+ * Returns one row per article that has both an effective craft_score from this
+ * prompt (or its parent chain) and a BT beta_score in lab_value_rankings.
+ * BT rank and Craft rank are 1-based (1 = highest score).
+ * diff = btRank − craftRank (positive = prompt over-ranks the article).
+ */
+export async function getRankingsTableRows(db: Db, promptId: string): Promise<RankingsTableRow[]> {
+  const { moduleId, chain } = await loadPromptChain(db, promptId);
+
+  // Effective craft_score per article: leaf-first chain walk (same pattern as loadScoreMap)
+  type ScoreRow = { prompt_id: string; article_id: string; craft_score: number | string | null };
+  const allScores: ScoreRow[] = [];
+  const PAGE = 1000;
+  let offset = 0;
+  while (true) {
+    const { data: page } = await db
+      .from("lab_value_article_scores")
+      .select("prompt_id, article_id, craft_score")
+      .in("prompt_id", chain)
+      .not("craft_score", "is", null)
+      .range(offset, offset + PAGE - 1);
+    const batch = (page ?? []) as ScoreRow[];
+    allScores.push(...batch);
+    if (batch.length < PAGE) break;
+    offset += PAGE;
+  }
+
+  const priority = new Map<string, number>(chain.map((id, i) => [id, i]));
+  const bestCraft = new Map<string, { rank: number; craftScore: number }>();
+  for (const r of allScores) {
+    const cs = r.craft_score !== null ? Number(r.craft_score) : NaN;
+    if (!Number.isFinite(cs)) continue;
+    const rank = priority.get(r.prompt_id) ?? Infinity;
+    const prev = bestCraft.get(r.article_id);
+    if (!prev || rank < prev.rank) bestCraft.set(r.article_id, { rank, craftScore: cs });
+  }
+  const craftMap = new Map<string, number>();
+  for (const [aid, { craftScore }] of bestCraft) craftMap.set(aid, craftScore);
+
+  // BT beta_score per article from lab_value_rankings
+  const { data: rankings } = await db
+    .from("lab_value_rankings")
+    .select("article_id, beta_score")
+    .eq("module_id", moduleId);
+  type RankRow = { article_id: string; beta_score: number | string };
+  const betaMap = new Map<string, number>();
+  for (const r of (rankings ?? []) as RankRow[]) {
+    const beta = Number(r.beta_score);
+    if (Number.isFinite(beta)) betaMap.set(r.article_id, beta);
+  }
+
+  // Only articles with both scores
+  const articleIds = [...craftMap.keys()].filter(id => betaMap.has(id));
+  if (articleIds.length === 0) return [];
+
+  const { data: arts } = await db
+    .from("lab_value_articles")
+    .select("id, title, article_type, prod_article_id")
+    .in("id", articleIds);
+  type ArtRow = { id: string; title: string; article_type: string | null; prod_article_id: string | null };
+  const artMap = new Map<string, ArtRow>();
+  for (const a of (arts ?? []) as ArtRow[]) artMap.set(a.id, a);
+
+  type Scored = { article_id: string; betaScore: number; craftScore: number; art: ArtRow };
+  const scored: Scored[] = [];
+  for (const id of articleIds) {
+    const art = artMap.get(id);
+    if (!art) continue;
+    scored.push({ article_id: id, betaScore: betaMap.get(id)!, craftScore: craftMap.get(id)!, art });
+  }
+
+  // Rank 1 = highest score (descending sort, then 1-based index)
+  const btRankOf = new Map<string, number>(
+    [...scored].sort((a, b) => b.betaScore - a.betaScore).map((r, i) => [r.article_id, i + 1])
+  );
+  const craftRankOf = new Map<string, number>(
+    [...scored].sort((a, b) => b.craftScore - a.craftScore).map((r, i) => [r.article_id, i + 1])
+  );
+
+  return scored.map(r => {
+    const btRank    = btRankOf.get(r.article_id)!;
+    const craftRank = craftRankOf.get(r.article_id)!;
+    return {
+      article_id:      r.article_id,
+      prod_article_id: r.art.prod_article_id,
+      title:           r.art.title,
+      article_type:    r.art.article_type,
+      btRank,
+      craftRank,
+      diff:            btRank - craftRank,
+      betaScore:       r.betaScore,
+      craftScore:      r.craftScore,
+    };
+  });
 }
