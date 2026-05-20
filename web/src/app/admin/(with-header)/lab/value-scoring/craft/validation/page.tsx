@@ -28,19 +28,25 @@ export default async function ValidationIndexPage() {
     poolCount = count ?? 0;
   }
 
-  // Scored prompts for the dropdown
-  type PromptRow = { id: string; version: number; direction_id: string | null };
+  // Fully-scored prompts for the dropdown — newest first, only those with all articles scored
+  type PromptRow = { id: string; version: number; created_at: string };
   let promptOptions: { id: string; version: number }[] = [];
   if (moduleId) {
-    // Get prompts that have at least one craft_score
-    const { data: scoredPrompts } = await admin
-      .from('lab_value_prompts')
-      .select('id, version, direction_id')
-      .eq('module_id', moduleId)
-      .order('version', { ascending: true });
-    const ps = ((scoredPrompts ?? []) as PromptRow[]);
+    // Article count for this module (need it to identify fully-scored prompts)
+    const { count: artCount } = await admin
+      .from('lab_value_articles')
+      .select('id', { count: 'exact', head: true })
+      .eq('module_id', moduleId);
+    const articleCount = artCount ?? 0;
 
-    // Filter to only those with scores
+    const { data: allPrompts } = await admin
+      .from('lab_value_prompts')
+      .select('id, version, created_at')
+      .eq('module_id', moduleId)
+      .order('created_at', { ascending: false });
+    const ps = ((allPrompts ?? []) as PromptRow[]);
+
+    // Keep only prompts that have a craft_score for every article (fully scored)
     const scored: { id: string; version: number }[] = [];
     for (const p of ps) {
       const { count } = await admin
@@ -48,7 +54,9 @@ export default async function ValidationIndexPage() {
         .select('article_id', { count: 'exact', head: true })
         .eq('prompt_id', p.id)
         .not('craft_score', 'is', null);
-      if (count && count > 0) scored.push({ id: p.id, version: p.version });
+      if (count && articleCount > 0 && count >= articleCount) {
+        scored.push({ id: p.id, version: p.version });
+      }
     }
     promptOptions = scored;
   }
