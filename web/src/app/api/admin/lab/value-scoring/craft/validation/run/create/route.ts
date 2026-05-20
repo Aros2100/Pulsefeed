@@ -48,19 +48,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Prompt has no scores yet — score it first' }, { status: 400 });
     }
 
-    // Get article IDs already used in any run for this prompt
-    const { data: usedItems } = await admin
-      .from('lab_value_validation_items')
-      .select('validation_article_id')
-      .in('run_id',
-        admin
-          .from('lab_value_validation_runs')
-          .select('id')
-          .eq('prompt_id', promptId)
-      )
-      .range(0, 9999);
-
-    // NOTE: Supabase JS doesn't support nested selects like that — do it in two steps
+    // Get article IDs already used in any run for this prompt (two-step: runs → items)
     const { data: runRows } = await admin
       .from('lab_value_validation_runs')
       .select('id')
