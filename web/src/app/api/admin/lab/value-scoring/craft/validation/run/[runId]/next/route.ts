@@ -53,22 +53,22 @@ export async function GET(
     };
     const it = item as Item;
 
-    // Load validation article
+    // Load validation article (full Article-compatible fields + abstract)
     const { data: valArt } = await admin
       .from('lab_value_validation_articles')
-      .select('id, title, journal, article_type, published_date, abstract, short_headline, resume, bottom_line, sari')
+      .select('id, pmid, title, journal, article_type, published_date, short_headline, resume, bottom_line, sari')
       .eq('id', it.validation_article_id)
       .maybeSingle();
 
-    // Load anchor articles from lab_value_articles
+    // Load anchor articles from lab_value_articles — full Article-compatible fields
     const anchorIds = [it.anchor_low_id, it.anchor_same_id, it.anchor_high_id].filter(Boolean) as string[];
     const anchorMap: Record<string, unknown> = {};
     if (anchorIds.length > 0) {
       const { data: anchorRows } = await admin
         .from('lab_value_articles')
-        .select('id, title, journal, article_type, published_date')
+        .select('id, pmid, title, journal, article_type, published_date, short_headline, resume, bottom_line, sari')
         .in('id', anchorIds);
-      type AnchorRow = { id: string; title: string; journal: string | null; article_type: string | null; published_date: string | null };
+      type AnchorRow = { id: string; pmid: string | null; title: string; journal: string | null; article_type: string | null; published_date: string | null; short_headline: string | null; resume: string | null; bottom_line: string | null; sari: unknown };
       for (const a of ((anchorRows ?? []) as AnchorRow[])) {
         anchorMap[a.id] = a;
       }

@@ -5,7 +5,7 @@ import Link from "next/link";
 
 interface Category { id: string; label: string; }
 
-interface Article {
+export interface Article {
   id: string; pmid: string | null; title: string; journal: string | null;
   article_type: string | null; published_date: string | null;
   short_headline: string | null; resume: string | null; bottom_line: string | null;
@@ -21,7 +21,7 @@ interface Props {
 
 const ACCENT = "#E83B2A";
 
-function fmtDate(iso: string | null): string {
+export function fmtDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
@@ -244,7 +244,6 @@ export default function PairwiseClient({
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
-      <style>{`.article-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.10) !important; }`}</style>
       <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 0 80px" }}>
 
         {error && (
@@ -378,7 +377,7 @@ export default function PairwiseClient({
 
 // ── Article card — clickable, no header ──────────────────────────────────────
 
-function ArticleCard({ article, chosen, onChoose, loading }: {
+export function ArticleCard({ article, chosen, onChoose, loading }: {
   article: Article; chosen: boolean; onChoose: () => void; loading: boolean;
 }) {
   return (
