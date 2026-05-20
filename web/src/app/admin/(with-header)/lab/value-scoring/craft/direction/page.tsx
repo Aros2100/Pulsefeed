@@ -94,9 +94,12 @@ export default async function DirectionIndexPage() {
           </div>
         )}
 
-        <div style={{ marginTop: "24px" }}>
+        <div style={{ marginTop: "24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Link href="/admin/lab/value-scoring/craft" style={{ fontSize: "12px", color: "#94a3b8", textDecoration: "none" }}>
             ← Back to module
+          </Link>
+          <Link href="/admin/lab/value-scoring/craft/validation" style={{ fontSize: "13px", color: "#E83B2A", textDecoration: "none", fontWeight: 600 }}>
+            Validation →
           </Link>
         </div>
       </div>
