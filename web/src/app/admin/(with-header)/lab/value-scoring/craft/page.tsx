@@ -7,7 +7,7 @@ import {
 } from "@/lib/lab/value-scoring/prompt-versions";
 import { computePairMatch } from "@/lib/lab/value-scoring/evaluation";
 
-const PHASES = ["sample", "pairwise", "prompt", "evaluation", "promoted"] as const;
+const PHASES = ["sample", "pairwise", "prompt", "evaluation", "validation", "promoted"] as const;
 type Phase = (typeof PHASES)[number];
 
 const PHASE_LABELS: Record<Phase, string> = {
@@ -15,6 +15,7 @@ const PHASE_LABELS: Record<Phase, string> = {
   pairwise:   "Pairwise",
   prompt:     "Prompt",
   evaluation: "Evaluation",
+  validation: "Validation",
   promoted:   "Promoted",
 };
 
@@ -23,6 +24,7 @@ const PHASE_HREFS: Partial<Record<Phase, string>> = {
   pairwise:   "/admin/lab/value-scoring/craft/pairwise",
   prompt:     "/admin/lab/value-scoring/craft/direction",
   evaluation: "/admin/lab/value-scoring/craft/evaluation",
+  validation: "/admin/lab/value-scoring/craft/validation",
 };
 
 export default async function CraftModulePage() {
@@ -71,6 +73,15 @@ export default async function CraftModulePage() {
     ? await computePairMatch(admin, latestEvalVersion.id)
     : null;
 
+  // Validation phase: pool size + run count
+  const [{ count: rawPoolCount }, { count: rawRunCount }] = await Promise.all([
+    admin.from("lab_value_validation_articles").select("id", { count: "exact", head: true }).eq("module_id", mod.id),
+    admin.from("lab_value_validation_runs").select("id", { count: "exact", head: true }).eq("module_id", mod.id),
+  ]);
+  const validationPoolCount = rawPoolCount ?? 0;
+  const validationRunCount  = rawRunCount  ?? 0;
+  const validationHasActivity = validationPoolCount > 0 || validationRunCount > 0;
+
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
       <div style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px 80px" }}>
@@ -109,13 +120,18 @@ export default async function CraftModulePage() {
               // any prompt version has been fully scored.
               const isPromptReachable     = phase === "prompt"     && promptReady     && !isDone && !isActive;
               const isEvaluationReachable = phase === "evaluation" && evaluationReady && !isDone && !isActive;
-              const isReachable           = isPromptReachable || isEvaluationReachable;
+              // Validation is reachable once evaluation is ready; treated as "active"
+              // (red filled circle) when the pool or runs have activity.
+              const isValidationActive    = phase === "validation" && validationHasActivity;
+              const isValidationReachable = phase === "validation" && evaluationReady && !isValidationActive && !isDone;
+              const isReachable           = isPromptReachable || isEvaluationReachable || isValidationReachable;
 
               // Pairwise row has an inner "View ranking" link — can't wrap outer row in <Link> too.
               const hasInnerLink = phase === "pairwise" && (isActive || isDone);
-              const wrapRow      = (isActive || isDone || isReachable) && !!href && !hasInnerLink;
+              const effectiveActive   = isActive || isValidationActive;
+              const wrapRow      = (effectiveActive || isDone || isReachable) && !!href && !hasInnerLink;
 
-              const dimmed = !isActive && !isDone && !isReachable;
+              const dimmed = !effectiveActive && !isDone && !isReachable;
 
               // Status pill text for the prompt row
               let promptStatusText: string | null = null;
@@ -141,6 +157,16 @@ export default async function CraftModulePage() {
                 evalStatusText = "Score a version to evaluate";
               }
 
+              // Status text for the validation row
+              let validationStatusText: string | null = null;
+              if (phase === "validation") {
+                if (validationHasActivity) {
+                  validationStatusText = `Pool: ${validationPoolCount} article${validationPoolCount !== 1 ? "s" : ""} · ${validationRunCount} run${validationRunCount !== 1 ? "s" : ""}`;
+                } else if (evaluationReady) {
+                  validationStatusText = "Not started";
+                }
+              }
+
               const row = (
                 <div style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -153,13 +179,13 @@ export default async function CraftModulePage() {
                       width: "26px", height: "26px", borderRadius: "50%", flexShrink: 0,
                       display: "flex", alignItems: "center", justifyContent: "center",
                       fontSize: "11px", fontWeight: 700,
-                      background: isActive ? "#E83B2A" : isDone ? "#059669" : isReachable ? "#fff" : "#e5e7eb",
-                      color: (isActive || isDone) ? "#fff" : isReachable ? "#E83B2A" : "#94a3b8",
+                      background: effectiveActive ? "#E83B2A" : isDone ? "#059669" : isReachable ? "#fff" : "#e5e7eb",
+                      color: (effectiveActive || isDone) ? "#fff" : isReachable ? "#E83B2A" : "#94a3b8",
                       border: isReachable ? "1.5px solid #E83B2A" : "none",
                     }}>
                       {isDone ? "✓" : i + 1}
                     </span>
-                    <span style={{ fontSize: "14px", fontWeight: isActive ? 500 : 400, color: isDone ? "#374151" : (isActive || isReachable) ? "#1a1a1a" : "#94a3b8" }}>
+                    <span style={{ fontSize: "14px", fontWeight: effectiveActive ? 500 : 400, color: isDone ? "#374151" : (effectiveActive || isReachable) ? "#1a1a1a" : "#94a3b8" }}>
                       {PHASE_LABELS[phase]}
                     </span>
                   </div>
@@ -184,7 +210,12 @@ export default async function CraftModulePage() {
                         {evalStatusText}
                       </span>
                     )}
-                    {isActive && href && (hasInnerLink
+                    {phase === "validation" && validationStatusText && (
+                      <span style={{ fontSize: "11px", color: isValidationActive ? "#5a6a85" : "#94a3b8" }}>
+                        {validationStatusText}
+                      </span>
+                    )}
+                    {effectiveActive && href && (hasInnerLink
                       ? <Link href={href} style={{ fontSize: "13px", color: "#E83B2A", textDecoration: "none" }}>Open →</Link>
                       : <span style={{ fontSize: "13px", color: "#E83B2A" }}>Open →</span>
                     )}
