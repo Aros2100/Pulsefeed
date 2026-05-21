@@ -7,7 +7,6 @@ import { computeOutcome } from "@/lib/lab/value-scoring/validation";
 const schema = z.object({
   itemId:         z.string().uuid(),
   choiceLow:      z.enum(['new', 'anchor']),
-  choiceSame:     z.enum(['new', 'anchor']),
   choiceHigh:     z.enum(['new', 'anchor']),
   validatorNotes: z.string().nullable().optional(),
 });
@@ -32,10 +31,10 @@ export async function POST(
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: parsed.error.message }, { status: 400 });
   }
-  const { itemId, choiceLow, choiceSame, choiceHigh, validatorNotes } = parsed.data;
+  const { itemId, choiceLow, choiceHigh, validatorNotes } = parsed.data;
 
   try {
-    const outcome = computeOutcome(choiceLow, choiceSame, choiceHigh);
+    const outcome = computeOutcome(choiceLow, choiceHigh);
     const now = new Date().toISOString();
 
     // Update the item
@@ -43,7 +42,6 @@ export async function POST(
       .from('lab_value_validation_items')
       .update({
         choice_low:      choiceLow,
-        choice_same:     choiceSame,
         choice_high:     choiceHigh,
         outcome,
         validator_notes: validatorNotes ?? null,

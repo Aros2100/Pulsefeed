@@ -19,40 +19,36 @@ export type ValidationStatus = 'pending' | 'scoring' | 'validating' | 'complete'
 export type ValidationOutcome = 'agree' | 'overscored' | 'underscored' | 'mixed';
 
 /**
- * Compute the validation outcome from the three anchor comparisons.
+ * Compute the validation outcome from two anchor comparisons (lower and upper).
+ * 'new' means the human judged the new article as higher craft than the anchor.
  *
- * choice_low / choice_same / choice_high are each 'new' or 'anchor'.
- * 'new' means the human said the new (validation) article is better than the anchor.
- *
- *   newWins === 3 → 'underscored'  (new article beat all anchors — scored too low)
- *   newWins === 0 → 'overscored'   (new article lost to all anchors — scored too high)
- *   low === 'new' && high === 'anchor' → 'agree'  (correct relative position)
- *   else → 'mixed'
+ *   both 'new'    → 'underscored'  (prompt scored too low)
+ *   both 'anchor' → 'overscored'   (prompt scored too high)
+ *   low='new', high='anchor' → 'agree'   (correct relative position)
+ *   low='anchor', high='new' → 'mixed'   (inconsistent / rare)
  */
-export function computeOutcome(low: string, same: string, high: string): ValidationOutcome {
-  const newWins = [low, same, high].filter(c => c === 'new').length;
-  if (newWins === 3) return 'underscored';
-  if (newWins === 0) return 'overscored';
-  if (low === 'new' && high === 'anchor') return 'agree';
+export function computeOutcome(low: string, high: string): ValidationOutcome {
+  if (low === 'new'    && high === 'new')    return 'underscored';
+  if (low === 'anchor' && high === 'anchor') return 'overscored';
+  if (low === 'new'    && high === 'anchor') return 'agree';
   return 'mixed';
 }
 
 /**
- * Select three anchor articles from lab_value_article_scores for the given prompt.
- * Uses craft_score bands of size 10:
- *   band = floor(craftScore / 10) * 10
- *   low  band = [band - 10, band)
- *   same band = [band, band + 10)
- *   high band = [band + 10, band + 20)
+ * Select two anchor articles for a new article with the given craft_score X.
  *
- * Falls back to nearest scored article if band is empty.
+ *   Lower anchor: craft_score in [X−15, X−10]
+ *   Upper anchor: craft_score in [X+10, X+15]
+ *
+ * If the initial window is empty, the outer bound expands by 5 each iteration
+ * (lower expands downward, upper expands upward) until an article is found.
+ * Final fallback: nearest article below / above X regardless of distance.
  */
 export async function selectAnchors(
   db: Db,
   promptId: string,
   craftScore: number,
-): Promise<{ lowId: string | null; sameId: string | null; highId: string | null }> {
-  // Fetch all scored rows for this prompt (use range to bypass PostgREST 1000-row cap)
+): Promise<{ lowId: string | null; highId: string | null }> {
   const { data: rows } = await db
     .from('lab_value_article_scores')
     .select('article_id, craft_score')
@@ -61,48 +57,48 @@ export async function selectAnchors(
     .range(0, 9999);
 
   type ScoreRow = { article_id: string; craft_score: number | string };
-  const scored = ((rows ?? []) as ScoreRow[]).map(r => ({
-    article_id: r.article_id,
-    craft_score: Number(r.craft_score),
-  }));
+  const scored = ((rows ?? []) as ScoreRow[])
+    .map(r => ({ article_id: r.article_id, craft_score: Number(r.craft_score) }))
+    .filter(r => Number.isFinite(r.craft_score));
 
-  if (scored.length === 0) {
-    return { lowId: null, sameId: null, highId: null };
-  }
+  if (scored.length === 0) return { lowId: null, highId: null };
 
-  const band = Math.floor(craftScore / 10) * 10;
-
-  // Partition by band
-  const lowBand  = scored.filter(r => r.craft_score >= band - 10 && r.craft_score < band);
-  const sameBand = scored.filter(r => r.craft_score >= band       && r.craft_score < band + 10);
-  const highBand = scored.filter(r => r.craft_score >= band + 10  && r.craft_score < band + 20);
-
-  function pickRandom(arr: typeof scored): string | null {
-    if (arr.length === 0) return null;
-    return arr[Math.floor(Math.random() * arr.length)].article_id;
-  }
-
-  function pickNearest(target: number, exclude: Set<string>): string | null {
-    const candidates = scored.filter(r => !exclude.has(r.article_id));
+  function pickRandom(candidates: typeof scored): string | null {
     if (candidates.length === 0) return null;
-    candidates.sort((a, b) => Math.abs(a.craft_score - target) - Math.abs(b.craft_score - target));
-    return candidates[0].article_id;
+    return candidates[Math.floor(Math.random() * candidates.length)].article_id;
   }
 
-  const usedIds = new Set<string>();
+  // Lower anchor: [X−15, X−10], outer bound expands downward
+  let lowId: string | null = null;
+  for (let expansion = 0; expansion <= 100 && !lowId; expansion += 5) {
+    const lo = craftScore - 15 - expansion;
+    const hi = craftScore - 10;
+    lowId = pickRandom(scored.filter(r => r.craft_score >= lo && r.craft_score <= hi));
+  }
+  if (!lowId) {
+    // Fallback: nearest article strictly below X
+    const below = scored
+      .filter(r => r.craft_score < craftScore)
+      .sort((a, b) => b.craft_score - a.craft_score);
+    lowId = below[0]?.article_id ?? null;
+  }
 
-  // Try to pick from each band first; fall back to nearest
-  const lowId = pickRandom(lowBand) ?? pickNearest(band - 5, usedIds);
-  if (lowId) usedIds.add(lowId);
+  // Upper anchor: [X+10, X+15], outer bound expands upward
+  let highId: string | null = null;
+  for (let expansion = 0; expansion <= 100 && !highId; expansion += 5) {
+    const lo = craftScore + 10;
+    const hi = craftScore + 15 + expansion;
+    highId = pickRandom(scored.filter(r => r.craft_score >= lo && r.craft_score <= hi));
+  }
+  if (!highId) {
+    // Fallback: nearest article strictly above X
+    const above = scored
+      .filter(r => r.craft_score > craftScore)
+      .sort((a, b) => a.craft_score - b.craft_score);
+    highId = above[0]?.article_id ?? null;
+  }
 
-  const sameBandFiltered = sameBand.filter(r => !usedIds.has(r.article_id));
-  const sameId = pickRandom(sameBandFiltered) ?? pickNearest(band + 5, usedIds);
-  if (sameId) usedIds.add(sameId);
-
-  const highBandFiltered = highBand.filter(r => !usedIds.has(r.article_id));
-  const highId = pickRandom(highBandFiltered) ?? pickNearest(band + 15, usedIds);
-
-  return { lowId, sameId, highId };
+  return { lowId, highId };
 }
 
 /**
@@ -214,12 +210,11 @@ export async function scoreValidationRun(db: Db, runId: string): Promise<void> {
     const cs = Number(item.craft_score);
     if (!Number.isFinite(cs)) continue;
     try {
-      const { lowId, sameId, highId } = await selectAnchors(db, r.prompt_id, cs);
+      const { lowId, highId } = await selectAnchors(db, r.prompt_id, cs);
       await db
         .from('lab_value_validation_items')
         .update({
           anchor_low_id:  lowId,
-          anchor_same_id: sameId,
           anchor_high_id: highId,
         })
         .eq('id', item.id);

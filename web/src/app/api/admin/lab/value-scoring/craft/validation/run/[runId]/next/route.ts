@@ -28,7 +28,7 @@ export async function GET(
     // Find first item that is scored, has anchors assigned, but not yet validated
     const { data: item } = await admin
       .from('lab_value_validation_items')
-      .select('id, validation_article_id, craft_score, dimensions, reasoning, anchor_low_id, anchor_same_id, anchor_high_id')
+      .select('id, validation_article_id, craft_score, dimensions, reasoning, anchor_low_id, anchor_high_id')
       .eq('run_id', runId)
       .not('scored_at', 'is', null)
       .not('anchor_low_id', 'is', null)
@@ -48,7 +48,6 @@ export async function GET(
       dimensions: unknown;
       reasoning: string | null;
       anchor_low_id: string | null;
-      anchor_same_id: string | null;
       anchor_high_id: string | null;
     };
     const it = item as Item;
@@ -61,7 +60,7 @@ export async function GET(
       .maybeSingle();
 
     // Load anchor articles from lab_value_articles — full Article-compatible fields
-    const anchorIds = [it.anchor_low_id, it.anchor_same_id, it.anchor_high_id].filter(Boolean) as string[];
+    const anchorIds = [it.anchor_low_id, it.anchor_high_id].filter(Boolean) as string[];
 
     type AnchorRow = {
       id: string; pmid: string | null; title: string; journal: string | null;
@@ -124,7 +123,6 @@ export async function GET(
         reasoning:  it.reasoning,
         article:    valArt,
         anchorLow:  buildAnchor(it.anchor_low_id),
-        anchorSame: buildAnchor(it.anchor_same_id),
         anchorHigh: buildAnchor(it.anchor_high_id),
       },
     });

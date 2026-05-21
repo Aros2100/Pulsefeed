@@ -19,12 +19,11 @@ interface ValidationItem {
   reasoning:  string | null;
   article:    Article | null;
   anchorLow:  AnchorArticle | null;
-  anchorSame: AnchorArticle | null;
   anchorHigh: AnchorArticle | null;
 }
 
 interface Comparison {
-  type:   'low' | 'same' | 'high';
+  type:   'low' | 'high';
   anchor: AnchorArticle;
   choice: 'new' | 'anchor' | null;
 }
@@ -39,11 +38,10 @@ interface Props {
 
 const ACCENT = "#E83B2A";
 
-function computeOutcome(low: string, same: string, high: string): string {
-  const wins = [low, same, high].filter(c => c === 'new').length;
-  if (wins === 3) return 'underscored';
-  if (wins === 0) return 'overscored';
-  if (low === 'new' && high === 'anchor') return 'agree';
+function computeOutcome(low: string, high: string): string {
+  if (low === 'new'    && high === 'new')    return 'underscored';
+  if (low === 'anchor' && high === 'anchor') return 'overscored';
+  if (low === 'new'    && high === 'anchor') return 'agree';
   return 'mixed';
 }
 
@@ -58,13 +56,14 @@ const OUTCOME_LABELS: Record<string, string> = {
   agree: 'Agree', overscored: 'Overscored', underscored: 'Underscored', mixed: 'Mixed',
 };
 const OUTCOME_DESC: Record<string, string> = {
-  agree:       'The prompt placed this article correctly relative to the anchors.',
-  overscored:  'The prompt scored this article too high — it lost to all three anchors.',
-  underscored: 'The prompt scored this article too low — it beat all three anchors.',
+  agree:       'The prompt placed this article correctly relative to both anchors.',
+  overscored:  'The prompt scored this article too high — it lost to both anchors.',
+  underscored: 'The prompt scored this article too low — it beat both anchors.',
   mixed:       "The prompt's score was directionally inconsistent with the comparisons.",
 };
 const BAND_LABELS: Record<string, string> = {
-  low: 'Lower-band anchor', same: 'Same-band anchor', high: 'Upper-band anchor',
+  low:  'Lower anchor (−10 to −15)',
+  high: 'Upper anchor (+10 to +15)',
 };
 
 export default function ValidationRunClient({ runId, runStatus: initialStatus, nArticles }: Props) {
@@ -82,13 +81,9 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
   function buildComparisons(item: ValidationItem): Comparison[] {
     const entries: Comparison[] = [];
     if (item.anchorLow)  entries.push({ type: 'low',  anchor: item.anchorLow,  choice: null });
-    if (item.anchorSame) entries.push({ type: 'same', anchor: item.anchorSame, choice: null });
     if (item.anchorHigh) entries.push({ type: 'high', anchor: item.anchorHigh, choice: null });
-    // Fisher-Yates shuffle — band order invisible to validator
-    for (let i = entries.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [entries[i], entries[j]] = [entries[j], entries[i]];
-    }
+    // Randomise order so validator can't infer which is lower/upper
+    if (entries.length === 2 && Math.random() > 0.5) entries.reverse();
     return entries;
   }
 
@@ -180,7 +175,6 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
         body:    JSON.stringify({
           itemId:         currentItem.id,
           choiceLow:      m['low']  ?? 'anchor',
-          choiceSame:     m['same'] ?? 'anchor',
           choiceHigh:     m['high'] ?? 'anchor',
           validatorNotes: validatorNotes.trim() || null,
         }),
@@ -197,9 +191,9 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
   }
 
   const outcome = phase === 'outcome' ? (() => {
-    const m: Record<string, string> = { low: 'anchor', same: 'anchor', high: 'anchor' };
+    const m: Record<string, string> = { low: 'anchor', high: 'anchor' };
     for (const c of comparisons) m[c.type] = c.choice ?? 'anchor';
-    return computeOutcome(m.low, m.same, m.high);
+    return computeOutcome(m.low, m.high);
   })() : null;
 
   // ── Layout ────────────────────────────────────────────────────────────────
@@ -338,7 +332,7 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
               </div>
               {comparisons.map((comp, i) => {
                 const won      = comp.choice === 'new';
-                const expected = (comp.type === 'low' && won) || (comp.type === 'high' && !won) || comp.type === 'same';
+                const expected = (comp.type === 'low' && won) || (comp.type === 'high' && !won);
                 return (
                   <div key={i} style={{ padding: '14px 24px', borderBottom: i < comparisons.length - 1 ? '1px solid #f5f5f5' : 'none', display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', alignItems: 'start' }}>
                     <div>

@@ -236,9 +236,8 @@ export default async function ValidationDisagreementsPage({ searchParams }: Page
               const art        = valArtMap.get(item.validation_article_id);
               const promptId   = runPromptMap.get(item.run_id) ?? '';
               const anchors = [
-                { id: item.anchor_low_id,  label: 'Low',  choice: item.choice_low  },
-                { id: item.anchor_same_id, label: 'Same', choice: item.choice_same },
-                { id: item.anchor_high_id, label: 'High', choice: item.choice_high },
+                { id: item.anchor_low_id,  label: 'Lower', choice: item.choice_low  },
+                { id: item.anchor_high_id, label: 'Upper', choice: item.choice_high },
               ];
 
               return (

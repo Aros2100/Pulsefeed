@@ -138,10 +138,6 @@ export async function POST(req: Request) {
         const a = anchorMap[item.anchor_low_id];
         lines.push(`  Anchor-low (score ${a?.craft_score?.toFixed(1) ?? '?'}): "${a?.title}" → human chose: ${item.choice_low ?? '?'}`);
       }
-      if (item.anchor_same_id) {
-        const a = anchorMap[item.anchor_same_id];
-        lines.push(`  Anchor-same (score ${a?.craft_score?.toFixed(1) ?? '?'}): "${a?.title}" → human chose: ${item.choice_same ?? '?'}`);
-      }
       if (item.anchor_high_id) {
         const a = anchorMap[item.anchor_high_id];
         lines.push(`  Anchor-high (score ${a?.craft_score?.toFixed(1) ?? '?'}): "${a?.title}" → human chose: ${item.choice_high ?? '?'}`);
