@@ -57,7 +57,7 @@ export async function POST(req: Request) {
 
     const { data: itemRows } = await admin
       .from('lab_value_validation_items')
-      .select('id, validation_article_id, craft_score, reasoning, outcome, choice_low, choice_same, choice_high, anchor_low_id, anchor_same_id, anchor_high_id')
+      .select('id, validation_article_id, craft_score, reasoning, outcome, choice_low, choice_same, choice_high, anchor_low_id, anchor_same_id, anchor_high_id, validator_notes')
       .in('run_id', runIds)
       .not('outcome', 'is', null)
       .neq('outcome', 'agree')
@@ -75,6 +75,7 @@ export async function POST(req: Request) {
       anchor_low_id: string | null;
       anchor_same_id: string | null;
       anchor_high_id: string | null;
+      validator_notes: string | null;
     };
     const items = ((itemRows ?? []) as ItemRow[]);
 
@@ -131,7 +132,8 @@ export async function POST(req: Request) {
       const lines: string[] = [];
       lines.push(`Disagreement ${i + 1} (outcome: ${item.outcome})`);
       lines.push(`  Article: "${artTitle}" [${artType}] · craft_score=${cs}`);
-      if (item.reasoning) lines.push(`  Reasoning: ${item.reasoning.slice(0, 300)}`);
+      if (item.reasoning)        lines.push(`  Reasoning: ${item.reasoning.slice(0, 300)}`);
+      if (item.validator_notes)  lines.push(`  Validator note: ${item.validator_notes}`);
       if (item.anchor_low_id) {
         const a = anchorMap[item.anchor_low_id];
         lines.push(`  Anchor-low (score ${a?.craft_score?.toFixed(1) ?? '?'}): "${a?.title}" → human chose: ${item.choice_low ?? '?'}`);

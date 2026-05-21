@@ -68,14 +68,15 @@ const BAND_LABELS: Record<string, string> = {
 };
 
 export default function ValidationRunClient({ runId, runStatus: initialStatus, nArticles }: Props) {
-  const [phase,          setPhase]          = useState<Phase>(initialStatus === 'complete' ? 'done' : 'loading');
-  const [status,         setStatus]         = useState(initialStatus);
-  const [currentItem,    setCurrentItem]    = useState<ValidationItem | null>(null);
-  const [comparisons,    setComparisons]    = useState<Comparison[]>([]);
-  const [step,           setStep]           = useState(0);
-  const [error,          setError]          = useState<string | null>(null);
-  const [submitting,     setSubmitting]     = useState(false);
-  const [validatedCount, setValidatedCount] = useState(0);
+  const [phase,           setPhase]          = useState<Phase>(initialStatus === 'complete' ? 'done' : 'loading');
+  const [status,          setStatus]         = useState(initialStatus);
+  const [currentItem,     setCurrentItem]    = useState<ValidationItem | null>(null);
+  const [comparisons,     setComparisons]    = useState<Comparison[]>([]);
+  const [step,            setStep]           = useState(0);
+  const [error,           setError]          = useState<string | null>(null);
+  const [submitting,      setSubmitting]     = useState(false);
+  const [validatedCount,  setValidatedCount] = useState(0);
+  const [validatorNotes,  setValidatorNotes] = useState('');
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function buildComparisons(item: ValidationItem): Comparison[] {
@@ -105,6 +106,7 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
         setCurrentItem(json.item);
         setComparisons(buildComparisons(json.item));
         setStep(0);
+        setValidatorNotes('');
         setPhase('comparing');
       }
     } catch (e) {
@@ -176,10 +178,11 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
-          itemId:     currentItem.id,
-          choiceLow:  m['low']  ?? 'anchor',
-          choiceSame: m['same'] ?? 'anchor',
-          choiceHigh: m['high'] ?? 'anchor',
+          itemId:         currentItem.id,
+          choiceLow:      m['low']  ?? 'anchor',
+          choiceSame:     m['same'] ?? 'anchor',
+          choiceHigh:     m['high'] ?? 'anchor',
+          validatorNotes: validatorNotes.trim() || null,
         }),
       });
       const json = await res.json() as { ok: boolean; error?: string };
@@ -353,6 +356,20 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
                   </div>
                 );
               })}
+            </div>
+
+            {/* Validator notes */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#5a6a85', marginBottom: '6px' }}>
+                Notes <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: '#94a3b8' }}>(optional)</span>
+              </div>
+              <textarea
+                value={validatorNotes}
+                onChange={e => setValidatorNotes(e.target.value)}
+                placeholder="Why did you choose what you did? What's the underlying pattern?"
+                rows={3}
+                style={{ width: '100%', fontSize: '13px', padding: '10px 12px', border: '1px solid #dde3ed', borderRadius: '8px', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box', color: '#1a1a1a' }}
+              />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

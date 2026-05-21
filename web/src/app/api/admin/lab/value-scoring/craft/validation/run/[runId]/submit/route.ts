@@ -5,10 +5,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { computeOutcome } from "@/lib/lab/value-scoring/validation";
 
 const schema = z.object({
-  itemId:     z.string().uuid(),
-  choiceLow:  z.enum(['new', 'anchor']),
-  choiceSame: z.enum(['new', 'anchor']),
-  choiceHigh: z.enum(['new', 'anchor']),
+  itemId:         z.string().uuid(),
+  choiceLow:      z.enum(['new', 'anchor']),
+  choiceSame:     z.enum(['new', 'anchor']),
+  choiceHigh:     z.enum(['new', 'anchor']),
+  validatorNotes: z.string().nullable().optional(),
 });
 
 export async function POST(
@@ -31,7 +32,7 @@ export async function POST(
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: parsed.error.message }, { status: 400 });
   }
-  const { itemId, choiceLow, choiceSame, choiceHigh } = parsed.data;
+  const { itemId, choiceLow, choiceSame, choiceHigh, validatorNotes } = parsed.data;
 
   try {
     const outcome = computeOutcome(choiceLow, choiceSame, choiceHigh);
@@ -41,11 +42,12 @@ export async function POST(
     const { error: itemErr } = await admin
       .from('lab_value_validation_items')
       .update({
-        choice_low:   choiceLow,
-        choice_same:  choiceSame,
-        choice_high:  choiceHigh,
+        choice_low:      choiceLow,
+        choice_same:     choiceSame,
+        choice_high:     choiceHigh,
         outcome,
-        validated_at: now,
+        validator_notes: validatorNotes ?? null,
+        validated_at:    now,
       })
       .eq('id', itemId)
       .eq('run_id', runId);

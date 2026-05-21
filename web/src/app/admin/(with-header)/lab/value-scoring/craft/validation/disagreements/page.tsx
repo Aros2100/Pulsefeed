@@ -66,13 +66,14 @@ export default async function ValidationDisagreementsPage({ searchParams }: Page
     anchor_low_id: string | null;
     anchor_same_id: string | null;
     anchor_high_id: string | null;
+    validator_notes: string | null;
   };
 
   let items: ItemRow[] = [];
   if (runIds.length > 0) {
     let q = admin
       .from('lab_value_validation_items')
-      .select('id, run_id, validation_article_id, craft_score, dimensions, reasoning, outcome, choice_low, choice_same, choice_high, anchor_low_id, anchor_same_id, anchor_high_id')
+      .select('id, run_id, validation_article_id, craft_score, dimensions, reasoning, outcome, choice_low, choice_same, choice_high, anchor_low_id, anchor_same_id, anchor_high_id, validator_notes')
       .in('run_id', runIds)
       .not('outcome', 'is', null)
       .neq('outcome', 'agree');
@@ -272,6 +273,13 @@ export default async function ValidationDisagreementsPage({ searchParams }: Page
                     {item.reasoning && (
                       <div style={{ fontSize: '12px', color: '#5a6a85', lineHeight: 1.55, background: '#f8fafc', borderRadius: '6px', padding: '10px 12px', marginBottom: '14px' }}>
                         <span style={{ fontWeight: 600 }}>Reasoning: </span>{item.reasoning}
+                      </div>
+                    )}
+
+                    {/* Validator notes */}
+                    {item.validator_notes && (
+                      <div style={{ fontSize: '12px', color: '#1a1a1a', lineHeight: 1.55, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '10px 12px', marginBottom: '14px' }}>
+                        <span style={{ fontWeight: 600, color: '#92400e' }}>Note: </span>{item.validator_notes}
                       </div>
                     )}
 
