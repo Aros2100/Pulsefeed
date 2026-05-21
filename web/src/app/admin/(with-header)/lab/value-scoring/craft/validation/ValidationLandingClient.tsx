@@ -26,7 +26,7 @@ export default function ValidationLandingClient({ poolCount, promptOptions }: Pr
 
   // Start run form
   const [selectedPrompt, setSelectedPrompt] = useState(promptOptions[0]?.id ?? "");
-  const [nArticles,      setNArticles]      = useState(10);
+  const [nArticles,      setNArticles]      = useState(1);
   const [creating,       setCreating]       = useState(false);
   const [createError,    setCreateError]    = useState<string | null>(null);
 
