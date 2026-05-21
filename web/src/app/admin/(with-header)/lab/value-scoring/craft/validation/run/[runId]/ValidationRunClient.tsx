@@ -3,13 +3,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  ArticleCard,
   type Article,
+  fmtDate,
 } from "@/app/admin/(with-header)/lab/value-scoring/craft/pairwise/PairwiseClient";
 
-// Anchor extends Article with the craft_score used on the outcome screen
+// Article with abstract — used in the comparison view
+interface ArticleWithAbstract extends Article {
+  abstract: string | null;
+}
+
+// Anchor extends Article with craft_score (outcome screen) and abstract (comparison view)
 interface AnchorArticle extends Article {
   craft_score: number | null;
+  abstract:    string | null;
 }
 
 interface ValidationItem {
@@ -17,7 +23,7 @@ interface ValidationItem {
   craftScore: number | null;
   dimensions: Record<string, { score: number | null; status: string }> | null;
   reasoning:  string | null;
-  article:    Article | null;
+  article:    ArticleWithAbstract | null;
   anchorLow:  AnchorArticle | null;
   anchorHigh: AnchorArticle | null;
 }
@@ -245,20 +251,10 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
                 Which article demonstrates higher scientific craft?
               </div>
 
-              {/* Article cards — same grid as pairwise */}
+              {/* Article cards — show abstract, not AI-generated fields */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '0 8px', marginBottom: '8px' }}>
-                <ArticleCard
-                  article={currentItem.article!}
-                  chosen={false}
-                  onChoose={() => handleChoice('new')}
-                  loading={false}
-                />
-                <ArticleCard
-                  article={comp.anchor}
-                  chosen={false}
-                  onChoose={() => handleChoice('anchor')}
-                  loading={false}
-                />
+                <ValidationCard article={currentItem.article!} onChoose={() => handleChoice('new')} />
+                <ValidationCard article={comp.anchor}          onChoose={() => handleChoice('anchor')} />
               </div>
 
               {/* Back navigation — same bottom bar */}
@@ -401,6 +397,54 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
             ← Back to validation
           </Link>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Validation comparison card ────────────────────────────────────────────────
+// Shows abstract instead of AI-generated fields (short_headline, resume,
+// bottom_line, SARI). Used only in the comparison step, not the outcome screen.
+
+function ValidationCard({ article, onChoose }: {
+  article: ArticleWithAbstract | AnchorArticle;
+  onChoose: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const meta = [article.journal, fmtDate(article.published_date), article.article_type]
+    .filter(Boolean).join(' · ');
+  return (
+    <div
+      className="article-card"
+      onClick={onChoose}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background:    '#fff',
+        borderRadius:  '10px',
+        border:        hovered ? `2px solid ${ACCENT}` : '1px solid #e5e7eb',
+        boxShadow:     '0 1px 3px rgba(0,0,0,0.07)',
+        overflow:      'hidden',
+        cursor:        'pointer',
+        transition:    'border-color 0.1s',
+      }}
+    >
+      <div style={{ padding: '20px 24px' }}>
+        <div style={{ fontSize: '14px', fontWeight: 600, lineHeight: 1.4, marginBottom: '6px' }}>
+          {article.title}
+        </div>
+        <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '14px' }}>
+          {meta}
+        </div>
+        {article.abstract ? (
+          <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.6 }}>
+            {article.abstract}
+          </div>
+        ) : (
+          <div style={{ fontSize: '12px', color: '#bbb', fontStyle: 'italic' }}>
+            Abstract not available.
+          </div>
+        )}
       </div>
     </div>
   );

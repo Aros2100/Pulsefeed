@@ -52,19 +52,20 @@ export async function GET(
     };
     const it = item as Item;
 
-    // Load validation article (full Article-compatible fields + abstract)
+    // Load validation article
     const { data: valArt } = await admin
       .from('lab_value_validation_articles')
-      .select('id, pmid, title, journal, article_type, published_date, short_headline, resume, bottom_line, sari')
+      .select('id, pmid, title, journal, article_type, published_date, abstract, short_headline, resume, bottom_line, sari')
       .eq('id', it.validation_article_id)
       .maybeSingle();
 
-    // Load anchor articles from lab_value_articles — full Article-compatible fields
+    // Load anchor articles from lab_value_articles
     const anchorIds = [it.anchor_low_id, it.anchor_high_id].filter(Boolean) as string[];
 
     type AnchorRow = {
       id: string; pmid: string | null; title: string; journal: string | null;
       article_type: string | null; published_date: string | null;
+      abstract: string | null;
       short_headline: string | null; resume: string | null; bottom_line: string | null;
       sari: { subject?: string; action?: string; result?: string; implication?: string } | null;
     };
@@ -72,7 +73,7 @@ export async function GET(
     if (anchorIds.length > 0) {
       const { data: anchorRows } = await admin
         .from('lab_value_articles')
-        .select('id, pmid, title, journal, article_type, published_date, short_headline, resume, bottom_line, sari')
+        .select('id, pmid, title, journal, article_type, published_date, abstract, short_headline, resume, bottom_line, sari')
         .in('id', anchorIds);
       for (const a of ((anchorRows ?? []) as AnchorRow[])) {
         anchorRowMap.set(a.id, a);
@@ -104,6 +105,7 @@ export async function GET(
         journal:        row.journal,
         article_type:   row.article_type,
         published_date: row.published_date,
+        abstract:       row.abstract,
         short_headline: row.short_headline,
         resume:         row.resume,
         bottom_line:    row.bottom_line,
