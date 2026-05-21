@@ -183,6 +183,7 @@ export default async function ValidationIndexPage() {
                   <th style={thStyle}>Prompt</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Validated</th>
                   <th style={{ ...thStyle, textAlign: 'right', color: '#059669' }}>Agree</th>
+                  <th style={{ ...thStyle, textAlign: 'right', color: '#059669' }}>Agree %</th>
                   <th style={{ ...thStyle, textAlign: 'right', color: '#b91c1c' }}>Overscored</th>
                   <th style={{ ...thStyle, textAlign: 'right', color: '#2563eb' }}>Underscored</th>
                   <th style={{ ...thStyle, textAlign: 'right', color: '#92400e' }}>Mixed</th>
@@ -196,6 +197,9 @@ export default async function ValidationIndexPage() {
                     <td style={{ ...tdStyle, fontWeight: 600 }}>v{s.version}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{s.validated}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#059669', fontWeight: s.agree > 0 ? 600 : 400 }}>{s.agree}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#059669', fontWeight: 600 }}>
+                      {s.validated > 0 ? `${Math.round(s.agree / s.validated * 100)}%` : '—'}
+                    </td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#b91c1c', fontWeight: s.overscored > 0 ? 600 : 400 }}>{s.overscored}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#2563eb', fontWeight: s.underscored > 0 ? 600 : 400 }}>{s.underscored}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#92400e', fontWeight: s.mixed > 0 ? 600 : 400 }}>{s.mixed}</td>
