@@ -403,8 +403,7 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
 }
 
 // ── Validation comparison card ────────────────────────────────────────────────
-// Shows abstract instead of AI-generated fields (short_headline, resume,
-// bottom_line, SARI). Used only in the comparison step, not the outcome screen.
+// Shows: title · meta · SARI · abstract. No short_headline / resume / bottom_line.
 
 function ValidationCard({ article, onChoose }: {
   article: ArticleWithAbstract | AnchorArticle;
@@ -413,6 +412,7 @@ function ValidationCard({ article, onChoose }: {
   const [hovered, setHovered] = useState(false);
   const meta = [article.journal, fmtDate(article.published_date), article.article_type]
     .filter(Boolean).join(' · ');
+  const sari = article.sari;
   return (
     <div
       className="article-card"
@@ -420,13 +420,13 @@ function ValidationCard({ article, onChoose }: {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background:    '#fff',
-        borderRadius:  '10px',
-        border:        hovered ? `2px solid ${ACCENT}` : '1px solid #e5e7eb',
-        boxShadow:     '0 1px 3px rgba(0,0,0,0.07)',
-        overflow:      'hidden',
-        cursor:        'pointer',
-        transition:    'border-color 0.1s',
+        background:   '#fff',
+        borderRadius: '10px',
+        border:       hovered ? `2px solid ${ACCENT}` : '1px solid #e5e7eb',
+        boxShadow:    '0 1px 3px rgba(0,0,0,0.07)',
+        overflow:     'hidden',
+        cursor:       'pointer',
+        transition:   'border-color 0.1s',
       }}
     >
       <div style={{ padding: '20px 24px' }}>
@@ -436,8 +436,29 @@ function ValidationCard({ article, onChoose }: {
         <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '14px' }}>
           {meta}
         </div>
+
+        {/* SARI */}
+        {sari && (
+          <div style={{ borderTop: '1px solid #ebebeb', paddingTop: '12px', marginTop: '0', marginBottom: '14px' }}>
+            <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#5a6a85', marginBottom: '8px' }}>SARI</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: '#fafafa', borderRadius: '6px', padding: '12px' }}>
+              {(['subject', 'action', 'result', 'implication'] as const).map(key => (
+                <div key={key}>
+                  <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '3px' }}>
+                    {key.charAt(0).toUpperCase() + key.slice(1)}
+                  </div>
+                  <div style={{ fontSize: '12px', color: sari[key] ? '#374151' : '#bbb', lineHeight: 1.5 }}>
+                    {sari[key] ?? '—'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Abstract */}
         {article.abstract ? (
-          <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.6 }}>
+          <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.6, borderTop: sari ? '1px solid #ebebeb' : 'none', paddingTop: sari ? '12px' : 0 }}>
             {article.abstract}
           </div>
         ) : (
