@@ -6,8 +6,8 @@ import { computeOutcome } from "@/lib/lab/value-scoring/validation";
 
 const schema = z.object({
   itemId:         z.string().uuid(),
-  choiceLow:      z.enum(['new', 'anchor']),
-  choiceHigh:     z.enum(['new', 'anchor']),
+  choiceLow:      z.enum(['new', 'anchor']).optional(),
+  choiceHigh:     z.enum(['new', 'anchor']).optional(),
   validatorNotes: z.string().nullable().optional(),
 });
 
@@ -34,15 +34,15 @@ export async function POST(
   const { itemId, choiceLow, choiceHigh, validatorNotes } = parsed.data;
 
   try {
-    const outcome = computeOutcome(choiceLow, choiceHigh);
+    const outcome = computeOutcome(choiceLow ?? null, choiceHigh ?? null);
     const now = new Date().toISOString();
 
-    // Update the item
+    // Update the item — only set the choice fields that were actually provided
     const { error: itemErr } = await admin
       .from('lab_value_validation_items')
       .update({
-        choice_low:      choiceLow,
-        choice_high:     choiceHigh,
+        ...(choiceLow  !== undefined ? { choice_low:  choiceLow  } : {}),
+        ...(choiceHigh !== undefined ? { choice_high: choiceHigh } : {}),
         outcome,
         validator_notes: validatorNotes ?? null,
         validated_at:    now,

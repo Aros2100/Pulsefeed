@@ -44,11 +44,24 @@ interface Props {
 
 const ACCENT = "#E83B2A";
 
-function computeOutcome(low: string, high: string): string {
-  if (low === 'new'    && high === 'new')    return 'underscored';
-  if (low === 'anchor' && high === 'anchor') return 'overscored';
-  if (low === 'new'    && high === 'anchor') return 'agree';
-  return 'mixed';
+function computeOutcome(low: 'new' | 'anchor' | null, high: 'new' | 'anchor' | null): string {
+  if (low !== null && high !== null) {
+    if (low === 'new'    && high === 'new')    return 'underscored';
+    if (low === 'anchor' && high === 'anchor') return 'overscored';
+    if (low === 'new'    && high === 'anchor') return 'agree';
+    return 'mixed';
+  }
+  if (low  !== null) return low  === 'new'    ? 'agree' : 'overscored';
+  if (high !== null) return high === 'anchor' ? 'agree' : 'underscored';
+  return 'agree';
+}
+
+function outcomeDesc(outcome: string, hasLow: boolean, hasHigh: boolean): string {
+  const anchors = hasLow && hasHigh ? 'both anchors' : hasLow ? 'the lower anchor' : 'the upper anchor';
+  if (outcome === 'agree')       return `The prompt placed this article correctly relative to ${anchors}.`;
+  if (outcome === 'overscored')  return `The prompt scored this article too high — it lost to ${anchors}.`;
+  if (outcome === 'underscored') return `The prompt scored this article too low — it beat ${anchors}.`;
+  return "The prompt's score was directionally inconsistent with the comparisons.";
 }
 
 function outcomeAccent(o: string) {
@@ -60,12 +73,6 @@ function outcomeAccent(o: string) {
 
 const OUTCOME_LABELS: Record<string, string> = {
   agree: 'Agree', overscored: 'Overscored', underscored: 'Underscored', mixed: 'Mixed',
-};
-const OUTCOME_DESC: Record<string, string> = {
-  agree:       'The prompt placed this article correctly relative to both anchors.',
-  overscored:  'The prompt scored this article too high — it lost to both anchors.',
-  underscored: 'The prompt scored this article too low — it beat both anchors.',
-  mixed:       "The prompt's score was directionally inconsistent with the comparisons.",
 };
 const BAND_LABELS: Record<string, string> = {
   low:  'Lower anchor (−10 to −15)',
@@ -180,8 +187,8 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
           itemId:         currentItem.id,
-          choiceLow:      m['low']  ?? 'anchor',
-          choiceHigh:     m['high'] ?? 'anchor',
+          ...(m['low']  !== undefined ? { choiceLow:  m['low']  } : {}),
+          ...(m['high'] !== undefined ? { choiceHigh: m['high'] } : {}),
           validatorNotes: validatorNotes.trim() || null,
         }),
       });
@@ -196,11 +203,12 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
     }
   }
 
-  const outcome = phase === 'outcome' ? (() => {
-    const m: Record<string, string> = { low: 'anchor', high: 'anchor' };
-    for (const c of comparisons) m[c.type] = c.choice ?? 'anchor';
-    return computeOutcome(m.low, m.high);
-  })() : null;
+  const lowComp  = comparisons.find(c => c.type === 'low');
+  const highComp = comparisons.find(c => c.type === 'high');
+  const outcome = phase === 'outcome' ? computeOutcome(
+    lowComp  ? (lowComp.choice  ?? 'anchor') : null,
+    highComp ? (highComp.choice ?? 'anchor') : null,
+  ) : null;
 
   // ── Layout ────────────────────────────────────────────────────────────────
 
@@ -281,7 +289,7 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
               <div style={{ display: 'inline-block', background: outcomeAccent(outcome), color: '#fff', fontWeight: 700, fontSize: '13px', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '8px 22px', borderRadius: '8px', marginBottom: '8px' }}>
                 {OUTCOME_LABELS[outcome]}
               </div>
-              <div style={{ fontSize: '13px', color: '#5a6a85' }}>{OUTCOME_DESC[outcome]}</div>
+              <div style={{ fontSize: '13px', color: '#5a6a85' }}>{outcomeDesc(outcome, !!lowComp, !!highComp)}</div>
             </div>
 
             {/* New article details */}
@@ -346,6 +354,16 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
                   </div>
                 );
               })}
+              {!lowComp && (
+                <div style={{ padding: '10px 24px', fontSize: '12px', color: '#94a3b8', fontStyle: 'italic', borderTop: comparisons.length > 0 ? '1px solid #f5f5f5' : 'none' }}>
+                  No lower anchor — this article scored below all calibrated references (no sample article within −10 to −15 points).
+                </div>
+              )}
+              {!highComp && (
+                <div style={{ padding: '10px 24px', fontSize: '12px', color: '#94a3b8', fontStyle: 'italic', borderTop: comparisons.length > 0 ? '1px solid #f5f5f5' : 'none' }}>
+                  No upper anchor — this article scored above all calibrated references (no sample article within +10 to +15 points).
+                </div>
+              )}
             </div>
 
             {/* Validator notes */}

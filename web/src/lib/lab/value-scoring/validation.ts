@@ -19,30 +19,43 @@ export type ValidationStatus = 'pending' | 'scoring' | 'validating' | 'complete'
 export type ValidationOutcome = 'agree' | 'overscored' | 'underscored' | 'mixed';
 
 /**
- * Compute the validation outcome from two anchor comparisons (lower and upper).
- * 'new' means the human judged the new article as higher craft than the anchor.
+ * Compute the validation outcome. Pass null for an anchor that was not available.
  *
- *   both 'new'    → 'underscored'  (prompt scored too low)
- *   both 'anchor' → 'overscored'   (prompt scored too high)
- *   low='new', high='anchor' → 'agree'   (correct relative position)
- *   low='anchor', high='new' → 'mixed'   (inconsistent / rare)
+ * Both anchors present:
+ *   new+new → underscored | anchor+anchor → overscored
+ *   new+anchor → agree    | anchor+new   → mixed
+ *
+ * Only lower anchor:
+ *   low=new → agree (article sits above lower as expected)
+ *   low=anchor → overscored (article lost to lower anchor)
+ *
+ * Only upper anchor:
+ *   high=anchor → agree (article sits below upper as expected)
+ *   high=new → underscored (article beat upper anchor)
  */
-export function computeOutcome(low: string, high: string): ValidationOutcome {
-  if (low === 'new'    && high === 'new')    return 'underscored';
-  if (low === 'anchor' && high === 'anchor') return 'overscored';
-  if (low === 'new'    && high === 'anchor') return 'agree';
-  return 'mixed';
+export function computeOutcome(
+  low:  'new' | 'anchor' | null,
+  high: 'new' | 'anchor' | null,
+): ValidationOutcome {
+  if (low !== null && high !== null) {
+    if (low === 'new'    && high === 'new')    return 'underscored';
+    if (low === 'anchor' && high === 'anchor') return 'overscored';
+    if (low === 'new'    && high === 'anchor') return 'agree';
+    return 'mixed';
+  }
+  if (low  !== null) return low  === 'new'    ? 'agree' : 'overscored';
+  if (high !== null) return high === 'anchor' ? 'agree' : 'underscored';
+  return 'agree';
 }
 
 /**
- * Select two anchor articles for a new article with the given craft_score X.
+ * Select anchor articles for a new article with the given craft_score X.
  *
- *   Lower anchor: craft_score in [X−15, X−10]
- *   Upper anchor: craft_score in [X+10, X+15]
+ *   Lower anchor: craft_score strictly in [X−15, X−10]
+ *   Upper anchor: craft_score strictly in [X+10, X+15]
  *
- * If the initial window is empty, the outer bound expands by 5 each iteration
- * (lower expands downward, upper expands upward) until an article is found.
- * Final fallback: nearest article below / above X regardless of distance.
+ * No expansion, no fallback. If no article exists in the window, returns null
+ * for that anchor so the validation run can proceed with a single comparison.
  */
 export async function selectAnchors(
   db: Db,
@@ -68,35 +81,12 @@ export async function selectAnchors(
     return candidates[Math.floor(Math.random() * candidates.length)].article_id;
   }
 
-  // Lower anchor: [X−15, X−10], outer bound expands downward
-  let lowId: string | null = null;
-  for (let expansion = 0; expansion <= 100 && !lowId; expansion += 5) {
-    const lo = craftScore - 15 - expansion;
-    const hi = craftScore - 10;
-    lowId = pickRandom(scored.filter(r => r.craft_score >= lo && r.craft_score <= hi));
-  }
-  if (!lowId) {
-    // Fallback: nearest article strictly below X
-    const below = scored
-      .filter(r => r.craft_score < craftScore)
-      .sort((a, b) => b.craft_score - a.craft_score);
-    lowId = below[0]?.article_id ?? null;
-  }
-
-  // Upper anchor: [X+10, X+15], outer bound expands upward
-  let highId: string | null = null;
-  for (let expansion = 0; expansion <= 100 && !highId; expansion += 5) {
-    const lo = craftScore + 10;
-    const hi = craftScore + 15 + expansion;
-    highId = pickRandom(scored.filter(r => r.craft_score >= lo && r.craft_score <= hi));
-  }
-  if (!highId) {
-    // Fallback: nearest article strictly above X
-    const above = scored
-      .filter(r => r.craft_score > craftScore)
-      .sort((a, b) => a.craft_score - b.craft_score);
-    highId = above[0]?.article_id ?? null;
-  }
+  const lowId  = pickRandom(scored.filter(r =>
+    r.craft_score >= craftScore - 15 && r.craft_score <= craftScore - 10
+  ));
+  const highId = pickRandom(scored.filter(r =>
+    r.craft_score >= craftScore + 10 && r.craft_score <= craftScore + 15
+  ));
 
   return { lowId, highId };
 }
