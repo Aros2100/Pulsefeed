@@ -14,7 +14,7 @@ import { SCORING_CONCURRENCY } from "@/lib/lab/value-scoring/craft-config";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = any;
 
-export type ValidationStatus = 'pending' | 'scoring' | 'validating' | 'complete';
+export type ValidationStatus = 'pending' | 'scoring' | 'scoring_failed' | 'validating' | 'complete';
 
 export type ValidationOutcome = 'agree' | 'overscored' | 'underscored' | 'mixed';
 
@@ -126,12 +126,12 @@ export async function scoreValidationRun(db: Db, runId: string): Promise<void> {
   // 4. Parse weights
   const weights = parseWeightsFromPrompt(p.prompt_text);
 
-  // 5. Load unscored items with their validation article info
+  // 5. Load items without a successful score (covers first attempt AND retries after failures)
   const { data: rawItems } = await db
     .from('lab_value_validation_items')
     .select('id, validation_article_id')
     .eq('run_id', runId)
-    .is('scored_at', null);
+    .is('craft_score', null);
 
   type ItemRow = { id: string; validation_article_id: string };
   const items = ((rawItems ?? []) as ItemRow[]);
@@ -175,22 +175,46 @@ export async function scoreValidationRun(db: Db, runId: string): Promise<void> {
               dimensions,
               reasoning,
               scored_at:   new Date().toISOString(),
+              score_error: null,
             })
             .eq('id', item.id);
         } catch (err) {
-          // Log but don't abort the whole run
-          console.error(`[scoreValidationRun] item ${item.id} failed:`, err instanceof Error ? err.message : err);
+          const errMsg = err instanceof Error ? err.message : String(err);
+          console.error(`[scoreValidationRun] item ${item.id} failed:`, errMsg);
+          // Mark item so its failure is visible and the run can still transition
+          await db
+            .from('lab_value_validation_items')
+            .update({
+              scored_at:   new Date().toISOString(),
+              score_error: errMsg.slice(0, 500),
+            })
+            .eq('id', item.id);
         }
       }));
     }
   }
 
-  // 7. Assign anchors for every scored item that doesn't have anchors yet
+  // 7. Gate: if zero items have a valid score, the entire batch failed
+  const { count: successCount } = await db
+    .from('lab_value_validation_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('run_id', runId)
+    .not('craft_score', 'is', null);
+
+  if ((successCount ?? 0) === 0) {
+    await db
+      .from('lab_value_validation_runs')
+      .update({ status: 'scoring_failed' })
+      .eq('id', runId);
+    return;
+  }
+
+  // 8. Assign anchors for successfully scored items that don't have anchors yet
   const { data: scoredItems } = await db
     .from('lab_value_validation_items')
     .select('id, craft_score')
     .eq('run_id', runId)
-    .not('scored_at', 'is', null)
+    .not('craft_score', 'is', null)
     .is('anchor_low_id', null);
 
   type ScoredItem = { id: string; craft_score: number | string | null };

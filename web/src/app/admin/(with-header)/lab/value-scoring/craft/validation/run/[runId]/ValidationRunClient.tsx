@@ -34,7 +34,7 @@ interface Comparison {
   choice: 'new' | 'anchor' | null;
 }
 
-type Phase = 'loading' | 'scoring' | 'comparing' | 'outcome' | 'done';
+type Phase = 'loading' | 'scoring' | 'comparing' | 'outcome' | 'done' | 'error';
 
 interface Props {
   runId:     string;
@@ -80,7 +80,10 @@ const BAND_LABELS: Record<string, string> = {
 };
 
 export default function ValidationRunClient({ runId, runStatus: initialStatus, nArticles }: Props) {
-  const [phase,           setPhase]          = useState<Phase>(initialStatus === 'complete' ? 'done' : 'loading');
+  const [phase,           setPhase]          = useState<Phase>(
+    initialStatus === 'complete'        ? 'done'  :
+    initialStatus === 'scoring_failed'  ? 'error' : 'loading'
+  );
   const [status,          setStatus]         = useState(initialStatus);
   const [currentItem,     setCurrentItem]    = useState<ValidationItem | null>(null);
   const [comparisons,     setComparisons]    = useState<Comparison[]>([]);
@@ -108,7 +111,9 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
       const json = await res.json() as { ok: boolean; done?: boolean; runStatus?: string; item?: ValidationItem; error?: string };
       if (!json.ok) { setError(json.error ?? 'Failed to load next item'); return; }
       if (json.runStatus) setStatus(json.runStatus);
-      if (json.done) {
+      if (json.runStatus === 'scoring_failed') {
+        setPhase('error');
+      } else if (json.done) {
         setPhase('done');
       } else if (json.item) {
         setCurrentItem(json.item);
@@ -143,7 +148,10 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
       const json = await res.json() as { ok: boolean; runStatus?: string; done?: boolean; item?: ValidationItem };
       if (!json.ok) return;
       if (json.runStatus) setStatus(json.runStatus);
-      if (json.runStatus === 'validating' || json.runStatus === 'complete') {
+      if (json.runStatus === 'scoring_failed') {
+        setStatus('scoring_failed');
+        setPhase('error');
+      } else if (json.runStatus === 'validating' || json.runStatus === 'complete') {
         if (json.done) setPhase('done');
         else if (json.item) {
           setCurrentItem(json.item);
@@ -159,10 +167,11 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
   }, [runId]);
 
   useEffect(() => {
-    if      (initialStatus === 'pending')    void triggerScoring();
-    else if (initialStatus === 'scoring')  { setPhase('scoring'); pollRef.current = setTimeout(pollStatus, 3000); }
-    else if (initialStatus === 'validating') void fetchNext();
-    else if (initialStatus === 'complete')   setPhase('done');
+    if      (initialStatus === 'pending')         void triggerScoring();
+    else if (initialStatus === 'scoring')       { setPhase('scoring'); pollRef.current = setTimeout(pollStatus, 3000); }
+    else if (initialStatus === 'validating')      void fetchNext();
+    else if (initialStatus === 'complete')        setPhase('done');
+    else if (initialStatus === 'scoring_failed')  setPhase('error');
     return () => { if (pollRef.current) clearTimeout(pollRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -219,6 +228,26 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
         {error && (
           <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '12px 16px', margin: '24px 24px 0', fontSize: '13px', color: '#b91c1c' }}>
             {error}
+          </div>
+        )}
+
+        {/* ── Scoring failed ────────────────────────────────────────────── */}
+        {phase === 'error' && (
+          <div style={{ padding: '24px' }}>
+            <div style={{ background: '#fff', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.07)', padding: '48px', textAlign: 'center' }}>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: '#b91c1c', marginBottom: '10px' }}>
+                Scoring failed
+              </div>
+              <p style={{ fontSize: '13px', color: '#5a6a85', marginBottom: '24px', maxWidth: '360px', margin: '0 auto 24px' }}>
+                No articles could be scored. This is usually caused by a missing Weights section in the prompt, or a temporary API error.
+              </p>
+              <button
+                onClick={() => void triggerScoring()}
+                style={{ background: ACCENT, color: '#fff', border: 'none', borderRadius: '6px', padding: '10px 22px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                Retry scoring →
+              </button>
+            </div>
           </div>
         )}
 
