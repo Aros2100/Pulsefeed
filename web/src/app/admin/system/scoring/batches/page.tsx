@@ -36,13 +36,9 @@ export default async function BatchesPage() {
   const admin = createAdminClient() as any;
   const specialty = ACTIVE_SPECIALTY;
 
-  // Pending specialty count — same query as scoring/page.tsx
-  const { count: pendingCount } = await admin
-    .from("article_specialties")
-    .select("*", { count: "exact", head: true })
-    .eq("specialty", specialty)
-    .eq("source", "c2_filter")
-    .is("specialty_match", null);
+  // Pending specialty count — uses RPC to exclude articles missing abstract
+  const { data: pendingRaw } = await admin.rpc("count_specialty_unscored", { p_specialty: specialty });
+  const pendingCount = pendingRaw ?? 0;
 
   // Active prompt version for specialty
   const { data: promptRow } = await admin
