@@ -126,9 +126,14 @@ export default async function ValidationIndexPage() {
       s.pending++;
     }
   }
-  // First (oldest, asc-sorted) non-complete run per prompt → link for continuing
+  // Oldest run (asc-sorted) that has at least one scored-but-unvalidated item
+  const runsWithPending = new Set(
+    allItems
+      .filter(i => i.craft_score !== null && i.validated_at === null)
+      .map(i => i.run_id)
+  );
   for (const run of runs) {
-    if (run.status !== 'complete') {
+    if (runsWithPending.has(run.id)) {
       const s = statsByPrompt.get(run.prompt_id);
       if (s && s.oldestActiveRunId === null) s.oldestActiveRunId = run.id;
     }
@@ -206,7 +211,7 @@ export default async function ValidationIndexPage() {
                     <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                       {s.pending > 0 && s.oldestActiveRunId ? (
                         <Link href={`/admin/lab/value-scoring/craft/validation/run/${s.oldestActiveRunId}`} style={{ color: '#E83B2A', textDecoration: 'none', fontWeight: 600 }}>
-                          {s.pending} pending →
+                          {s.pending}
                         </Link>
                       ) : (
                         <span style={{ color: '#94a3b8' }}>{s.pending > 0 ? s.pending : '—'}</span>
