@@ -25,13 +25,14 @@ export async function GET(
     type Run = { id: string; prompt_id: string; status: string };
     const r = run as Run;
 
-    // Find first item that is scored, has anchors assigned, but not yet validated
+    // Find first item that is scored, has at least one anchor, and is not yet validated.
+    // Items where both anchors are null (anchor assignment failed) are skipped.
     const { data: item } = await admin
       .from('lab_value_validation_items')
       .select('id, validation_article_id, craft_score, dimensions, reasoning, anchor_low_id, anchor_high_id')
       .eq('run_id', runId)
-      .not('scored_at', 'is', null)
-      .not('anchor_low_id', 'is', null)
+      .not('craft_score', 'is', null)
+      .or('anchor_low_id.not.is.null,anchor_high_id.not.is.null')
       .is('validated_at', null)
       .order('id', { ascending: true })
       .limit(1)
