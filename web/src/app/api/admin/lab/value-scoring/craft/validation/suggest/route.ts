@@ -57,7 +57,7 @@ export async function POST(req: Request) {
 
     const { data: itemRows } = await admin
       .from('lab_value_validation_items')
-      .select('id, validation_article_id, craft_score, reasoning, outcome, choice_low, choice_same, choice_high, anchor_low_id, anchor_same_id, anchor_high_id, validator_notes')
+      .select('id, validation_article_id, craft_score, reasoning, outcome, choice_low, choice_same, choice_high, anchor_low_id, anchor_same_id, anchor_high_id, anchor_id, anchor_side, choice, validator_notes')
       .in('run_id', runIds)
       .not('outcome', 'is', null)
       .neq('outcome', 'agree')
@@ -69,12 +69,17 @@ export async function POST(req: Request) {
       craft_score: number | string | null;
       reasoning: string | null;
       outcome: string;
+      // Legacy fields
       choice_low: string | null;
       choice_same: string | null;
       choice_high: string | null;
       anchor_low_id: string | null;
       anchor_same_id: string | null;
       anchor_high_id: string | null;
+      // Single-anchor fields
+      anchor_id: string | null;
+      anchor_side: string | null;
+      choice: string | null;
       validator_notes: string | null;
     };
     const items = ((itemRows ?? []) as ItemRow[]);
@@ -92,9 +97,9 @@ export async function POST(req: Request) {
     type ValArt = { id: string; title: string; article_type: string | null; journal: string | null };
     const valArtMap = new Map<string, ValArt>(((valArts ?? []) as ValArt[]).map(a => [a.id, a]));
 
-    // Load anchor articles
+    // Load anchor articles — includes both legacy and single-anchor IDs
     const allAnchorIds = [...new Set(items.flatMap(i =>
-      [i.anchor_low_id, i.anchor_same_id, i.anchor_high_id].filter(Boolean) as string[]
+      [i.anchor_low_id, i.anchor_same_id, i.anchor_high_id, i.anchor_id].filter(Boolean) as string[]
     ))];
     const anchorMap: Record<string, { title: string; craft_score: number | null }> = {};
     if (allAnchorIds.length > 0) {
@@ -134,13 +139,21 @@ export async function POST(req: Request) {
       lines.push(`  Article: "${artTitle}" [${artType}] · craft_score=${cs}`);
       if (item.reasoning)        lines.push(`  Reasoning: ${item.reasoning.slice(0, 300)}`);
       if (item.validator_notes)  lines.push(`  Validator note: ${item.validator_notes}`);
+
+      // Single-anchor item
+      if (item.anchor_side && item.anchor_id && item.choice) {
+        const a = anchorMap[item.anchor_id];
+        lines.push(`  Anchor-${item.anchor_side} (score ${a?.craft_score?.toFixed(1) ?? '?'}): "${a?.title ?? 'Unknown'}" → human chose: ${item.choice}`);
+      }
+
+      // Legacy 2-anchor item
       if (item.anchor_low_id) {
         const a = anchorMap[item.anchor_low_id];
-        lines.push(`  Anchor-low (score ${a?.craft_score?.toFixed(1) ?? '?'}): "${a?.title}" → human chose: ${item.choice_low ?? '?'}`);
+        lines.push(`  Anchor-low (score ${a?.craft_score?.toFixed(1) ?? '?'}): "${a?.title ?? 'Unknown'}" → human chose: ${item.choice_low ?? '?'}`);
       }
       if (item.anchor_high_id) {
         const a = anchorMap[item.anchor_high_id];
-        lines.push(`  Anchor-high (score ${a?.craft_score?.toFixed(1) ?? '?'}): "${a?.title}" → human chose: ${item.choice_high ?? '?'}`);
+        lines.push(`  Anchor-high (score ${a?.craft_score?.toFixed(1) ?? '?'}): "${a?.title ?? 'Unknown'}" → human chose: ${item.choice_high ?? '?'}`);
       }
       return lines.join('\n');
     }).join('\n\n');

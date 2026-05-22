@@ -26,13 +26,13 @@ export async function GET(
     const r = run as Run;
 
     // Find first item that is scored, has at least one anchor, and is not yet validated.
-    // Items where both anchors are null (anchor assignment failed) are skipped.
+    // Accepts both legacy items (anchor_low_id / anchor_high_id) and new single-anchor items (anchor_id).
     const { data: item } = await admin
       .from('lab_value_validation_items')
-      .select('id, validation_article_id, craft_score, dimensions, reasoning, anchor_low_id, anchor_high_id')
+      .select('id, validation_article_id, craft_score, dimensions, reasoning, anchor_low_id, anchor_high_id, anchor_id, anchor_side')
       .eq('run_id', runId)
       .not('craft_score', 'is', null)
-      .or('anchor_low_id.not.is.null,anchor_high_id.not.is.null')
+      .or('anchor_low_id.not.is.null,anchor_high_id.not.is.null,anchor_id.not.is.null')
       .is('validated_at', null)
       .order('id', { ascending: true })
       .limit(1)
@@ -50,6 +50,8 @@ export async function GET(
       reasoning: string | null;
       anchor_low_id: string | null;
       anchor_high_id: string | null;
+      anchor_id: string | null;
+      anchor_side: string | null;
     };
     const it = item as Item;
 
@@ -61,7 +63,8 @@ export async function GET(
       .maybeSingle();
 
     // Load anchor articles from lab_value_articles
-    const anchorIds = [it.anchor_low_id, it.anchor_high_id].filter(Boolean) as string[];
+    // Include anchor_id (single-anchor) alongside legacy anchor_low_id / anchor_high_id
+    const anchorIds = [it.anchor_low_id, it.anchor_high_id, it.anchor_id].filter(Boolean) as string[];
 
     type AnchorRow = {
       id: string; pmid: string | null; title: string; journal: string | null;
@@ -115,6 +118,9 @@ export async function GET(
       };
     }
 
+    // Build response — branch on single-anchor vs legacy
+    const isSingleAnchor = it.anchor_id !== null;
+
     return NextResponse.json({
       ok: true,
       done: false,
@@ -125,8 +131,16 @@ export async function GET(
         dimensions: it.dimensions,
         reasoning:  it.reasoning,
         article:    valArt,
-        anchorLow:  buildAnchor(it.anchor_low_id),
-        anchorHigh: buildAnchor(it.anchor_high_id),
+        // Single-anchor fields
+        ...(isSingleAnchor ? {
+          anchor:     buildAnchor(it.anchor_id),
+          anchorSide: it.anchor_side,
+        } : {}),
+        // Legacy 2-anchor fields
+        ...(!isSingleAnchor ? {
+          anchorLow:  buildAnchor(it.anchor_low_id),
+          anchorHigh: buildAnchor(it.anchor_high_id),
+        } : {}),
       },
     });
   } catch (err) {

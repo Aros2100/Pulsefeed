@@ -51,7 +51,7 @@ export default async function ValidationDisagreementsPage({ searchParams }: Page
   // Build run→promptId map
   const runPromptMap = new Map<string, string>(runs.map(r => [r.id, r.prompt_id]));
 
-  // Load disagreement items
+  // Load disagreement items (both legacy and single-anchor)
   type ItemRow = {
     id: string;
     run_id: string;
@@ -60,12 +60,17 @@ export default async function ValidationDisagreementsPage({ searchParams }: Page
     dimensions: Record<string, { score: number | null; status: string }> | null;
     reasoning: string | null;
     outcome: string;
+    // Legacy 2-anchor fields
     choice_low: string | null;
     choice_same: string | null;
     choice_high: string | null;
     anchor_low_id: string | null;
     anchor_same_id: string | null;
     anchor_high_id: string | null;
+    // Single-anchor fields
+    anchor_id: string | null;
+    anchor_side: string | null;
+    choice: string | null;
     validator_notes: string | null;
   };
 
@@ -73,7 +78,7 @@ export default async function ValidationDisagreementsPage({ searchParams }: Page
   if (runIds.length > 0) {
     let q = admin
       .from('lab_value_validation_items')
-      .select('id, run_id, validation_article_id, craft_score, dimensions, reasoning, outcome, choice_low, choice_same, choice_high, anchor_low_id, anchor_same_id, anchor_high_id, validator_notes')
+      .select('id, run_id, validation_article_id, craft_score, dimensions, reasoning, outcome, choice_low, choice_same, choice_high, anchor_low_id, anchor_same_id, anchor_high_id, anchor_id, anchor_side, choice, validator_notes')
       .in('run_id', runIds)
       .not('outcome', 'is', null)
       .neq('outcome', 'agree');
@@ -106,9 +111,9 @@ export default async function ValidationDisagreementsPage({ searchParams }: Page
     items = items.filter(i => valArtMap.get(i.validation_article_id)?.article_type === sp.articleType);
   }
 
-  // Load anchor articles
+  // Load anchor articles — include both legacy anchor IDs and new anchor_id
   const allAnchorIds = [...new Set(items.flatMap(i =>
-    [i.anchor_low_id, i.anchor_same_id, i.anchor_high_id].filter(Boolean) as string[]
+    [i.anchor_low_id, i.anchor_same_id, i.anchor_high_id, i.anchor_id].filter(Boolean) as string[]
   ))];
   type AnchorArt = { id: string; title: string };
   const anchorArtMap = new Map<string, string>();
@@ -235,7 +240,10 @@ export default async function ValidationDisagreementsPage({ searchParams }: Page
             {items.map(item => {
               const art        = valArtMap.get(item.validation_article_id);
               const promptId   = runPromptMap.get(item.run_id) ?? '';
-              const anchors = [
+              const isSingle   = item.anchor_side !== null;
+
+              // Build anchor rows depending on item type
+              const legacyAnchors = [
                 { id: item.anchor_low_id,  label: 'Lower', choice: item.choice_low  },
                 { id: item.anchor_high_id, label: 'Upper', choice: item.choice_high },
               ];
@@ -251,6 +259,11 @@ export default async function ValidationDisagreementsPage({ searchParams }: Page
                       <span style={{ fontSize: '12px', color: '#94a3b8' }}>
                         v{promptVersionMap.get(promptId) ?? '?'}
                       </span>
+                      {isSingle && (
+                        <span style={{ fontSize: '11px', fontWeight: 600, background: '#e0f2fe', color: '#0369a1', padding: '2px 7px', borderRadius: '4px' }}>
+                          1-anchor ({item.anchor_side})
+                        </span>
+                      )}
                     </div>
                     <span style={{ fontSize: '13px', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#1a1a1a' }}>
                       craft: {item.craft_score !== null ? Number(item.craft_score).toFixed(1) : '—'}
@@ -297,37 +310,70 @@ export default async function ValidationDisagreementsPage({ searchParams }: Page
                       </div>
                     )}
 
-                    {/* Anchors table */}
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                      <thead>
-                        <tr style={{ background: '#fafbfc' }}>
-                          <th style={{ ...thStyle, padding: '8px 12px' }}>Band</th>
-                          <th style={{ ...thStyle, padding: '8px 12px' }}>Anchor article</th>
-                          <th style={{ ...thStyle, padding: '8px 12px', textAlign: 'right' }}>Score</th>
-                          <th style={{ ...thStyle, padding: '8px 12px' }}>Human chose</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {anchors.map(a => !a.id ? null : (
-                          <tr key={a.id} style={{ borderTop: '1px solid #f5f5f5' }}>
-                            <td style={{ padding: '7px 12px', fontWeight: 600, color: '#5a6a85', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{a.label}</td>
-                            <td style={{ padding: '7px 12px', color: '#1a1a1a' }}>{anchorArtMap.get(a.id) ?? '—'}</td>
+                    {/* Anchors table — single-anchor or legacy */}
+                    {isSingle && item.anchor_id ? (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                        <thead>
+                          <tr style={{ background: '#fafbfc' }}>
+                            <th style={{ ...thStyle, padding: '8px 12px' }}>Side</th>
+                            <th style={{ ...thStyle, padding: '8px 12px' }}>Anchor article</th>
+                            <th style={{ ...thStyle, padding: '8px 12px', textAlign: 'right' }}>Score</th>
+                            <th style={{ ...thStyle, padding: '8px 12px' }}>Human chose</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr style={{ borderTop: '1px solid #f5f5f5' }}>
+                            <td style={{ padding: '7px 12px', fontWeight: 600, color: '#5a6a85', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              {item.anchor_side === 'lower' ? 'Lower' : 'Upper'}
+                            </td>
+                            <td style={{ padding: '7px 12px', color: '#1a1a1a' }}>{anchorArtMap.get(item.anchor_id) ?? '—'}</td>
                             <td style={{ padding: '7px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#1a1a1a' }}>
-                              {anchorScoreMap.get(`${promptId}:${a.id}`) !== undefined
-                                ? (anchorScoreMap.get(`${promptId}:${a.id}`) ?? null) !== null
-                                  ? (anchorScoreMap.get(`${promptId}:${a.id}`) as number).toFixed(1)
+                              {anchorScoreMap.get(`${promptId}:${item.anchor_id}`) !== undefined
+                                ? (anchorScoreMap.get(`${promptId}:${item.anchor_id}`) ?? null) !== null
+                                  ? (anchorScoreMap.get(`${promptId}:${item.anchor_id}`) as number).toFixed(1)
                                   : '—'
                                 : '—'}
                             </td>
                             <td style={{ padding: '7px 12px' }}>
-                              <span style={{ fontSize: '11px', fontWeight: 600, color: a.choice === 'new' ? '#059669' : '#2563eb', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                {a.choice ?? '—'}
+                              <span style={{ fontSize: '11px', fontWeight: 600, color: item.choice === 'new' ? '#059669' : '#2563eb', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                {item.choice ?? '—'}
                               </span>
                             </td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </tbody>
+                      </table>
+                    ) : (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                        <thead>
+                          <tr style={{ background: '#fafbfc' }}>
+                            <th style={{ ...thStyle, padding: '8px 12px' }}>Band</th>
+                            <th style={{ ...thStyle, padding: '8px 12px' }}>Anchor article</th>
+                            <th style={{ ...thStyle, padding: '8px 12px', textAlign: 'right' }}>Score</th>
+                            <th style={{ ...thStyle, padding: '8px 12px' }}>Human chose</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {legacyAnchors.map(a => !a.id ? null : (
+                            <tr key={a.id} style={{ borderTop: '1px solid #f5f5f5' }}>
+                              <td style={{ padding: '7px 12px', fontWeight: 600, color: '#5a6a85', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{a.label}</td>
+                              <td style={{ padding: '7px 12px', color: '#1a1a1a' }}>{anchorArtMap.get(a.id) ?? '—'}</td>
+                              <td style={{ padding: '7px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#1a1a1a' }}>
+                                {anchorScoreMap.get(`${promptId}:${a.id}`) !== undefined
+                                  ? (anchorScoreMap.get(`${promptId}:${a.id}`) ?? null) !== null
+                                    ? (anchorScoreMap.get(`${promptId}:${a.id}`) as number).toFixed(1)
+                                    : '—'
+                                  : '—'}
+                              </td>
+                              <td style={{ padding: '7px 12px' }}>
+                                <span style={{ fontSize: '11px', fontWeight: 600, color: a.choice === 'new' ? '#059669' : '#2563eb', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                  {a.choice ?? '—'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
                 </div>
               );

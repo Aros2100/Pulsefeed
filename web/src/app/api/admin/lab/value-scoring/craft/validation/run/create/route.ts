@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { selectArticlesForRun } from "@/lib/lab/value-scoring/validation";
 
 const schema = z.object({
   promptId:  z.string().uuid(),
@@ -48,44 +49,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Prompt has no scores yet — score it first' }, { status: 400 });
     }
 
-    // Get article IDs already used in any run for this prompt (two-step: runs → items)
-    const { data: runRows } = await admin
-      .from('lab_value_validation_runs')
-      .select('id')
-      .eq('prompt_id', promptId)
-      .range(0, 9999);
+    // Select articles using rotation strategy
+    const articleIds = await selectArticlesForRun(admin, p.module_id, nArticles);
 
-    type RunRow = { id: string };
-    const runIds = ((runRows ?? []) as RunRow[]).map(r => r.id);
-    const usedArticleIds = new Set<string>();
-
-    if (runIds.length > 0) {
-      const { data: usedItemRows } = await admin
-        .from('lab_value_validation_items')
-        .select('validation_article_id')
-        .in('run_id', runIds)
-        .range(0, 9999);
-      type UsedRow = { validation_article_id: string };
-      for (const r of ((usedItemRows ?? []) as UsedRow[])) {
-        usedArticleIds.add(r.validation_article_id);
-      }
-    }
-
-    // Pick N oldest validation articles for this module, not yet used in this prompt
-    const { data: poolRows } = await admin
-      .from('lab_value_validation_articles')
-      .select('id')
-      .eq('module_id', p.module_id)
-      .order('imported_at', { ascending: true })
-      .range(0, 9999);
-
-    type PoolRow = { id: string };
-    const pool = ((poolRows ?? []) as PoolRow[])
-      .filter(r => !usedArticleIds.has(r.id))
-      .slice(0, nArticles);
-
-    if (pool.length === 0) {
-      return NextResponse.json({ ok: false, error: 'No unused validation articles available for this prompt' }, { status: 400 });
+    if (articleIds.length === 0) {
+      return NextResponse.json({ ok: false, error: 'No validation articles available for a new run (all articles have both sides validated)' }, { status: 400 });
     }
 
     // Create run
@@ -94,7 +62,7 @@ export async function POST(req: Request) {
       .insert({
         module_id:  p.module_id,
         prompt_id:  promptId,
-        n_articles: pool.length,
+        n_articles: articleIds.length,
         status:     'pending',
       })
       .select('id')
@@ -103,9 +71,9 @@ export async function POST(req: Request) {
     const runId = (runData as { id: string }).id;
 
     // Create item rows
-    const itemRows = pool.map(a => ({
+    const itemRows = articleIds.map(id => ({
       run_id:                runId,
-      validation_article_id: a.id,
+      validation_article_id: id,
     }));
     const { error: itemErr } = await admin
       .from('lab_value_validation_items')

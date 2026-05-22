@@ -24,6 +24,10 @@ interface ValidationItem {
   dimensions: Record<string, { score: number | null; status: string }> | null;
   reasoning:  string | null;
   article:    ArticleWithAbstract | null;
+  // Single-anchor fields (new flow)
+  anchor:     AnchorArticle | null;
+  anchorSide: string | null;   // 'lower' | 'upper'
+  // Legacy 2-anchor fields
   anchorLow:  AnchorArticle | null;
   anchorHigh: AnchorArticle | null;
 }
@@ -56,12 +60,25 @@ function computeOutcome(low: 'new' | 'anchor' | null, high: 'new' | 'anchor' | n
   return 'agree';
 }
 
+function computeOutcomeSingleAnchor(side: 'lower' | 'upper', choice: 'new' | 'anchor'): string {
+  if (side === 'lower') return choice === 'new' ? 'agree' : 'overscored';
+  return choice === 'anchor' ? 'agree' : 'underscored';
+}
+
 function outcomeDesc(outcome: string, hasLow: boolean, hasHigh: boolean): string {
   const anchors = hasLow && hasHigh ? 'both anchors' : hasLow ? 'the lower anchor' : 'the upper anchor';
   if (outcome === 'agree')       return `The prompt placed this article correctly relative to ${anchors}.`;
   if (outcome === 'overscored')  return `The prompt scored this article too high — it lost to ${anchors}.`;
   if (outcome === 'underscored') return `The prompt scored this article too low — it beat ${anchors}.`;
   return "The prompt's score was directionally inconsistent with the comparisons.";
+}
+
+function outcomeDescSingleAnchor(outcome: string, side: 'lower' | 'upper'): string {
+  const anchor = side === 'lower' ? 'the lower anchor' : 'the upper anchor';
+  if (outcome === 'agree')       return `The prompt placed this article correctly relative to ${anchor}.`;
+  if (outcome === 'overscored')  return `The prompt scored this article too high — it lost to ${anchor}.`;
+  if (outcome === 'underscored') return `The prompt scored this article too low — it beat ${anchor}.`;
+  return "The prompt's score was inconsistent with the comparison.";
 }
 
 function outcomeAccent(o: string) {
@@ -95,6 +112,13 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function buildComparisons(item: ValidationItem): Comparison[] {
+    // Single-anchor flow: only one comparison
+    if (item.anchor) {
+      // Map anchor_side to comparison type: lower → 'low', upper → 'high'
+      const type: 'low' | 'high' = item.anchorSide === 'upper' ? 'high' : 'low';
+      return [{ type, anchor: item.anchor, choice: null }];
+    }
+    // Legacy 2-anchor flow
     const entries: Comparison[] = [];
     if (item.anchorLow)  entries.push({ type: 'low',  anchor: item.anchorLow,  choice: null });
     if (item.anchorHigh) entries.push({ type: 'high', anchor: item.anchorHigh, choice: null });
@@ -185,21 +209,37 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
 
   async function handleNext() {
     if (!currentItem || submitting) return;
-    const m: Record<string, 'new' | 'anchor'> = {};
-    for (const c of comparisons) if (c.choice) m[c.type] = c.choice;
-
     setSubmitting(true);
     setError(null);
     try {
-      const res  = await fetch(`/api/admin/lab/value-scoring/craft/validation/run/${runId}/submit`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
+      const isSingleAnchor = currentItem.anchorSide !== null;
+      let body: string;
+
+      if (isSingleAnchor) {
+        // Single-anchor: send 'choice' field
+        const comp = comparisons[0];
+        const choice = comp?.choice ?? 'anchor';
+        body = JSON.stringify({
+          itemId:         currentItem.id,
+          choice,
+          validatorNotes: validatorNotes.trim() || null,
+        });
+      } else {
+        // Legacy 2-anchor: send choiceLow / choiceHigh
+        const m: Record<string, 'new' | 'anchor'> = {};
+        for (const c of comparisons) if (c.choice) m[c.type] = c.choice;
+        body = JSON.stringify({
           itemId:         currentItem.id,
           ...(m['low']  !== undefined ? { choiceLow:  m['low']  } : {}),
           ...(m['high'] !== undefined ? { choiceHigh: m['high'] } : {}),
           validatorNotes: validatorNotes.trim() || null,
-        }),
+        });
+      }
+
+      const res  = await fetch(`/api/admin/lab/value-scoring/craft/validation/run/${runId}/submit`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
       });
       const json = await res.json() as { ok: boolean; error?: string };
       if (!json.ok) { setError(json.error ?? 'Submit failed'); return; }
@@ -212,11 +252,20 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
     }
   }
 
+  // Compute outcome for display
+  const isSingleAnchor = currentItem?.anchorSide !== null && currentItem?.anchorSide !== undefined;
   const lowComp  = comparisons.find(c => c.type === 'low');
   const highComp = comparisons.find(c => c.type === 'high');
-  const outcome = phase === 'outcome' ? computeOutcome(
-    lowComp  ? (lowComp.choice  ?? 'anchor') : null,
-    highComp ? (highComp.choice ?? 'anchor') : null,
+  const outcome = phase === 'outcome' ? (
+    isSingleAnchor && currentItem?.anchorSide
+      ? computeOutcomeSingleAnchor(
+          currentItem.anchorSide as 'lower' | 'upper',
+          comparisons[0]?.choice ?? 'anchor',
+        )
+      : computeOutcome(
+          lowComp  ? (lowComp.choice  ?? 'anchor') : null,
+          highComp ? (highComp.choice ?? 'anchor') : null,
+        )
   ) : null;
 
   // ── Layout ────────────────────────────────────────────────────────────────
@@ -318,7 +367,12 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
               <div style={{ display: 'inline-block', background: outcomeAccent(outcome), color: '#fff', fontWeight: 700, fontSize: '13px', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '8px 22px', borderRadius: '8px', marginBottom: '8px' }}>
                 {OUTCOME_LABELS[outcome]}
               </div>
-              <div style={{ fontSize: '13px', color: '#5a6a85' }}>{outcomeDesc(outcome, !!lowComp, !!highComp)}</div>
+              <div style={{ fontSize: '13px', color: '#5a6a85' }}>
+                {isSingleAnchor && currentItem.anchorSide
+                  ? outcomeDescSingleAnchor(outcome, currentItem.anchorSide as 'lower' | 'upper')
+                  : outcomeDesc(outcome, !!lowComp, !!highComp)
+                }
+              </div>
             </div>
 
             {/* New article details */}
@@ -383,12 +437,13 @@ export default function ValidationRunClient({ runId, runStatus: initialStatus, n
                   </div>
                 );
               })}
-              {!lowComp && (
+              {/* Legacy: show missing anchor notes */}
+              {!isSingleAnchor && !lowComp && (
                 <div style={{ padding: '10px 24px', fontSize: '12px', color: '#94a3b8', fontStyle: 'italic', borderTop: comparisons.length > 0 ? '1px solid #f5f5f5' : 'none' }}>
                   No lower anchor — this article scored below all calibrated references (no sample article within −10 to −15 points).
                 </div>
               )}
-              {!highComp && (
+              {!isSingleAnchor && !highComp && (
                 <div style={{ padding: '10px 24px', fontSize: '12px', color: '#94a3b8', fontStyle: 'italic', borderTop: comparisons.length > 0 ? '1px solid #f5f5f5' : 'none' }}>
                   No upper anchor — this article scored above all calibrated references (no sample article within +10 to +15 points).
                 </div>

@@ -87,14 +87,20 @@ export default async function ValidationIndexPage() {
     for (const pv of ((pvRows ?? []) as PVRow[])) promptVersionMap.set(pv.id, pv.version);
   }
 
-  // Aggregate validation items per prompt
-  type ItemRow = { run_id: string; outcome: string | null; craft_score: number | string | null; validated_at: string | null };
+  // Aggregate validation items per prompt, split by type (legacy vs single-anchor)
+  type ItemRow = {
+    run_id: string;
+    outcome: string | null;
+    craft_score: number | string | null;
+    validated_at: string | null;
+    anchor_side: string | null;
+  };
   const runIds = runs.map(r => r.id);
   let allItems: ItemRow[] = [];
   if (runIds.length > 0) {
     const { data: itemRows } = await admin
       .from('lab_value_validation_items')
-      .select('run_id, outcome, craft_score, validated_at')
+      .select('run_id, outcome, craft_score, validated_at, anchor_side')
       .in('run_id', runIds)
       .range(0, 9999);
     allItems = ((itemRows ?? []) as ItemRow[]);
@@ -104,8 +110,13 @@ export default async function ValidationIndexPage() {
 
   type PromptStats = {
     promptId: string; version: number;
-    validated: number; agree: number; overscored: number; underscored: number; mixed: number;
-    pending: number; oldestActiveRunId: string | null;
+    // Legacy (2-anchor) stats
+    legacyValidated: number; legacyAgree: number; legacyOverscored: number;
+    legacyUnderscored: number; legacyMixed: number; legacyPending: number;
+    // Single-anchor stats
+    singleValidated: number; singleAgree: number; singleOverscored: number;
+    singleUnderscored: number; singlePending: number;
+    oldestActiveRunId: string | null;
   };
   const statsByPrompt = new Map<string, PromptStats>();
 
@@ -113,19 +124,35 @@ export default async function ValidationIndexPage() {
     const promptId = runPromptMap.get(item.run_id);
     if (!promptId) continue;
     if (!statsByPrompt.has(promptId)) {
-      statsByPrompt.set(promptId, { promptId, version: promptVersionMap.get(promptId) ?? 0, validated: 0, agree: 0, overscored: 0, underscored: 0, mixed: 0, pending: 0, oldestActiveRunId: null });
+      statsByPrompt.set(promptId, {
+        promptId, version: promptVersionMap.get(promptId) ?? 0,
+        legacyValidated: 0, legacyAgree: 0, legacyOverscored: 0, legacyUnderscored: 0, legacyMixed: 0, legacyPending: 0,
+        singleValidated: 0, singleAgree: 0, singleOverscored: 0, singleUnderscored: 0, singlePending: 0,
+        oldestActiveRunId: null,
+      });
     }
     const s = statsByPrompt.get(promptId)!;
+    const isSingle = item.anchor_side !== null;
+
     if (item.validated_at !== null) {
-      s.validated++;
-      if (item.outcome === 'agree')       s.agree++;
-      else if (item.outcome === 'overscored')  s.overscored++;
-      else if (item.outcome === 'underscored') s.underscored++;
-      else if (item.outcome === 'mixed')       s.mixed++;
+      if (isSingle) {
+        s.singleValidated++;
+        if (item.outcome === 'agree')            s.singleAgree++;
+        else if (item.outcome === 'overscored')  s.singleOverscored++;
+        else if (item.outcome === 'underscored') s.singleUnderscored++;
+      } else {
+        s.legacyValidated++;
+        if (item.outcome === 'agree')            s.legacyAgree++;
+        else if (item.outcome === 'overscored')  s.legacyOverscored++;
+        else if (item.outcome === 'underscored') s.legacyUnderscored++;
+        else if (item.outcome === 'mixed')       s.legacyMixed++;
+      }
     } else if (item.craft_score !== null) {
-      s.pending++;
+      if (isSingle) s.singlePending++;
+      else          s.legacyPending++;
     }
   }
+
   // Oldest run (asc-sorted) that has at least one scored-but-unvalidated item
   const runsWithPending = new Set(
     allItems
@@ -139,9 +166,37 @@ export default async function ValidationIndexPage() {
     }
   }
 
-  const promptStatsList = [...statsByPrompt.values()]
-    .filter(s => s.validated > 0)
-    .sort((a, b) => b.version - a.version);
+  // Build display rows (one per prompt, but include both type rows when applicable)
+  type DisplayRow = {
+    promptId: string; version: number; type: 'single' | 'legacy';
+    validated: number; agree: number; overscored: number; underscored: number; mixed: number | null;
+    pending: number; oldestActiveRunId: string | null;
+  };
+
+  const displayRows: DisplayRow[] = [];
+  const promptStatsList = [...statsByPrompt.values()].sort((a, b) => b.version - a.version);
+
+  for (const s of promptStatsList) {
+    const hasSingle = s.singleValidated > 0 || s.singlePending > 0;
+    const hasLegacy = s.legacyValidated > 0 || s.legacyPending > 0;
+
+    if (hasSingle) {
+      displayRows.push({
+        promptId: s.promptId, version: s.version, type: 'single',
+        validated: s.singleValidated, agree: s.singleAgree,
+        overscored: s.singleOverscored, underscored: s.singleUnderscored,
+        mixed: null, pending: s.singlePending, oldestActiveRunId: s.oldestActiveRunId,
+      });
+    }
+    if (hasLegacy) {
+      displayRows.push({
+        promptId: s.promptId, version: s.version, type: 'legacy',
+        validated: s.legacyValidated, agree: s.legacyAgree,
+        overscored: s.legacyOverscored, underscored: s.legacyUnderscored,
+        mixed: s.legacyMixed, pending: s.legacyPending, oldestActiveRunId: s.oldestActiveRunId,
+      });
+    }
+  }
 
   const thStyle: React.CSSProperties = {
     textAlign: 'left', fontSize: '11px', fontWeight: 600,
@@ -172,7 +227,7 @@ export default async function ValidationIndexPage() {
         />
 
         {/* Validation results per prompt */}
-        {promptStatsList.length > 0 && (
+        {displayRows.length > 0 && (
           <div style={{ background: '#fff', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)', overflow: 'hidden', marginTop: '20px' }}>
             <div style={{ background: '#EEF2F7', borderBottom: '1px solid #dde3ed', padding: '10px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '11px', letterSpacing: '0.08em', color: '#5a6a85', textTransform: 'uppercase', fontWeight: 700 }}>
@@ -186,6 +241,7 @@ export default async function ValidationIndexPage() {
               <thead>
                 <tr style={{ background: '#fafbfc' }}>
                   <th style={thStyle}>Prompt</th>
+                  <th style={thStyle}>Type</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Validated</th>
                   <th style={{ ...thStyle, textAlign: 'right', color: '#059669' }}>Agree</th>
                   <th style={{ ...thStyle, textAlign: 'right', color: '#059669' }}>Agree %</th>
@@ -197,28 +253,38 @@ export default async function ValidationIndexPage() {
                 </tr>
               </thead>
               <tbody>
-                {promptStatsList.map(s => (
-                  <tr key={s.promptId} style={{ borderTop: '1px solid #f5f5f5' }}>
-                    <td style={{ ...tdStyle, fontWeight: 600 }}>v{s.version}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{s.validated}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#059669', fontWeight: s.agree > 0 ? 600 : 400 }}>{s.agree}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#059669', fontWeight: 600 }}>
-                      {s.validated > 0 ? `${Math.round(s.agree / s.validated * 100)}%` : '—'}
+                {displayRows.map((row, idx) => (
+                  <tr key={`${row.promptId}-${row.type}`} style={{ borderTop: '1px solid #f5f5f5' }}>
+                    <td style={{ ...tdStyle, fontWeight: 600 }}>
+                      {/* Show version only on first row for this prompt */}
+                      {idx === 0 || displayRows[idx - 1].promptId !== row.promptId ? `v${row.version}` : ''}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#b91c1c', fontWeight: s.overscored > 0 ? 600 : 400 }}>{s.overscored}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#2563eb', fontWeight: s.underscored > 0 ? 600 : 400 }}>{s.underscored}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#92400e', fontWeight: s.mixed > 0 ? 600 : 400 }}>{s.mixed}</td>
+                    <td style={{ ...tdStyle }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 7px', borderRadius: '4px', background: row.type === 'single' ? '#e0f2fe' : '#f5f7fa', color: row.type === 'single' ? '#0369a1' : '#5a6a85' }}>
+                        {row.type === 'single' ? '1-anchor' : '2-anchor (legacy)'}
+                      </span>
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.validated}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#059669', fontWeight: row.agree > 0 ? 600 : 400 }}>{row.agree}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#059669', fontWeight: 600 }}>
+                      {row.validated > 0 ? `${Math.round(row.agree / row.validated * 100)}%` : '—'}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#b91c1c', fontWeight: row.overscored > 0 ? 600 : 400 }}>{row.overscored}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#2563eb', fontWeight: row.underscored > 0 ? 600 : 400 }}>{row.underscored}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#92400e', fontWeight: (row.mixed ?? 0) > 0 ? 600 : 400 }}>
+                      {row.mixed !== null ? row.mixed : '—'}
+                    </td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                      {s.pending > 0 && s.oldestActiveRunId ? (
-                        <Link href={`/admin/lab/value-scoring/craft/validation/run/${s.oldestActiveRunId}`} style={{ color: '#E83B2A', textDecoration: 'none', fontWeight: 600 }}>
-                          {s.pending}
+                      {row.pending > 0 && row.oldestActiveRunId ? (
+                        <Link href={`/admin/lab/value-scoring/craft/validation/run/${row.oldestActiveRunId}`} style={{ color: '#E83B2A', textDecoration: 'none', fontWeight: 600 }}>
+                          {row.pending}
                         </Link>
                       ) : (
-                        <span style={{ color: '#94a3b8' }}>{s.pending > 0 ? s.pending : '—'}</span>
+                        <span style={{ color: '#94a3b8' }}>{row.pending > 0 ? row.pending : '—'}</span>
                       )}
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <Link href={`/admin/lab/value-scoring/craft/validation/disagreements?promptId=${s.promptId}`} style={{ fontSize: '12px', color: '#E83B2A', textDecoration: 'none', fontWeight: 600 }}>
+                      <Link href={`/admin/lab/value-scoring/craft/validation/disagreements?promptId=${row.promptId}`} style={{ fontSize: '12px', color: '#E83B2A', textDecoration: 'none', fontWeight: 600 }}>
                         View disagreements →
                       </Link>
                     </td>
