@@ -43,13 +43,13 @@ export async function UserKpiSection() {
     <div style={{ marginBottom: "28px" }}>
       <div style={{ marginBottom: "10px" }}>
         <div style={{ fontSize: "13px", fontWeight: 700, color: "#1a1a1a", marginBottom: "2px" }}>
-          Users
+          Subscribers
         </div>
         <div style={{ fontSize: "11px", color: "#5a6a85" }}>
-          Active subscribers
+          Active users
         </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
         <Tile label="Total"        value={k.total_active.toLocaleString("en-US")}       sub="active" />
         <Tile label="Last 30 days" value={`+${k.signups_30d.toLocaleString("en-US")}`} sub="signups" />
         <Tile label="Last 7 days"  value={`+${k.signups_7d.toLocaleString("en-US")}`}  sub="signups" />

@@ -1,18 +1,11 @@
 import Link from "next/link";
 import { ArticleKpiSection } from "@/app/admin/_components/ArticleKpiSection";
 import { UserKpiSection } from "@/app/admin/_components/UserKpiSection";
+import { AuthorKpiSection } from "@/app/admin/_components/AuthorKpiSection";
 import { NewsletterCard } from "@/app/admin/_components/NewsletterCard";
 import { ImportStatusSection } from "@/app/admin/_components/ImportStatusSection";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-
-function getISOWeek(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const day = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-}
 
 function getThisWeekRange(): { start: string; end: string } {
   const today = new Date();
@@ -25,13 +18,17 @@ function getThisWeekRange(): { start: string; end: string } {
   };
 }
 
-const navCards = [
-  { href: "/admin/articles",        icon: "📄", title: "Articles",         desc: "Browse and search imported PubMed articles" },
-  { href: "/admin/authors",         icon: "🧑‍🔬", title: "Authors",          desc: "Browse researchers indexed in the database" },
-  { href: "/admin/subscribers",     icon: "👥", title: "Subscribers",      desc: "Manage users, statuses, and preferences" },
-  { href: "/admin/lab",             icon: "🧪", title: "The Lab",          desc: "Train and improve the AI models" },
-  { href: "/admin/system",          icon: "⚙️", title: "System",           desc: "Import configuration and logs" },
-];
+const colNavCardStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  background: "#fff",
+  borderRadius: "10px",
+  boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
+  padding: "16px 20px",
+  textDecoration: "none",
+  color: "#1a1a1a",
+};
 
 export default async function AdminDashboard() {
   const { start, end } = getThisWeekRange();
@@ -45,32 +42,67 @@ export default async function AdminDashboard() {
   });
   if (rpcError) console.error("[newsletter widget] count_newsletter_articles error:", rpcError.message, { start, end, specialty: ACTIVE_SPECIALTY });
   const articleCount: number = Number(countResult ?? 0);
+
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
-        {/* Article KPI tiles */}
-        <ArticleKpiSection />
-        <UserKpiSection />
+        {/* Three parallel columns: Articles · Authors · Subscribers */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "20px", marginBottom: "24px" }}>
 
-        {/* Newsletter + Import status — compact tiles */}
+          {/* Column 1 — Articles */}
+          <div>
+            <ArticleKpiSection />
+            <Link href="/admin/articles" style={colNavCardStyle}>
+              <div style={{ fontSize: "20px", marginBottom: "8px" }}>📄</div>
+              <div style={{ fontSize: "13px", fontWeight: 700 }}>Articles</div>
+              <div style={{ fontSize: "11px", color: "#888", marginTop: "3px", lineHeight: 1.4 }}>Browse and search imported PubMed articles</div>
+            </Link>
+          </div>
+
+          {/* Column 2 — Authors */}
+          <div>
+            <AuthorKpiSection />
+            <Link href="/admin/authors" style={colNavCardStyle}>
+              <div style={{ fontSize: "20px", marginBottom: "8px" }}>🧑‍🔬</div>
+              <div style={{ fontSize: "13px", fontWeight: 700 }}>Authors</div>
+              <div style={{ fontSize: "11px", color: "#888", marginTop: "3px", lineHeight: 1.4 }}>Browse researchers indexed in the database</div>
+            </Link>
+          </div>
+
+          {/* Column 3 — Subscribers */}
+          <div>
+            <UserKpiSection />
+            <Link href="/admin/subscribers" style={colNavCardStyle}>
+              <div style={{ fontSize: "20px", marginBottom: "8px" }}>👥</div>
+              <div style={{ fontSize: "13px", fontWeight: 700 }}>Subscribers</div>
+              <div style={{ fontSize: "11px", color: "#888", marginTop: "3px", lineHeight: 1.4 }}>Manage users, statuses, and preferences</div>
+            </Link>
+          </div>
+
+        </div>
+
+        {/* Newsletter + Import status */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
           <NewsletterCard articleCount={articleCount} />
           <ImportStatusSection />
         </div>
 
-        {/* Quick access */}
+        {/* The Lab + System */}
         <div style={{ fontSize: "11px", letterSpacing: "0.08em", color: "#5a6a85", textTransform: "uppercase", fontWeight: 700, marginBottom: "12px" }}>
           Quick access
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "28px" }}>
-          {navCards.map((card) => (
-            <Link key={card.href} href={card.href} style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "20px 24px", textDecoration: "none", color: "#1a1a1a" }}>
-              <div style={{ fontSize: "22px", marginBottom: "12px" }}>{card.icon}</div>
-              <div style={{ fontSize: "14px", fontWeight: 700 }}>{card.title}</div>
-              <div style={{ fontSize: "12px", color: "#888", marginTop: "4px", lineHeight: 1.4 }}>{card.desc}</div>
-            </Link>
-          ))}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+          <Link href="/admin/lab" style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "20px 24px", textDecoration: "none", color: "#1a1a1a" }}>
+            <div style={{ fontSize: "22px", marginBottom: "12px" }}>🧪</div>
+            <div style={{ fontSize: "14px", fontWeight: 700 }}>The Lab</div>
+            <div style={{ fontSize: "12px", color: "#888", marginTop: "4px", lineHeight: 1.4 }}>Train and improve the AI models</div>
+          </Link>
+          <Link href="/admin/system" style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", background: "#fff", borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)", padding: "20px 24px", textDecoration: "none", color: "#1a1a1a" }}>
+            <div style={{ fontSize: "22px", marginBottom: "12px" }}>⚙️</div>
+            <div style={{ fontSize: "14px", fontWeight: 700 }}>System</div>
+            <div style={{ fontSize: "12px", color: "#888", marginTop: "4px", lineHeight: 1.4 }}>Import configuration and logs</div>
+          </Link>
         </div>
 
       </div>
