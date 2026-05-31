@@ -18,18 +18,6 @@ function getThisWeekRange(): { start: string; end: string } {
   };
 }
 
-const colNavCardStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "flex-start",
-  background: "#fff",
-  borderRadius: "10px",
-  boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04)",
-  padding: "16px 20px",
-  textDecoration: "none",
-  color: "#1a1a1a",
-};
-
 export default async function AdminDashboard() {
   const { start, end } = getThisWeekRange();
 
@@ -45,41 +33,16 @@ export default async function AdminDashboard() {
 
   return (
     <div style={{ fontFamily: "var(--font-inter), Inter, sans-serif", background: "#f5f7fa", color: "#1a1a1a", minHeight: "100vh" }}>
+      {/* Hover effect for the three section cards */}
+      <style>{`.kpi-card:hover { box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.22) !important; }`}</style>
+
       <div style={{ maxWidth: "960px", margin: "0 auto", padding: "40px 24px 80px" }}>
 
-        {/* Three parallel columns: Articles · Authors · Subscribers */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "20px", marginBottom: "24px" }}>
-
-          {/* Column 1 — Articles */}
-          <div>
-            <ArticleKpiSection />
-            <Link href="/admin/articles" style={colNavCardStyle}>
-              <div style={{ fontSize: "20px", marginBottom: "8px" }}>📄</div>
-              <div style={{ fontSize: "13px", fontWeight: 700 }}>Articles</div>
-              <div style={{ fontSize: "11px", color: "#888", marginTop: "3px", lineHeight: 1.4 }}>Browse and search imported PubMed articles</div>
-            </Link>
-          </div>
-
-          {/* Column 2 — Authors */}
-          <div>
-            <AuthorKpiSection />
-            <Link href="/admin/authors" style={colNavCardStyle}>
-              <div style={{ fontSize: "20px", marginBottom: "8px" }}>🧑‍🔬</div>
-              <div style={{ fontSize: "13px", fontWeight: 700 }}>Authors</div>
-              <div style={{ fontSize: "11px", color: "#888", marginTop: "3px", lineHeight: 1.4 }}>Browse researchers indexed in the database</div>
-            </Link>
-          </div>
-
-          {/* Column 3 — Subscribers */}
-          <div>
-            <UserKpiSection />
-            <Link href="/admin/subscribers" style={colNavCardStyle}>
-              <div style={{ fontSize: "20px", marginBottom: "8px" }}>👥</div>
-              <div style={{ fontSize: "13px", fontWeight: 700 }}>Subscribers</div>
-              <div style={{ fontSize: "11px", color: "#888", marginTop: "3px", lineHeight: 1.4 }}>Manage users, statuses, and preferences</div>
-            </Link>
-          </div>
-
+        {/* Articles · Authors · Subscribers — three color-coded clickable cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" }}>
+          <ArticleKpiSection />
+          <AuthorKpiSection />
+          <UserKpiSection />
         </div>
 
         {/* Newsletter + Import status */}

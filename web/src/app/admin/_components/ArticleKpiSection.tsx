@@ -1,4 +1,12 @@
+import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { KpiTile, type TileColors } from "@/app/admin/_components/KpiTile";
+
+const COLORS: TileColors = {
+  background: "#E1F5EE",
+  label:      "#0F6E56",
+  value:      "#085041",
+};
 
 type ArticleKpis = {
   total: number;
@@ -24,46 +32,28 @@ function formatDate(iso: string): string {
   });
 }
 
-function Tile({ label, value, sub }: { label: string; value: string; sub: string }) {
-  return (
-    <div style={{
-      background: "#EFF6FF",
-      border: "1px solid #BFDBFE",
-      borderRadius: "10px",
-      padding: "16px",
-      minWidth: 0,
-    }}>
-      <div style={{ fontSize: "11px", fontWeight: 600, color: "#1E40AF", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: "6px" }}>
-        {label}
-      </div>
-      <div style={{ fontSize: "22px", fontWeight: 700, color: "#1E3A8A", lineHeight: 1.1, marginBottom: "4px" }}>
-        {value}
-      </div>
-      <div style={{ fontSize: "11px", color: "#3B82F6", opacity: 0.85 }}>
-        {sub}
-      </div>
-    </div>
-  );
-}
-
 export async function ArticleKpiSection() {
   const k = await fetchKpis();
   return (
-    <div style={{ marginBottom: "28px" }}>
-      <div style={{ marginBottom: "10px" }}>
-        <div style={{ fontSize: "13px", fontWeight: 700, color: "#1a1a1a", marginBottom: "2px" }}>
-          Articles
-        </div>
-        <div style={{ fontSize: "11px", color: "#5a6a85" }}>
-          In-specialty only
-        </div>
+    <Link href="/admin/articles" aria-label="Articles" className="kpi-card" style={{
+      display: "block", textDecoration: "none", color: "inherit",
+      background: "#fff", borderRadius: "12px",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.09)",
+      padding: "14px",
+    }}>
+      <div style={{ marginBottom: "12px" }}>
+        <div style={{ fontSize: "15px", fontWeight: 500, color: COLORS.label }}>Articles</div>
+        <div style={{ fontSize: "12px", color: "#5a6a85", marginTop: "2px" }}>In-specialty only</div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
-        <Tile label="Total"        value={k.total.toLocaleString("en-US")}              sub="all-time" />
-        <Tile label="Last 30 days" value={`+${k.last_30_days.toLocaleString("en-US")}`} sub={`avg ${k.avg_per_night_30d}/night`} />
-        <Tile label="Last 7 days"  value={`+${k.last_7_days.toLocaleString("en-US")}`}  sub={`avg ${k.avg_per_night_7d}/night`} />
-        <Tile label="Last night"   value={`+${k.last_night.toLocaleString("en-US")}`}   sub={formatDate(k.last_night_date)} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px", marginBottom: "12px" }}>
+        <KpiTile label="Total"        value={k.total.toLocaleString("en-US")}              sub="all-time"                           colors={COLORS} />
+        <KpiTile label="Last 30 days" value={`+${k.last_30_days.toLocaleString("en-US")}`} sub={`avg ${k.avg_per_night_30d}/night`}  colors={COLORS} />
+        <KpiTile label="Last 7 days"  value={`+${k.last_7_days.toLocaleString("en-US")}`}  sub={`avg ${k.avg_per_night_7d}/night`}   colors={COLORS} />
+        <KpiTile label="Last night"   value={`+${k.last_night.toLocaleString("en-US")}`}   sub={formatDate(k.last_night_date)}       colors={COLORS} />
       </div>
-    </div>
+      <div style={{ textAlign: "right" }}>
+        <span aria-hidden="true" style={{ fontSize: "18px", color: COLORS.label }}>→</span>
+      </div>
+    </Link>
   );
 }
