@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-import NewsletterOverviewClient from "./NewsletterOverviewClient";
+import NewsletterOverviewClient, { type Edition } from "./NewsletterOverviewClient";
 
 export default async function NewsletterIndexPage() {
   const supabase = await createClient();
@@ -15,12 +15,12 @@ export default async function NewsletterIndexPage() {
 
   const { data: editions } = await admin
     .from("newsletter_editions")
-    .select("id, week_number, year, status, content")
+    .select("id, week_number, year, status, content, published_at")
     .eq("specialty", ACTIVE_SPECIALTY)
     .order("year", { ascending: false })
     .order("week_number", { ascending: false });
 
-  const editionList: { id: string; week_number: number; year: number; status: "draft" | "approved" | "sent"; content: Record<string, unknown> | null }[] = editions ?? [];
+  const editionList: { id: string; week_number: number; year: number; status: "draft" | "approved" | "sent"; content: Record<string, unknown> | null; published_at: string | null }[] = editions ?? [];
 
   // Fetch all newsletter_edition_articles rows for all editions in one query
   let allEditionArticles: { edition_id: string; subspecialty: string | null; is_global: boolean }[] = [];
@@ -58,12 +58,13 @@ export default async function NewsletterIndexPage() {
     }
   }
 
-  const enriched = editionList.map((e, idx) => {
+  const enriched: Edition[] = editionList.map((e, idx) => {
     const articlesBySubspecialty = bySubspecialtyMap[e.id] ?? {};
     const globalCount = globalCountMap[e.id] ?? 0;
     const subspecialtiesWithArticles = Object.keys(articlesBySubspecialty);
     return {
       ...e,
+      published_at: e.published_at ?? null,
       article_count: countMap[e.id] ?? 0,
       // Detailed props only for the current (first) edition
       articlesBySubspecialty: idx === 0 ? articlesBySubspecialty : {},

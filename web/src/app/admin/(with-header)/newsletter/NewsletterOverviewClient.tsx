@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-interface Edition {
+export interface Edition {
   id: string;
   week_number: number;
   year: number;
