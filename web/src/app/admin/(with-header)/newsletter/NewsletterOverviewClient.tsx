@@ -1,18 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { ACTIVE_SPECIALTY } from "@/lib/auth/specialties";
-
-function getCurrentISOWeek(): { week_number: number; year: number } {
-  const now = new Date();
-  const thursday = new Date(now);
-  thursday.setUTCDate(now.getUTCDate() + 4 - (now.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 1));
-  const week = Math.ceil((((thursday.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return { week_number: week, year: thursday.getUTCFullYear() };
-}
 
 interface Edition {
   id: string;
@@ -20,6 +8,7 @@ interface Edition {
   year: number;
   status: "draft" | "approved" | "sent";
   content: Record<string, unknown> | null;
+  published_at: string | null;
   article_count: number;
   articlesBySubspecialty: Record<string, number>;
   globalCount: number;
@@ -31,20 +20,24 @@ interface Props {
   editions: Edition[];
 }
 
-// ISO week Saturday date
-function weekSaturday(week: number, year: number): string {
+// Months for UTC-safe date formatting
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+// Format an edition date: prefer published_at (Sunday of the week), fall back to
+// computing Saturday from week_number/year for any edition still missing it.
+function fmtEditionDate(publishedAt: string | null, week: number, year: number): string {
+  if (publishedAt) {
+    const [y, m, d] = publishedAt.slice(0, 10).split("-").map(Number);
+    return `${d} ${MONTHS[m - 1]} ${y}`;
+  }
+  // Fallback: Saturday of the week (pre-backfill safety net)
   const jan4 = new Date(Date.UTC(year, 0, 4));
   const jan4Day = jan4.getUTCDay() || 7;
   const monday = new Date(jan4);
   monday.setUTCDate(jan4.getUTCDate() - (jan4Day - 1) + (week - 1) * 7);
   const saturday = new Date(monday);
   saturday.setUTCDate(monday.getUTCDate() + 5);
-  return saturday.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+  return `${saturday.getUTCDate()} ${MONTHS[saturday.getUTCMonth()]} ${saturday.getUTCFullYear()}`;
 }
 
 type Step = "selection" | "review" | "sub-headlines" | "preview";
@@ -190,7 +183,7 @@ function CurrentEditionCard({ edition }: { edition: Edition }) {
               Week {edition.week_number} · {edition.year}
             </div>
             <div style={{ fontSize: "13px", color: "#6b7280" }}>
-              {weekSaturday(edition.week_number, edition.year)}
+              {fmtEditionDate(edition.published_at, edition.week_number, edition.year)}
             </div>
           </div>
           <StatusBadge status={edition.status} />
@@ -256,64 +249,15 @@ function CurrentEditionCard({ edition }: { edition: Edition }) {
 }
 
 export default function NewsletterOverviewClient({ editions }: Props) {
-  const router = useRouter();
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-
-  async function handleNewEdition() {
-    setCreating(true);
-    setCreateError(null);
-    const { week_number, year } = getCurrentISOWeek();
-    try {
-      const res = await fetch("/api/admin/newsletter/edition", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ week_number, year, specialty: ACTIVE_SPECIALTY }),
-      });
-      const json = await res.json() as { ok: boolean; error?: string };
-      if (!json.ok) {
-        setCreateError(json.error ?? "Unknown error");
-        return;
-      }
-      router.refresh();
-    } catch {
-      setCreateError("Request failed");
-    } finally {
-      setCreating(false);
-    }
-  }
-
   const current = editions[0] ?? null;
   const previous = editions.slice(1);
 
   return (
     <div style={{ maxWidth: 760, margin: "0 auto", padding: "32px 24px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+      <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: "22px", fontWeight: 700, color: "#1a1a1a", margin: 0 }}>
           Newsletter
         </h1>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-          <button
-            onClick={handleNewEdition}
-            disabled={creating}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "7px",
-              border: "none",
-              background: creating ? "#9ca3af" : "#1a1a1a",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "#fff",
-              cursor: creating ? "not-allowed" : "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {creating ? "Creating…" : "New edition →"}
-          </button>
-          {createError && (
-            <span style={{ fontSize: "12px", color: "#dc2626" }}>{createError}</span>
-          )}
-        </div>
       </div>
 
       {current ? (
@@ -352,7 +296,7 @@ export default function NewsletterOverviewClient({ editions }: Props) {
                     Week {ed.week_number} · {ed.year}
                   </div>
                   <div style={{ fontSize: "12px", color: "#9ca3af", marginTop: 1 }}>
-                    {weekSaturday(ed.week_number, ed.year)}
+                    {fmtEditionDate(ed.published_at, ed.week_number, ed.year)}
                   </div>
                 </div>
                 <span style={{ fontSize: "13px", color: "#6b7280", whiteSpace: "nowrap" }}>
